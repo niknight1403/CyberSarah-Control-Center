@@ -2,6 +2,7 @@ import { EmptySurface, PrimaryButton, StudioHeader, StudioSection } from "@/comp
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
+import { type FieldValidation, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -16,6 +17,8 @@ export default function SettingsScreen() {
   const [githubToken, setGithubToken] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [workspaceTouched, setWorkspaceTouched] = useState(false);
+  const [serviceTokenTouched, setServiceTokenTouched] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -25,7 +28,14 @@ export default function SettingsScreen() {
     setProvider(settings.provider);
   }, [loading, settings]);
 
+  const workspaceValidation = validateWorkspaceUrl(workspaceUrl);
+  const serviceTokenValidation = validateServiceAccessToken(serviceAccessToken, settings.hasServiceAccessToken);
+  const canSave = workspaceValidation.valid && serviceTokenValidation.valid;
+
   const persistSettings = async () => {
+    setWorkspaceTouched(true);
+    setServiceTokenTouched(true);
+    if (!canSave) return;
     setSaveState("saving");
     await saveSettings({ workspaceUrl, repositoryUrl, branch, provider, serviceAccessToken, githubToken, providerApiKey });
     setServiceAccessToken("");
@@ -46,10 +56,12 @@ export default function SettingsScreen() {
         <View style={styles.sectionSpacer}>
           <StudioSection label="Service" title="Remote-Arbeitsbereich" />
           <Text style={styles.fieldLabel}>HTTPS-URL DES WORKSPACE-SERVICE</Text>
-          <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="url" onChangeText={setWorkspaceUrl} placeholder="https://studio.example.com" placeholderTextColor="#697A90" style={styles.input} value={workspaceUrl} />
+          <TextInput accessibilityHint="Erfordert eine öffentliche HTTPS-Adresse ohne Beispiel-Domain." accessibilityLabel="HTTPS-URL des Workspace-Service" autoCapitalize="none" autoCorrect={false} keyboardType="url" onBlur={() => setWorkspaceTouched(true)} onChangeText={(value) => { setWorkspaceUrl(value); setWorkspaceTouched(true); setSaveState("idle"); }} placeholder="https://studio.deine-domain.de" placeholderTextColor="#697A90" style={[styles.input, getInputStyle(workspaceValidation, workspaceTouched)]} value={workspaceUrl} />
+          <ValidationMessage active={workspaceTouched || Boolean(workspaceUrl)} validation={workspaceValidation} />
           <Text style={styles.fieldHint}>Der Service stellt Git-Operationen, Dateizugriff, Prozess-Runner und die Vorschau bereit.</Text>
           <Text style={styles.fieldLabel}>SERVICE-ZUGRIFFSTOKEN</Text>
-          <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setServiceAccessToken} placeholder={settings.hasServiceAccessToken ? "Gespeichert — neuen Token eingeben, um ihn zu ersetzen" : "Bearer-Token aus der Service-Konfiguration"} placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={serviceAccessToken} />
+          <TextInput accessibilityHint="Füge nur den vollständigen Token ohne Bearer-Präfix, Leerzeichen oder Zeilenumbrüche ein." accessibilityLabel="Service-Zugriffstoken" autoCapitalize="none" autoCorrect={false} onBlur={() => setServiceTokenTouched(true)} onChangeText={(value) => { setServiceAccessToken(value); setServiceTokenTouched(true); setSaveState("idle"); }} placeholder={settings.hasServiceAccessToken ? "Gespeichert — neuen Token eingeben, um ihn zu ersetzen" : "Token aus der Service-Konfiguration"} placeholderTextColor="#697A90" secureTextEntry style={[styles.input, getInputStyle(serviceTokenValidation, serviceTokenTouched)]} value={serviceAccessToken} />
+          <ValidationMessage active={serviceTokenTouched || settings.hasServiceAccessToken || Boolean(serviceAccessToken)} validation={serviceTokenValidation} />
           {settings.hasServiceAccessToken ? <TouchableOpacity activeOpacity={0.7} onPress={() => void clearServiceAccessToken()} style={styles.clearAction}><Text style={styles.clearActionText}>Service-Zugriffstoken entfernen</Text></TouchableOpacity> : null}
           <Text style={styles.fieldLabel}>REPOSITORY-URL</Text>
           <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="url" onChangeText={setRepositoryUrl} placeholder="https://github.com/owner/repository.git" placeholderTextColor="#697A90" style={styles.input} value={repositoryUrl} />
@@ -86,7 +98,11 @@ export default function SettingsScreen() {
         </View>
         {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Im Web-Build werden eingegebene Schlüssel nur in der Browser-Sitzung gehalten. Nutze für produktive Schlüssel die native App oder die serverseitige Provider-Konfiguration.</Text></View> : null}
         <View style={styles.saveArea}>
-          <PrimaryButton icon="checkmark.circle.fill" label={saveState === "saving" ? "Wird gespeichert …" : "Konfiguration speichern"} onPress={() => void persistSettings()} disabled={saveState === "saving"} />
+          <View style={[styles.readinessCard, canSave ? styles.readinessCardReady : styles.readinessCardPending]}>
+            <IconSymbol name={canSave ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"} size={17} color={canSave ? "#45D996" : "#F6BA5E"} />
+            <Text style={[styles.readinessText, canSave ? styles.readinessTextReady : styles.readinessTextPending]}>{canSave ? "Service-Adresse und Zugriffstoken sind bereit zum Speichern." : "Vervollständige die beiden Service-Felder, um die Konfiguration zu speichern."}</Text>
+          </View>
+          <PrimaryButton icon="checkmark.circle.fill" label={saveState === "saving" ? "Wird gespeichert …" : "Konfiguration speichern"} onPress={() => void persistSettings()} disabled={saveState === "saving" || !canSave} />
           {saveState === "saved" ? <Text style={styles.savedLabel}>Lokal gespeichert. Der Service kann jetzt über die definierte API angesprochen werden.</Text> : null}
         </View>
         <View style={styles.notice}>
@@ -98,12 +114,38 @@ export default function SettingsScreen() {
   );
 }
 
+function getInputStyle(validation: FieldValidation, active: boolean) {
+  if (!active) return undefined;
+  if (validation.valid) return validation.tone === "stored" ? styles.inputStored : styles.inputValid;
+  return styles.inputInvalid;
+}
+
+function ValidationMessage({ active, validation }: { active: boolean; validation: FieldValidation }) {
+  if (!active) return null;
+  const icon = validation.valid ? "checkmark.circle.fill" : validation.tone === "neutral" ? "exclamationmark.triangle.fill" : "exclamationmark.triangle.fill";
+  const color = validation.valid ? (validation.tone === "stored" ? "#8B7CFF" : "#45D996") : validation.tone === "neutral" ? "#F6BA5E" : "#FF6B7A";
+  return (
+    <View style={styles.validationRow}>
+      <IconSymbol name={icon} size={15} color={color} />
+      <Text style={[styles.validationText, validation.valid ? styles.validationTextSuccess : validation.tone === "neutral" ? styles.validationTextNeutral : styles.validationTextError]}>{validation.message}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   content: { paddingBottom: 20 },
   sectionSpacer: { marginTop: 26 },
   fieldLabel: { color: "#75859B", fontSize: 10, fontWeight: "900", letterSpacing: 1.05, marginBottom: 7, marginTop: 16 },
   fieldHint: { color: "#8796AA", fontSize: 12, lineHeight: 18, marginBottom: 9 },
   input: { backgroundColor: "#111925", borderColor: "#2B3B51", borderRadius: 13, borderWidth: 1, color: "#EDF4FC", fontSize: 14, minHeight: 48, paddingHorizontal: 13, paddingVertical: 11 },
+  inputValid: { borderColor: "#45D996" },
+  inputStored: { borderColor: "#8B7CFF" },
+  inputInvalid: { borderColor: "#FF6B7A" },
+  validationRow: { alignItems: "flex-start", flexDirection: "row", gap: 7, marginTop: 8 },
+  validationText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  validationTextSuccess: { color: "#70E4AA" },
+  validationTextNeutral: { color: "#E5BD6D" },
+  validationTextError: { color: "#FF8B96" },
   clearAction: { alignSelf: "flex-start", marginTop: 10 },
   clearActionText: { color: "#FF8792", fontSize: 12, fontWeight: "800" },
   providerRow: { alignItems: "center", backgroundColor: "#121823", borderColor: "#243247", borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 11, marginBottom: 8, padding: 12 },
@@ -117,6 +159,12 @@ const styles = StyleSheet.create({
   webWarning: { alignItems: "flex-start", backgroundColor: "rgba(246,186,94,0.11)", borderColor: "rgba(246,186,94,0.35)", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 9, marginTop: 26, padding: 13 },
   webWarningText: { color: "#F0C982", flex: 1, fontSize: 12, lineHeight: 18 },
   saveArea: { marginTop: 26 },
+  readinessCard: { alignItems: "flex-start", borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginBottom: 11, padding: 12 },
+  readinessCardReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.36)" },
+  readinessCardPending: { backgroundColor: "rgba(246,186,94,0.10)", borderColor: "rgba(246,186,94,0.32)" },
+  readinessText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  readinessTextReady: { color: "#70E4AA" },
+  readinessTextPending: { color: "#E5BD6D" },
   savedLabel: { color: "#70E4AA", fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: "center" },
   notice: { alignItems: "flex-start", flexDirection: "row", gap: 9, marginTop: 20, paddingHorizontal: 5 },
   noticeText: { color: "#8B9AAE", flex: 1, fontSize: 12, lineHeight: 18 },

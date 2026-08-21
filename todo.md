@@ -12,3 +12,4 @@
 - [x] Create the first complete project checkpoint and provide hand-off guidance.
 - [x] Compress and replace all native launcher assets below the checkpoint size limit, then retry the checkpoint.
 - [x] Fix the settings route crash caused by StudioSettingsProvider not wrapping the root navigator.
+- [x] Add live visual validation for workspace URL and service access token before settings can be saved.
