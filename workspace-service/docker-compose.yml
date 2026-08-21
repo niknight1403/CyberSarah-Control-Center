@@ -1,0 +1,12 @@
+services:
+  workspace-service:
+    build: .
+    env_file: .env
+    ports:
+      - "8787:8787"
+    volumes:
+      - workspace-data:/data/workspaces
+    restart: unless-stopped
+
+volumes:
+  workspace-data:
