@@ -39,6 +39,13 @@ export function isValidSupportBackupPassword(value: string) {
   return value.trim().length >= 12;
 }
 
+export function getSupportShareConfirmation() {
+  return {
+    title: "Verschlüsseltes Backup für Support freigeben?",
+    message: "Die Datei enthält den begrenzten Chat-Verlauf, ist mit deinem Passwort geschützt und enthält keine Tokens, API-Schlüssel oder vollständigen generierten Datei-Inhalte. Teile sie nur mit einem vertrauenswürdigen Support-Kanal. Das Passwort wird nicht mitgesendet.",
+  };
+}
+
 export function createEncryptedSupportBackup(input: { history: string; passphrase: string; salt: Uint8Array; iv: Uint8Array; createdAt: string }): EncryptedSupportBackup {
   if (!isValidSupportBackupPassword(input.passphrase)) throw new Error("Das Export-Passwort muss mindestens 12 Zeichen enthalten.");
   if (input.salt.length < 16 || input.iv.length !== 16) throw new Error("Die Verschlüsselungsparameter sind ungültig.");

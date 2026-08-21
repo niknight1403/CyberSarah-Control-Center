@@ -23,3 +23,4 @@
 - [x] Persist bounded local development-chat history, proposals, and application state across app restarts.
 - [x] Add an opt-in encrypted native local storage mode for development-chat content with clear platform disclosure.
 - [x] Add a user-controlled encrypted support-backup export for bounded development-chat history.
+- [x] Require an explicit support-sharing confirmation before opening the encrypted backup share sheet.

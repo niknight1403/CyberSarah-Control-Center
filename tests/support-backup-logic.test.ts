@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEncryptedSupportBackup, isValidSupportBackupPassword, SUPPORT_BACKUP_FORMAT } from "../lib/support-backup-logic";
+import { createEncryptedSupportBackup, getSupportShareConfirmation, isValidSupportBackupPassword, SUPPORT_BACKUP_FORMAT } from "../lib/support-backup-logic";
 import { serializeDevelopmentChatHistory } from "../lib/development-chat-history-logic";
 
 describe("encrypted support backups", () => {
@@ -17,5 +17,12 @@ describe("encrypted support backups", () => {
   it("requires a sufficiently long export password", () => {
     expect(isValidSupportBackupPassword("short")).toBe(false);
     expect(isValidSupportBackupPassword("long-enough-password")).toBe(true);
+  });
+
+  it("explains the encrypted support-sharing scope before the system share action", () => {
+    const confirmation = getSupportShareConfirmation();
+    expect(confirmation.title).toContain("Support");
+    expect(confirmation.message).toContain("keine Tokens");
+    expect(confirmation.message).toContain("Passwort wird nicht mitgesendet");
   });
 });
