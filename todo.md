@@ -20,3 +20,4 @@
 - [x] Add an in-app pull-request creation action after a successful branch push.
 - [x] Add visual merge readiness and CI result indicators to the connected repository card.
 - [x] Add a context-aware development chat with reviewable repository-change proposals and controlled application flow.
+- [x] Persist bounded local development-chat history, proposals, and application state across app restarts.
