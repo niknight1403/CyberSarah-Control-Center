@@ -30,7 +30,7 @@
 - [x] Sprint 4: Add pull-request summary and review-state visibility.
 - [x] Sprint 5: Add CI-quality details and a manual status refresh flow.
 - [x] Sprint 6: Scope persisted development-chat sessions to their connected repository.
-- [ ] Sprint 7: Allow selective application and controlled reversal of agent-proposed changes.
+- [x] Sprint 7: Allow selective application and controlled reversal of agent-proposed changes.
 - [ ] Sprint 8: Add offline draft state and remote-conflict warnings.
 - [ ] Sprint 9: Add integrity verification and restore preview for encrypted support backups.
 - [ ] Sprint 10: Add a consolidated quality dashboard and mobile robustness improvements.

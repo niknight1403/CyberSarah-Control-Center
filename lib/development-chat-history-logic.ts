@@ -7,7 +7,7 @@ export type DevelopmentChatHistoryMessage = {
   id: string;
   role: "user" | "agent";
   content: string;
-  state?: "ready" | "applying" | "applied" | "error" | "restored";
+  state?: "ready" | "applying" | "applied" | "reverting" | "reverted" | "error" | "restored";
   proposalPreview?: PersistedProposalPreview;
 };
 
@@ -45,7 +45,7 @@ function isHistoryMessage(value: unknown): value is UnknownHistoryMessage & { id
 }
 
 export function serializeDevelopmentChatHistory(messages: DevelopmentChatHistoryMessage[]): string {
-  return JSON.stringify({ version: 1, messages: messages.slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT).map((message) => ({ id: message.id.slice(0, 100), role: message.role, content: message.content.slice(0, 900), state: message.state === "applying" ? "ready" : message.state, proposalPreview: cleanPreview(message.proposalPreview) })) });
+  return JSON.stringify({ version: 1, messages: messages.slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT).map((message) => ({ id: message.id.slice(0, 100), role: message.role, content: message.content.slice(0, 900), state: message.state === "applying" || message.state === "reverting" ? "ready" : message.state, proposalPreview: cleanPreview(message.proposalPreview) })) });
 }
 
 export function parseDevelopmentChatHistory(raw: string | null): DevelopmentChatHistoryMessage[] {
