@@ -34,6 +34,7 @@ const MAPPING = {
   "bolt.fill": "bolt",
   "square.and.pencil": "edit",
   "lock.fill": "lock",
+  "chart.bar.fill": "bar-chart",
 } as IconMapping;
 
 /**

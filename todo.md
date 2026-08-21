@@ -33,4 +33,4 @@
 - [x] Sprint 7: Allow selective application and controlled reversal of agent-proposed changes.
 - [x] Sprint 8: Add offline draft state and remote-conflict warnings.
 - [x] Sprint 9: Add integrity verification and restore preview for encrypted support backups.
-- [ ] Sprint 10: Add a consolidated quality dashboard and mobile robustness improvements.
+- [x] Sprint 10: Add a consolidated quality dashboard and mobile robustness improvements.

@@ -49,6 +49,13 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => <IconSymbol size={25} name="play.rectangle.fill" color={color} />,
           }}
         />
+        <Tabs.Screen
+          name="quality"
+          options={{
+            title: "Qualität",
+            tabBarIcon: ({ color }) => <IconSymbol size={25} name="chart.bar.fill" color={color} />,
+          }}
+        />
     </Tabs>
   );
 }

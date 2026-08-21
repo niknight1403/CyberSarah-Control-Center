@@ -111,6 +111,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 11,
     marginBottom: 9,
+    minHeight: 44,
     padding: 13,
   },
   logTextArea: { flex: 1 },

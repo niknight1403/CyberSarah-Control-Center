@@ -1,5 +1,6 @@
 import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
+import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { getFileDiffSummaries } from "@/lib/file-diff-logic";
 import { getProtectedBranchWarning, isProtectedBranch } from "@/lib/protected-branch-logic";
@@ -207,7 +208,7 @@ export default function WorkspaceScreen() {
               </View>
             </View>
             {hasWorkspaceService ? <View style={[styles.healthPanel, healthState === "error" && styles.healthPanelError]}><View style={styles.healthHeader}><View><Text style={styles.healthEyebrow}>SERVICE-DIAGNOSE</Text><Text style={styles.healthTitle}>{healthState === "checking" ? "Verbindung wird geprüft …" : healthState === "ready" && serviceHealth ? serviceHealth.status === "ready" ? "Workspace-Service erreichbar" : "Workspace-Service beschäftigt" : "Verbindungsstatus ausstehend"}</Text></View><TouchableOpacity accessibilityLabel="Workspace-Service prüfen" activeOpacity={0.75} disabled={healthState === "checking"} onPress={() => void refreshHealth()} style={[styles.refreshButton, healthState === "checking" && styles.healthButtonDisabled]}><Text style={styles.refreshButtonText}>{healthState === "checking" ? "Prüft …" : "Prüfen"}</Text></TouchableOpacity></View><Text style={[styles.healthDetail, healthState === "error" && styles.repositoryError]}>{healthState === "ready" && serviceHealth ? `Version ${serviceHealth.version}${serviceHealth.previewUrl ? " · Vorschau verfügbar" : " · Keine Laufzeitvorschau gemeldet"}${healthCheckedAt ? ` · geprüft ${formatCommitDate(healthCheckedAt)}` : ""}` : healthState === "error" ? healthError : "Die Diagnose prüft Service-Erreichbarkeit ohne Repository-Daten zu verändern."}</Text></View> : null}
-            {hasAttachedRepository ? (
+            <StudioErrorBoundary section="Repository-Ansicht">{hasAttachedRepository ? (
               <View style={styles.repositoryPanel}>
                 <View style={styles.repositoryHeader}>
                   <View>
@@ -238,7 +239,7 @@ export default function WorkspaceScreen() {
                 {qualityState === "ready" && quality ? <RepositoryQualityPanel quality={quality} /> : <Text style={[styles.emptyRepositoryText, qualityState === "error" && styles.repositoryError]}>{qualityState === "error" ? qualityError : "Merge- und CI-Status werden geladen …"}</Text>}
                 {repositoryState === "error" ? <Text style={styles.repositoryError}>{repositoryError}</Text> : null}
               </View>
-            ) : null}
+            ) : null}</StudioErrorBoundary>
             <StudioSection label="Explorer" title="Projektdateien" />
           </>
         }
@@ -401,11 +402,11 @@ const styles = StyleSheet.create({
   repositoryHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   repositoryEyebrow: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
   repositoryTitle: { color: "#EDF5FC", fontSize: 16, fontWeight: "800" },
-  refreshButton: { backgroundColor: "#173646", borderColor: "#367F98", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  refreshButton: { alignItems: "center", backgroundColor: "#173646", borderColor: "#367F98", borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
   refreshButtonText: { color: "#7BE4FF", fontSize: 11, fontWeight: "800" },
   repositoryHint: { color: "#91A1B5", fontSize: 12, lineHeight: 17, marginTop: 10 },
   branchList: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 12 },
-  branchChip: { backgroundColor: "#172130", borderColor: "#33445B", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  branchChip: { alignItems: "center", backgroundColor: "#172130", borderColor: "#33445B", borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
   branchChipSelected: { backgroundColor: "#153646", borderColor: "#52D8FF" },
   branchChipText: { color: "#A6B5C6", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
   branchChipTextSelected: { color: "#A9EFFF" },
@@ -484,7 +485,7 @@ const styles = StyleSheet.create({
   diffMore: { color: "#8C9FB2", fontSize: 10, marginTop: 4 },
   commitInput: { backgroundColor: "#0C131E", borderColor: "#2B3C52", borderRadius: 11, borderWidth: 1, color: "#E7F0F9", fontSize: 13, minHeight: 44, paddingHorizontal: 11, paddingVertical: 9 },
   gitActions: { flexDirection: "row", gap: 8, marginTop: 10 },
-  gitActionButton: { alignItems: "center", borderRadius: 11, flex: 1, paddingHorizontal: 8, paddingVertical: 11 },
+  gitActionButton: { alignItems: "center", borderRadius: 11, flex: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
   commitButton: { backgroundColor: "#22314A", borderColor: "#6678A8", borderWidth: 1 },
   pushButton: { backgroundColor: "#16728B", borderColor: "#52D8FF", borderWidth: 1 },
   gitActionDisabled: { opacity: 0.45 },
@@ -501,12 +502,12 @@ const styles = StyleSheet.create({
   branchInline: { color: "#B9EFFF", fontFamily: codeFont, fontWeight: "800" },
   pullRequestInput: { marginTop: 8 },
   pullRequestBody: { marginTop: 8, minHeight: 76 },
-  pullRequestButton: { alignItems: "center", backgroundColor: "#473C80", borderColor: "#9E91FF", borderRadius: 11, borderWidth: 1, marginTop: 10, paddingHorizontal: 8, paddingVertical: 11 },
+  pullRequestButton: { alignItems: "center", backgroundColor: "#473C80", borderColor: "#9E91FF", borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 10, minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
   pullRequestButtonText: { color: "#F3F1FF", fontSize: 12, fontWeight: "900" },
   consoleCard: { backgroundColor: "#0F161F", borderColor: "#243347", borderRadius: 16, borderWidth: 1, padding: 14 },
   consolePrompt: { alignItems: "center", flexDirection: "row", gap: 7, marginBottom: 9 },
   consolePromptText: { color: "#6BE5A7", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
   consoleText: { color: "#A2B0C1", fontFamily: codeFont, fontSize: 12, lineHeight: 18 },
-  consoleLink: { alignItems: "center", flexDirection: "row", gap: 6, marginTop: 12 },
+  consoleLink: { alignItems: "center", flexDirection: "row", gap: 6, marginTop: 12, minHeight: 44 },
   consoleLinkText: { color: "#52D8FF", fontSize: 12, fontWeight: "800" },
 });
