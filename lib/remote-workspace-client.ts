@@ -26,7 +26,8 @@ export type AgentRequest = {
 
 export type AgentProposal = {
   summary: string;
-  patch: string;
+  rationale: string;
+  changes: Array<{ path: string; content: string; explanation: string }>;
   affectedFiles: string[];
 };
 export type RemoteCommit = {
@@ -37,6 +38,20 @@ export type RemoteCommit = {
   message: string;
 };
 export type RemoteBranches = { currentBranch: string; branches: string[] };
+export type RepositoryQuality = {
+  branch: string;
+  pullRequest: { number: number; title: string; url: string; headBranch: string; baseBranch: string } | null;
+  merge: { state: string; label: string };
+  ci: {
+    state: string;
+    label: string;
+    total: number;
+    passed: number;
+    failed: number;
+    pending: number;
+    checks: Array<{ name: string; status: string; conclusion: string | null; url: string | null }>;
+  };
+};
 
 export function buildWorkspaceHeaders(config: RemoteWorkspaceConfig) {
   return {
@@ -121,6 +136,9 @@ export class RemoteWorkspaceClient {
       method: "POST",
       body: JSON.stringify(input),
     });
+  }
+  getRepositoryQuality(workspaceId: string) {
+    return this.request<RepositoryQuality>(`/api/v1/workspaces/${workspaceId}/git/quality`);
   }
 
   requestAgentProposal(input: AgentRequest) {

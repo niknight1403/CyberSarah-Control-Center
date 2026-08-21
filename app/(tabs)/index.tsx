@@ -1,6 +1,7 @@
 import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import type { RepositoryQuality } from "@/lib/remote-workspace-client";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { getRepositoryLabel } from "@/lib/studio-settings-logic";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -10,7 +11,7 @@ import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View
 
 export default function WorkspaceScreen() {
   const { changedFileCount, files, hydrateFile, loadRemoteFiles, markFilesSynced, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
-  const { commitRepository, createRepositoryPullRequest, loadRepositoryDetails, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
+  const { commitRepository, createRepositoryPullRequest, loadRepositoryDetails, loadRepositoryQuality, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
   const hasAttachedRepository = Boolean(settings.workspaceId);
   const repositoryLabel = getRepositoryLabel(settings.repositoryUrl);
@@ -18,6 +19,9 @@ export default function WorkspaceScreen() {
   const [commits, setCommits] = useState<Array<{ shortHash: string; author: string; committedAt: string; message: string }>>([]);
   const [repositoryState, setRepositoryState] = useState<"idle" | "loading" | "ready" | "switching" | "error">("idle");
   const [repositoryError, setRepositoryError] = useState("");
+  const [quality, setQuality] = useState<RepositoryQuality | null>(null);
+  const [qualityState, setQualityState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [qualityError, setQualityError] = useState("");
   const [commitMessage, setCommitMessage] = useState("Update from Custom AI Studio");
   const [gitAction, setGitAction] = useState<"idle" | "saving" | "committing" | "committed" | "pushing" | "pushed" | "error">("idle");
   const [gitFeedback, setGitFeedback] = useState("");
@@ -31,16 +35,26 @@ export default function WorkspaceScreen() {
     if (!hasAttachedRepository) return;
     setRepositoryState("loading");
     setRepositoryError("");
-    try {
-      const details = await loadRepositoryDetails();
+    setQualityState("loading");
+    setQualityError("");
+    const [detailsResult, qualityResult] = await Promise.allSettled([loadRepositoryDetails(), loadRepositoryQuality()]);
+    if (detailsResult.status === "fulfilled") {
+      const details = detailsResult.value;
       setBranches(details.branches);
       setCommits(details.commits);
       setRepositoryState("ready");
-    } catch (error) {
+    } else {
       setRepositoryState("error");
-      setRepositoryError(error instanceof Error ? error.message : "Branch- und Commit-Daten konnten nicht geladen werden.");
+      setRepositoryError(detailsResult.reason instanceof Error ? detailsResult.reason.message : "Branch- und Commit-Daten konnten nicht geladen werden.");
     }
-  }, [hasAttachedRepository, loadRepositoryDetails]);
+    if (qualityResult.status === "fulfilled") {
+      setQuality(qualityResult.value);
+      setQualityState("ready");
+    } else {
+      setQualityState("error");
+      setQualityError(qualityResult.reason instanceof Error ? qualityResult.reason.message : "Merge- und CI-Status konnten nicht geladen werden.");
+    }
+  }, [hasAttachedRepository, loadRepositoryDetails, loadRepositoryQuality]);
 
   useEffect(() => { void refreshRepository(); }, [refreshRepository]);
 
@@ -162,6 +176,9 @@ export default function WorkspaceScreen() {
                     <View style={styles.commitTextArea}><Text numberOfLines={1} style={styles.commitMessage}>{commit.message}</Text><Text numberOfLines={1} style={styles.commitMeta}>{commit.author} · {formatCommitDate(commit.committedAt)}</Text></View>
                   </View>
                 )) : <Text style={styles.emptyRepositoryText}>{repositoryState === "loading" ? "Commit-Historie wird geladen …" : "Noch keine Commits verfügbar."}</Text>}
+                <View style={styles.qualityDivider} />
+                <View style={styles.qualityHeader}><Text style={styles.qualityLabel}>BUILD-QUALITÄT</Text><Text style={styles.qualityRefresh}>{qualityState === "loading" ? "Prüft …" : "GitHub Live-Status"}</Text></View>
+                {qualityState === "ready" && quality ? <RepositoryQualityPanel quality={quality} /> : <Text style={[styles.emptyRepositoryText, qualityState === "error" && styles.repositoryError]}>{qualityState === "error" ? qualityError : "Merge- und CI-Status werden geladen …"}</Text>}
                 {repositoryState === "error" ? <Text style={styles.repositoryError}>{repositoryError}</Text> : null}
               </View>
             ) : null}
@@ -280,6 +297,29 @@ function formatCommitDate(value: string) {
   return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }
 
+function RepositoryQualityPanel({ quality }: { quality: RepositoryQuality }) {
+  const mergeTone = getQualityTone(quality.merge.state);
+  const ciTone = getQualityTone(quality.ci.state);
+  return (
+    <View style={styles.qualityPanel}>
+      <View style={styles.qualityPillRow}>
+        <View style={[styles.qualityPill, mergeTone.container]}><View style={[styles.qualityDot, mergeTone.dot]} /><Text style={[styles.qualityPillText, mergeTone.text]}>{quality.merge.label}</Text></View>
+        <View style={[styles.qualityPill, ciTone.container]}><View style={[styles.qualityDot, ciTone.dot]} /><Text style={[styles.qualityPillText, ciTone.text]}>{quality.ci.label}</Text></View>
+      </View>
+      {quality.pullRequest ? <Text style={styles.qualityPrText}>PR #{quality.pullRequest.number}: {quality.pullRequest.headBranch} → {quality.pullRequest.baseBranch}</Text> : <Text style={styles.qualityPrText}>Für den aktuellen Branch ist kein offener Pull Request vorhanden.</Text>}
+      <View style={styles.qualityMetrics}><Text style={styles.qualityMetric}>Bestanden <Text style={styles.qualityMetricStrong}>{quality.ci.passed}</Text></Text><Text style={styles.qualityMetric}>Läuft <Text style={styles.qualityMetricStrong}>{quality.ci.pending}</Text></Text><Text style={styles.qualityMetric}>Fehler <Text style={styles.qualityMetricStrong}>{quality.ci.failed}</Text></Text></View>
+      {quality.ci.checks.length ? quality.ci.checks.slice(0, 4).map((check) => <View key={`${check.name}-${check.status}`} style={styles.checkRow}><View style={[styles.checkDot, getQualityTone(check.conclusion ?? check.status).dot]} /><Text numberOfLines={1} style={styles.checkName}>{check.name}</Text><Text style={styles.checkState}>{check.conclusion ?? check.status}</Text></View>) : <Text style={styles.qualityEmpty}>GitHub meldet für diesen Pull Request noch keine Check-Runs oder Commit-Status-Prüfungen.</Text>}
+    </View>
+  );
+}
+
+function getQualityTone(state: string) {
+  if (["ready", "passed", "merged", "success"].includes(state)) return { container: styles.qualityReady, dot: styles.dotReady, text: styles.textReady };
+  if (["failing", "blocked", "failure", "error", "cancelled", "timed_out"].includes(state)) return { container: styles.qualityFailure, dot: styles.dotFailure, text: styles.textFailure };
+  if (["running", "checking", "attention", "draft"].includes(state)) return { container: styles.qualityWarning, dot: styles.dotWarning, text: styles.textWarning };
+  return { container: styles.qualityNeutral, dot: styles.dotNeutral, text: styles.textNeutral };
+}
+
 const styles = StyleSheet.create({
   content: { paddingBottom: 20 },
   projectCard: { backgroundColor: "#121A26", borderColor: "#2A3B52", borderRadius: 18, borderWidth: 1, marginBottom: 26, padding: 15 },
@@ -312,6 +352,36 @@ const styles = StyleSheet.create({
   commitMeta: { color: "#7B8B9E", fontSize: 11, marginTop: 2 },
   emptyRepositoryText: { color: "#8293A8", fontSize: 12, marginTop: 7 },
   repositoryError: { color: "#FF9AA4", fontSize: 12, lineHeight: 17, marginTop: 12 },
+  qualityDivider: { backgroundColor: "#26384D", height: 1, marginTop: 17 },
+  qualityHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 9, marginTop: 14 },
+  qualityLabel: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
+  qualityRefresh: { color: "#7895AE", fontSize: 10, fontWeight: "700" },
+  qualityPanel: { backgroundColor: "#0C131E", borderColor: "#263950", borderRadius: 13, borderWidth: 1, padding: 11 },
+  qualityPillRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  qualityPill: { alignItems: "center", borderRadius: 9, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 8, paddingVertical: 6 },
+  qualityPillText: { fontSize: 11, fontWeight: "800" },
+  qualityDot: { borderRadius: 4, height: 7, width: 7 },
+  qualityReady: { backgroundColor: "rgba(69,217,150,0.11)", borderColor: "rgba(69,217,150,0.4)" },
+  qualityFailure: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.42)" },
+  qualityWarning: { backgroundColor: "rgba(246,186,94,0.10)", borderColor: "rgba(246,186,94,0.38)" },
+  qualityNeutral: { backgroundColor: "rgba(140,157,181,0.10)", borderColor: "rgba(140,157,181,0.3)" },
+  dotReady: { backgroundColor: "#45D996" },
+  dotFailure: { backgroundColor: "#FF6B7A" },
+  dotWarning: { backgroundColor: "#F6BA5E" },
+  dotNeutral: { backgroundColor: "#8A9BB0" },
+  textReady: { color: "#7BE5AE" },
+  textFailure: { color: "#FFA3AD" },
+  textWarning: { color: "#F2C979" },
+  textNeutral: { color: "#A2B1C2" },
+  qualityPrText: { color: "#B0BFCE", fontSize: 11, lineHeight: 16, marginTop: 10 },
+  qualityMetrics: { flexDirection: "row", gap: 13, marginTop: 10 },
+  qualityMetric: { color: "#8294A8", fontSize: 11 },
+  qualityMetricStrong: { color: "#DFE9F5", fontWeight: "800" },
+  checkRow: { alignItems: "center", borderTopColor: "#1E2B3B", borderTopWidth: 1, flexDirection: "row", gap: 7, marginTop: 9, paddingTop: 9 },
+  checkDot: { borderRadius: 4, height: 7, width: 7 },
+  checkName: { color: "#C2CFDC", flex: 1, fontSize: 11, fontWeight: "700" },
+  checkState: { color: "#8294A8", fontFamily: codeFont, fontSize: 10 },
+  qualityEmpty: { color: "#8192A7", fontSize: 11, lineHeight: 16, marginTop: 10 },
   fileRow: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 10, marginBottom: 5, padding: 10 },
   fileRowSelected: { backgroundColor: "#172A39" },
   fileIcon: { alignItems: "center", backgroundColor: "#1A2433", borderRadius: 9, height: 33, justifyContent: "center", width: 33 },

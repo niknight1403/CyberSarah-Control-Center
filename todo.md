@@ -18,3 +18,5 @@
 - [x] Add branch selection and recent commit history to the connected repository view.
 - [x] Add a commit and push bar for changed connected workspace files, with clear state feedback.
 - [x] Add an in-app pull-request creation action after a successful branch push.
+- [x] Add visual merge readiness and CI result indicators to the connected repository card.
+- [x] Add a context-aware development chat with reviewable repository-change proposals and controlled application flow.

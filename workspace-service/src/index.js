@@ -99,6 +99,77 @@ async function createGitHubPullRequest(repositoryUrl, token, input) {
   return { number: payload.number, url: payload.html_url, state: payload.state, title: payload.title };
 }
 
+async function githubJson(pathname, token) {
+  const response = await fetch(`https://api.github.com${pathname}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = typeof payload.message === "string" ? payload.message : "Unbekannter GitHub-Fehler";
+    throw new Error(`GitHub-Status konnte nicht geladen werden (${response.status}): ${message}`);
+  }
+  return payload;
+}
+
+function getMergeQuality(pullRequest) {
+  if (pullRequest.draft) return { state: "draft", label: "Entwurf" };
+  if (pullRequest.merged_at) return { state: "merged", label: "Gemergt" };
+  if (pullRequest.mergeable === false) return { state: "blocked", label: "Merge blockiert" };
+  if (pullRequest.mergeable === null) return { state: "checking", label: "Merge wird geprüft" };
+  if (pullRequest.mergeable_state === "clean") return { state: "ready", label: "Merge bereit" };
+  return { state: "attention", label: "Prüfung erforderlich" };
+}
+
+function getCiQuality(checks) {
+  const failed = checks.filter((check) => ["failure", "timed_out", "cancelled", "action_required", "error"].includes(check.conclusion ?? check.status)).length;
+  const pending = checks.filter((check) => !check.conclusion && !["success", "neutral", "skipped"].includes(check.status)).length;
+  const passed = checks.filter((check) => check.conclusion === "success" || check.status === "success").length;
+  if (!checks.length) return { state: "not_configured", label: "Keine CI-Prüfungen", total: 0, passed: 0, failed: 0, pending: 0 };
+  if (failed) return { state: "failing", label: "CI fehlgeschlagen", total: checks.length, passed, failed, pending };
+  if (pending) return { state: "running", label: "CI läuft", total: checks.length, passed, failed: 0, pending };
+  return { state: "passed", label: "CI bestanden", total: checks.length, passed, failed: 0, pending: 0 };
+}
+
+async function getRepositoryQuality(repositoryUrl, branch, token) {
+  if (!token) {
+    return { pullRequest: null, merge: { state: "unavailable", label: "GitHub-Token erforderlich" }, ci: { state: "unavailable", label: "CI nicht verfügbar", total: 0, passed: 0, failed: 0, pending: 0, checks: [] } };
+  }
+  const { owner, repository } = assertRepositoryUrl(repositoryUrl);
+  const head = encodeURIComponent(`${owner}:${branch}`);
+  const pullRequests = await githubJson(`/repos/${owner}/${repository}/pulls?state=open&head=${head}&per_page=1`, token);
+  const pullRequest = Array.isArray(pullRequests) ? pullRequests[0] : undefined;
+  if (!pullRequest) {
+    return { pullRequest: null, merge: { state: "no_pull_request", label: "Kein offener Pull Request" }, ci: { state: "not_configured", label: "Keine CI-Prüfungen", total: 0, passed: 0, failed: 0, pending: 0, checks: [] } };
+  }
+  const fullPullRequest = await githubJson(`/repos/${owner}/${repository}/pulls/${pullRequest.number}`, token);
+  const headSha = fullPullRequest.head?.sha;
+  const [checkRunsResult, commitStatusResult] = await Promise.allSettled([
+    githubJson(`/repos/${owner}/${repository}/commits/${headSha}/check-runs?per_page=20`, token),
+    githubJson(`/repos/${owner}/${repository}/commits/${headSha}/status?per_page=20`, token),
+  ]);
+  const checkRunsPayload = checkRunsResult.status === "fulfilled" ? checkRunsResult.value : {};
+  const commitStatusPayload = commitStatusResult.status === "fulfilled" ? commitStatusResult.value : {};
+  const checkRuns = Array.isArray(checkRunsPayload.check_runs)
+    ? checkRunsPayload.check_runs.map((check) => ({ name: check.name, status: check.status, conclusion: check.conclusion, url: check.details_url ?? check.html_url ?? null }))
+    : [];
+  const commitStatuses = Array.isArray(commitStatusPayload.statuses)
+    ? commitStatusPayload.statuses.map((status) => ({ name: status.context, status: status.state, conclusion: status.state, url: status.target_url ?? null }))
+    : [];
+  const checks = [...checkRuns, ...commitStatuses].slice(0, 8);
+  const ci = checkRunsResult.status === "rejected" && commitStatusResult.status === "rejected"
+    ? { state: "unavailable", label: "CI-Zugriff eingeschränkt", total: 0, passed: 0, failed: 0, pending: 0, checks: [] }
+    : { ...getCiQuality(checks), checks };
+  return {
+    pullRequest: { number: fullPullRequest.number, title: fullPullRequest.title, url: fullPullRequest.html_url, headBranch: fullPullRequest.head?.ref, baseBranch: fullPullRequest.base?.ref },
+    merge: getMergeQuality(fullPullRequest),
+    ci,
+  };
+}
+
 function getWorkspacePath(workspaceId) {
   const parsed = workspaceIdSchema.safeParse(workspaceId);
   if (!parsed.success) throw new Error("Ungültige Workspace-ID.");
@@ -196,18 +267,34 @@ async function stopRuntime(workspaceId) {
 
 function buildAgentMessages(snapshot, input) {
   const context = snapshot
-    .map(({ file, content }) => `--- ${file} ---\n${content.slice(0, 9_000)}`)
+    .map(({ file, content }) => `--- ${file} ---\n${content.slice(0, 4_000)}`)
     .join("\n\n");
   return [
     {
       role: "system",
-      content: "You are a senior software engineer. Return strict JSON with the keys summary, patch, affectedFiles. Do not mutate files. The patch must be a concise unified diff.",
+      content: "You are a senior software engineer working in a user-owned repository. Return strict JSON only: {summary:string,rationale:string,changes:[{path:string,content:string,explanation:string}]}. Do not mutate files yourself. Propose no more than four complete text-file replacements. Each path must exactly match a supplied project file; never create, delete, rename, commit, push, change credentials, or execute commands. Preserve unrelated code. If a safe complete-file change is not possible, return an empty changes array and explain why.",
     },
     {
       role: "user",
       content: `Request: ${input.prompt}\nActive file: ${input.activeFile ?? "not specified"}\n\nProject files:\n${context}`,
     },
   ];
+}
+
+function normalizeAgentProposal(proposal, allowedFiles) {
+  const changes = Array.isArray(proposal?.changes)
+    ? proposal.changes
+      .filter((change) => change && typeof change.path === "string" && typeof change.content === "string" && typeof change.explanation === "string")
+      .filter((change) => allowedFiles.includes(change.path))
+      .slice(0, 4)
+      .map((change) => ({ path: change.path, content: change.content.slice(0, 1_000_000), explanation: change.explanation.slice(0, 600) }))
+    : [];
+  return {
+    summary: typeof proposal?.summary === "string" ? proposal.summary.slice(0, 1_500) : "Der Agent hat einen Vorschlag erstellt.",
+    rationale: typeof proposal?.rationale === "string" ? proposal.rationale.slice(0, 2_000) : "Überprüfe die vorgeschlagenen Dateien vor der Übernahme.",
+    changes,
+    affectedFiles: changes.map((change) => change.path),
+  };
 }
 
 async function invokeProvider(request, messages) {
@@ -392,6 +479,19 @@ app.post("/api/v1/workspaces/:workspaceId/git/pull-request", requireServiceAutho
   }
 });
 
+app.get("/api/v1/workspaces/:workspaceId/git/quality", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const { stdout: repositoryUrlOutput } = await git(["remote", "get-url", "origin"], workspacePath, getGitHubToken(request));
+    const { stdout: branchOutput } = await git(["branch", "--show-current"], workspacePath, getGitHubToken(request));
+    const branch = branchNameSchema.parse(branchOutput.trim());
+    const quality = await getRepositoryQuality(repositoryUrlOutput.trim(), branch, getGitHubToken(request));
+    response.json({ branch, ...quality });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/v1/workspaces/:workspaceId/runtime/start", requireServiceAuthorization, async (request, response, next) => {
   try {
     const workspacePath = getWorkspacePath(request.params.workspaceId);
@@ -429,9 +529,10 @@ app.post("/api/v1/agent/proposals", requireServiceAuthorization, async (request,
     const input = agentSchema.parse(request.body);
     const workspacePath = getWorkspacePath(input.workspaceId);
     const fileNames = await listFiles(workspacePath);
-    const relevantFiles = fileNames.filter((file) => file.endsWith(".ts") || file.endsWith(".tsx") || file.endsWith(".js") || file.endsWith(".jsx") || file.endsWith(".css")).slice(0, 18);
+    const sourceFiles = fileNames.filter((file) => file.endsWith(".ts") || file.endsWith(".tsx") || file.endsWith(".js") || file.endsWith(".jsx") || file.endsWith(".css") || file.endsWith(".json"));
+    const relevantFiles = [...new Set([input.activeFile, ...sourceFiles].filter((file) => typeof file === "string" && sourceFiles.includes(file)))].slice(0, 8);
     const snapshot = await Promise.all(relevantFiles.map(async (file) => ({ file, content: await fs.readFile(getSafeProjectPath(input.workspaceId, file), "utf8") })));
-    const proposal = await invokeProvider(request, buildAgentMessages(snapshot, input));
+    const proposal = normalizeAgentProposal(await invokeProvider(request, buildAgentMessages(snapshot, input)), relevantFiles);
     response.json({ proposal });
   } catch (error) {
     next(error);

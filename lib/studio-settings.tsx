@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { type RemoteCommit, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
+import { type AgentProposal, type RemoteCommit, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
 import { toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -89,6 +89,8 @@ type StudioSettingsContextValue = {
   commitRepository: (message: string) => Promise<{ hash: string }>;
   pushRepository: () => Promise<{ branch: string }>;
   createRepositoryPullRequest: (input: { baseBranch: string; title: string; body: string }) => Promise<{ number: number; url: string; headBranch: string; baseBranch: string }>;
+  loadRepositoryQuality: () => Promise<RepositoryQuality>;
+  requestDevelopmentProposal: (input: { prompt: string; activeFile?: string }) => Promise<AgentProposal>;
 };
 
 const StudioSettingsContext = createContext<StudioSettingsContextValue | undefined>(undefined);
@@ -254,9 +256,21 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return { number: result.number, url: result.url, headBranch: result.headBranch, baseBranch: result.baseBranch };
   }, [createConnectedClient, settings.workspaceId]);
 
+  const loadRepositoryQuality = useCallback(async () => {
+    if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    const client = await createConnectedClient();
+    return client.getRepositoryQuality(settings.workspaceId);
+  }, [createConnectedClient, settings.workspaceId]);
+
+  const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string }) => {
+    if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");
+    const client = await createConnectedClient();
+    return client.requestAgentProposal({ prompt: input.prompt.trim(), activeFile: input.activeFile });
+  }, [createConnectedClient, settings.workspaceId]);
+
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, pushRepository, readAttachedFile, saveSettings, settings, switchRepositoryBranch, syncRemoteChanges],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, requestDevelopmentProposal }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, settings, switchRepositoryBranch, syncRemoteChanges],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;
