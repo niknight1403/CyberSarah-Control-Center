@@ -2,13 +2,14 @@ import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/compo
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { getFileDiffSummaries } from "@/lib/file-diff-logic";
+import { getProtectedBranchWarning, isProtectedBranch } from "@/lib/protected-branch-logic";
 import type { RemoteHealth, RepositoryQuality } from "@/lib/remote-workspace-client";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { getRepositoryLabel } from "@/lib/studio-settings-logic";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function WorkspaceScreen() {
   const { changedFileCount, files, hydrateFile, loadRemoteFiles, markFilesSynced, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
@@ -37,6 +38,7 @@ export default function WorkspaceScreen() {
   const [healthCheckedAt, setHealthCheckedAt] = useState<string | null>(null);
   const changedRemoteFiles = useMemo(() => files.filter((file) => file.changed && file.remote), [files]);
   const diffSummaries = useMemo(() => getFileDiffSummaries(changedRemoteFiles.map((file) => ({ path: file.path, before: file.remoteContent ?? "", after: file.content }))), [changedRemoteFiles]);
+  const currentBranchIsProtected = isProtectedBranch(settings.branch);
 
   const refreshHealth = useCallback(async () => {
     if (!hasWorkspaceService) return;
@@ -114,7 +116,7 @@ export default function WorkspaceScreen() {
     }
   };
 
-  const pushChanges = async () => {
+  const executePush = async () => {
     if (gitAction !== "committed") return;
     setGitFeedback("");
     try {
@@ -130,6 +132,18 @@ export default function WorkspaceScreen() {
       setGitAction("error");
       setGitFeedback(error instanceof Error ? error.message : "Der Push konnte nicht abgeschlossen werden.");
     }
+  };
+
+  const pushChanges = () => {
+    if (gitAction !== "committed") return;
+    if (!currentBranchIsProtected) {
+      void executePush();
+      return;
+    }
+    Alert.alert("Geschützter Branch", getProtectedBranchWarning(settings.branch), [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Weiter", onPress: () => Alert.alert("Push endgültig bestätigen", `Bestätige den Push auf „${settings.branch}“ ein zweites Mal. Der Vorgang kann nicht aus der App zurückgenommen werden.`, [{ text: "Abbrechen", style: "cancel" }, { text: "Push ausführen", style: "destructive", onPress: () => void executePush() }]) },
+    ]);
   };
 
   const createPullRequest = async () => {
@@ -166,7 +180,7 @@ export default function WorkspaceScreen() {
                     <Text style={styles.projectPath}>{hasWorkspaceService ? settings.workspaceUrl : "Lokaler Arbeitsbereich"}</Text>
                   </View>
                 </View>
-                <StatusBadge label={settings.branch} tone="accent" />
+                <StatusBadge label={currentBranchIsProtected ? `${settings.branch} · geschützt` : settings.branch} tone={currentBranchIsProtected ? "warning" : "accent"} />
               </View>
               <View style={styles.projectFooter}>
                 <Text style={styles.projectState}>{changedFileCount ? `${changedFileCount} Datei(en) geändert` : "Keine offenen Änderungen"}</Text>
@@ -252,7 +266,7 @@ export default function WorkspaceScreen() {
                   <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor="#718196" style={styles.commitInput} value={commitMessage} />
                 <View style={styles.gitActions}>
                   <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing"} onPress={() => void commitChanges()} style={[styles.gitActionButton, styles.commitButton, (!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing") && styles.gitActionDisabled]}><Text style={styles.commitButtonText}>{gitAction === "saving" ? "Speichert …" : gitAction === "committing" ? "Commit …" : "Commit erstellen"}</Text></TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={gitAction !== "committed"} onPress={() => void pushChanges()} style={[styles.gitActionButton, styles.pushButton, gitAction !== "committed" && styles.gitActionDisabled]}><Text style={styles.pushButtonText}>{gitAction === "pushing" ? "Push …" : "Push zu GitHub"}</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={gitAction !== "committed"} onPress={pushChanges} style={[styles.gitActionButton, styles.pushButton, gitAction !== "committed" && styles.gitActionDisabled]}><Text style={styles.pushButtonText}>{gitAction === "pushing" ? "Push …" : currentBranchIsProtected ? "Push bestätigen" : "Push zu GitHub"}</Text></TouchableOpacity>
                 </View>
                 {gitFeedback ? <Text style={[styles.gitFeedback, gitAction === "error" ? styles.gitFeedbackError : styles.gitFeedbackSuccess]}>{gitFeedback}</Text> : <Text style={styles.gitHint}>Commit speichert alle geänderten Remote-Dateien; Push veröffentlicht den Commit auf dem ausgewählten Branch.</Text>}
                 {gitAction === "pushed" || pullRequestState === "created" ? (
