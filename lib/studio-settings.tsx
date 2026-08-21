@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { type AgentProposal, type RemoteCommit, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
+import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
 import { toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -93,6 +93,7 @@ type StudioSettingsContextValue = {
   pushRepository: () => Promise<{ branch: string }>;
   createRepositoryPullRequest: (input: { baseBranch: string; title: string; body: string }) => Promise<{ number: number; url: string; headBranch: string; baseBranch: string }>;
   loadRepositoryQuality: () => Promise<RepositoryQuality>;
+  loadWorkspaceHealth: () => Promise<RemoteHealth>;
   requestDevelopmentProposal: (input: { prompt: string; activeFile?: string }) => Promise<AgentProposal>;
   setProtectedChatContent: (enabled: boolean) => Promise<void>;
 };
@@ -272,6 +273,17 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return client.getRepositoryQuality(settings.workspaceId);
   }, [createConnectedClient, settings.workspaceId]);
 
+  const loadWorkspaceHealth = useCallback(async () => {
+    if (!settings.workspaceUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
+    const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
+      readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
+      readSecureValue(GITHUB_TOKEN_KEY),
+      readSecureValue(PROVIDER_KEY_KEY),
+    ]);
+    const client = new RemoteWorkspaceClient({ baseUrl: settings.workspaceUrl, serviceAccessToken: serviceAccessToken || undefined, githubToken: githubToken || undefined, provider: settings.provider, providerApiKey: providerApiKey || undefined });
+    return client.getHealth();
+  }, [settings.provider, settings.workspaceUrl]);
+
   const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string }) => {
     if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");
     const client = await createConnectedClient();
@@ -279,8 +291,8 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, requestDevelopmentProposal, setProtectedChatContent }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, requestDevelopmentProposal, setProtectedChatContent }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;

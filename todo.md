@@ -24,3 +24,13 @@
 - [x] Add an opt-in encrypted native local storage mode for development-chat content with clear platform disclosure.
 - [x] Add a user-controlled encrypted support-backup export for bounded development-chat history.
 - [x] Require an explicit support-sharing confirmation before opening the encrypted backup share sheet.
+- [x] Sprint 1: Add workspace connection diagnostics and manual health refresh.
+- [ ] Sprint 2: Add an inspectable local file-diff view before synchronization.
+- [ ] Sprint 3: Add protected-branch warnings and explicit push confirmation.
+- [ ] Sprint 4: Add pull-request summary and review-state visibility.
+- [ ] Sprint 5: Add CI-quality details and a manual status refresh flow.
+- [ ] Sprint 6: Scope persisted development-chat sessions to their connected repository.
+- [ ] Sprint 7: Allow selective application and controlled reversal of agent-proposed changes.
+- [ ] Sprint 8: Add offline draft state and remote-conflict warnings.
+- [ ] Sprint 9: Add integrity verification and restore preview for encrypted support backups.
+- [ ] Sprint 10: Add a consolidated quality dashboard and mobile robustness improvements.

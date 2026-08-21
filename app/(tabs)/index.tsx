@@ -1,7 +1,7 @@
 import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import type { RepositoryQuality } from "@/lib/remote-workspace-client";
+import type { RemoteHealth, RepositoryQuality } from "@/lib/remote-workspace-client";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { getRepositoryLabel } from "@/lib/studio-settings-logic";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -11,7 +11,7 @@ import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View
 
 export default function WorkspaceScreen() {
   const { changedFileCount, files, hydrateFile, loadRemoteFiles, markFilesSynced, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
-  const { commitRepository, createRepositoryPullRequest, loadRepositoryDetails, loadRepositoryQuality, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
+  const { commitRepository, createRepositoryPullRequest, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
   const hasAttachedRepository = Boolean(settings.workspaceId);
   const repositoryLabel = getRepositoryLabel(settings.repositoryUrl);
@@ -30,6 +30,25 @@ export default function WorkspaceScreen() {
   const [pullRequestBase, setPullRequestBase] = useState("main");
   const [pullRequestState, setPullRequestState] = useState<"idle" | "creating" | "created" | "error">("idle");
   const [pullRequestFeedback, setPullRequestFeedback] = useState("");
+  const [serviceHealth, setServiceHealth] = useState<RemoteHealth | null>(null);
+  const [healthState, setHealthState] = useState<"idle" | "checking" | "ready" | "error">("idle");
+  const [healthError, setHealthError] = useState("");
+  const [healthCheckedAt, setHealthCheckedAt] = useState<string | null>(null);
+
+  const refreshHealth = useCallback(async () => {
+    if (!hasWorkspaceService) return;
+    setHealthState("checking");
+    setHealthError("");
+    try {
+      const result = await loadWorkspaceHealth();
+      setServiceHealth(result);
+      setHealthState("ready");
+      setHealthCheckedAt(new Date().toISOString());
+    } catch (error) {
+      setHealthState("error");
+      setHealthError(error instanceof Error ? error.message : "Der Workspace-Service ist momentan nicht erreichbar.");
+    }
+  }, [hasWorkspaceService, loadWorkspaceHealth]);
 
   const refreshRepository = useCallback(async () => {
     if (!hasAttachedRepository) return;
@@ -57,6 +76,7 @@ export default function WorkspaceScreen() {
   }, [hasAttachedRepository, loadRepositoryDetails, loadRepositoryQuality]);
 
   useEffect(() => { void refreshRepository(); }, [refreshRepository]);
+  useEffect(() => { void refreshHealth(); }, [refreshHealth]);
 
   const chooseBranch = async (branch: string) => {
     if (branch === settings.branch || repositoryState === "switching") return;
@@ -150,6 +170,7 @@ export default function WorkspaceScreen() {
                 <StatusBadge label={hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={hasAttachedRepository || hasWorkspaceService ? "ready" : "warning"} />
               </View>
             </View>
+            {hasWorkspaceService ? <View style={[styles.healthPanel, healthState === "error" && styles.healthPanelError]}><View style={styles.healthHeader}><View><Text style={styles.healthEyebrow}>SERVICE-DIAGNOSE</Text><Text style={styles.healthTitle}>{healthState === "checking" ? "Verbindung wird geprüft …" : healthState === "ready" && serviceHealth ? serviceHealth.status === "ready" ? "Workspace-Service erreichbar" : "Workspace-Service beschäftigt" : "Verbindungsstatus ausstehend"}</Text></View><TouchableOpacity accessibilityLabel="Workspace-Service prüfen" activeOpacity={0.75} disabled={healthState === "checking"} onPress={() => void refreshHealth()} style={[styles.refreshButton, healthState === "checking" && styles.healthButtonDisabled]}><Text style={styles.refreshButtonText}>{healthState === "checking" ? "Prüft …" : "Prüfen"}</Text></TouchableOpacity></View><Text style={[styles.healthDetail, healthState === "error" && styles.repositoryError]}>{healthState === "ready" && serviceHealth ? `Version ${serviceHealth.version}${serviceHealth.previewUrl ? " · Vorschau verfügbar" : " · Keine Laufzeitvorschau gemeldet"}${healthCheckedAt ? ` · geprüft ${formatCommitDate(healthCheckedAt)}` : ""}` : healthState === "error" ? healthError : "Die Diagnose prüft Service-Erreichbarkeit ohne Repository-Daten zu verändern."}</Text></View> : null}
             {hasAttachedRepository ? (
               <View style={styles.repositoryPanel}>
                 <View style={styles.repositoryHeader}>
@@ -330,6 +351,13 @@ const styles = StyleSheet.create({
   projectPath: { color: "#8493A7", fontSize: 12 },
   projectFooter: { alignItems: "center", borderTopColor: "#26364B", borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", marginTop: 14, paddingTop: 12 },
   projectState: { color: "#9BABBE", fontSize: 12 },
+  healthPanel: { backgroundColor: "#101B22", borderColor: "#2C5864", borderRadius: 16, borderWidth: 1, marginBottom: 25, marginTop: -12, padding: 13 },
+  healthPanelError: { backgroundColor: "#21161C", borderColor: "#6E3C4B" },
+  healthHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  healthEyebrow: { color: "#7AA6B0", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
+  healthTitle: { color: "#E8F5F8", fontSize: 14, fontWeight: "800" },
+  healthDetail: { color: "#9BB2BD", fontSize: 11, lineHeight: 17, marginTop: 9 },
+  healthButtonDisabled: { opacity: 0.55 },
   repositoryPanel: { backgroundColor: "#101925", borderColor: "#293B51", borderRadius: 17, borderWidth: 1, marginBottom: 25, padding: 14 },
   repositoryHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   repositoryEyebrow: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
