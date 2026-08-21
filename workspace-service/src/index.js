@@ -33,6 +33,11 @@ const commitSchema = z.object({ message: z.string().min(1).max(240) });
 const branchNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/-]{0,118}$/, "Ungültiger Branch-Name.");
 const checkoutSchema = z.object({ branch: branchNameSchema });
 const commitLimitSchema = z.coerce.number().int().min(1).max(30).default(10);
+const pullRequestSchema = z.object({
+  baseBranch: branchNameSchema,
+  title: z.string().trim().min(3).max(140),
+  body: z.string().trim().max(10_000).default(""),
+});
 const agentSchema = z.object({
   workspaceId: workspaceIdSchema,
   prompt: z.string().min(1).max(8_000),
@@ -71,6 +76,27 @@ function assertRepositoryUrl(repositoryUrl) {
 function workspaceIdFor(repositoryUrl) {
   const { owner, repository } = assertRepositoryUrl(repositoryUrl);
   return `${owner}-${repository}`.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+}
+
+async function createGitHubPullRequest(repositoryUrl, token, input) {
+  if (!token) throw new Error("Für einen Pull Request ist ein GitHub-Zugriffstoken erforderlich.");
+  const { owner, repository } = assertRepositoryUrl(repositoryUrl);
+  const response = await fetch(`https://api.github.com/repos/${owner}/${repository}/pulls`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = typeof payload.message === "string" ? payload.message : "Unbekannter GitHub-Fehler";
+    throw new Error(`Pull Request konnte nicht erstellt werden (${response.status}): ${message}`);
+  }
+  return { number: payload.number, url: payload.html_url, state: payload.state, title: payload.title };
 }
 
 function getWorkspacePath(workspaceId) {
@@ -341,6 +367,26 @@ app.post("/api/v1/workspaces/:workspaceId/git/push", requireServiceAuthorization
     const branch = branchNameSchema.parse(branchOutput.trim());
     const { stdout } = await git(["push", "origin", `HEAD:refs/heads/${branch}`], workspacePath, getGitHubToken(request));
     response.json({ pushed: true, branch, output: stdout });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/v1/workspaces/:workspaceId/git/pull-request", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const input = pullRequestSchema.parse(request.body);
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const { stdout: repositoryUrlOutput } = await git(["remote", "get-url", "origin"], workspacePath, getGitHubToken(request));
+    const { stdout: headBranchOutput } = await git(["branch", "--show-current"], workspacePath, getGitHubToken(request));
+    const headBranch = branchNameSchema.parse(headBranchOutput.trim());
+    if (headBranch === input.baseBranch) throw new Error("Quell- und Zielbranch eines Pull Requests müssen unterschiedlich sein.");
+    const pullRequest = await createGitHubPullRequest(repositoryUrlOutput.trim(), getGitHubToken(request), {
+      title: input.title,
+      body: input.body,
+      head: headBranch,
+      base: input.baseBranch,
+    });
+    response.status(201).json({ ...pullRequest, headBranch, baseBranch: input.baseBranch });
   } catch (error) {
     next(error);
   }

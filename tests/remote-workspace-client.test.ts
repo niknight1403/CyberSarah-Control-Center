@@ -61,4 +61,13 @@ describe("workspace service client", () => {
     ]);
     vi.unstubAllGlobals();
   });
+
+  it("creates a pull request only through the typed post-push endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ number: 17, url: "https://github.com/example/repo/pull/17", state: "open", title: "Ship feature", headBranch: "release", baseBranch: "main" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new RemoteWorkspaceClient({ baseUrl: "https://studio.example.com", serviceAccessToken: "service-secret" });
+    await expect(client.createPullRequest("workspace", { baseBranch: "main", title: "Ship feature", body: "Ready for review." })).resolves.toMatchObject({ number: 17, headBranch: "release" });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://studio.example.com/api/v1/workspaces/workspace/git/pull-request");
+    vi.unstubAllGlobals();
+  });
 });

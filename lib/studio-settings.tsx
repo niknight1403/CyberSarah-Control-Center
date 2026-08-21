@@ -88,6 +88,7 @@ type StudioSettingsContextValue = {
   syncRemoteChanges: (changes: RemoteWorkspaceChange[]) => Promise<{ savedCount: number; status: string }>;
   commitRepository: (message: string) => Promise<{ hash: string }>;
   pushRepository: () => Promise<{ branch: string }>;
+  createRepositoryPullRequest: (input: { baseBranch: string; title: string; body: string }) => Promise<{ number: number; url: string; headBranch: string; baseBranch: string }>;
 };
 
 const StudioSettingsContext = createContext<StudioSettingsContextValue | undefined>(undefined);
@@ -246,9 +247,16 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return { branch: result.branch };
   }, [createConnectedClient, settings.workspaceId]);
 
+  const createRepositoryPullRequest = useCallback(async (input: { baseBranch: string; title: string; body: string }) => {
+    if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    const client = await createConnectedClient();
+    const result = await client.createPullRequest(settings.workspaceId, input);
+    return { number: result.number, url: result.url, headBranch: result.headBranch, baseBranch: result.baseBranch };
+  }, [createConnectedClient, settings.workspaceId]);
+
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, loading, loadRepositoryDetails, pushRepository, readAttachedFile, saveSettings, settings, switchRepositoryBranch, syncRemoteChanges],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, pushRepository, readAttachedFile, saveSettings, settings, switchRepositoryBranch, syncRemoteChanges],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;

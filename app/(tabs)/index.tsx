@@ -10,7 +10,7 @@ import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View
 
 export default function WorkspaceScreen() {
   const { changedFileCount, files, hydrateFile, loadRemoteFiles, markFilesSynced, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
-  const { commitRepository, loadRepositoryDetails, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
+  const { commitRepository, createRepositoryPullRequest, loadRepositoryDetails, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
   const hasAttachedRepository = Boolean(settings.workspaceId);
   const repositoryLabel = getRepositoryLabel(settings.repositoryUrl);
@@ -21,6 +21,11 @@ export default function WorkspaceScreen() {
   const [commitMessage, setCommitMessage] = useState("Update from Custom AI Studio");
   const [gitAction, setGitAction] = useState<"idle" | "saving" | "committing" | "committed" | "pushing" | "pushed" | "error">("idle");
   const [gitFeedback, setGitFeedback] = useState("");
+  const [pullRequestTitle, setPullRequestTitle] = useState("");
+  const [pullRequestBody, setPullRequestBody] = useState("");
+  const [pullRequestBase, setPullRequestBase] = useState("main");
+  const [pullRequestState, setPullRequestState] = useState<"idle" | "creating" | "created" | "error">("idle");
+  const [pullRequestFeedback, setPullRequestFeedback] = useState("");
 
   const refreshRepository = useCallback(async () => {
     if (!hasAttachedRepository) return;
@@ -80,10 +85,27 @@ export default function WorkspaceScreen() {
       const result = await pushRepository();
       setGitAction("pushed");
       setGitFeedback(`Branch ${result.branch} wurde erfolgreich zu GitHub hochgeladen.`);
+      setPullRequestTitle(commitMessage.trim());
+      setPullRequestState("idle");
+      setPullRequestFeedback("");
       await refreshRepository();
     } catch (error) {
       setGitAction("error");
       setGitFeedback(error instanceof Error ? error.message : "Der Push konnte nicht abgeschlossen werden.");
+    }
+  };
+
+  const createPullRequest = async () => {
+    if (gitAction !== "pushed" || pullRequestState === "creating" || pullRequestTitle.trim().length < 3 || pullRequestBase.trim() === settings.branch) return;
+    setPullRequestState("creating");
+    setPullRequestFeedback("");
+    try {
+      const result = await createRepositoryPullRequest({ baseBranch: pullRequestBase.trim(), title: pullRequestTitle.trim(), body: pullRequestBody.trim() });
+      setPullRequestState("created");
+      setPullRequestFeedback(`Pull Request #${result.number} erstellt: ${result.url}`);
+    } catch (error) {
+      setPullRequestState("error");
+      setPullRequestFeedback(error instanceof Error ? error.message : "Der Pull Request konnte nicht erstellt werden.");
     }
   };
 
@@ -191,6 +213,17 @@ export default function WorkspaceScreen() {
                   <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={gitAction !== "committed"} onPress={() => void pushChanges()} style={[styles.gitActionButton, styles.pushButton, gitAction !== "committed" && styles.gitActionDisabled]}><Text style={styles.pushButtonText}>{gitAction === "pushing" ? "Push …" : "Push zu GitHub"}</Text></TouchableOpacity>
                 </View>
                 {gitFeedback ? <Text style={[styles.gitFeedback, gitAction === "error" ? styles.gitFeedbackError : styles.gitFeedbackSuccess]}>{gitFeedback}</Text> : <Text style={styles.gitHint}>Commit speichert alle geänderten Remote-Dateien; Push veröffentlicht den Commit auf dem ausgewählten Branch.</Text>}
+                {gitAction === "pushed" || pullRequestState === "created" ? (
+                  <View style={styles.pullRequestBar}>
+                    <Text style={styles.pullRequestEyebrow}>PULL REQUEST</Text>
+                    <Text style={styles.pullRequestHint}>Erstelle aus <Text style={styles.branchInline}>{settings.branch}</Text> einen Pull Request in den Zielbranch.</Text>
+                    <TextInput accessibilityLabel="Pull-Request-Titel" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setPullRequestTitle(value); if (pullRequestState !== "creating") setPullRequestState("idle"); }} placeholder="Pull-Request-Titel" placeholderTextColor="#718196" style={styles.commitInput} value={pullRequestTitle} />
+                    <TextInput accessibilityLabel="Zielbranch des Pull Requests" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setPullRequestBase(value); if (pullRequestState !== "creating") setPullRequestState("idle"); }} placeholder="main" placeholderTextColor="#718196" style={[styles.commitInput, styles.pullRequestInput]} value={pullRequestBase} />
+                    <TextInput accessibilityLabel="Pull-Request-Beschreibung" autoCapitalize="sentences" multiline onChangeText={setPullRequestBody} placeholder="Optionale Beschreibung" placeholderTextColor="#718196" style={[styles.commitInput, styles.pullRequestBody]} textAlignVertical="top" value={pullRequestBody} />
+                    <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={pullRequestState === "creating" || pullRequestState === "created" || pullRequestTitle.trim().length < 3 || pullRequestBase.trim() === settings.branch} onPress={() => void createPullRequest()} style={[styles.pullRequestButton, (pullRequestState === "creating" || pullRequestState === "created" || pullRequestTitle.trim().length < 3 || pullRequestBase.trim() === settings.branch) && styles.gitActionDisabled]}><Text style={styles.pullRequestButtonText}>{pullRequestState === "creating" ? "Pull Request wird erstellt …" : pullRequestState === "created" ? "Pull Request erstellt" : "Pull Request erstellen"}</Text></TouchableOpacity>
+                    {pullRequestFeedback ? <Text style={[styles.gitFeedback, pullRequestState === "error" ? styles.gitFeedbackError : styles.gitFeedbackSuccess]}>{pullRequestFeedback}</Text> : null}
+                  </View>
+                ) : null}
               </View>
             ) : null}
             <StudioSection label="Console" title="Aktiver Kontext" />
@@ -313,6 +346,14 @@ const styles = StyleSheet.create({
   gitFeedbackSuccess: { color: "#6FE0A7" },
   gitFeedbackError: { color: "#FF9AA4" },
   gitHint: { color: "#8294AA", fontSize: 11, lineHeight: 16, marginTop: 10 },
+  pullRequestBar: { borderTopColor: "#2B3E55", borderTopWidth: 1, marginTop: 14, paddingTop: 14 },
+  pullRequestEyebrow: { color: "#B9A8FF", fontSize: 10, fontWeight: "900", letterSpacing: 1.05, marginBottom: 5 },
+  pullRequestHint: { color: "#94A4B8", fontSize: 11, lineHeight: 16, marginBottom: 9 },
+  branchInline: { color: "#B9EFFF", fontFamily: codeFont, fontWeight: "800" },
+  pullRequestInput: { marginTop: 8 },
+  pullRequestBody: { marginTop: 8, minHeight: 76 },
+  pullRequestButton: { alignItems: "center", backgroundColor: "#473C80", borderColor: "#9E91FF", borderRadius: 11, borderWidth: 1, marginTop: 10, paddingHorizontal: 8, paddingVertical: 11 },
+  pullRequestButtonText: { color: "#F3F1FF", fontSize: 12, fontWeight: "900" },
   consoleCard: { backgroundColor: "#0F161F", borderColor: "#243347", borderRadius: 16, borderWidth: 1, padding: 14 },
   consolePrompt: { alignItems: "center", flexDirection: "row", gap: 7, marginBottom: 9 },
   consolePromptText: { color: "#6BE5A7", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },

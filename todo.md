@@ -17,3 +17,4 @@
 - [x] Prepare and validate an isolated test repository against the workspace service.
 - [x] Add branch selection and recent commit history to the connected repository view.
 - [x] Add a commit and push bar for changed connected workspace files, with clear state feedback.
+- [x] Add an in-app pull-request creation action after a successful branch push.

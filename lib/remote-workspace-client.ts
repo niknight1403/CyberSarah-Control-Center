@@ -116,6 +116,12 @@ export class RemoteWorkspaceClient {
   push(workspaceId: string) {
     return this.request<{ pushed: boolean; branch: string; output: string }>(`/api/v1/workspaces/${workspaceId}/git/push`, { method: "POST" });
   }
+  createPullRequest(workspaceId: string, input: { baseBranch: string; title: string; body: string }) {
+    return this.request<{ number: number; url: string; state: string; title: string; headBranch: string; baseBranch: string }>(`/api/v1/workspaces/${workspaceId}/git/pull-request`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
 
   requestAgentProposal(input: AgentRequest) {
     return this.request<AgentProposal>("/api/v1/agent/proposals", {
