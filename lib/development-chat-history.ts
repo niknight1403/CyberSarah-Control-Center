@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { DEVELOPMENT_CHAT_HISTORY_KEY, splitProtectedHistory } from "./development-chat-history-logic";
+import { getDevelopmentChatHistoryKey, getDevelopmentChatHistoryScope, splitProtectedHistory } from "./development-chat-history-logic";
 
 export * from "./development-chat-history-logic";
 
@@ -12,63 +12,73 @@ function supportsProtectedHistory() {
   return Platform.OS !== "web";
 }
 
-async function removeProtectedHistory() {
-  if (!supportsProtectedHistory()) return;
-  const manifestRaw = await SecureStore.getItemAsync(PROTECTED_HISTORY_MANIFEST_KEY);
-  const count = manifestRaw ? Number.parseInt(manifestRaw, 10) : 0;
-  await Promise.all(Array.from({ length: Number.isFinite(count) ? Math.min(count, 96) : 0 }, (_, index) => SecureStore.deleteItemAsync(`${PROTECTED_HISTORY_CHUNK_PREFIX}${index}`)));
-  await SecureStore.deleteItemAsync(PROTECTED_HISTORY_MANIFEST_KEY);
+function getProtectedHistoryKeys(workspaceId?: string) {
+  const scope = getDevelopmentChatHistoryScope(workspaceId);
+  return { manifest: `${PROTECTED_HISTORY_MANIFEST_KEY}.${scope}`, chunkPrefix: `${PROTECTED_HISTORY_CHUNK_PREFIX}${scope}.` };
 }
 
-async function readProtectedHistory(): Promise<string | null> {
+async function removeProtectedHistory(workspaceId?: string) {
+  if (!supportsProtectedHistory()) return;
+  const keys = getProtectedHistoryKeys(workspaceId);
+  const manifestRaw = await SecureStore.getItemAsync(keys.manifest);
+  const count = manifestRaw ? Number.parseInt(manifestRaw, 10) : 0;
+  await Promise.all(Array.from({ length: Number.isFinite(count) ? Math.min(count, 96) : 0 }, (_, index) => SecureStore.deleteItemAsync(`${keys.chunkPrefix}${index}`)));
+  await SecureStore.deleteItemAsync(keys.manifest);
+}
+
+async function readProtectedHistory(workspaceId?: string): Promise<string | null> {
   if (!supportsProtectedHistory()) return null;
-  const manifestRaw = await SecureStore.getItemAsync(PROTECTED_HISTORY_MANIFEST_KEY);
+  const keys = getProtectedHistoryKeys(workspaceId);
+  const manifestRaw = await SecureStore.getItemAsync(keys.manifest);
   const count = manifestRaw ? Number.parseInt(manifestRaw, 10) : 0;
   if (!Number.isInteger(count) || count < 1 || count > 96) return null;
-  const chunks = await Promise.all(Array.from({ length: count }, (_, index) => SecureStore.getItemAsync(`${PROTECTED_HISTORY_CHUNK_PREFIX}${index}`)));
+  const chunks = await Promise.all(Array.from({ length: count }, (_, index) => SecureStore.getItemAsync(`${keys.chunkPrefix}${index}`)));
   return chunks.every((chunk) => typeof chunk === "string") ? chunks.join("") : null;
 }
 
-async function writeProtectedHistory(value: string) {
+async function writeProtectedHistory(value: string, workspaceId?: string) {
   const chunks = splitProtectedHistory(value);
   if (!chunks.length || chunks.length > 96) throw new Error("Der geschützte Chat-Verlauf ist zu groß.");
-  await removeProtectedHistory();
-  await Promise.all(chunks.map((chunk, index) => SecureStore.setItemAsync(`${PROTECTED_HISTORY_CHUNK_PREFIX}${index}`, chunk, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY })));
-  await SecureStore.setItemAsync(PROTECTED_HISTORY_MANIFEST_KEY, String(chunks.length), { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
+  const keys = getProtectedHistoryKeys(workspaceId);
+  await removeProtectedHistory(workspaceId);
+  await Promise.all(chunks.map((chunk, index) => SecureStore.setItemAsync(`${keys.chunkPrefix}${index}`, chunk, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY })));
+  await SecureStore.setItemAsync(keys.manifest, String(chunks.length), { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
 }
 
-export async function loadDevelopmentChatHistory(protectedMode: boolean): Promise<string | null> {
+export async function loadDevelopmentChatHistory(protectedMode: boolean, workspaceId?: string): Promise<string | null> {
+  const historyKey = getDevelopmentChatHistoryKey(workspaceId);
   if (protectedMode && supportsProtectedHistory()) {
-    const secured = await readProtectedHistory();
+    const secured = await readProtectedHistory(workspaceId);
     if (secured) return secured;
-    const standard = await AsyncStorage.getItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+    const standard = await AsyncStorage.getItem(historyKey);
     if (standard) {
-      await writeProtectedHistory(standard);
-      await AsyncStorage.removeItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+      await writeProtectedHistory(standard, workspaceId);
+      await AsyncStorage.removeItem(historyKey);
     }
     return standard;
   }
-  const standard = await AsyncStorage.getItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+  const standard = await AsyncStorage.getItem(historyKey);
   if (standard || !supportsProtectedHistory()) return standard;
-  const secured = await readProtectedHistory();
+  const secured = await readProtectedHistory(workspaceId);
   if (secured) {
-    await AsyncStorage.setItem(DEVELOPMENT_CHAT_HISTORY_KEY, secured);
-    await removeProtectedHistory();
+    await AsyncStorage.setItem(historyKey, secured);
+    await removeProtectedHistory(workspaceId);
   }
   return secured;
 }
 
-export async function saveDevelopmentChatHistory(value: string, protectedMode: boolean) {
+export async function saveDevelopmentChatHistory(value: string, protectedMode: boolean, workspaceId?: string) {
+  const historyKey = getDevelopmentChatHistoryKey(workspaceId);
   if (protectedMode && supportsProtectedHistory()) {
-    await writeProtectedHistory(value);
-    await AsyncStorage.removeItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+    await writeProtectedHistory(value, workspaceId);
+    await AsyncStorage.removeItem(historyKey);
     return;
   }
-  await AsyncStorage.setItem(DEVELOPMENT_CHAT_HISTORY_KEY, value);
-  await removeProtectedHistory();
+  await AsyncStorage.setItem(historyKey, value);
+  await removeProtectedHistory(workspaceId);
 }
 
-export async function clearDevelopmentChatHistory() {
-  await AsyncStorage.removeItem(DEVELOPMENT_CHAT_HISTORY_KEY);
-  await removeProtectedHistory();
+export async function clearDevelopmentChatHistory(workspaceId?: string) {
+  await AsyncStorage.removeItem(getDevelopmentChatHistoryKey(workspaceId));
+  await removeProtectedHistory(workspaceId);
 }

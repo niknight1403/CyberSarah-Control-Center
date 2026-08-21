@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { DEVELOPMENT_CHAT_HISTORY_LIMIT, parseDevelopmentChatHistory, serializeDevelopmentChatHistory, splitProtectedHistory } from "../lib/development-chat-history-logic";
+import { DEVELOPMENT_CHAT_HISTORY_LIMIT, getDevelopmentChatHistoryKey, getDevelopmentChatHistoryScope, parseDevelopmentChatHistory, serializeDevelopmentChatHistory, splitProtectedHistory } from "../lib/development-chat-history-logic";
 
 describe("development chat history", () => {
+  it("creates isolated, SecureStore-compatible repository scopes", () => {
+    expect(getDevelopmentChatHistoryScope("Workspace/Team Repo#42")).toBe("workspace-team-repo-42");
+    expect(getDevelopmentChatHistoryKey("repo-a")).not.toBe(getDevelopmentChatHistoryKey("repo-b"));
+    expect(getDevelopmentChatHistoryScope()).toBe("unattached");
+  });
+
   it("persists a bounded conversation while retaining proposal metadata but never proposal file content", () => {
     const messages = Array.from({ length: DEVELOPMENT_CHAT_HISTORY_LIMIT + 3 }, (_, index) => ({
       id: `message-${index}`,

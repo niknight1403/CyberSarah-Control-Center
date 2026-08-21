@@ -31,24 +31,29 @@ export default function AgentScreen() {
   const [backupState, setBackupState] = useState<"idle" | "exporting" | "shared" | "error">("idle");
   const [backupMessage, setBackupMessage] = useState("");
   const hasRepository = Boolean(settings.workspaceId);
+  const chatWorkspaceId = settings.workspaceId;
   const providerLabel = settings.provider === "managed" ? "On-Server" : settings.provider === "together" ? "Together AI" : settings.provider[0].toUpperCase() + settings.provider.slice(1);
   const readyForChat = hasRepository && (settings.provider === "managed" || settings.hasProviderKey);
   const contextLabel = useMemo(() => `${selectedFile.name} · ${settings.branch}`, [selectedFile.name, settings.branch]);
 
   useEffect(() => {
-    loadDevelopmentChatHistory(settings.protectChatContent)
+    let active = true;
+    setHistoryLoaded(false);
+    setMessages(initialMessages);
+    loadDevelopmentChatHistory(settings.protectChatContent, chatWorkspaceId)
       .then((raw) => {
         const restored = parseDevelopmentChatHistory(raw);
-        if (restored.length) setMessages(restored);
+        if (active && restored.length) setMessages(restored);
       })
-      .catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht wiederhergestellt werden."))
-      .finally(() => setHistoryLoaded(true));
-  }, [settings.protectChatContent]);
+      .catch(() => active && setChatError("Der lokale Chat-Verlauf konnte nicht wiederhergestellt werden."))
+      .finally(() => active && setHistoryLoaded(true));
+    return () => { active = false; };
+  }, [chatWorkspaceId, settings.protectChatContent]);
 
   useEffect(() => {
     if (!historyLoaded) return;
-    void saveDevelopmentChatHistory(serializeDevelopmentChatHistory(messages), settings.protectChatContent).catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gespeichert werden."));
-  }, [historyLoaded, messages, settings.protectChatContent]);
+    void saveDevelopmentChatHistory(serializeDevelopmentChatHistory(messages), settings.protectChatContent, chatWorkspaceId).catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gespeichert werden."));
+  }, [chatWorkspaceId, historyLoaded, messages, settings.protectChatContent]);
 
   const submitPrompt = async () => {
     const normalizedPrompt = prompt.trim();
@@ -97,7 +102,7 @@ export default function AgentScreen() {
   };
 
   const clearHistory = async () => {
-    await clearDevelopmentChatHistory().catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gelöscht werden."));
+    await clearDevelopmentChatHistory(chatWorkspaceId).catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gelöscht werden."));
     setMessages(initialMessages);
   };
 
@@ -139,7 +144,7 @@ export default function AgentScreen() {
             <StudioHeader eyebrow="KI-ENTWICKLUNGSFLUSS" title="Agent" />
             <View style={[styles.readinessCard, readyForChat ? styles.readinessReady : styles.readinessWaiting]}><View style={styles.readinessIcon}><IconSymbol name="sparkles" size={17} color={readyForChat ? "#B9B2FF" : "#F6BA5E"} /></View><View style={styles.readinessCopy}><Text style={styles.readinessTitle}>{readyForChat ? "Entwicklungs-Chat bereit" : "Verbindung für den Agenten fehlt"}</Text><Text style={styles.readinessText}>{readyForChat ? `Projektkontext aus ${contextLabel} · ${providerLabel}` : hasRepository ? "Hinterlege für das gewählte KI-Profil einen Schlüssel oder nutze ein konfiguriertes On-Server-Profil." : "Verbinde zuerst ein Repository und einen Workspace-Service in den Einstellungen."}</Text></View></View>
             <View style={styles.contextRow}><View style={styles.contextChip}><IconSymbol name="doc.text.fill" size={14} color="#8B7CFF" /><Text numberOfLines={1} style={styles.contextText}>{contextLabel}</Text></View><StatusBadge label={readyForChat ? "Kontrolliert" : "Offline"} tone={readyForChat ? "accent" : "warning"} /></View>
-            <View style={styles.historyRow}><Text style={styles.historyText}>{historyLoaded ? settings.protectChatContent ? "Geschützt gespeichert · verschlüsselt auf diesem Gerät" : "Lokal gesichert · ohne Tokens und Dateiinhalte" : "Verlauf wird wiederhergestellt …"}</Text><TouchableOpacity accessibilityRole="button" activeOpacity={0.75} onPress={() => void clearHistory()} style={styles.clearHistoryButton}><Text style={styles.clearHistoryText}>Verlauf löschen</Text></TouchableOpacity></View>
+            <View style={styles.historyRow}><Text style={styles.historyText}>{historyLoaded ? settings.protectChatContent ? "Geschützt gespeichert · verschlüsselt und repository-spezifisch" : "Lokal gesichert · repository-spezifisch, ohne Tokens und Dateiinhalte" : "Verlauf wird wiederhergestellt …"}</Text><TouchableOpacity accessibilityRole="button" activeOpacity={0.75} onPress={() => void clearHistory()} style={styles.clearHistoryButton}><Text style={styles.clearHistoryText}>Verlauf löschen</Text></TouchableOpacity></View>
             <StudioSection label="Konversation" title="Reviewbarer Projektkontext" />
           </>}
           ListFooterComponent={<><View style={styles.composerCard}><Text style={styles.composerLabel}>NÄCHSTER ENTWICKLUNGSAUFTRAG</Text><TextInput accessibilityLabel="Entwicklungsauftrag für den Agenten" editable={readyForChat && !isThinking} multiline onChangeText={setPrompt} placeholder="Beschreibe eine Änderung, einen Fehler oder ein Refactoring …" placeholderTextColor="#708095" style={styles.composerInput} textAlignVertical="top" value={prompt} /><PrimaryButton icon="arrow.up.circle.fill" label={isThinking ? "Agent analysiert …" : "Vorschlag erstellen"} onPress={() => void submitPrompt()} disabled={!prompt.trim() || !readyForChat || isThinking} /><Text style={styles.composerHint}>Der Agent erzeugt nur einen überprüfbaren Vorschlag. Er commitet oder pusht niemals selbstständig.</Text>{chatError ? <Text style={styles.chatError}>{chatError}</Text> : null}</View><View style={styles.backupCard}><View style={styles.backupTitleRow}><IconSymbol name="lock.fill" size={16} color="#F2C979" /><Text style={styles.backupTitle}>VERSCHLÜSSELTES SUPPORT-BACKUP</Text></View><Text style={styles.backupHint}>Erzeugt eine passwortgeschützte Datei mit dem begrenzten Chat-Verlauf. Zugangsdaten und vollständige Datei-Inhalte sind ausgeschlossen. Das Passwort wird nicht gespeichert.</Text><TextInput accessibilityLabel="Passwort für verschlüsseltes Support-Backup" autoCapitalize="none" onChangeText={setBackupPassword} placeholder="Mindestens 12 Zeichen" placeholderTextColor="#708095" secureTextEntry style={styles.backupInput} value={backupPassword} /><TextInput accessibilityLabel="Passwort für verschlüsseltes Support-Backup wiederholen" autoCapitalize="none" onChangeText={setBackupPasswordRepeat} placeholder="Passwort wiederholen" placeholderTextColor="#708095" secureTextEntry style={styles.backupInput} value={backupPasswordRepeat} /><PrimaryButton icon="square.and.arrow.up" label={backupState === "exporting" ? "Backup wird verschlüsselt …" : "Freigabe prüfen und teilen"} onPress={confirmBackupExport} disabled={backupState === "exporting" || !historyLoaded || !isValidSupportBackupPassword(backupPassword) || backupPassword !== backupPasswordRepeat} />{backupMessage ? <Text style={backupState === "shared" ? styles.backupSuccess : styles.backupError}>{backupMessage}</Text> : null}</View></>}

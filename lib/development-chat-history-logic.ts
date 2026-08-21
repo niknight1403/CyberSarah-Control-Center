@@ -15,6 +15,15 @@ export const DEVELOPMENT_CHAT_HISTORY_KEY = "custom-ai-studio.development-chat.v
 export const DEVELOPMENT_CHAT_HISTORY_LIMIT = 24;
 export const PROTECTED_HISTORY_CHUNK_SIZE = 420;
 
+export function getDevelopmentChatHistoryScope(workspaceId?: string) {
+  const normalized = workspaceId?.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized || "unattached";
+}
+
+export function getDevelopmentChatHistoryKey(workspaceId?: string) {
+  return `${DEVELOPMENT_CHAT_HISTORY_KEY}.${getDevelopmentChatHistoryScope(workspaceId)}`;
+}
+
 function isRole(value: unknown): value is DevelopmentChatHistoryMessage["role"] {
   return value === "user" || value === "agent";
 }
