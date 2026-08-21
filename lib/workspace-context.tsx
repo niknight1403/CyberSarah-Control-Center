@@ -8,6 +8,7 @@ export type StudioFile = {
   content: string;
   changed?: boolean;
   remote?: boolean;
+  remoteContent?: string;
 };
 
 export type StudioMessage = {
@@ -205,11 +206,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const hydrateFile = useCallback((id: string, content: string) => {
-    setFiles((currentFiles) => currentFiles.map((file) => (file.id === id ? { ...file, content, changed: false } : file)));
+    setFiles((currentFiles) => currentFiles.map((file) => (file.id === id ? { ...file, content, remoteContent: content, changed: false } : file)));
   }, []);
 
   const markFilesSynced = useCallback((ids: string[]) => {
-    setFiles((currentFiles) => currentFiles.map((file) => (ids.includes(file.id) ? { ...file, changed: false } : file)));
+    setFiles((currentFiles) => currentFiles.map((file) => (ids.includes(file.id) ? { ...file, remoteContent: file.content, changed: false } : file)));
     setEvents((currentEvents) => [
       { id: `sync-${Date.now()}`, level: "success", label: "Änderungen versioniert", detail: `${ids.length} Datei(en) wurden committed und warten auf den Push.` },
       ...currentEvents,

@@ -1,12 +1,13 @@
 import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { getFileDiffSummaries } from "@/lib/file-diff-logic";
 import type { RemoteHealth, RepositoryQuality } from "@/lib/remote-workspace-client";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { getRepositoryLabel } from "@/lib/studio-settings-logic";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function WorkspaceScreen() {
@@ -34,6 +35,8 @@ export default function WorkspaceScreen() {
   const [healthState, setHealthState] = useState<"idle" | "checking" | "ready" | "error">("idle");
   const [healthError, setHealthError] = useState("");
   const [healthCheckedAt, setHealthCheckedAt] = useState<string | null>(null);
+  const changedRemoteFiles = useMemo(() => files.filter((file) => file.changed && file.remote), [files]);
+  const diffSummaries = useMemo(() => getFileDiffSummaries(changedRemoteFiles.map((file) => ({ path: file.path, before: file.remoteContent ?? "", after: file.content }))), [changedRemoteFiles]);
 
   const refreshHealth = useCallback(async () => {
     if (!hasWorkspaceService) return;
@@ -93,7 +96,7 @@ export default function WorkspaceScreen() {
   };
 
   const commitChanges = async () => {
-    const changedFiles = files.filter((file) => file.changed && file.remote);
+    const changedFiles = changedRemoteFiles;
     if (!changedFiles.length || commitMessage.trim().length < 3) return;
     setGitFeedback("");
     try {
@@ -243,9 +246,10 @@ export default function WorkspaceScreen() {
               <PrimaryButton icon="square.and.pencil" label="Entwurf speichern" onPress={saveDraft} disabled={!selectedFile.changed} />
             </View>
             {hasAttachedRepository ? (
-              <View style={styles.gitBar}>
-                <View style={styles.gitBarHeader}><Text style={styles.gitBarEyebrow}>GIT-ÄNDERUNGEN</Text><Text style={styles.gitBarCount}>{changedFileCount ? `${changedFileCount} Datei(en) bereit` : "Keine lokalen Änderungen"}</Text></View>
-                <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor="#718196" style={styles.commitInput} value={commitMessage} />
+                <View style={styles.gitBar}>
+                  <View style={styles.gitBarHeader}><Text style={styles.gitBarEyebrow}>GIT-ÄNDERUNGEN</Text><Text style={styles.gitBarCount}>{changedFileCount ? `${changedFileCount} Datei(en) bereit` : "Keine lokalen Änderungen"}</Text></View>
+                  {diffSummaries.length ? <View style={styles.diffPreview}><Text style={styles.diffPreviewTitle}>SYNCHRONISIERUNGSVORSCHAU</Text>{diffSummaries.slice(0, 4).map((summary) => <View key={summary.path} style={styles.diffRow}><Text numberOfLines={1} style={styles.diffPath}>{summary.path}</Text><Text style={styles.diffCounts}>+{summary.addedLines} / −{summary.removedLines}</Text></View>)}{diffSummaries.length > 4 ? <Text style={styles.diffMore}>+ {diffSummaries.length - 4} weitere Datei(en)</Text> : null}</View> : changedRemoteFiles.length ? <Text style={styles.gitHint}>Dateiinhalte werden geladen, bevor eine zeilenbasierte Vorschau möglich ist.</Text> : null}
+                  <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor="#718196" style={styles.commitInput} value={commitMessage} />
                 <View style={styles.gitActions}>
                   <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing"} onPress={() => void commitChanges()} style={[styles.gitActionButton, styles.commitButton, (!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing") && styles.gitActionDisabled]}><Text style={styles.commitButtonText}>{gitAction === "saving" ? "Speichert …" : gitAction === "committing" ? "Commit …" : "Commit erstellen"}</Text></TouchableOpacity>
                   <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={gitAction !== "committed"} onPress={() => void pushChanges()} style={[styles.gitActionButton, styles.pushButton, gitAction !== "committed" && styles.gitActionDisabled]}><Text style={styles.pushButtonText}>{gitAction === "pushing" ? "Push …" : "Push zu GitHub"}</Text></TouchableOpacity>
@@ -432,6 +436,12 @@ const styles = StyleSheet.create({
   gitBarHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   gitBarEyebrow: { color: "#7B90A8", fontSize: 10, fontWeight: "900", letterSpacing: 1.05 },
   gitBarCount: { color: "#9FCBDA", fontSize: 11, fontWeight: "700" },
+  diffPreview: { backgroundColor: "#0B141D", borderColor: "#29445A", borderRadius: 11, borderWidth: 1, marginBottom: 10, padding: 10 },
+  diffPreviewTitle: { color: "#7794AB", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: 4 },
+  diffRow: { alignItems: "center", borderTopColor: "#1B2D3D", borderTopWidth: 1, flexDirection: "row", gap: 9, justifyContent: "space-between", paddingVertical: 6 },
+  diffPath: { color: "#C6D9E9", flex: 1, fontFamily: codeFont, fontSize: 10, fontWeight: "700" },
+  diffCounts: { color: "#70D9B0", fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
+  diffMore: { color: "#8C9FB2", fontSize: 10, marginTop: 4 },
   commitInput: { backgroundColor: "#0C131E", borderColor: "#2B3C52", borderRadius: 11, borderWidth: 1, color: "#E7F0F9", fontSize: 13, minHeight: 44, paddingHorizontal: 11, paddingVertical: 9 },
   gitActions: { flexDirection: "row", gap: 8, marginTop: 10 },
   gitActionButton: { alignItems: "center", borderRadius: 11, flex: 1, paddingHorizontal: 8, paddingVertical: 11 },
