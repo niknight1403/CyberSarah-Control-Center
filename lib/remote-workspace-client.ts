@@ -51,6 +51,7 @@ export type RepositoryQuality = {
     pending: number;
     checks: Array<{ name: string; status: string; conclusion: string | null; url: string | null }>;
   };
+  reviews: { reviewerCount: number; approvedCount: number; requestedChangesCount: number };
 };
 
 export function buildWorkspaceHeaders(config: RemoteWorkspaceConfig) {

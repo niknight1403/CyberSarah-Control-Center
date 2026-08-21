@@ -134,22 +134,39 @@ function getCiQuality(checks) {
   return { state: "passed", label: "CI bestanden", total: checks.length, passed, failed: 0, pending: 0 };
 }
 
+function getReviewQuality(reviews) {
+  const latestStateByReviewer = new Map();
+  for (const review of reviews) {
+    const reviewer = review.user?.login;
+    const state = String(review.state ?? "").toUpperCase();
+    if (!reviewer || !["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"].includes(state)) continue;
+    latestStateByReviewer.set(reviewer, state);
+  }
+  const states = [...latestStateByReviewer.values()];
+  return {
+    reviewerCount: states.length,
+    approvedCount: states.filter((state) => state === "APPROVED").length,
+    requestedChangesCount: states.filter((state) => state === "CHANGES_REQUESTED").length,
+  };
+}
+
 async function getRepositoryQuality(repositoryUrl, branch, token) {
   if (!token) {
-    return { pullRequest: null, merge: { state: "unavailable", label: "GitHub-Token erforderlich" }, ci: { state: "unavailable", label: "CI nicht verfügbar", total: 0, passed: 0, failed: 0, pending: 0, checks: [] } };
+    return { pullRequest: null, merge: { state: "unavailable", label: "GitHub-Token erforderlich" }, ci: { state: "unavailable", label: "CI nicht verfügbar", total: 0, passed: 0, failed: 0, pending: 0, checks: [] }, reviews: { reviewerCount: 0, approvedCount: 0, requestedChangesCount: 0 } };
   }
   const { owner, repository } = assertRepositoryUrl(repositoryUrl);
   const head = encodeURIComponent(`${owner}:${branch}`);
   const pullRequests = await githubJson(`/repos/${owner}/${repository}/pulls?state=open&head=${head}&per_page=1`, token);
   const pullRequest = Array.isArray(pullRequests) ? pullRequests[0] : undefined;
   if (!pullRequest) {
-    return { pullRequest: null, merge: { state: "no_pull_request", label: "Kein offener Pull Request" }, ci: { state: "not_configured", label: "Keine CI-Prüfungen", total: 0, passed: 0, failed: 0, pending: 0, checks: [] } };
+    return { pullRequest: null, merge: { state: "no_pull_request", label: "Kein offener Pull Request" }, ci: { state: "not_configured", label: "Keine CI-Prüfungen", total: 0, passed: 0, failed: 0, pending: 0, checks: [] }, reviews: { reviewerCount: 0, approvedCount: 0, requestedChangesCount: 0 } };
   }
   const fullPullRequest = await githubJson(`/repos/${owner}/${repository}/pulls/${pullRequest.number}`, token);
   const headSha = fullPullRequest.head?.sha;
-  const [checkRunsResult, commitStatusResult] = await Promise.allSettled([
+  const [checkRunsResult, commitStatusResult, reviewsResult] = await Promise.allSettled([
     githubJson(`/repos/${owner}/${repository}/commits/${headSha}/check-runs?per_page=20`, token),
     githubJson(`/repos/${owner}/${repository}/commits/${headSha}/status?per_page=20`, token),
+    githubJson(`/repos/${owner}/${repository}/pulls/${pullRequest.number}/reviews?per_page=100`, token),
   ]);
   const checkRunsPayload = checkRunsResult.status === "fulfilled" ? checkRunsResult.value : {};
   const commitStatusPayload = commitStatusResult.status === "fulfilled" ? commitStatusResult.value : {};
@@ -163,10 +180,12 @@ async function getRepositoryQuality(repositoryUrl, branch, token) {
   const ci = checkRunsResult.status === "rejected" && commitStatusResult.status === "rejected"
     ? { state: "unavailable", label: "CI-Zugriff eingeschränkt", total: 0, passed: 0, failed: 0, pending: 0, checks: [] }
     : { ...getCiQuality(checks), checks };
+  const reviews = reviewsResult.status === "fulfilled" && Array.isArray(reviewsResult.value) ? getReviewQuality(reviewsResult.value) : { reviewerCount: 0, approvedCount: 0, requestedChangesCount: 0 };
   return {
     pullRequest: { number: fullPullRequest.number, title: fullPullRequest.title, url: fullPullRequest.html_url, headBranch: fullPullRequest.head?.ref, baseBranch: fullPullRequest.base?.ref },
     merge: getMergeQuality(fullPullRequest),
     ci,
+    reviews,
   };
 }
 

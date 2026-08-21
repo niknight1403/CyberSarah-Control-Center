@@ -73,10 +73,10 @@ describe("workspace service client", () => {
   });
 
   it("loads merge readiness and CI results from the typed quality endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "release", pullRequest: { number: 1, title: "Ship", url: "https://github.com/example/repo/pull/1", headBranch: "release", baseBranch: "main" }, merge: { state: "ready", label: "Merge bereit" }, ci: { state: "passed", label: "CI bestanden", total: 1, passed: 1, failed: 0, pending: 0, checks: [] } }) });
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ branch: "release", pullRequest: { number: 1, title: "Ship", url: "https://github.com/example/repo/pull/1", headBranch: "release", baseBranch: "main" }, merge: { state: "ready", label: "Merge bereit" }, ci: { state: "passed", label: "CI bestanden", total: 1, passed: 1, failed: 0, pending: 0, checks: [] }, reviews: { reviewerCount: 2, approvedCount: 1, requestedChangesCount: 1 } }) });
     vi.stubGlobal("fetch", fetchMock);
     const client = new RemoteWorkspaceClient({ baseUrl: "https://studio.example.com", serviceAccessToken: "service-secret" });
-    await expect(client.getRepositoryQuality("workspace")).resolves.toMatchObject({ branch: "release", merge: { state: "ready" }, ci: { state: "passed" } });
+    await expect(client.getRepositoryQuality("workspace")).resolves.toMatchObject({ branch: "release", merge: { state: "ready" }, ci: { state: "passed" }, reviews: { approvedCount: 1, requestedChangesCount: 1 } });
     expect(fetchMock.mock.calls[0][0]).toBe("https://studio.example.com/api/v1/workspaces/workspace/git/quality");
     vi.unstubAllGlobals();
   });

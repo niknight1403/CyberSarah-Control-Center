@@ -346,6 +346,7 @@ function RepositoryQualityPanel({ quality }: { quality: RepositoryQuality }) {
         <View style={[styles.qualityPill, ciTone.container]}><View style={[styles.qualityDot, ciTone.dot]} /><Text style={[styles.qualityPillText, ciTone.text]}>{quality.ci.label}</Text></View>
       </View>
       {quality.pullRequest ? <Text style={styles.qualityPrText}>PR #{quality.pullRequest.number}: {quality.pullRequest.headBranch} → {quality.pullRequest.baseBranch}</Text> : <Text style={styles.qualityPrText}>Für den aktuellen Branch ist kein offener Pull Request vorhanden.</Text>}
+      {quality.pullRequest ? <View style={styles.reviewMetrics}><Text style={styles.reviewMetric}>Reviewer <Text style={styles.qualityMetricStrong}>{quality.reviews.reviewerCount}</Text></Text><Text style={styles.reviewMetricApproved}>Genehmigt <Text style={styles.qualityMetricStrong}>{quality.reviews.approvedCount}</Text></Text><Text style={styles.reviewMetricChanges}>Änderungen <Text style={styles.qualityMetricStrong}>{quality.reviews.requestedChangesCount}</Text></Text></View> : null}
       <View style={styles.qualityMetrics}><Text style={styles.qualityMetric}>Bestanden <Text style={styles.qualityMetricStrong}>{quality.ci.passed}</Text></Text><Text style={styles.qualityMetric}>Läuft <Text style={styles.qualityMetricStrong}>{quality.ci.pending}</Text></Text><Text style={styles.qualityMetric}>Fehler <Text style={styles.qualityMetricStrong}>{quality.ci.failed}</Text></Text></View>
       {quality.ci.checks.length ? quality.ci.checks.slice(0, 4).map((check) => <View key={`${check.name}-${check.status}`} style={styles.checkRow}><View style={[styles.checkDot, getQualityTone(check.conclusion ?? check.status).dot]} /><Text numberOfLines={1} style={styles.checkName}>{check.name}</Text><Text style={styles.checkState}>{check.conclusion ?? check.status}</Text></View>) : <Text style={styles.qualityEmpty}>GitHub meldet für diesen Pull Request noch keine Check-Runs oder Commit-Status-Prüfungen.</Text>}
     </View>
@@ -421,7 +422,11 @@ const styles = StyleSheet.create({
   textNeutral: { color: "#A2B1C2" },
   qualityPrText: { color: "#B0BFCE", fontSize: 11, lineHeight: 16, marginTop: 10 },
   qualityMetrics: { flexDirection: "row", gap: 13, marginTop: 10 },
+  reviewMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 11, marginTop: 9 },
   qualityMetric: { color: "#8294A8", fontSize: 11 },
+  reviewMetric: { color: "#AAB8C8", fontSize: 11 },
+  reviewMetricApproved: { color: "#7BE5AE", fontSize: 11 },
+  reviewMetricChanges: { color: "#F2C979", fontSize: 11 },
   qualityMetricStrong: { color: "#DFE9F5", fontWeight: "800" },
   checkRow: { alignItems: "center", borderTopColor: "#1E2B3B", borderTopWidth: 1, flexDirection: "row", gap: 7, marginTop: 9, paddingTop: 9 },
   checkDot: { borderRadius: 4, height: 7, width: 7 },

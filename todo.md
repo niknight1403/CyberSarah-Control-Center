@@ -27,7 +27,7 @@
 - [x] Sprint 1: Add workspace connection diagnostics and manual health refresh.
 - [x] Sprint 2: Add an inspectable local file-diff view before synchronization.
 - [x] Sprint 3: Add protected-branch warnings and explicit push confirmation.
-- [ ] Sprint 4: Add pull-request summary and review-state visibility.
+- [x] Sprint 4: Add pull-request summary and review-state visibility.
 - [ ] Sprint 5: Add CI-quality details and a manual status refresh flow.
 - [ ] Sprint 6: Scope persisted development-chat sessions to their connected repository.
 - [ ] Sprint 7: Allow selective application and controlled reversal of agent-proposed changes.
