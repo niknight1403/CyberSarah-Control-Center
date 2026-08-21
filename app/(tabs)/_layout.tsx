@@ -3,7 +3,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { StudioSettingsProvider } from "@/lib/studio-settings";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import { Platform } from "react-native";
 import { useColors } from "@/hooks/use-colors";
@@ -15,9 +14,8 @@ export default function TabLayout() {
   const tabBarHeight = 56 + bottomPadding;
 
   return (
-    <StudioSettingsProvider>
-      <WorkspaceProvider>
-        <Tabs
+    <WorkspaceProvider>
+      <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.tint,
         headerShown: false,
@@ -53,8 +51,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => <IconSymbol size={25} name="play.rectangle.fill" color={color} />,
           }}
         />
-        </Tabs>
-      </WorkspaceProvider>
-    </StudioSettingsProvider>
+      </Tabs>
+    </WorkspaceProvider>
   );
 }

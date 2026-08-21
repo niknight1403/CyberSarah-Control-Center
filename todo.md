@@ -9,5 +9,6 @@
 - [x] Generate and apply a custom Custom AI Studio Mobile icon and app branding.
 - [x] Add deterministic tests for workspace state and configuration persistence.
 - [x] Verify TypeScript, tests, and the rendered mobile layout.
-- [ ] Create the first complete project checkpoint and provide hand-off guidance.
+- [x] Create the first complete project checkpoint and provide hand-off guidance.
 - [x] Compress and replace all native launcher assets below the checkpoint size limit, then retry the checkpoint.
+- [x] Fix the settings route crash caused by StudioSettingsProvider not wrapping the root navigator.
