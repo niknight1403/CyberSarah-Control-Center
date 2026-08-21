@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
 import { toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
 import * as SecureStore from "expo-secure-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -24,6 +25,7 @@ export type StudioSettings = {
   repositoryUrl: string;
   branch: string;
   provider: ProviderId;
+  workspaceId?: string;
   hasServiceAccessToken: boolean;
   hasGitHubToken: boolean;
   hasProviderKey: boolean;
@@ -66,6 +68,11 @@ async function hasSecureValue(key: string) {
   return Boolean(await SecureStore.getItemAsync(key));
 }
 
+async function readSecureValue(key: string) {
+  if (Platform.OS === "web") return typeof sessionStorage !== "undefined" ? sessionStorage.getItem(key) : null;
+  return SecureStore.getItemAsync(key);
+}
+
 type StudioSettingsContextValue = {
   settings: StudioSettings;
   loading: boolean;
@@ -73,6 +80,8 @@ type StudioSettingsContextValue = {
   clearServiceAccessToken: () => Promise<void>;
   clearGitHubToken: () => Promise<void>;
   clearProviderKey: () => Promise<void>;
+  attachRepository: (input: StudioSettingsInput) => Promise<{ workspaceId: string; branch: string; files: string[] }>;
+  readAttachedFile: (path: string) => Promise<{ path: string; content: string }>;
 };
 
 const StudioSettingsContext = createContext<StudioSettingsContextValue | undefined>(undefined);
@@ -91,13 +100,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
           hasSecureValue(GITHUB_TOKEN_KEY),
           hasSecureValue(PROVIDER_KEY_KEY),
         ]);
-        setSettings({
-          ...defaultSettings,
-          ...parsed,
-          hasServiceAccessToken,
-          hasGitHubToken,
-          hasProviderKey,
-        });
+        setSettings({ ...defaultSettings, ...parsed, hasServiceAccessToken, hasGitHubToken, hasProviderKey });
       } finally {
         setLoading(false);
       }
@@ -108,6 +111,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   const saveSettings = useCallback(async (input: StudioSettingsInput) => {
     const nextSettings: StudioSettings = {
       ...toPersistedStudioSettings(input),
+      workspaceId: settings.workspaceId,
       hasServiceAccessToken: input.serviceAccessToken?.trim() ? true : settings.hasServiceAccessToken,
       hasGitHubToken: input.githubToken?.trim() ? true : settings.hasGitHubToken,
       hasProviderKey: input.providerApiKey?.trim() ? true : settings.hasProviderKey,
@@ -117,18 +121,10 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     if (input.githubToken?.trim()) await writeSecureValue(GITHUB_TOKEN_KEY, input.githubToken.trim());
     if (input.providerApiKey?.trim()) await writeSecureValue(PROVIDER_KEY_KEY, input.providerApiKey.trim());
 
-    await AsyncStorage.setItem(
-      PREFERENCES_KEY,
-      JSON.stringify({
-        workspaceUrl: nextSettings.workspaceUrl,
-        repositoryUrl: nextSettings.repositoryUrl,
-        branch: nextSettings.branch,
-        provider: nextSettings.provider,
-      }),
-    );
+    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(nextSettings));
     setSettings(nextSettings);
     return nextSettings;
-  }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken]);
+  }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken, settings.workspaceId]);
 
   const clearServiceAccessToken = useCallback(async () => {
     await deleteSecureValue(SERVICE_ACCESS_TOKEN_KEY);
@@ -145,9 +141,48 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     setSettings((current) => ({ ...current, hasProviderKey: false }));
   }, []);
 
+  const attachRepository = useCallback(async (input: StudioSettingsInput) => {
+    const storedSettings = await saveSettings(input);
+    const [storedServiceToken, storedGitHubToken, storedProviderKey] = await Promise.all([
+      readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
+      readSecureValue(GITHUB_TOKEN_KEY),
+      readSecureValue(PROVIDER_KEY_KEY),
+    ]);
+    const client = new RemoteWorkspaceClient({
+      baseUrl: storedSettings.workspaceUrl,
+      serviceAccessToken: input.serviceAccessToken?.trim() || storedServiceToken || undefined,
+      githubToken: input.githubToken?.trim() || storedGitHubToken || undefined,
+      provider: storedSettings.provider,
+      providerApiKey: input.providerApiKey?.trim() || storedProviderKey || undefined,
+    });
+    const attached = await client.attachRepository({ repositoryUrl: storedSettings.repositoryUrl, branch: storedSettings.branch });
+    const files = (await client.listFiles(attached.workspaceId)).files;
+    const nextSettings = { ...storedSettings, workspaceId: attached.workspaceId };
+    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(nextSettings));
+    setSettings(nextSettings);
+    return { ...attached, files };
+  }, [saveSettings]);
+
+  const readAttachedFile = useCallback(async (path: string) => {
+    if (!settings.workspaceUrl || !settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
+      readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
+      readSecureValue(GITHUB_TOKEN_KEY),
+      readSecureValue(PROVIDER_KEY_KEY),
+    ]);
+    const client = new RemoteWorkspaceClient({
+      baseUrl: settings.workspaceUrl,
+      serviceAccessToken: serviceAccessToken || undefined,
+      githubToken: githubToken || undefined,
+      provider: settings.provider,
+      providerApiKey: providerApiKey || undefined,
+    });
+    return client.getFile(settings.workspaceId, path);
+  }, [settings.provider, settings.workspaceId, settings.workspaceUrl]);
+
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey }),
-    [clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, saveSettings, settings],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, settings],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;

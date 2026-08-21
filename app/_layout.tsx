@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { StudioSettingsProvider } from "@/lib/studio-settings";
+import { WorkspaceProvider } from "@/lib/workspace-context";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -82,8 +83,9 @@ export default function RootLayout() {
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StudioSettingsProvider>
-        <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}>
+        <WorkspaceProvider>
+          <trpc.Provider client={trpcClient} queryClient={queryClient}>
+            <QueryClientProvider client={queryClient}>
             {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
             {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
             {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
@@ -92,8 +94,9 @@ export default function RootLayout() {
               <Stack.Screen name="oauth/callback" />
             </Stack>
             <StatusBar style="auto" />
-          </QueryClientProvider>
-        </trpc.Provider>
+            </QueryClientProvider>
+          </trpc.Provider>
+        </WorkspaceProvider>
       </StudioSettingsProvider>
     </GestureHandlerRootView>
   );

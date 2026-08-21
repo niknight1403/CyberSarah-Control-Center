@@ -7,6 +7,7 @@ export type StudioFile = {
   language: "tsx" | "ts" | "css" | "json";
   content: string;
   changed?: boolean;
+  remote?: boolean;
 };
 
 export type StudioMessage = {
@@ -100,6 +101,8 @@ type WorkspaceContextValue = {
   saveDraft: () => void;
   askAgent: (prompt: string) => void;
   refreshPreview: () => void;
+  loadRemoteFiles: (paths: string[]) => void;
+  hydrateFile: (id: string, content: string) => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
@@ -172,6 +175,38 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     ]);
   }, []);
 
+  const loadRemoteFiles = useCallback((paths: string[]) => {
+    const filesFromRepository: StudioFile[] = paths.map((filePath) => {
+      const name = filePath.split("/").pop() ?? filePath;
+      const extension = name.split(".").pop()?.toLowerCase();
+      const language = extension === "css" ? "css" : extension === "json" ? "json" : extension === "tsx" || extension === "jsx" ? "tsx" : "ts";
+      return {
+        id: `remote-${filePath.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`,
+        name,
+        path: filePath,
+        language,
+        content: "// Lade Inhalt vom verbundenen Workspace-Service …",
+        remote: true,
+      };
+    });
+    if (!filesFromRepository.length) return;
+    setFiles(filesFromRepository);
+    setSelectedFileId(filesFromRepository[0].id);
+    setEvents((currentEvents) => [
+      {
+        id: `repository-${Date.now()}`,
+        level: "success",
+        label: "Repository verbunden",
+        detail: `${filesFromRepository.length} Dateien wurden aus dem Workspace-Service geladen`,
+      },
+      ...currentEvents,
+    ]);
+  }, []);
+
+  const hydrateFile = useCallback((id: string, content: string) => {
+    setFiles((currentFiles) => currentFiles.map((file) => (file.id === id ? { ...file, content, changed: false } : file)));
+  }, []);
+
   const value = useMemo<WorkspaceContextValue>(
     () => ({
       files,
@@ -187,6 +222,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       saveDraft,
       askAgent,
       refreshPreview,
+      loadRemoteFiles,
+      hydrateFile,
     }),
     [
       askAgent,
@@ -201,6 +238,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       selectedFile,
       selectedFileId,
       updateFile,
+      loadRemoteFiles,
+      hydrateFile,
     ],
   );
 

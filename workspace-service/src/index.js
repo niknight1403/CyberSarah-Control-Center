@@ -85,9 +85,15 @@ function getSafeProjectPath(workspaceId, relativePath) {
 
 async function git(argumentsList, cwd, token) {
   const args = token
-    ? ["-c", `http.extraHeader=AUTHORIZATION: Bearer ${token}`, ...argumentsList]
+    ? ["-c", `http.extraHeader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString("base64")}`, ...argumentsList]
     : argumentsList;
-  return execFileAsync("git", args, { cwd, maxBuffer: 2_000_000 });
+  try {
+    return await execFileAsync("git", args, { cwd, maxBuffer: 2_000_000 });
+  } catch (error) {
+    const stderr = error instanceof Error && "stderr" in error ? String(error.stderr ?? "") : "";
+    const sanitized = token ? stderr.replaceAll(token, "[REDACTED]") : stderr;
+    throw new Error(`Git-Operation fehlgeschlagen.${sanitized ? ` ${sanitized.trim()}` : ""}`);
+  }
 }
 
 async function ensureWorkspace(repositoryUrl, branch, token) {

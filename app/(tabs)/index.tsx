@@ -8,9 +8,10 @@ import { router } from "expo-router";
 import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function WorkspaceScreen() {
-  const { changedFileCount, files, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
-  const { settings } = useStudioSettings();
+  const { changedFileCount, files, hydrateFile, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
+  const { readAttachedFile, settings } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
+  const hasAttachedRepository = Boolean(settings.workspaceId);
   const repositoryLabel = getRepositoryLabel(settings.repositoryUrl);
 
   return (
@@ -33,11 +34,11 @@ export default function WorkspaceScreen() {
                     <Text style={styles.projectPath}>{hasWorkspaceService ? settings.workspaceUrl : "Lokaler Arbeitsbereich"}</Text>
                   </View>
                 </View>
-                <StatusBadge label="main" tone="accent" />
+                <StatusBadge label={settings.branch} tone="accent" />
               </View>
               <View style={styles.projectFooter}>
                 <Text style={styles.projectState}>{changedFileCount ? `${changedFileCount} Datei(en) geändert` : "Keine offenen Änderungen"}</Text>
-                <StatusBadge label={hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={hasWorkspaceService ? "ready" : "warning"} />
+                <StatusBadge label={hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={hasAttachedRepository || hasWorkspaceService ? "ready" : "warning"} />
               </View>
             </View>
             <StudioSection label="Explorer" title="Projektdateien" />
@@ -85,7 +86,7 @@ export default function WorkspaceScreen() {
                 <IconSymbol name="terminal.fill" size={16} color="#45D996" />
                 <Text style={styles.consolePromptText}>workspace:main</Text>
               </View>
-              <Text style={styles.consoleText}>Sichere Remote-Verbindung noch nicht konfiguriert.</Text>
+              <Text style={styles.consoleText}>{hasAttachedRepository ? `Verbunden mit ${repositoryLabel} auf ${settings.branch}.` : "Sichere Remote-Verbindung noch nicht konfiguriert."}</Text>
               <TouchableOpacity activeOpacity={0.75} onPress={() => router.push("/settings" as never)} style={styles.consoleLink}>
                 <Text style={styles.consoleLinkText}>Verbindung einrichten</Text>
                 <IconSymbol name="arrow.right" size={14} color="#52D8FF" />
@@ -99,7 +100,12 @@ export default function WorkspaceScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               activeOpacity={0.76}
-              onPress={() => selectFile(item.id)}
+              onPress={() => {
+                selectFile(item.id);
+                if (item.remote) {
+                  void readAttachedFile(item.path).then((result) => hydrateFile(item.id, result.content)).catch(() => undefined);
+                }
+              }}
               style={[styles.fileRow, isSelected && styles.fileRowSelected]}
             >
               <View style={[styles.fileIcon, isSelected && styles.fileIconSelected]}>

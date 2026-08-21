@@ -1,14 +1,17 @@
 import { EmptySurface, PrimaryButton, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { integrationFixture } from "@/constants/integration-fixture";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
 import { type FieldValidation, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
+import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function SettingsScreen() {
-  const { clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, saveSettings, settings } = useStudioSettings();
+  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, settings } = useStudioSettings();
+  const { loadRemoteFiles } = useWorkspace();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [branch, setBranch] = useState("main");
@@ -19,6 +22,8 @@ export default function SettingsScreen() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [workspaceTouched, setWorkspaceTouched] = useState(false);
   const [serviceTokenTouched, setServiceTokenTouched] = useState(false);
+  const [attachState, setAttachState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const [attachMessage, setAttachMessage] = useState("");
 
   useEffect(() => {
     if (loading) return;
@@ -31,6 +36,7 @@ export default function SettingsScreen() {
   const workspaceValidation = validateWorkspaceUrl(workspaceUrl);
   const serviceTokenValidation = validateServiceAccessToken(serviceAccessToken, settings.hasServiceAccessToken);
   const canSave = workspaceValidation.valid && serviceTokenValidation.valid;
+  const canAttach = canSave && Boolean(repositoryUrl.trim()) && Boolean(branch.trim());
 
   const persistSettings = async () => {
     setWorkspaceTouched(true);
@@ -42,6 +48,26 @@ export default function SettingsScreen() {
     setGithubToken("");
     setProviderApiKey("");
     setSaveState("saved");
+  };
+
+  const connectRepository = async () => {
+    setWorkspaceTouched(true);
+    setServiceTokenTouched(true);
+    if (!canAttach) return;
+    setAttachState("connecting");
+    setAttachMessage("");
+    try {
+      const attached = await attachRepository({ workspaceUrl, repositoryUrl, branch, provider, serviceAccessToken, githubToken, providerApiKey });
+      loadRemoteFiles(attached.files);
+      setServiceAccessToken("");
+      setGithubToken("");
+      setProviderApiKey("");
+      setAttachState("connected");
+      setAttachMessage(`${attached.files.length} Dateien sind auf Branch ${attached.branch} verfügbar.`);
+    } catch (error) {
+      setAttachState("error");
+      setAttachMessage(error instanceof Error ? error.message : "Die Repository-Verbindung konnte nicht hergestellt werden.");
+    }
   };
 
   return (
@@ -66,7 +92,20 @@ export default function SettingsScreen() {
           <Text style={styles.fieldLabel}>REPOSITORY-URL</Text>
           <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="url" onChangeText={setRepositoryUrl} placeholder="https://github.com/owner/repository.git" placeholderTextColor="#697A90" style={styles.input} value={repositoryUrl} />
           <Text style={styles.fieldLabel}>BRANCH</Text>
-          <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setBranch} placeholder="main" placeholderTextColor="#697A90" style={styles.input} value={branch} />
+          <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setBranch(value); setAttachState("idle"); }} placeholder="main" placeholderTextColor="#697A90" style={styles.input} value={branch} />
+          <TouchableOpacity activeOpacity={0.75} onPress={() => { setRepositoryUrl(integrationFixture.repositoryUrl); setBranch(integrationFixture.branch); setAttachState("idle"); }} style={styles.fixtureButton}>
+            <IconSymbol name="bolt.fill" size={16} color="#52D8FF" />
+            <View style={styles.fixtureTextArea}>
+              <Text style={styles.fixtureTitle}>Test-Repository einsetzen</Text>
+              <Text style={styles.fixtureDetail}>{integrationFixture.label}</Text>
+            </View>
+            <IconSymbol name="arrow.right" size={16} color="#52D8FF" />
+          </TouchableOpacity>
+          <View style={styles.attachArea}>
+            <PrimaryButton icon="folder.fill" label={attachState === "connecting" ? "Repository wird verbunden …" : "Repository verbinden"} onPress={() => void connectRepository()} disabled={!canAttach || attachState === "connecting"} />
+            {attachState === "connected" ? <View style={styles.attachSuccess}><IconSymbol name="checkmark.circle.fill" size={17} color="#45D996" /><Text style={styles.attachSuccessText}>{attachMessage}</Text></View> : null}
+            {attachState === "error" ? <View style={styles.attachError}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#FF6B7A" /><Text style={styles.attachErrorText}>{attachMessage}</Text></View> : null}
+          </View>
         </View>
         <View style={styles.sectionSpacer}>
           <StudioSection label="GitHub" title="Persönlicher Zugriffstoken" />
@@ -165,6 +204,15 @@ const styles = StyleSheet.create({
   readinessText: { flex: 1, fontSize: 12, lineHeight: 18 },
   readinessTextReady: { color: "#70E4AA" },
   readinessTextPending: { color: "#E5BD6D" },
+  attachArea: { marginTop: 16 },
+  fixtureButton: { alignItems: "center", backgroundColor: "#132534", borderColor: "#2B677E", borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 9, marginTop: 13, padding: 12 },
+  fixtureTextArea: { flex: 1 },
+  fixtureTitle: { color: "#D9F5FC", fontSize: 13, fontWeight: "800", marginBottom: 2 },
+  fixtureDetail: { color: "#8FBCCA", fontSize: 11 },
+  attachSuccess: { alignItems: "flex-start", backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.34)", borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginTop: 10, padding: 12 },
+  attachSuccessText: { color: "#70E4AA", flex: 1, fontSize: 12, lineHeight: 18 },
+  attachError: { alignItems: "flex-start", backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.32)", borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginTop: 10, padding: 12 },
+  attachErrorText: { color: "#FF9AA4", flex: 1, fontSize: 12, lineHeight: 18 },
   savedLabel: { color: "#70E4AA", fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: "center" },
   notice: { alignItems: "flex-start", flexDirection: "row", gap: 9, marginTop: 20, paddingHorizontal: 5 },
   noticeText: { color: "#8B9AAE", flex: 1, fontSize: 12, lineHeight: 18 },

@@ -13,3 +13,5 @@
 - [x] Compress and replace all native launcher assets below the checkpoint size limit, then retry the checkpoint.
 - [x] Fix the settings route crash caused by StudioSettingsProvider not wrapping the root navigator.
 - [x] Add live visual validation for workspace URL and service access token before settings can be saved.
+- [x] Activate repository connection from Settings and surface attachment state in the workspace.
+- [x] Prepare and validate an isolated test repository against the workspace service.

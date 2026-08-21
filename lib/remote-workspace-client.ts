@@ -71,6 +71,14 @@ export class RemoteWorkspaceClient {
     });
   }
 
+  listFiles(workspaceId: string) {
+    return this.request<{ files: string[] }>(`/api/v1/workspaces/${workspaceId}/files`);
+  }
+
+  getFile(workspaceId: string, path: string) {
+    return this.request<{ path: string; content: string }>(`/api/v1/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`);
+  }
+
   requestAgentProposal(input: AgentRequest) {
     return this.request<AgentProposal>("/api/v1/agent/proposals", {
       method: "POST",
