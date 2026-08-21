@@ -413,8 +413,17 @@ app.put("/api/v1/workspaces/:workspaceId/file", requireServiceAuthorization, asy
 
 app.get("/api/v1/workspaces/:workspaceId/git/status", requireServiceAuthorization, async (request, response, next) => {
   try {
-    const { stdout } = await git(["status", "--short", "--branch"], getWorkspacePath(request.params.workspaceId), getGitHubToken(request));
-    response.json({ status: stdout });
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const token = getGitHubToken(request);
+    const { stdout } = await git(["status", "--short", "--branch"], workspacePath, token);
+    try {
+      await git(["fetch", "origin", "--quiet"], workspacePath, token);
+      const { stdout: divergence } = await git(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], workspacePath, token);
+      const [localAhead = 0, remoteAhead = 0] = divergence.trim().split(/\s+/).map((value) => Number.parseInt(value, 10));
+      response.json({ status: stdout, remoteAhead: Number.isFinite(remoteAhead) && remoteAhead > 0, localAhead: Number.isFinite(localAhead) && localAhead > 0, remoteCheckAvailable: true });
+    } catch {
+      response.json({ status: stdout, remoteAhead: false, localAhead: false, remoteCheckAvailable: false });
+    }
   } catch (error) {
     next(error);
   }

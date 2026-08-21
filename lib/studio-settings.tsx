@@ -86,7 +86,7 @@ type StudioSettingsContextValue = {
   clearProviderKey: () => Promise<void>;
   attachRepository: (input: StudioSettingsInput) => Promise<{ workspaceId: string; branch: string; files: string[] }>;
   readAttachedFile: (path: string) => Promise<{ path: string; content: string }>;
-  loadRepositoryDetails: () => Promise<{ currentBranch: string; branches: string[]; commits: RemoteCommit[] }>;
+  loadRepositoryDetails: () => Promise<{ currentBranch: string; branches: string[]; commits: RemoteCommit[]; remoteAhead: boolean; remoteCheckAvailable: boolean }>;
   switchRepositoryBranch: (branch: string) => Promise<{ branch: string; files: string[] }>;
   syncRemoteChanges: (changes: RemoteWorkspaceChange[]) => Promise<{ savedCount: number; status: string }>;
   commitRepository: (message: string) => Promise<{ hash: string }>;
@@ -219,11 +219,12 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   const loadRepositoryDetails = useCallback(async () => {
     if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
     const client = await createConnectedClient();
-    const [branchState, commitState] = await Promise.all([
+    const [branchState, commitState, gitStatus] = await Promise.all([
       client.listBranches(settings.workspaceId),
       client.listCommits(settings.workspaceId),
+      client.getGitStatus(settings.workspaceId),
     ]);
-    return { ...branchState, commits: commitState.commits };
+    return { ...branchState, commits: commitState.commits, remoteAhead: gitStatus.remoteAhead, remoteCheckAvailable: gitStatus.remoteCheckAvailable };
   }, [createConnectedClient, settings.workspaceId]);
 
   const switchRepositoryBranch = useCallback(async (branch: string) => {

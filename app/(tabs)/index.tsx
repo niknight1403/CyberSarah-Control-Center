@@ -7,6 +7,7 @@ import type { RemoteHealth, RepositoryQuality } from "@/lib/remote-workspace-cli
 import { useStudioSettings } from "@/lib/studio-settings";
 import { getRepositoryLabel } from "@/lib/studio-settings-logic";
 import { useWorkspace } from "@/lib/workspace-context";
+import { getWorkspaceSyncState } from "@/lib/workspace-sync-logic";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -36,9 +37,12 @@ export default function WorkspaceScreen() {
   const [healthState, setHealthState] = useState<"idle" | "checking" | "ready" | "error">("idle");
   const [healthError, setHealthError] = useState("");
   const [healthCheckedAt, setHealthCheckedAt] = useState<string | null>(null);
+  const [remoteAhead, setRemoteAhead] = useState(false);
+  const [remoteCheckAvailable, setRemoteCheckAvailable] = useState(true);
   const changedRemoteFiles = useMemo(() => files.filter((file) => file.changed && file.remote), [files]);
   const diffSummaries = useMemo(() => getFileDiffSummaries(changedRemoteFiles.map((file) => ({ path: file.path, before: file.remoteContent ?? "", after: file.content }))), [changedRemoteFiles]);
   const currentBranchIsProtected = isProtectedBranch(settings.branch);
+  const syncState = getWorkspaceSyncState(changedRemoteFiles.length, remoteAhead);
 
   const refreshHealth = useCallback(async () => {
     if (!hasWorkspaceService) return;
@@ -66,6 +70,8 @@ export default function WorkspaceScreen() {
       const details = detailsResult.value;
       setBranches(details.branches);
       setCommits(details.commits);
+      setRemoteAhead(details.remoteAhead);
+      setRemoteCheckAvailable(details.remoteCheckAvailable);
       setRepositoryState("ready");
     } else {
       setRepositoryState("error");
@@ -196,8 +202,8 @@ export default function WorkspaceScreen() {
                 <StatusBadge label={currentBranchIsProtected ? `${settings.branch} · geschützt` : settings.branch} tone={currentBranchIsProtected ? "warning" : "accent"} />
               </View>
               <View style={styles.projectFooter}>
-                <Text style={styles.projectState}>{changedFileCount ? `${changedFileCount} Datei(en) geändert` : "Keine offenen Änderungen"}</Text>
-                <StatusBadge label={hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={hasAttachedRepository || hasWorkspaceService ? "ready" : "warning"} />
+                <Text style={styles.projectState}>{syncState.offlineDraftCount ? `${syncState.offlineDraftCount} Offline-Entwurf(e)` : "Keine offenen Änderungen"}</Text>
+                <StatusBadge label={syncState.hasConflictRisk ? "Möglicher Konflikt" : hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={syncState.hasConflictRisk ? "warning" : hasAttachedRepository || hasWorkspaceService ? "ready" : "warning"} />
               </View>
             </View>
             {hasWorkspaceService ? <View style={[styles.healthPanel, healthState === "error" && styles.healthPanelError]}><View style={styles.healthHeader}><View><Text style={styles.healthEyebrow}>SERVICE-DIAGNOSE</Text><Text style={styles.healthTitle}>{healthState === "checking" ? "Verbindung wird geprüft …" : healthState === "ready" && serviceHealth ? serviceHealth.status === "ready" ? "Workspace-Service erreichbar" : "Workspace-Service beschäftigt" : "Verbindungsstatus ausstehend"}</Text></View><TouchableOpacity accessibilityLabel="Workspace-Service prüfen" activeOpacity={0.75} disabled={healthState === "checking"} onPress={() => void refreshHealth()} style={[styles.refreshButton, healthState === "checking" && styles.healthButtonDisabled]}><Text style={styles.refreshButtonText}>{healthState === "checking" ? "Prüft …" : "Prüfen"}</Text></TouchableOpacity></View><Text style={[styles.healthDetail, healthState === "error" && styles.repositoryError]}>{healthState === "ready" && serviceHealth ? `Version ${serviceHealth.version}${serviceHealth.previewUrl ? " · Vorschau verfügbar" : " · Keine Laufzeitvorschau gemeldet"}${healthCheckedAt ? ` · geprüft ${formatCommitDate(healthCheckedAt)}` : ""}` : healthState === "error" ? healthError : "Die Diagnose prüft Service-Erreichbarkeit ohne Repository-Daten zu verändern."}</Text></View> : null}
@@ -275,6 +281,7 @@ export default function WorkspaceScreen() {
             {hasAttachedRepository ? (
                 <View style={styles.gitBar}>
                   <View style={styles.gitBarHeader}><Text style={styles.gitBarEyebrow}>GIT-ÄNDERUNGEN</Text><Text style={styles.gitBarCount}>{changedFileCount ? `${changedFileCount} Datei(en) bereit` : "Keine lokalen Änderungen"}</Text></View>
+                  {syncState.offlineDraftCount ? <Text style={[styles.gitHint, syncState.hasConflictRisk && styles.conflictWarning]}>{syncState.hasConflictRisk ? `Möglicher Konflikt: ${settings.branch} hat neue Remote-Commits. Prüfe Diff und ziehe den Branch vor dem Commit ab.` : remoteCheckAvailable ? "Offline-Entwürfe: Diese Änderungen wurden seit dem letzten Remote-Abgleich noch nicht synchronisiert." : "Offline-Entwürfe: Der Remote-Abgleich ist derzeit nicht verfügbar."}</Text> : null}
                   {diffSummaries.length ? <View style={styles.diffPreview}><Text style={styles.diffPreviewTitle}>SYNCHRONISIERUNGSVORSCHAU</Text>{diffSummaries.slice(0, 4).map((summary) => <View key={summary.path} style={styles.diffRow}><Text numberOfLines={1} style={styles.diffPath}>{summary.path}</Text><Text style={styles.diffCounts}>+{summary.addedLines} / −{summary.removedLines}</Text></View>)}{diffSummaries.length > 4 ? <Text style={styles.diffMore}>+ {diffSummaries.length - 4} weitere Datei(en)</Text> : null}</View> : changedRemoteFiles.length ? <Text style={styles.gitHint}>Dateiinhalte werden geladen, bevor eine zeilenbasierte Vorschau möglich ist.</Text> : null}
                   <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor="#718196" style={styles.commitInput} value={commitMessage} />
                 <View style={styles.gitActions}>
@@ -487,6 +494,7 @@ const styles = StyleSheet.create({
   gitFeedbackSuccess: { color: "#6FE0A7" },
   gitFeedbackError: { color: "#FF9AA4" },
   gitHint: { color: "#8294AA", fontSize: 11, lineHeight: 16, marginTop: 10 },
+  conflictWarning: { color: "#F2C979", fontWeight: "800" },
   pullRequestBar: { borderTopColor: "#2B3E55", borderTopWidth: 1, marginTop: 14, paddingTop: 14 },
   pullRequestEyebrow: { color: "#B9A8FF", fontSize: 10, fontWeight: "900", letterSpacing: 1.05, marginBottom: 5 },
   pullRequestHint: { color: "#94A4B8", fontSize: 11, lineHeight: 16, marginBottom: 9 },

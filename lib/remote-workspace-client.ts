@@ -109,7 +109,7 @@ export class RemoteWorkspaceClient {
     });
   }
   getGitStatus(workspaceId: string) {
-    return this.request<{ status: string }>(`/api/v1/workspaces/${workspaceId}/git/status`);
+    return this.request<{ status: string; remoteAhead: boolean; localAhead: boolean; remoteCheckAvailable: boolean }>(`/api/v1/workspaces/${workspaceId}/git/status`);
   }
   listBranches(workspaceId: string) {
     return this.request<RemoteBranches>(`/api/v1/workspaces/${workspaceId}/git/branches`);
