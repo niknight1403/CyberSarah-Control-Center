@@ -5,14 +5,50 @@ import { useStudioSettings } from "@/lib/studio-settings";
 import { getRepositoryLabel } from "@/lib/studio-settings-logic";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function WorkspaceScreen() {
-  const { changedFileCount, files, hydrateFile, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
-  const { readAttachedFile, settings } = useStudioSettings();
+  const { changedFileCount, files, hydrateFile, loadRemoteFiles, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
+  const { loadRepositoryDetails, readAttachedFile, settings, switchRepositoryBranch } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
   const hasAttachedRepository = Boolean(settings.workspaceId);
   const repositoryLabel = getRepositoryLabel(settings.repositoryUrl);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [commits, setCommits] = useState<Array<{ shortHash: string; author: string; committedAt: string; message: string }>>([]);
+  const [repositoryState, setRepositoryState] = useState<"idle" | "loading" | "ready" | "switching" | "error">("idle");
+  const [repositoryError, setRepositoryError] = useState("");
+
+  const refreshRepository = useCallback(async () => {
+    if (!hasAttachedRepository) return;
+    setRepositoryState("loading");
+    setRepositoryError("");
+    try {
+      const details = await loadRepositoryDetails();
+      setBranches(details.branches);
+      setCommits(details.commits);
+      setRepositoryState("ready");
+    } catch (error) {
+      setRepositoryState("error");
+      setRepositoryError(error instanceof Error ? error.message : "Branch- und Commit-Daten konnten nicht geladen werden.");
+    }
+  }, [hasAttachedRepository, loadRepositoryDetails]);
+
+  useEffect(() => { void refreshRepository(); }, [refreshRepository]);
+
+  const chooseBranch = async (branch: string) => {
+    if (branch === settings.branch || repositoryState === "switching") return;
+    setRepositoryState("switching");
+    setRepositoryError("");
+    try {
+      const result = await switchRepositoryBranch(branch);
+      loadRemoteFiles(result.files);
+      await refreshRepository();
+    } catch (error) {
+      setRepositoryState("error");
+      setRepositoryError(error instanceof Error ? error.message : "Der Branch konnte nicht gewechselt werden.");
+    }
+  };
 
   return (
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
@@ -41,6 +77,35 @@ export default function WorkspaceScreen() {
                 <StatusBadge label={hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={hasAttachedRepository || hasWorkspaceService ? "ready" : "warning"} />
               </View>
             </View>
+            {hasAttachedRepository ? (
+              <View style={styles.repositoryPanel}>
+                <View style={styles.repositoryHeader}>
+                  <View>
+                    <Text style={styles.repositoryEyebrow}>REPOSITORY</Text>
+                    <Text style={styles.repositoryTitle}>Branch & Commits</Text>
+                  </View>
+                  <TouchableOpacity accessibilityLabel="Branch- und Commit-Daten aktualisieren" activeOpacity={0.75} onPress={() => void refreshRepository()} style={styles.refreshButton}>
+                    <Text style={styles.refreshButtonText}>{repositoryState === "loading" ? "Lädt …" : "Aktualisieren"}</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.repositoryHint}>{repositoryState === "switching" ? "Branch wird sicher im Workspace-Service gewechselt …" : "Wähle einen Remote-Branch. Nicht gespeicherte lokale Änderungen werden nicht automatisch übertragen."}</Text>
+                <View style={styles.branchList}>
+                  {branches.length ? branches.map((branch) => {
+                    const selected = branch === settings.branch;
+                    return <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected }} activeOpacity={0.75} disabled={repositoryState === "switching"} key={branch} onPress={() => void chooseBranch(branch)} style={[styles.branchChip, selected && styles.branchChipSelected]}><Text style={[styles.branchChipText, selected && styles.branchChipTextSelected]}>{branch}</Text></TouchableOpacity>;
+                  }) : <Text style={styles.emptyRepositoryText}>{repositoryState === "loading" ? "Branch-Liste wird geladen …" : "Noch keine Remote-Branches verfügbar."}</Text>}
+                </View>
+                <View style={styles.commitDivider} />
+                <Text style={styles.commitLabel}>LETZTE COMMITS</Text>
+                {commits.length ? commits.slice(0, 5).map((commit) => (
+                  <View key={commit.shortHash} style={styles.commitRow}>
+                    <View style={styles.commitHash}><Text style={styles.commitHashText}>{commit.shortHash}</Text></View>
+                    <View style={styles.commitTextArea}><Text numberOfLines={1} style={styles.commitMessage}>{commit.message}</Text><Text numberOfLines={1} style={styles.commitMeta}>{commit.author} · {formatCommitDate(commit.committedAt)}</Text></View>
+                  </View>
+                )) : <Text style={styles.emptyRepositoryText}>{repositoryState === "loading" ? "Commit-Historie wird geladen …" : "Noch keine Commits verfügbar."}</Text>}
+                {repositoryState === "error" ? <Text style={styles.repositoryError}>{repositoryError}</Text> : null}
+              </View>
+            ) : null}
             <StudioSection label="Explorer" title="Projektdateien" />
           </>
         }
@@ -84,7 +149,7 @@ export default function WorkspaceScreen() {
             <View style={styles.consoleCard}>
               <View style={styles.consolePrompt}>
                 <IconSymbol name="terminal.fill" size={16} color="#45D996" />
-                <Text style={styles.consolePromptText}>workspace:main</Text>
+                <Text style={styles.consolePromptText}>workspace:{settings.branch}</Text>
               </View>
               <Text style={styles.consoleText}>{hasAttachedRepository ? `Verbunden mit ${repositoryLabel} auf ${settings.branch}.` : "Sichere Remote-Verbindung noch nicht konfiguriert."}</Text>
               <TouchableOpacity activeOpacity={0.75} onPress={() => router.push("/settings" as never)} style={styles.consoleLink}>
@@ -128,6 +193,12 @@ export default function WorkspaceScreen() {
 
 const codeFont = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
 
+function formatCommitDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+}
+
 const styles = StyleSheet.create({
   content: { paddingBottom: 20 },
   projectCard: { backgroundColor: "#121A26", borderColor: "#2A3B52", borderRadius: 18, borderWidth: 1, marginBottom: 26, padding: 15 },
@@ -138,6 +209,28 @@ const styles = StyleSheet.create({
   projectPath: { color: "#8493A7", fontSize: 12 },
   projectFooter: { alignItems: "center", borderTopColor: "#26364B", borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", marginTop: 14, paddingTop: 12 },
   projectState: { color: "#9BABBE", fontSize: 12 },
+  repositoryPanel: { backgroundColor: "#101925", borderColor: "#293B51", borderRadius: 17, borderWidth: 1, marginBottom: 25, padding: 14 },
+  repositoryHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  repositoryEyebrow: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
+  repositoryTitle: { color: "#EDF5FC", fontSize: 16, fontWeight: "800" },
+  refreshButton: { backgroundColor: "#173646", borderColor: "#367F98", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  refreshButtonText: { color: "#7BE4FF", fontSize: 11, fontWeight: "800" },
+  repositoryHint: { color: "#91A1B5", fontSize: 12, lineHeight: 17, marginTop: 10 },
+  branchList: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 12 },
+  branchChip: { backgroundColor: "#172130", borderColor: "#33445B", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  branchChipSelected: { backgroundColor: "#153646", borderColor: "#52D8FF" },
+  branchChipText: { color: "#A6B5C6", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
+  branchChipTextSelected: { color: "#A9EFFF" },
+  commitDivider: { backgroundColor: "#26384D", height: 1, marginTop: 16 },
+  commitLabel: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 8, marginTop: 14 },
+  commitRow: { alignItems: "center", flexDirection: "row", gap: 9, marginTop: 10 },
+  commitHash: { backgroundColor: "#221F3A", borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
+  commitHashText: { color: "#B4A8FF", fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
+  commitTextArea: { flex: 1 },
+  commitMessage: { color: "#DDE7F1", fontSize: 12, fontWeight: "700" },
+  commitMeta: { color: "#7B8B9E", fontSize: 11, marginTop: 2 },
+  emptyRepositoryText: { color: "#8293A8", fontSize: 12, marginTop: 7 },
+  repositoryError: { color: "#FF9AA4", fontSize: 12, lineHeight: 17, marginTop: 12 },
   fileRow: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 10, marginBottom: 5, padding: 10 },
   fileRowSelected: { backgroundColor: "#172A39" },
   fileIcon: { alignItems: "center", backgroundColor: "#1A2433", borderRadius: 9, height: 33, justifyContent: "center", width: 33 },

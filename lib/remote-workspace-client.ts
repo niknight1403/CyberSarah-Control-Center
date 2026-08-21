@@ -29,6 +29,14 @@ export type AgentProposal = {
   patch: string;
   affectedFiles: string[];
 };
+export type RemoteCommit = {
+  hash: string;
+  shortHash: string;
+  author: string;
+  committedAt: string;
+  message: string;
+};
+export type RemoteBranches = { currentBranch: string; branches: string[] };
 
 export function buildWorkspaceHeaders(config: RemoteWorkspaceConfig) {
   return {
@@ -77,6 +85,18 @@ export class RemoteWorkspaceClient {
 
   getFile(workspaceId: string, path: string) {
     return this.request<{ path: string; content: string }>(`/api/v1/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`);
+  }
+  listBranches(workspaceId: string) {
+    return this.request<RemoteBranches>(`/api/v1/workspaces/${workspaceId}/git/branches`);
+  }
+  checkoutBranch(workspaceId: string, branch: string) {
+    return this.request<{ branch: string; files: string[] }>(`/api/v1/workspaces/${workspaceId}/git/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ branch }),
+    });
+  }
+  listCommits(workspaceId: string, limit = 10) {
+    return this.request<{ commits: RemoteCommit[] }>(`/api/v1/workspaces/${workspaceId}/git/commits?limit=${limit}`);
   }
 
   requestAgentProposal(input: AgentRequest) {

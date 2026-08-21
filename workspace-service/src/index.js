@@ -28,6 +28,9 @@ const fileWriteSchema = z.object({
   content: z.string().max(1_000_000),
 });
 const commitSchema = z.object({ message: z.string().min(1).max(240) });
+const branchNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/-]{0,118}$/, "Ungültiger Branch-Name.");
+const checkoutSchema = z.object({ branch: branchNameSchema });
+const commitLimitSchema = z.coerce.number().int().min(1).max(30).default(10);
 const agentSchema = z.object({
   workspaceId: workspaceIdSchema,
   prompt: z.string().min(1).max(8_000),
@@ -110,6 +113,31 @@ async function ensureWorkspace(repositoryUrl, branch, token) {
     await git(["checkout", "-B", branch, `origin/${branch}`], workspacePath, token);
   }
   return { workspaceId, workspacePath };
+}
+
+async function getBranchState(workspacePath, token) {
+  const [{ stdout: currentOutput }, { stdout: branchOutput }] = await Promise.all([
+    git(["branch", "--show-current"], workspacePath, token),
+    git(["ls-remote", "--heads", "origin"], workspacePath, token),
+  ]);
+  const branches = branchOutput
+    .split("\n")
+    .map((entry) => entry.split("\t")[1]?.replace(/^refs\/heads\//, "") ?? "")
+    .filter(Boolean)
+    .filter((entry, index, entries) => entries.indexOf(entry) === index)
+    .sort((left, right) => left.localeCompare(right));
+  return { currentBranch: currentOutput.trim(), branches };
+}
+
+async function getRecentCommits(workspacePath, token, limit) {
+  const { stdout } = await git(["log", `-n${limit}`, "--date=iso-strict", "--pretty=format:%H%x1f%h%x1f%an%x1f%aI%x1f%s"], workspacePath, token);
+  return stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [hash, shortHash, author, committedAt, message] = line.split("\x1f");
+      return { hash, shortHash, author, committedAt, message };
+    });
 }
 
 async function listFiles(directory, baseDirectory = directory, entries = []) {
@@ -253,6 +281,39 @@ app.get("/api/v1/workspaces/:workspaceId/git/status", requireServiceAuthorizatio
   try {
     const { stdout } = await git(["status", "--short", "--branch"], getWorkspacePath(request.params.workspaceId), getGitHubToken(request));
     response.json({ status: stdout });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/v1/workspaces/:workspaceId/git/branches", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const state = await getBranchState(getWorkspacePath(request.params.workspaceId), getGitHubToken(request));
+    response.json(state);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/v1/workspaces/:workspaceId/git/checkout", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const { branch } = checkoutSchema.parse(request.body);
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const token = getGitHubToken(request);
+    await git(["fetch", "origin", `refs/heads/${branch}:refs/remotes/origin/${branch}`], workspacePath, token);
+    await git(["checkout", "-B", branch, `origin/${branch}`], workspacePath, token);
+    const files = await listFiles(workspacePath);
+    response.json({ branch, files });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/v1/workspaces/:workspaceId/git/commits", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const limit = commitLimitSchema.parse(request.query.limit);
+    const commits = await getRecentCommits(getWorkspacePath(request.params.workspaceId), getGitHubToken(request), limit);
+    response.json({ commits });
   } catch (error) {
     next(error);
   }
