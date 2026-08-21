@@ -22,3 +22,4 @@
 - [x] Add a context-aware development chat with reviewable repository-change proposals and controlled application flow.
 - [x] Persist bounded local development-chat history, proposals, and application state across app restarts.
 - [x] Add an opt-in encrypted native local storage mode for development-chat content with clear platform disclosure.
+- [x] Add a user-controlled encrypted support-backup export for bounded development-chat history.
