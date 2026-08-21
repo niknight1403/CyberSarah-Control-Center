@@ -29,12 +29,14 @@ export type StudioSettings = {
   hasServiceAccessToken: boolean;
   hasGitHubToken: boolean;
   hasProviderKey: boolean;
+  protectChatContent: boolean;
 };
 
-export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" | "hasGitHubToken" | "hasProviderKey"> & {
+export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" | "hasGitHubToken" | "hasProviderKey" | "protectChatContent"> & {
   serviceAccessToken?: string;
   githubToken?: string;
   providerApiKey?: string;
+  protectChatContent?: boolean;
 };
 export type RemoteWorkspaceChange = { path: string; content: string };
 
@@ -46,6 +48,7 @@ const defaultSettings: StudioSettings = {
   hasServiceAccessToken: false,
   hasGitHubToken: false,
   hasProviderKey: false,
+  protectChatContent: false,
 };
 
 async function writeSecureValue(key: string, value: string) {
@@ -91,6 +94,7 @@ type StudioSettingsContextValue = {
   createRepositoryPullRequest: (input: { baseBranch: string; title: string; body: string }) => Promise<{ number: number; url: string; headBranch: string; baseBranch: string }>;
   loadRepositoryQuality: () => Promise<RepositoryQuality>;
   requestDevelopmentProposal: (input: { prompt: string; activeFile?: string }) => Promise<AgentProposal>;
+  setProtectedChatContent: (enabled: boolean) => Promise<void>;
 };
 
 const StudioSettingsContext = createContext<StudioSettingsContextValue | undefined>(undefined);
@@ -119,7 +123,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
 
   const saveSettings = useCallback(async (input: StudioSettingsInput) => {
     const nextSettings: StudioSettings = {
-      ...toPersistedStudioSettings(input),
+      ...toPersistedStudioSettings({ ...input, protectChatContent: input.protectChatContent ?? settings.protectChatContent }),
       workspaceId: settings.workspaceId,
       hasServiceAccessToken: input.serviceAccessToken?.trim() ? true : settings.hasServiceAccessToken,
       hasGitHubToken: input.githubToken?.trim() ? true : settings.hasGitHubToken,
@@ -134,6 +138,12 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     setSettings(nextSettings);
     return nextSettings;
   }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken, settings.workspaceId]);
+
+  const setProtectedChatContent = useCallback(async (enabled: boolean) => {
+    const nextSettings = { ...settings, protectChatContent: enabled };
+    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(nextSettings));
+    setSettings(nextSettings);
+  }, [settings]);
 
   const clearServiceAccessToken = useCallback(async () => {
     await deleteSecureValue(SERVICE_ACCESS_TOKEN_KEY);
@@ -269,8 +279,8 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, requestDevelopmentProposal }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, settings, switchRepositoryBranch, syncRemoteChanges],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, requestDevelopmentProposal, setProtectedChatContent }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;

@@ -1,73 +1,74 @@
-export type PersistedProposalPreview = {
-  affectedFiles: string[];
-  changes: Array<{ path: string; explanation: string }>;
-};
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import { DEVELOPMENT_CHAT_HISTORY_KEY, splitProtectedHistory } from "./development-chat-history-logic";
 
-export type DevelopmentChatHistoryMessage = {
-  id: string;
-  role: "user" | "agent";
-  content: string;
-  state?: "ready" | "applying" | "applied" | "error" | "restored";
-  proposalPreview?: PersistedProposalPreview;
-};
+export * from "./development-chat-history-logic";
 
-export const DEVELOPMENT_CHAT_HISTORY_KEY = "custom-ai-studio.development-chat.v1";
-export const DEVELOPMENT_CHAT_HISTORY_LIMIT = 24;
+const PROTECTED_HISTORY_MANIFEST_KEY = "custom-ai-studio.development-chat.manifest.v1";
+const PROTECTED_HISTORY_CHUNK_PREFIX = "custom-ai-studio.development-chat.chunk.v1.";
 
-function isRole(value: unknown): value is DevelopmentChatHistoryMessage["role"] {
-  return value === "user" || value === "agent";
+function supportsProtectedHistory() {
+  return Platform.OS !== "web";
 }
 
-function cleanPreview(value: unknown): PersistedProposalPreview | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const candidate = value as { affectedFiles?: unknown; changes?: unknown };
-  const affectedFiles = Array.isArray(candidate.affectedFiles)
-    ? candidate.affectedFiles.filter((path): path is string => typeof path === "string").slice(0, 4)
-    : [];
-  const changes = Array.isArray(candidate.changes)
-    ? candidate.changes
-      .filter((change): change is { path: string; explanation: string } => Boolean(change) && typeof change === "object" && typeof (change as { path?: unknown }).path === "string" && typeof (change as { explanation?: unknown }).explanation === "string")
-      .slice(0, 4)
-      .map((change) => ({ path: change.path.slice(0, 500), explanation: change.explanation.slice(0, 600) }))
-    : [];
-  return affectedFiles.length || changes.length ? { affectedFiles, changes } : undefined;
+async function removeProtectedHistory() {
+  if (!supportsProtectedHistory()) return;
+  const manifestRaw = await SecureStore.getItemAsync(PROTECTED_HISTORY_MANIFEST_KEY);
+  const count = manifestRaw ? Number.parseInt(manifestRaw, 10) : 0;
+  await Promise.all(Array.from({ length: Number.isFinite(count) ? Math.min(count, 96) : 0 }, (_, index) => SecureStore.deleteItemAsync(`${PROTECTED_HISTORY_CHUNK_PREFIX}${index}`)));
+  await SecureStore.deleteItemAsync(PROTECTED_HISTORY_MANIFEST_KEY);
 }
 
-type UnknownHistoryMessage = { id: unknown; role: unknown; content: unknown; state?: unknown; proposalPreview?: unknown };
-
-function isHistoryMessage(value: unknown): value is UnknownHistoryMessage & { id: string; role: DevelopmentChatHistoryMessage["role"]; content: string } {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as UnknownHistoryMessage;
-  return typeof candidate.id === "string" && isRole(candidate.role) && typeof candidate.content === "string";
+async function readProtectedHistory(): Promise<string | null> {
+  if (!supportsProtectedHistory()) return null;
+  const manifestRaw = await SecureStore.getItemAsync(PROTECTED_HISTORY_MANIFEST_KEY);
+  const count = manifestRaw ? Number.parseInt(manifestRaw, 10) : 0;
+  if (!Number.isInteger(count) || count < 1 || count > 96) return null;
+  const chunks = await Promise.all(Array.from({ length: count }, (_, index) => SecureStore.getItemAsync(`${PROTECTED_HISTORY_CHUNK_PREFIX}${index}`)));
+  return chunks.every((chunk) => typeof chunk === "string") ? chunks.join("") : null;
 }
 
-export function serializeDevelopmentChatHistory(messages: DevelopmentChatHistoryMessage[]): string {
-  const bounded = messages.slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT).map((message) => ({
-    id: message.id.slice(0, 100),
-    role: message.role,
-    content: message.content.slice(0, 4_000),
-    state: message.state === "applying" ? "ready" : message.state,
-    proposalPreview: cleanPreview(message.proposalPreview),
-  }));
-  return JSON.stringify({ version: 1, messages: bounded });
+async function writeProtectedHistory(value: string) {
+  const chunks = splitProtectedHistory(value);
+  if (!chunks.length || chunks.length > 96) throw new Error("Der geschützte Chat-Verlauf ist zu groß.");
+  await removeProtectedHistory();
+  await Promise.all(chunks.map((chunk, index) => SecureStore.setItemAsync(`${PROTECTED_HISTORY_CHUNK_PREFIX}${index}`, chunk, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY })));
+  await SecureStore.setItemAsync(PROTECTED_HISTORY_MANIFEST_KEY, String(chunks.length), { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
 }
 
-export function parseDevelopmentChatHistory(raw: string | null): DevelopmentChatHistoryMessage[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as { version?: unknown; messages?: unknown };
-    if (parsed.version !== 1 || !Array.isArray(parsed.messages)) return [];
-    return parsed.messages
-      .filter(isHistoryMessage)
-      .slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT)
-      .map((message) => ({
-        id: message.id.slice(0, 100),
-        role: message.role,
-        content: message.content.slice(0, 4_000),
-        state: message.proposalPreview ? "restored" : message.state === "applied" ? "applied" : undefined,
-        proposalPreview: cleanPreview(message.proposalPreview),
-      }));
-  } catch {
-    return [];
+export async function loadDevelopmentChatHistory(protectedMode: boolean): Promise<string | null> {
+  if (protectedMode && supportsProtectedHistory()) {
+    const secured = await readProtectedHistory();
+    if (secured) return secured;
+    const standard = await AsyncStorage.getItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+    if (standard) {
+      await writeProtectedHistory(standard);
+      await AsyncStorage.removeItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+    }
+    return standard;
   }
+  const standard = await AsyncStorage.getItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+  if (standard || !supportsProtectedHistory()) return standard;
+  const secured = await readProtectedHistory();
+  if (secured) {
+    await AsyncStorage.setItem(DEVELOPMENT_CHAT_HISTORY_KEY, secured);
+    await removeProtectedHistory();
+  }
+  return secured;
+}
+
+export async function saveDevelopmentChatHistory(value: string, protectedMode: boolean) {
+  if (protectedMode && supportsProtectedHistory()) {
+    await writeProtectedHistory(value);
+    await AsyncStorage.removeItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+    return;
+  }
+  await AsyncStorage.setItem(DEVELOPMENT_CHAT_HISTORY_KEY, value);
+  await removeProtectedHistory();
+}
+
+export async function clearDevelopmentChatHistory() {
+  await AsyncStorage.removeItem(DEVELOPMENT_CHAT_HISTORY_KEY);
+  await removeProtectedHistory();
 }

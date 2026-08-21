@@ -1,11 +1,10 @@
 import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { DEVELOPMENT_CHAT_HISTORY_KEY, parseDevelopmentChatHistory, serializeDevelopmentChatHistory, type DevelopmentChatHistoryMessage } from "@/lib/development-chat-history";
+import { clearDevelopmentChatHistory, loadDevelopmentChatHistory, parseDevelopmentChatHistory, saveDevelopmentChatHistory, serializeDevelopmentChatHistory, type DevelopmentChatHistoryMessage } from "@/lib/development-chat-history";
 import type { AgentProposal } from "@/lib/remote-workspace-client";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { useWorkspace } from "@/lib/workspace-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
@@ -31,19 +30,19 @@ export default function AgentScreen() {
   const contextLabel = useMemo(() => `${selectedFile.name} · ${settings.branch}`, [selectedFile.name, settings.branch]);
 
   useEffect(() => {
-    AsyncStorage.getItem(DEVELOPMENT_CHAT_HISTORY_KEY)
+    loadDevelopmentChatHistory(settings.protectChatContent)
       .then((raw) => {
         const restored = parseDevelopmentChatHistory(raw);
         if (restored.length) setMessages(restored);
       })
       .catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht wiederhergestellt werden."))
       .finally(() => setHistoryLoaded(true));
-  }, []);
+  }, [settings.protectChatContent]);
 
   useEffect(() => {
     if (!historyLoaded) return;
-    void AsyncStorage.setItem(DEVELOPMENT_CHAT_HISTORY_KEY, serializeDevelopmentChatHistory(messages)).catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gespeichert werden."));
-  }, [historyLoaded, messages]);
+    void saveDevelopmentChatHistory(serializeDevelopmentChatHistory(messages), settings.protectChatContent).catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gespeichert werden."));
+  }, [historyLoaded, messages, settings.protectChatContent]);
 
   const submitPrompt = async () => {
     const normalizedPrompt = prompt.trim();
@@ -92,7 +91,7 @@ export default function AgentScreen() {
   };
 
   const clearHistory = async () => {
-    await AsyncStorage.removeItem(DEVELOPMENT_CHAT_HISTORY_KEY).catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gelöscht werden."));
+    await clearDevelopmentChatHistory().catch(() => setChatError("Der lokale Chat-Verlauf konnte nicht gelöscht werden."));
     setMessages(initialMessages);
   };
 
@@ -108,7 +107,7 @@ export default function AgentScreen() {
             <StudioHeader eyebrow="KI-ENTWICKLUNGSFLUSS" title="Agent" />
             <View style={[styles.readinessCard, readyForChat ? styles.readinessReady : styles.readinessWaiting]}><View style={styles.readinessIcon}><IconSymbol name="sparkles" size={17} color={readyForChat ? "#B9B2FF" : "#F6BA5E"} /></View><View style={styles.readinessCopy}><Text style={styles.readinessTitle}>{readyForChat ? "Entwicklungs-Chat bereit" : "Verbindung für den Agenten fehlt"}</Text><Text style={styles.readinessText}>{readyForChat ? `Projektkontext aus ${contextLabel} · ${providerLabel}` : hasRepository ? "Hinterlege für das gewählte KI-Profil einen Schlüssel oder nutze ein konfiguriertes On-Server-Profil." : "Verbinde zuerst ein Repository und einen Workspace-Service in den Einstellungen."}</Text></View></View>
             <View style={styles.contextRow}><View style={styles.contextChip}><IconSymbol name="doc.text.fill" size={14} color="#8B7CFF" /><Text numberOfLines={1} style={styles.contextText}>{contextLabel}</Text></View><StatusBadge label={readyForChat ? "Kontrolliert" : "Offline"} tone={readyForChat ? "accent" : "warning"} /></View>
-            <View style={styles.historyRow}><Text style={styles.historyText}>{historyLoaded ? "Lokal gesichert · ohne Tokens und Dateiinhalte" : "Verlauf wird wiederhergestellt …"}</Text><TouchableOpacity accessibilityRole="button" activeOpacity={0.75} onPress={() => void clearHistory()} style={styles.clearHistoryButton}><Text style={styles.clearHistoryText}>Verlauf löschen</Text></TouchableOpacity></View>
+            <View style={styles.historyRow}><Text style={styles.historyText}>{historyLoaded ? settings.protectChatContent ? "Geschützt gespeichert · verschlüsselt auf diesem Gerät" : "Lokal gesichert · ohne Tokens und Dateiinhalte" : "Verlauf wird wiederhergestellt …"}</Text><TouchableOpacity accessibilityRole="button" activeOpacity={0.75} onPress={() => void clearHistory()} style={styles.clearHistoryButton}><Text style={styles.clearHistoryText}>Verlauf löschen</Text></TouchableOpacity></View>
             <StudioSection label="Konversation" title="Reviewbarer Projektkontext" />
           </>}
           ListFooterComponent={<View style={styles.composerCard}><Text style={styles.composerLabel}>NÄCHSTER ENTWICKLUNGSAUFTRAG</Text><TextInput accessibilityLabel="Entwicklungsauftrag für den Agenten" editable={readyForChat && !isThinking} multiline onChangeText={setPrompt} placeholder="Beschreibe eine Änderung, einen Fehler oder ein Refactoring …" placeholderTextColor="#708095" style={styles.composerInput} textAlignVertical="top" value={prompt} /><PrimaryButton icon="arrow.up.circle.fill" label={isThinking ? "Agent analysiert …" : "Vorschlag erstellen"} onPress={() => void submitPrompt()} disabled={!prompt.trim() || !readyForChat || isThinking} /><Text style={styles.composerHint}>Der Agent erzeugt nur einen überprüfbaren Vorschlag. Er commitet oder pusht niemals selbstständig.</Text>{chatError ? <Text style={styles.chatError}>{chatError}</Text> : null}</View>}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEVELOPMENT_CHAT_HISTORY_LIMIT, parseDevelopmentChatHistory, serializeDevelopmentChatHistory } from "../lib/development-chat-history";
+import { DEVELOPMENT_CHAT_HISTORY_LIMIT, parseDevelopmentChatHistory, serializeDevelopmentChatHistory, splitProtectedHistory } from "../lib/development-chat-history-logic";
 
 describe("development chat history", () => {
   it("persists a bounded conversation while retaining proposal metadata but never proposal file content", () => {
@@ -20,5 +20,13 @@ describe("development chat history", () => {
   it("ignores malformed or incompatible local history safely", () => {
     expect(parseDevelopmentChatHistory("not-json")).toEqual([]);
     expect(parseDevelopmentChatHistory(JSON.stringify({ version: 99, messages: [] }))).toEqual([]);
+  });
+
+  it("splits protected history into bounded secure-storage chunks without losing content", () => {
+    const source = "sicherer-chat-".repeat(150);
+    const chunks = splitProtectedHistory(source);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.length <= 420)).toBe(true);
+    expect(chunks.join("")).toBe(source);
   });
 });

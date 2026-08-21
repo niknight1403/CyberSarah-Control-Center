@@ -5,6 +5,7 @@ export type PersistedStudioSettings = {
   repositoryUrl: string;
   branch: string;
   provider: ProviderId;
+  protectChatContent: boolean;
 };
 
 export function normalizeWorkspaceUrl(url: string) {
@@ -17,6 +18,7 @@ export function toPersistedStudioSettings(input: PersistedStudioSettings): Persi
     repositoryUrl: input.repositoryUrl.trim(),
     branch: input.branch.trim() || "main",
     provider: input.provider,
+    protectChatContent: input.protectChatContent,
   };
 }
 

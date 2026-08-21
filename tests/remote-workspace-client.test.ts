@@ -18,11 +18,12 @@ describe("workspace service client", () => {
   });
 
   it("normalizes the non-sensitive saved workspace preferences", () => {
-    expect(toPersistedStudioSettings({ workspaceUrl: " https://studio.example.com/// ", repositoryUrl: " https://github.com/example-org/custom-ai-studio.git ", branch: " ", provider: "managed" })).toEqual({
+    expect(toPersistedStudioSettings({ workspaceUrl: " https://studio.example.com/// ", repositoryUrl: " https://github.com/example-org/custom-ai-studio.git ", branch: " ", provider: "managed", protectChatContent: false })).toEqual({
       workspaceUrl: "https://studio.example.com",
       repositoryUrl: "https://github.com/example-org/custom-ai-studio.git",
       branch: "main",
       provider: "managed",
+      protectChatContent: false,
     });
   });
 

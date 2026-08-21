@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function SettingsScreen() {
-  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, settings } = useStudioSettings();
+  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings } = useStudioSettings();
   const { loadRemoteFiles } = useWorkspace();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
@@ -135,6 +135,10 @@ export default function SettingsScreen() {
             </>
           ) : null}
         </View>
+        <View style={styles.sectionSpacer}>
+          <StudioSection label="Datenschutz" title="Chat-Inhalte auf diesem Gerät" />
+          {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Die geschützte Chat-Ablage ist im Web-Build nicht verfügbar. Nutze für verschlüsselte lokale Gesprächsinhalte die native App.</Text></View> : <TouchableOpacity accessibilityRole="switch" accessibilityState={{ checked: settings.protectChatContent }} activeOpacity={0.75} onPress={() => void setProtectedChatContent(!settings.protectChatContent)} style={[styles.protectionRow, settings.protectChatContent && styles.protectionRowEnabled]}><View style={[styles.protectionIndicator, settings.protectChatContent && styles.protectionIndicatorEnabled]}><IconSymbol name={settings.protectChatContent ? "lock.fill" : "lock.open.fill"} size={16} color={settings.protectChatContent ? "#6FE2A9" : "#99A9BC"} /></View><View style={styles.providerText}><Text style={styles.providerLabel}>{settings.protectChatContent ? "Geschützte Chat-Ablage aktiv" : "Geschützte Chat-Ablage deaktiviert"}</Text><Text style={styles.providerDetail}>{settings.protectChatContent ? "Verlauf wird lokal über den geschützten Gerätespeicher verschlüsselt abgelegt. Bestehende Inhalte werden migriert." : "Aktiviere die geräteverschlüsselte Ablage für Gesprächsinhalte. Tokens und Dateiinhalte werden weiterhin nicht gespeichert."}</Text></View></TouchableOpacity>}
+        </View>
         {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Im Web-Build werden eingegebene Schlüssel nur in der Browser-Sitzung gehalten. Nutze für produktive Schlüssel die native App oder die serverseitige Provider-Konfiguration.</Text></View> : null}
         <View style={styles.saveArea}>
           <View style={[styles.readinessCard, canSave ? styles.readinessCardReady : styles.readinessCardPending]}>
@@ -195,6 +199,10 @@ const styles = StyleSheet.create({
   providerText: { flex: 1 },
   providerLabel: { color: "#EDF3FB", fontSize: 14, fontWeight: "800", marginBottom: 3 },
   providerDetail: { color: "#8291A6", fontSize: 12, lineHeight: 17 },
+  protectionRow: { alignItems: "center", backgroundColor: "#121823", borderColor: "#243247", borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 11, padding: 12 },
+  protectionRowEnabled: { backgroundColor: "#12251F", borderColor: "#3B8E68" },
+  protectionIndicator: { alignItems: "center", backgroundColor: "#202A38", borderRadius: 10, height: 34, justifyContent: "center", width: 34 },
+  protectionIndicatorEnabled: { backgroundColor: "#173A2B" },
   webWarning: { alignItems: "flex-start", backgroundColor: "rgba(246,186,94,0.11)", borderColor: "rgba(246,186,94,0.35)", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 9, marginTop: 26, padding: 13 },
   webWarningText: { color: "#F0C982", flex: 1, fontSize: 12, lineHeight: 18 },
   saveArea: { marginTop: 26 },
