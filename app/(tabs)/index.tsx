@@ -80,6 +80,19 @@ export default function WorkspaceScreen() {
     }
   }, [hasAttachedRepository, loadRepositoryDetails, loadRepositoryQuality]);
 
+  const refreshQuality = useCallback(async () => {
+    if (!hasAttachedRepository) return;
+    setQualityState("loading");
+    setQualityError("");
+    try {
+      setQuality(await loadRepositoryQuality());
+      setQualityState("ready");
+    } catch (error) {
+      setQualityState("error");
+      setQualityError(error instanceof Error ? error.message : "Der CI-Status konnte nicht aktualisiert werden.");
+    }
+  }, [hasAttachedRepository, loadRepositoryQuality]);
+
   useEffect(() => { void refreshRepository(); }, [refreshRepository]);
   useEffect(() => { void refreshHealth(); }, [refreshHealth]);
 
@@ -215,7 +228,7 @@ export default function WorkspaceScreen() {
                   </View>
                 )) : <Text style={styles.emptyRepositoryText}>{repositoryState === "loading" ? "Commit-Historie wird geladen …" : "Noch keine Commits verfügbar."}</Text>}
                 <View style={styles.qualityDivider} />
-                <View style={styles.qualityHeader}><Text style={styles.qualityLabel}>BUILD-QUALITÄT</Text><Text style={styles.qualityRefresh}>{qualityState === "loading" ? "Prüft …" : "GitHub Live-Status"}</Text></View>
+                <View style={styles.qualityHeader}><Text style={styles.qualityLabel}>BUILD-QUALITÄT</Text><TouchableOpacity accessibilityLabel="CI-Status aktualisieren" activeOpacity={0.75} disabled={qualityState === "loading"} onPress={() => void refreshQuality()} style={[styles.qualityRefreshButton, qualityState === "loading" && styles.gitActionDisabled]}><Text style={styles.qualityRefresh}>{qualityState === "loading" ? "Prüft …" : "CI aktualisieren"}</Text></TouchableOpacity></View>
                 {qualityState === "ready" && quality ? <RepositoryQualityPanel quality={quality} /> : <Text style={[styles.emptyRepositoryText, qualityState === "error" && styles.repositoryError]}>{qualityState === "error" ? qualityError : "Merge- und CI-Status werden geladen …"}</Text>}
                 {repositoryState === "error" ? <Text style={styles.repositoryError}>{repositoryError}</Text> : null}
               </View>
@@ -348,7 +361,7 @@ function RepositoryQualityPanel({ quality }: { quality: RepositoryQuality }) {
       {quality.pullRequest ? <Text style={styles.qualityPrText}>PR #{quality.pullRequest.number}: {quality.pullRequest.headBranch} → {quality.pullRequest.baseBranch}</Text> : <Text style={styles.qualityPrText}>Für den aktuellen Branch ist kein offener Pull Request vorhanden.</Text>}
       {quality.pullRequest ? <View style={styles.reviewMetrics}><Text style={styles.reviewMetric}>Reviewer <Text style={styles.qualityMetricStrong}>{quality.reviews.reviewerCount}</Text></Text><Text style={styles.reviewMetricApproved}>Genehmigt <Text style={styles.qualityMetricStrong}>{quality.reviews.approvedCount}</Text></Text><Text style={styles.reviewMetricChanges}>Änderungen <Text style={styles.qualityMetricStrong}>{quality.reviews.requestedChangesCount}</Text></Text></View> : null}
       <View style={styles.qualityMetrics}><Text style={styles.qualityMetric}>Bestanden <Text style={styles.qualityMetricStrong}>{quality.ci.passed}</Text></Text><Text style={styles.qualityMetric}>Läuft <Text style={styles.qualityMetricStrong}>{quality.ci.pending}</Text></Text><Text style={styles.qualityMetric}>Fehler <Text style={styles.qualityMetricStrong}>{quality.ci.failed}</Text></Text></View>
-      {quality.ci.checks.length ? quality.ci.checks.slice(0, 4).map((check) => <View key={`${check.name}-${check.status}`} style={styles.checkRow}><View style={[styles.checkDot, getQualityTone(check.conclusion ?? check.status).dot]} /><Text numberOfLines={1} style={styles.checkName}>{check.name}</Text><Text style={styles.checkState}>{check.conclusion ?? check.status}</Text></View>) : <Text style={styles.qualityEmpty}>GitHub meldet für diesen Pull Request noch keine Check-Runs oder Commit-Status-Prüfungen.</Text>}
+      {quality.ci.checks.length ? quality.ci.checks.map((check) => <View key={`${check.name}-${check.status}`} style={styles.checkRow}><View style={[styles.checkDot, getQualityTone(check.conclusion ?? check.status).dot]} /><Text numberOfLines={1} style={styles.checkName}>{check.name}</Text><Text style={styles.checkState}>{check.conclusion ?? check.status}</Text></View>) : <Text style={styles.qualityEmpty}>GitHub meldet für diesen Pull Request noch keine Check-Runs oder Commit-Status-Prüfungen.</Text>}
     </View>
   );
 }
@@ -402,7 +415,8 @@ const styles = StyleSheet.create({
   qualityDivider: { backgroundColor: "#26384D", height: 1, marginTop: 17 },
   qualityHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 9, marginTop: 14 },
   qualityLabel: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
-  qualityRefresh: { color: "#7895AE", fontSize: 10, fontWeight: "700" },
+  qualityRefreshButton: { alignItems: "center", backgroundColor: "#152A39", borderColor: "#2D607A", borderRadius: 9, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
+  qualityRefresh: { color: "#82D9F1", fontSize: 10, fontWeight: "800" },
   qualityPanel: { backgroundColor: "#0C131E", borderColor: "#263950", borderRadius: 13, borderWidth: 1, padding: 11 },
   qualityPillRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   qualityPill: { alignItems: "center", borderRadius: 9, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 8, paddingVertical: 6 },
