@@ -86,6 +86,15 @@ export class RemoteWorkspaceClient {
   getFile(workspaceId: string, path: string) {
     return this.request<{ path: string; content: string }>(`/api/v1/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`);
   }
+  writeFile(workspaceId: string, path: string, content: string) {
+    return this.request<{ saved: boolean; path: string }>(`/api/v1/workspaces/${workspaceId}/file`, {
+      method: "PUT",
+      body: JSON.stringify({ path, content }),
+    });
+  }
+  getGitStatus(workspaceId: string) {
+    return this.request<{ status: string }>(`/api/v1/workspaces/${workspaceId}/git/status`);
+  }
   listBranches(workspaceId: string) {
     return this.request<RemoteBranches>(`/api/v1/workspaces/${workspaceId}/git/branches`);
   }
@@ -97,6 +106,15 @@ export class RemoteWorkspaceClient {
   }
   listCommits(workspaceId: string, limit = 10) {
     return this.request<{ commits: RemoteCommit[] }>(`/api/v1/workspaces/${workspaceId}/git/commits?limit=${limit}`);
+  }
+  commit(workspaceId: string, message: string) {
+    return this.request<{ committed: boolean; hash: string; output: string }>(`/api/v1/workspaces/${workspaceId}/git/commit`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    });
+  }
+  push(workspaceId: string) {
+    return this.request<{ pushed: boolean; branch: string; output: string }>(`/api/v1/workspaces/${workspaceId}/git/push`, { method: "POST" });
   }
 
   requestAgentProposal(input: AgentRequest) {

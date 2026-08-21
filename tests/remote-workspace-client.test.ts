@@ -43,4 +43,22 @@ describe("workspace service client", () => {
     ]);
     vi.unstubAllGlobals();
   });
+
+  it("writes changed files, then addresses the commit and push endpoints for one workspace", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ saved: true, path: "src/fixture.ts" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ committed: true, hash: "c0ffee1", output: "" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ pushed: true, branch: "main", output: "" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new RemoteWorkspaceClient({ baseUrl: "https://studio.example.com", serviceAccessToken: "service-secret" });
+    await expect(client.writeFile("workspace", "src/fixture.ts", "export const updated = true;\n")).resolves.toMatchObject({ saved: true });
+    await expect(client.commit("workspace", "Update fixture")).resolves.toMatchObject({ hash: "c0ffee1" });
+    await expect(client.push("workspace")).resolves.toMatchObject({ branch: "main" });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://studio.example.com/api/v1/workspaces/workspace/file",
+      "https://studio.example.com/api/v1/workspaces/workspace/git/commit",
+      "https://studio.example.com/api/v1/workspaces/workspace/git/push",
+    ]);
+    vi.unstubAllGlobals();
+  });
 });

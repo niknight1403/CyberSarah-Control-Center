@@ -9,8 +9,8 @@ import { useCallback, useEffect, useState } from "react";
 import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function WorkspaceScreen() {
-  const { changedFileCount, files, hydrateFile, loadRemoteFiles, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
-  const { loadRepositoryDetails, readAttachedFile, settings, switchRepositoryBranch } = useStudioSettings();
+  const { changedFileCount, files, hydrateFile, loadRemoteFiles, markFilesSynced, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
+  const { commitRepository, loadRepositoryDetails, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
   const hasAttachedRepository = Boolean(settings.workspaceId);
   const repositoryLabel = getRepositoryLabel(settings.repositoryUrl);
@@ -18,6 +18,9 @@ export default function WorkspaceScreen() {
   const [commits, setCommits] = useState<Array<{ shortHash: string; author: string; committedAt: string; message: string }>>([]);
   const [repositoryState, setRepositoryState] = useState<"idle" | "loading" | "ready" | "switching" | "error">("idle");
   const [repositoryError, setRepositoryError] = useState("");
+  const [commitMessage, setCommitMessage] = useState("Update from Custom AI Studio");
+  const [gitAction, setGitAction] = useState<"idle" | "saving" | "committing" | "committed" | "pushing" | "pushed" | "error">("idle");
+  const [gitFeedback, setGitFeedback] = useState("");
 
   const refreshRepository = useCallback(async () => {
     if (!hasAttachedRepository) return;
@@ -47,6 +50,40 @@ export default function WorkspaceScreen() {
     } catch (error) {
       setRepositoryState("error");
       setRepositoryError(error instanceof Error ? error.message : "Der Branch konnte nicht gewechselt werden.");
+    }
+  };
+
+  const commitChanges = async () => {
+    const changedFiles = files.filter((file) => file.changed && file.remote);
+    if (!changedFiles.length || commitMessage.trim().length < 3) return;
+    setGitFeedback("");
+    try {
+      setGitAction("saving");
+      await syncRemoteChanges(changedFiles.map(({ path, content }) => ({ path, content })));
+      setGitAction("committing");
+      const result = await commitRepository(commitMessage);
+      markFilesSynced(changedFiles.map((file) => file.id));
+      setGitAction("committed");
+      setGitFeedback(`Commit ${result.hash} erstellt. Jetzt kannst du den Branch hochladen.`);
+      await refreshRepository();
+    } catch (error) {
+      setGitAction("error");
+      setGitFeedback(error instanceof Error ? error.message : "Der Commit konnte nicht erstellt werden.");
+    }
+  };
+
+  const pushChanges = async () => {
+    if (gitAction !== "committed") return;
+    setGitFeedback("");
+    try {
+      setGitAction("pushing");
+      const result = await pushRepository();
+      setGitAction("pushed");
+      setGitFeedback(`Branch ${result.branch} wurde erfolgreich zu GitHub hochgeladen.`);
+      await refreshRepository();
+    } catch (error) {
+      setGitAction("error");
+      setGitFeedback(error instanceof Error ? error.message : "Der Push konnte nicht abgeschlossen werden.");
     }
   };
 
@@ -145,6 +182,17 @@ export default function WorkspaceScreen() {
             <View style={styles.editorAction}>
               <PrimaryButton icon="square.and.pencil" label="Entwurf speichern" onPress={saveDraft} disabled={!selectedFile.changed} />
             </View>
+            {hasAttachedRepository ? (
+              <View style={styles.gitBar}>
+                <View style={styles.gitBarHeader}><Text style={styles.gitBarEyebrow}>GIT-ÄNDERUNGEN</Text><Text style={styles.gitBarCount}>{changedFileCount ? `${changedFileCount} Datei(en) bereit` : "Keine lokalen Änderungen"}</Text></View>
+                <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor="#718196" style={styles.commitInput} value={commitMessage} />
+                <View style={styles.gitActions}>
+                  <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing"} onPress={() => void commitChanges()} style={[styles.gitActionButton, styles.commitButton, (!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing") && styles.gitActionDisabled]}><Text style={styles.commitButtonText}>{gitAction === "saving" ? "Speichert …" : gitAction === "committing" ? "Commit …" : "Commit erstellen"}</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={gitAction !== "committed"} onPress={() => void pushChanges()} style={[styles.gitActionButton, styles.pushButton, gitAction !== "committed" && styles.gitActionDisabled]}><Text style={styles.pushButtonText}>{gitAction === "pushing" ? "Push …" : "Push zu GitHub"}</Text></TouchableOpacity>
+                </View>
+                {gitFeedback ? <Text style={[styles.gitFeedback, gitAction === "error" ? styles.gitFeedbackError : styles.gitFeedbackSuccess]}>{gitFeedback}</Text> : <Text style={styles.gitHint}>Commit speichert alle geänderten Remote-Dateien; Push veröffentlicht den Commit auf dem ausgewählten Branch.</Text>}
+              </View>
+            ) : null}
             <StudioSection label="Console" title="Aktiver Kontext" />
             <View style={styles.consoleCard}>
               <View style={styles.consolePrompt}>
@@ -249,6 +297,22 @@ const styles = StyleSheet.create({
   lineNumber: { color: "#526275", fontFamily: codeFont, fontSize: 11, lineHeight: 19, textAlign: "right" },
   codeInput: { color: "#DDE8F4", flex: 1, fontFamily: codeFont, fontSize: 12, lineHeight: 19, minHeight: 176, padding: 13 },
   editorAction: { marginBottom: 29, marginTop: 12 },
+  gitBar: { backgroundColor: "#101A26", borderColor: "#2B3E55", borderRadius: 16, borderWidth: 1, marginBottom: 28, padding: 13 },
+  gitBarHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  gitBarEyebrow: { color: "#7B90A8", fontSize: 10, fontWeight: "900", letterSpacing: 1.05 },
+  gitBarCount: { color: "#9FCBDA", fontSize: 11, fontWeight: "700" },
+  commitInput: { backgroundColor: "#0C131E", borderColor: "#2B3C52", borderRadius: 11, borderWidth: 1, color: "#E7F0F9", fontSize: 13, minHeight: 44, paddingHorizontal: 11, paddingVertical: 9 },
+  gitActions: { flexDirection: "row", gap: 8, marginTop: 10 },
+  gitActionButton: { alignItems: "center", borderRadius: 11, flex: 1, paddingHorizontal: 8, paddingVertical: 11 },
+  commitButton: { backgroundColor: "#22314A", borderColor: "#6678A8", borderWidth: 1 },
+  pushButton: { backgroundColor: "#16728B", borderColor: "#52D8FF", borderWidth: 1 },
+  gitActionDisabled: { opacity: 0.45 },
+  commitButtonText: { color: "#DDE6FF", fontSize: 12, fontWeight: "800" },
+  pushButtonText: { color: "#ECFBFF", fontSize: 12, fontWeight: "800" },
+  gitFeedback: { fontSize: 12, lineHeight: 17, marginTop: 10 },
+  gitFeedbackSuccess: { color: "#6FE0A7" },
+  gitFeedbackError: { color: "#FF9AA4" },
+  gitHint: { color: "#8294AA", fontSize: 11, lineHeight: 16, marginTop: 10 },
   consoleCard: { backgroundColor: "#0F161F", borderColor: "#243347", borderRadius: 16, borderWidth: 1, padding: 14 },
   consolePrompt: { alignItems: "center", flexDirection: "row", gap: 7, marginBottom: 9 },
   consolePromptText: { color: "#6BE5A7", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },

@@ -15,6 +15,8 @@ const workspacesDirectory = path.resolve(process.env.WORKSPACES_DIR ?? "/data/wo
 const publicBaseUrl = (process.env.PREVIEW_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
 const serviceAccessToken = process.env.SERVICE_ACCESS_TOKEN ?? "";
 const allowedOrigin = process.env.ALLOWED_ORIGIN ?? "";
+const gitCommitAuthorName = process.env.GIT_COMMIT_AUTHOR_NAME ?? "Custom AI Studio";
+const gitCommitAuthorEmail = process.env.GIT_COMMIT_AUTHOR_EMAIL ?? "workspace@custom-ai-studio.local";
 const runtimes = new Map();
 const proxy = httpProxy.createProxyServer({ ws: true, xfwd: true });
 
@@ -324,8 +326,9 @@ app.post("/api/v1/workspaces/:workspaceId/git/commit", requireServiceAuthorizati
     const { message } = commitSchema.parse(request.body);
     const workspacePath = getWorkspacePath(request.params.workspaceId);
     await git(["add", "--all"], workspacePath, getGitHubToken(request));
-    const { stdout } = await git(["commit", "-m", message], workspacePath, getGitHubToken(request));
-    response.json({ committed: true, output: stdout });
+    const { stdout } = await git(["-c", `user.name=${gitCommitAuthorName}`, "-c", `user.email=${gitCommitAuthorEmail}`, "commit", "-m", message], workspacePath, getGitHubToken(request));
+    const { stdout: hash } = await git(["rev-parse", "--short", "HEAD"], workspacePath, getGitHubToken(request));
+    response.json({ committed: true, hash: hash.trim(), output: stdout });
   } catch (error) {
     next(error);
   }
@@ -333,8 +336,11 @@ app.post("/api/v1/workspaces/:workspaceId/git/commit", requireServiceAuthorizati
 
 app.post("/api/v1/workspaces/:workspaceId/git/push", requireServiceAuthorization, async (request, response, next) => {
   try {
-    const { stdout } = await git(["push", "origin", "HEAD"], getWorkspacePath(request.params.workspaceId), getGitHubToken(request));
-    response.json({ pushed: true, output: stdout });
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const { stdout: branchOutput } = await git(["branch", "--show-current"], workspacePath, getGitHubToken(request));
+    const branch = branchNameSchema.parse(branchOutput.trim());
+    const { stdout } = await git(["push", "origin", `HEAD:refs/heads/${branch}`], workspacePath, getGitHubToken(request));
+    response.json({ pushed: true, branch, output: stdout });
   } catch (error) {
     next(error);
   }

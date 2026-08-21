@@ -103,6 +103,7 @@ type WorkspaceContextValue = {
   refreshPreview: () => void;
   loadRemoteFiles: (paths: string[]) => void;
   hydrateFile: (id: string, content: string) => void;
+  markFilesSynced: (ids: string[]) => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
@@ -207,6 +208,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setFiles((currentFiles) => currentFiles.map((file) => (file.id === id ? { ...file, content, changed: false } : file)));
   }, []);
 
+  const markFilesSynced = useCallback((ids: string[]) => {
+    setFiles((currentFiles) => currentFiles.map((file) => (ids.includes(file.id) ? { ...file, changed: false } : file)));
+    setEvents((currentEvents) => [
+      { id: `sync-${Date.now()}`, level: "success", label: "Änderungen versioniert", detail: `${ids.length} Datei(en) wurden committed und warten auf den Push.` },
+      ...currentEvents,
+    ]);
+  }, []);
+
   const value = useMemo<WorkspaceContextValue>(
     () => ({
       files,
@@ -224,6 +233,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       refreshPreview,
       loadRemoteFiles,
       hydrateFile,
+      markFilesSynced,
     }),
     [
       askAgent,
@@ -240,6 +250,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       updateFile,
       loadRemoteFiles,
       hydrateFile,
+      markFilesSynced,
     ],
   );
 

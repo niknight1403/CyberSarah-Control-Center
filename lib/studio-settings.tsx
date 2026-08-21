@@ -36,6 +36,7 @@ export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" |
   githubToken?: string;
   providerApiKey?: string;
 };
+export type RemoteWorkspaceChange = { path: string; content: string };
 
 const defaultSettings: StudioSettings = {
   workspaceUrl: "",
@@ -84,6 +85,9 @@ type StudioSettingsContextValue = {
   readAttachedFile: (path: string) => Promise<{ path: string; content: string }>;
   loadRepositoryDetails: () => Promise<{ currentBranch: string; branches: string[]; commits: RemoteCommit[] }>;
   switchRepositoryBranch: (branch: string) => Promise<{ branch: string; files: string[] }>;
+  syncRemoteChanges: (changes: RemoteWorkspaceChange[]) => Promise<{ savedCount: number; status: string }>;
+  commitRepository: (message: string) => Promise<{ hash: string }>;
+  pushRepository: () => Promise<{ branch: string }>;
 };
 
 const StudioSettingsContext = createContext<StudioSettingsContextValue | undefined>(undefined);
@@ -218,9 +222,33 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return result;
   }, [createConnectedClient, settings]);
 
+  const syncRemoteChanges = useCallback(async (changes: RemoteWorkspaceChange[]) => {
+    if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    const client = await createConnectedClient();
+    for (const change of changes) {
+      await client.writeFile(settings.workspaceId, change.path, change.content);
+    }
+    const { status } = await client.getGitStatus(settings.workspaceId);
+    return { savedCount: changes.length, status };
+  }, [createConnectedClient, settings.workspaceId]);
+
+  const commitRepository = useCallback(async (message: string) => {
+    if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    const client = await createConnectedClient();
+    const result = await client.commit(settings.workspaceId, message.trim());
+    return { hash: result.hash };
+  }, [createConnectedClient, settings.workspaceId]);
+
+  const pushRepository = useCallback(async () => {
+    if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    const client = await createConnectedClient();
+    const result = await client.push(settings.workspaceId);
+    return { branch: result.branch };
+  }, [createConnectedClient, settings.workspaceId]);
+
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, loadRepositoryDetails, readAttachedFile, saveSettings, settings, switchRepositoryBranch],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, loading, loadRepositoryDetails, pushRepository, readAttachedFile, saveSettings, settings, switchRepositoryBranch, syncRemoteChanges],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;
