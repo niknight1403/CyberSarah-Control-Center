@@ -6,16 +6,17 @@ import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studi
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
 import { type FieldValidation, validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
+import { getSettingsBackupShareConfirmation, isValidSettingsBackupPassword } from "@/lib/settings-backup";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type LocalProviderId = "ollama" | "lmstudio";
 type EndpointTestState = "idle" | "checking" | "ready" | "error";
 
 export default function SettingsScreen() {
-  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings, testCloudProvider, testLocalProviderEndpoint } = useStudioSettings();
+  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, exportSettingsBackup, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings, testCloudProvider, testLocalProviderEndpoint } = useStudioSettings();
   const { loadRemoteFiles } = useWorkspace();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
@@ -37,6 +38,9 @@ export default function SettingsScreen() {
   const [serviceTokenTouched, setServiceTokenTouched] = useState(false);
   const [attachState, setAttachState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
   const [attachMessage, setAttachMessage] = useState("");
+  const [backupPassphrase, setBackupPassphrase] = useState("");
+  const [backupState, setBackupState] = useState<"idle" | "exporting" | "shared" | "error">("idle");
+  const [backupMessage, setBackupMessage] = useState("");
 
   useEffect(() => {
     if (loading) return;
@@ -55,6 +59,8 @@ export default function SettingsScreen() {
   const canSave = workspaceValidation.valid && serviceTokenValidation.valid && ollamaEndpointValidation.valid && lmstudioEndpointValidation.valid;
   const canAttach = canSave && Boolean(repositoryUrl.trim()) && Boolean(branch.trim());
   const selectedCloudProvider = cloudProviderIds.includes(provider as CloudProviderId) ? (provider as CloudProviderId) : null;
+  const configuredProviderKeyCount = Object.values(settings.providerKeyStatus).filter(Boolean).length;
+  const configuredEndpointCount = Object.values(settings.localProviderEndpoints).filter(Boolean).length;
 
   const testEndpoint = async (localProvider: LocalProviderId, endpoint: string, validation: FieldValidation) => {
     if (!validation.valid) {
@@ -103,6 +109,39 @@ export default function SettingsScreen() {
     setGithubToken("");
     setProviderApiKey("");
     setSaveState("saved");
+  };
+
+  const confirmSettingsBackupExport = () => {
+    if (Platform.OS === "web") {
+      setBackupState("error");
+      setBackupMessage("Verschlüsselte Settings-Backups können nur in der nativen App geteilt werden.");
+      return;
+    }
+    if (!isValidSettingsBackupPassword(backupPassphrase)) {
+      setBackupState("error");
+      setBackupMessage("Das Backup-Passwort muss mindestens 12 Zeichen enthalten.");
+      return;
+    }
+    const confirmation = getSettingsBackupShareConfirmation();
+    Alert.alert(confirmation.title, confirmation.message, [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Backup erstellen & teilen", style: "destructive", onPress: () => void performSettingsBackupExport() },
+    ]);
+  };
+
+  const performSettingsBackupExport = async () => {
+    setBackupState("exporting");
+    setBackupMessage("");
+    try {
+      const result = await exportSettingsBackup(backupPassphrase);
+      setBackupState("shared");
+      setBackupMessage(`${result.filename} wurde verschlüsselt erstellt und über das System-Menü geteilt.`);
+    } catch (error) {
+      setBackupState("error");
+      setBackupMessage(error instanceof Error ? error.message : "Das Settings-Backup konnte nicht erstellt werden.");
+    } finally {
+      setBackupPassphrase("");
+    }
   };
 
   const connectRepository = async () => {
@@ -218,6 +257,15 @@ export default function SettingsScreen() {
           <StudioSection label="Datenschutz" title="Chat-Inhalte auf diesem Gerät" />
           {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Die geschützte Chat-Ablage ist im Web-Build nicht verfügbar. Nutze für verschlüsselte lokale Gesprächsinhalte die native App.</Text></View> : <TouchableOpacity accessibilityRole="switch" accessibilityState={{ checked: settings.protectChatContent }} activeOpacity={0.75} onPress={() => void setProtectedChatContent(!settings.protectChatContent)} style={[styles.protectionRow, settings.protectChatContent && styles.protectionRowEnabled]}><View style={[styles.protectionIndicator, settings.protectChatContent && styles.protectionIndicatorEnabled]}><IconSymbol name={settings.protectChatContent ? "lock.fill" : "lock.open.fill"} size={16} color={settings.protectChatContent ? "#6FE2A9" : "#99A9BC"} /></View><View style={styles.providerText}><Text style={styles.providerLabel}>{settings.protectChatContent ? "Geschützte Chat-Ablage aktiv" : "Geschützte Chat-Ablage deaktiviert"}</Text><Text style={styles.providerDetail}>{settings.protectChatContent ? "Verlauf wird lokal über den geschützten Gerätespeicher verschlüsselt abgelegt. Bestehende Inhalte werden migriert." : "Aktiviere die geräteverschlüsselte Ablage für Gesprächsinhalte. Tokens und Dateiinhalte werden weiterhin nicht gespeichert."}</Text></View></TouchableOpacity>}
         </View>
+        <View style={styles.sectionSpacer}>
+          <StudioSection label="Backup" title="Provider-Konfiguration exportieren" />
+          <Text style={styles.fieldHint}>Erstelle ein verschlüsseltes Backup der gespeicherten Cloud-Keys und lokalen Endpoint-URLs. Service- und GitHub-Tokens werden bewusst nicht exportiert. Das Passwort wird nur für diesen Export verwendet und nie gespeichert.</Text>
+          <View style={styles.backupSummary}><Text style={styles.backupSummaryText}>{configuredProviderKeyCount} Cloud-Key{configuredProviderKeyCount === 1 ? "" : "s"} · {configuredEndpointCount} lokale Endpoint{configuredEndpointCount === 1 ? "" : "s"}</Text><Text style={styles.backupSummaryHint}>AES-256-CBC · PBKDF2-SHA256 · HMAC-Integrität</Text></View>
+          <Text style={styles.fieldLabel}>BACKUP-PASSWORT</Text>
+          <TextInput accessibilityHint="Mindestens 12 Zeichen. Das Passwort nicht gemeinsam mit der Backup-Datei weitergeben." accessibilityLabel="Passwort für Settings-Backup" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setBackupPassphrase(value); setBackupState("idle"); setBackupMessage(""); }} placeholder="Mindestens 12 Zeichen" placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={backupPassphrase} />
+          <TouchableOpacity accessibilityLabel="Verschlüsseltes Settings-Backup erstellen und teilen" accessibilityRole="button" activeOpacity={0.75} disabled={backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)} onPress={confirmSettingsBackupExport} style={[styles.backupButton, (backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)) && styles.endpointTestButtonDisabled]}><IconSymbol name="lock.fill" size={15} color="#061019" /><Text style={styles.backupButtonText}>{backupState === "exporting" ? "Backup wird erstellt …" : "Verschlüsseltes Backup teilen"}</Text></TouchableOpacity>
+          {backupState === "shared" || backupState === "error" ? <View style={[styles.backupFeedback, backupState === "shared" ? styles.backupFeedbackReady : styles.backupFeedbackError]}><IconSymbol name={backupState === "shared" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"} size={15} color={backupState === "shared" ? "#45D996" : "#FF6B7A"} /><Text style={[styles.backupFeedbackText, backupState === "shared" ? styles.backupFeedbackTextReady : styles.backupFeedbackTextError]}>{backupMessage}</Text></View> : null}
+        </View>
         {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Im Web-Build werden eingegebene Schlüssel nur in der Browser-Sitzung gehalten. Nutze für produktive Schlüssel die native App oder die serverseitige Provider-Konfiguration.</Text></View> : null}
         <View style={styles.saveArea}>
           <View style={[styles.readinessCard, canSave ? styles.readinessCardReady : styles.readinessCardPending]}>
@@ -295,6 +343,17 @@ const styles = StyleSheet.create({
   validationTextSuccess: { color: "#70E4AA" },
   validationTextNeutral: { color: "#E5BD6D" },
   validationTextError: { color: "#FF8B96" },
+  backupSummary: { backgroundColor: "#111925", borderColor: "#2B3B51", borderRadius: 13, borderWidth: 1, marginTop: 12, padding: 12 },
+  backupSummaryText: { color: "#DCE8F4", fontSize: 12, fontWeight: "800" },
+  backupSummaryHint: { color: "#8291A6", fontFamily: "monospace", fontSize: 10, marginTop: 5 },
+  backupButton: { alignItems: "center", backgroundColor: "#B4A8FF", borderRadius: 12, flexDirection: "row", gap: 7, justifyContent: "center", marginTop: 12, minHeight: 48, paddingHorizontal: 12 },
+  backupButtonText: { color: "#0B0F18", fontSize: 12, fontWeight: "900" },
+  backupFeedback: { alignItems: "flex-start", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
+  backupFeedbackReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.32)" },
+  backupFeedbackError: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.32)" },
+  backupFeedbackText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  backupFeedbackTextReady: { color: "#70E4AA" },
+  backupFeedbackTextError: { color: "#FF9AA4" },
   clearAction: { alignSelf: "flex-start", marginTop: 10 },
   clearActionText: { color: "#FF8792", fontSize: 12, fontWeight: "800" },
   providerRow: { alignItems: "center", backgroundColor: "#121823", borderColor: "#243247", borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 11, marginBottom: 8, padding: 12 },

@@ -3,6 +3,7 @@ import { type AgentProposal, type RemoteCommit, type RemoteHealth, type Reposito
 import { defaultLocalProviderEndpoints, getDefaultFreeProvider, normalizeLocalProviderEndpoints, providerDefaults, toPersistedStudioSettings, type CloudProviderId, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
 import { secureSessionStore } from "@/lib/secure-session-store";
 import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
+import { exportEncryptedSettingsBackup, type SettingsBackupExportResult } from "@/lib/settings-backup";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const PREFERENCES_KEY = "custom-ai-studio.preferences.v1";
@@ -101,6 +102,7 @@ type StudioSettingsContextValue = {
   loadWorkspaceHealth: () => Promise<RemoteHealth>;
   testLocalProviderEndpoint: (provider: "ollama" | "lmstudio", endpoint: string) => Promise<{ provider: "ollama" | "lmstudio"; status: "ready"; modelCount: number }>;
   testCloudProvider: (provider: CloudProviderId, apiKey?: string) => Promise<{ provider: CloudProviderId; status: "ready"; model: string; modelCount: number }>;
+  exportSettingsBackup: (passphrase: string) => Promise<SettingsBackupExportResult>;
   requestDevelopmentProposal: (input: { prompt: string; activeFile?: string }) => Promise<AgentProposal>;
   setProtectedChatContent: (enabled: boolean) => Promise<void>;
 };
@@ -322,6 +324,15 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return client.testCloudProvider(provider);
   }, [settings.workspaceUrl]);
 
+  const exportSettingsBackup = useCallback(async (passphrase: string) => {
+    const providerEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed").map(async (option) => [option.id, await readSecureValue(providerKeyStorageKey(option.id))] as const));
+    const providerKeys: Record<string, string> = {};
+    for (const [providerId, key] of providerEntries) if (key) providerKeys[providerId] = key;
+    const legacyKey = await readSecureValue(PROVIDER_KEY_KEY);
+    if (legacyKey && settings.provider !== "managed" && !providerKeys[settings.provider]) providerKeys[settings.provider] = legacyKey;
+    return exportEncryptedSettingsBackup({ providerKeys, localProviderEndpoints: settings.localProviderEndpoints, passphrase });
+  }, [settings.localProviderEndpoints, settings.provider]);
+
   const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string }) => {
     if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");
     const client = await createConnectedClient();
@@ -329,8 +340,8 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, testLocalProviderEndpoint, testCloudProvider, requestDevelopmentProposal, setProtectedChatContent }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges, testCloudProvider, testLocalProviderEndpoint],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, testLocalProviderEndpoint, testCloudProvider, exportSettingsBackup, requestDevelopmentProposal, setProtectedChatContent }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, exportSettingsBackup, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges, testCloudProvider, testLocalProviderEndpoint],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;

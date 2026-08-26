@@ -128,3 +128,6 @@
 - [x] Nächsten Release-Preflight ausführen und neuen Publish-Checkpoint erstellen
 - [x] Publish-Warnung „nicht gepackte Änderungen“ für Version 1.0.1 beheben und Packstatus erneut validieren
 - [x] Sprint 21: Release-Status und Publish-Handoff im Workspace sichtbar und nachvollziehbar machen
+- [x] Verschlüsseltes Settings-Backup für Cloud-API-Keys und lokale Provider-Endpoints exportieren
+- [x] Passwort- und Freigabebestätigung vor dem Teilen des Settings-Backups erzwingen
+- [x] Secret-Isolation, Backup-Integrität und native Share-Pipeline deterministisch testen
