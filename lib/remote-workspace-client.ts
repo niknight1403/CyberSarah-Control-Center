@@ -31,6 +31,8 @@ export type AgentProposal = {
   rationale: string;
   changes: Array<{ path: string; content: string; explanation: string }>;
   affectedFiles: string[];
+  providerUsed?: ProviderId;
+  fallbackUsed?: boolean;
 };
 export type RemoteCommit = {
   hash: string;
@@ -151,7 +153,8 @@ export class RemoteWorkspaceClient {
       method: "POST",
       body: JSON.stringify(input),
     });
-    return "proposal" in response ? response.proposal : response;
+    const proposal = "proposal" in response ? response.proposal : response;
+    return { ...proposal, providerUsed: this.config.provider, fallbackUsed: false };
   }
 
   requestAgentProposal(input: AgentRequest) {
@@ -167,7 +170,7 @@ export class RemoteWorkspaceClient {
         fallbackProvider: undefined,
         fallbackProviderApiKey: undefined,
       });
-      return fallbackClient.requestAgentProposalDirect(input);
+      return fallbackClient.requestAgentProposalDirect(input).then((proposal) => ({ ...proposal, fallbackUsed: true }));
     });
   }
 }

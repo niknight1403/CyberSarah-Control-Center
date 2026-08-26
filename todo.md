@@ -102,3 +102,4 @@
 - [x] Provider-Healthchecks, Auto-Binding und Graceful-Degradation für Cloud- und Local-AI validieren.
 - [x] CI/CD-Audit und Release-Benachrichtigungsstatus abschließen.
 - [x] Finalen Release-Commit erstellen und einen Publish-bereiten Checkpoint speichern.
+- [x] Visuelle Anzeige für lokale KI, Cloud-Provider und aktiven Fallback in der Benutzeroberfläche ergänzen.

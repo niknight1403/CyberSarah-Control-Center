@@ -5,6 +5,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { clearDevelopmentChatHistory, loadDevelopmentChatHistory, parseDevelopmentChatHistory, saveDevelopmentChatHistory, serializeDevelopmentChatHistory, type DevelopmentChatHistoryMessage } from "@/lib/development-chat-history";
 import { captureProposalSnapshots, getSelectedProposalChanges, type ProposalFileSnapshot } from "@/lib/proposal-application-logic";
 import type { AgentProposal } from "@/lib/remote-workspace-client";
+import { getProviderLabel, getProviderStatusCopy, type ProviderActivity } from "@/lib/provider-status-logic";
 import { exportEncryptedSupportBackup, isValidSupportBackupPassword } from "@/lib/support-backup";
 import { getSupportShareConfirmation } from "@/lib/support-backup-logic";
 import { useMediaPicker } from "@/hooks/use-media-picker";
@@ -43,6 +44,8 @@ export default function AgentScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [prompt, setPrompt] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [providerActivity, setProviderActivity] = useState<ProviderActivity>("idle");
+  const [lastProviderUsed, setLastProviderUsed] = useState(settings.provider);
   const [chatError, setChatError] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [backupPassword, setBackupPassword] = useState("");
@@ -63,7 +66,8 @@ export default function AgentScreen() {
   const { busy: mediaPickerBusy, pickFiles: pickFilesFromDevice, pickPhotos, pickVideos } = useMediaPicker();
   const hasRepository = Boolean(settings.workspaceId);
   const chatWorkspaceId = settings.workspaceId;
-  const providerLabel = settings.provider === "managed" ? "On-Server" : settings.provider === "together" ? "Together AI" : settings.provider[0].toUpperCase() + settings.provider.slice(1);
+  const providerLabel = getProviderLabel(settings.provider);
+  const providerStatus = getProviderStatusCopy(settings.provider, providerActivity, lastProviderUsed);
   const readyForChat = hasRepository && (settings.provider === "managed" || settings.hasProviderKey);
   const contextLabel = useMemo(() => `${selectedFile.name} · ${settings.branch}`, [selectedFile.name, settings.branch]);
 
@@ -128,11 +132,14 @@ export default function AgentScreen() {
     setPrompt("");
     setAttachments([]);
     setChatError("");
+    setProviderActivity("requesting");
     setIsThinking(true);
     try {
       const enabledSkills = [skillPreferences.agent ? "Agent-Vorschläge" : "", skillPreferences.diff ? "Code-Diff-Prüfung" : "", skillPreferences.quality ? "CI-Qualitätsprüfung" : ""].filter(Boolean).join(", ");
       const contextualPrompt = enabledSkills ? `${normalizedPrompt}\n\nAktive Skills: ${enabledSkills}` : normalizedPrompt;
       const proposal = await requestDevelopmentProposal({ prompt: contextualPrompt, activeFile: selectedFile.remote ? selectedFile.path : undefined });
+      setLastProviderUsed(proposal.providerUsed ?? settings.provider);
+      setProviderActivity(proposal.fallbackUsed ? "fallback" : "active");
       const content = proposal.changes.length ? `${proposal.summary}\n\n${proposal.rationale}\n\n${proposal.changes.length} Datei(en) zur Überprüfung bereit.` : `${proposal.summary}\n\n${proposal.rationale}`;
       const proposalMessageId = `proposal-${Date.now()}`;
       setMessages((current) => [...current, {
@@ -145,6 +152,7 @@ export default function AgentScreen() {
       }]);
       setSelectedProposalPaths((current) => ({ ...current, [proposalMessageId]: proposal.changes.map((change) => change.path) }));
     } catch (error) {
+      setProviderActivity("error");
       setChatError(error instanceof Error ? error.message : "Der Entwicklungsauftrag konnte nicht verarbeitet werden.");
     } finally {
       setIsThinking(false);
@@ -286,6 +294,7 @@ export default function AgentScreen() {
           ListHeaderComponent={<>
             <StudioHeader eyebrow="KI-ENTWICKLUNGSFLUSS" title="Agent" />
             <View style={[styles.readinessCard, readyForChat ? styles.readinessReady : styles.readinessWaiting]}><View style={styles.readinessIcon}><IconSymbol name="sparkles" size={17} color={readyForChat ? "#B9B2FF" : "#F6BA5E"} /></View><View style={styles.readinessCopy}><Text style={styles.readinessTitle}>{readyForChat ? "Entwicklungs-Chat bereit" : "Verbindung für den Agenten fehlt"}</Text><Text style={styles.readinessText}>{readyForChat ? `Projektkontext aus ${contextLabel} · ${providerLabel}` : hasRepository ? "Hinterlege für das gewählte KI-Profil einen Schlüssel oder nutze ein konfiguriertes On-Server-Profil." : "Verbinde zuerst ein Repository und einen Workspace-Service in den Einstellungen."}</Text></View></View>
+            <View style={[styles.providerStatusCard, providerStatus.tone === "warning" ? styles.providerStatusWarning : providerStatus.tone === "ready" ? styles.providerStatusLocal : styles.providerStatusCloud]}><View style={styles.providerStatusIcon}>{providerActivity === "requesting" ? <ActivityIndicator color="#52D8FF" size="small" /> : <View style={[styles.providerStatusDot, providerStatus.tone === "warning" ? styles.providerStatusDotWarning : providerStatus.tone === "ready" ? styles.providerStatusDotLocal : styles.providerStatusDotCloud]} />}</View><View style={styles.providerStatusCopy}><Text style={styles.providerStatusEyebrow}>AKTIVER KI-KANAL</Text><Text style={styles.providerStatusTitle}>{providerStatus.title}</Text><Text numberOfLines={2} style={styles.providerStatusText}>{providerStatus.detail}</Text></View><StatusBadge label={providerStatus.badge} tone={providerStatus.tone} /></View>
             <View style={styles.contextRow}><View style={styles.contextChip}><IconSymbol name="doc.text.fill" size={14} color="#8B7CFF" /><Text numberOfLines={1} style={styles.contextText}>{contextLabel}</Text></View><StatusBadge label={readyForChat ? "Kontrolliert" : "Offline"} tone={readyForChat ? "accent" : "warning"} /></View>
             <View style={styles.historyRow}><Text style={styles.historyText}>{historyLoaded ? settings.protectChatContent ? "Geschützt gespeichert · verschlüsselt und repository-spezifisch" : "Lokal gesichert · repository-spezifisch, ohne Tokens und Dateiinhalte" : "Verlauf wird wiederhergestellt …"}</Text><TouchableOpacity accessibilityRole="button" activeOpacity={0.75} onPress={() => void clearHistory()} style={styles.clearHistoryButton}><Text style={styles.clearHistoryText}>Verlauf löschen</Text></TouchableOpacity></View>
             <StudioSection label="Konversation" title="Reviewbarer Projektkontext" />
@@ -307,6 +316,7 @@ export default function AgentScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 }, content: { paddingBottom: 20 },
   readinessCard: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 13, padding: 12 }, readinessReady: { backgroundColor: "#181A2F", borderColor: "#4D477A" }, readinessWaiting: { backgroundColor: "#211D16", borderColor: "#6A542A" }, readinessIcon: { alignItems: "center", backgroundColor: "#25233E", borderRadius: 11, height: 35, justifyContent: "center", width: 35 }, readinessCopy: { flex: 1 }, readinessTitle: { color: "#EDF4FC", fontSize: 13, fontWeight: "900", marginBottom: 3 }, readinessText: { color: "#9CAABD", fontSize: 11, lineHeight: 16 },
+  providerStatusCard: { alignItems: "center", borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 13, padding: 11 }, providerStatusLocal: { backgroundColor: "#132B2D", borderColor: "#2F746B" }, providerStatusCloud: { backgroundColor: "#17253A", borderColor: "#315D82" }, providerStatusWarning: { backgroundColor: "#2A2118", borderColor: "#8A6330" }, providerStatusIcon: { alignItems: "center", backgroundColor: "#0D151E", borderRadius: 12, height: 30, justifyContent: "center", width: 30 }, providerStatusDot: { borderRadius: 6, height: 11, width: 11 }, providerStatusDotLocal: { backgroundColor: "#78DFA8" }, providerStatusDotCloud: { backgroundColor: "#52D8FF" }, providerStatusDotWarning: { backgroundColor: "#F6BA5E" }, providerStatusCopy: { flex: 1, minWidth: 0 }, providerStatusEyebrow: { color: "#8E9CAF", fontSize: 9, fontWeight: "900", letterSpacing: 1.1, marginBottom: 2 }, providerStatusTitle: { color: "#EFF6FF", fontSize: 12, fontWeight: "900" }, providerStatusText: { color: "#AAB8C9", fontSize: 10, lineHeight: 14, marginTop: 2 },
   contextRow: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "space-between", marginBottom: 25 }, contextChip: { alignItems: "center", backgroundColor: "#171C29", borderColor: "#2A3449", borderRadius: 999, borderWidth: 1, flex: 1, flexDirection: "row", gap: 6, maxWidth: 220, paddingHorizontal: 11, paddingVertical: 8 }, contextText: { color: "#C9D4E2", flexShrink: 1, fontSize: 12, fontWeight: "700" }, historyRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 15, marginTop: -12 }, historyText: { color: "#8294A9", flex: 1, fontSize: 10, lineHeight: 14, marginRight: 8 }, clearHistoryButton: { alignItems: "center", borderColor: "#3A4659", borderRadius: 8, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 8 }, clearHistoryText: { color: "#AAB8C8", fontSize: 10, fontWeight: "800" },
   messageRow: { alignItems: "flex-start", flexDirection: "row", gap: 9, marginBottom: 13 }, userMessageRow: { justifyContent: "flex-end" }, agentAvatar: { alignItems: "center", backgroundColor: "#25233E", borderRadius: 13, height: 27, justifyContent: "center", marginTop: 4, width: 27 }, messageBubble: { borderRadius: 17, maxWidth: "84%", paddingHorizontal: 14, paddingVertical: 12 }, agentBubble: { backgroundColor: "#151C29", borderTopLeftRadius: 5 }, userBubble: { backgroundColor: "#20354A", borderTopRightRadius: 5 }, messageRole: { color: "#B9B2FF", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 5 }, userMessageRole: { color: "#78DCF7" }, messageText: { color: "#E5ECF5", fontSize: 14, lineHeight: 20 },
   changeList: { borderTopColor: "#2A3548", borderTopWidth: 1, marginTop: 11, paddingTop: 4 }, selectionHint: { color: "#9DACBD", fontSize: 10, lineHeight: 15, marginTop: 7 }, changeRow: { alignItems: "center", borderRadius: 9, flexDirection: "row", gap: 8, marginTop: 7, minHeight: 44, paddingHorizontal: 6, paddingVertical: 5 }, changeRowSelected: { backgroundColor: "#1B3142" }, changeSelection: { alignItems: "center", borderColor: "#63718A", borderRadius: 5, borderWidth: 1, height: 18, justifyContent: "center", width: 18 }, changeSelectionSelected: { backgroundColor: "#52D8FF", borderColor: "#52D8FF" }, changeSelectionMark: { color: "#071218", fontSize: 13, fontWeight: "900", lineHeight: 16 }, changeCopy: { flex: 1 }, changePath: { color: "#C9C0FF", fontFamily: "monospace", fontSize: 11, fontWeight: "800" }, changeExplanation: { color: "#9DACBD", fontSize: 11, lineHeight: 16, marginTop: 2 }, applyButton: { alignItems: "center", backgroundColor: "#206275", borderColor: "#52D8FF", borderRadius: 10, borderWidth: 1, flexDirection: "row", gap: 5, justifyContent: "center", marginTop: 13, minHeight: 44, paddingVertical: 10 }, applyButtonDisabled: { opacity: 0.55 }, applyText: { color: "#E6FAFF", fontSize: 12, fontWeight: "900" }, undoButton: { alignItems: "center", borderColor: "#B49A5C", borderRadius: 10, borderWidth: 1, justifyContent: "center", marginTop: 8, minHeight: 44, paddingHorizontal: 12 }, undoText: { color: "#F2C979", fontSize: 12, fontWeight: "900" }, appliedText: { color: "#78DFA8", fontSize: 11, fontWeight: "800", marginTop: 12 }, restoredText: { color: "#F2C979", fontSize: 11, lineHeight: 16, marginTop: 12 },
