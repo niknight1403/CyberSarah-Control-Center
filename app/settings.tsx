@@ -11,8 +11,11 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
+type LocalProviderId = "ollama" | "lmstudio";
+type EndpointTestState = "idle" | "checking" | "ready" | "error";
+
 export default function SettingsScreen() {
-  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings } = useStudioSettings();
+  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings, testLocalProviderEndpoint } = useStudioSettings();
   const { loadRemoteFiles } = useWorkspace();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
@@ -25,6 +28,8 @@ export default function SettingsScreen() {
   const [lmstudioEndpoint, setLmstudioEndpoint] = useState(defaultLocalProviderEndpoints.lmstudio);
   const [ollamaEndpointTouched, setOllamaEndpointTouched] = useState(false);
   const [lmstudioEndpointTouched, setLmstudioEndpointTouched] = useState(false);
+  const [endpointTestState, setEndpointTestState] = useState<Record<LocalProviderId, EndpointTestState>>({ ollama: "idle", lmstudio: "idle" });
+  const [endpointTestMessage, setEndpointTestMessage] = useState<Record<LocalProviderId, string>>({ ollama: "", lmstudio: "" });
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [workspaceTouched, setWorkspaceTouched] = useState(false);
   const [serviceTokenTouched, setServiceTokenTouched] = useState(false);
@@ -47,6 +52,24 @@ export default function SettingsScreen() {
   const lmstudioEndpointValidation = validateLocalProviderEndpoint(lmstudioEndpoint, "LM Studio");
   const canSave = workspaceValidation.valid && serviceTokenValidation.valid && ollamaEndpointValidation.valid && lmstudioEndpointValidation.valid;
   const canAttach = canSave && Boolean(repositoryUrl.trim()) && Boolean(branch.trim());
+
+  const testEndpoint = async (localProvider: LocalProviderId, endpoint: string, validation: FieldValidation) => {
+    if (!validation.valid) {
+      setEndpointTestState((current) => ({ ...current, [localProvider]: "error" }));
+      setEndpointTestMessage((current) => ({ ...current, [localProvider]: validation.message }));
+      return;
+    }
+    setEndpointTestState((current) => ({ ...current, [localProvider]: "checking" }));
+    setEndpointTestMessage((current) => ({ ...current, [localProvider]: "" }));
+    try {
+      const result = await testLocalProviderEndpoint(localProvider, endpoint);
+      setEndpointTestState((current) => ({ ...current, [localProvider]: "ready" }));
+      setEndpointTestMessage((current) => ({ ...current, [localProvider]: `${result.modelCount} Modell${result.modelCount === 1 ? "" : "e"} erreichbar.` }));
+    } catch (error) {
+      setEndpointTestState((current) => ({ ...current, [localProvider]: "error" }));
+      setEndpointTestMessage((current) => ({ ...current, [localProvider]: error instanceof Error ? error.message : "Der lokale Endpoint ist nicht erreichbar." }));
+    }
+  };
 
   const persistSettings = async () => {
     setWorkspaceTouched(true);
@@ -151,11 +174,19 @@ export default function SettingsScreen() {
           <StudioSection label="Lokal" title="Provider-Endpoints" />
           <Text style={styles.fieldHint}>Lege die erreichbare Basisadresse für lokale KI fest. Auf Android zeigt localhost auf das Telefon – verwende für einen Rechner im Netzwerk dessen LAN-, VPN- oder Tailscale-Adresse.</Text>
           <Text style={styles.fieldLabel}>OLLAMA BASIS-URL</Text>
-          <TextInput accessibilityLabel="Ollama Basis-URL" autoCapitalize="none" autoCorrect={false} keyboardType="url" onBlur={() => setOllamaEndpointTouched(true)} onChangeText={(value) => { setOllamaEndpoint(value); setOllamaEndpointTouched(true); setSaveState("idle"); }} placeholder="http://192.168.1.20:11434/v1" placeholderTextColor="#697A90" style={[styles.input, getInputStyle(ollamaEndpointValidation, ollamaEndpointTouched)]} value={ollamaEndpoint} />
+          <View style={styles.endpointFieldRow}>
+            <TextInput accessibilityLabel="Ollama Basis-URL" autoCapitalize="none" autoCorrect={false} keyboardType="url" onBlur={() => setOllamaEndpointTouched(true)} onChangeText={(value) => { setOllamaEndpoint(value); setOllamaEndpointTouched(true); setEndpointTestState((current) => ({ ...current, ollama: "idle" })); setEndpointTestMessage((current) => ({ ...current, ollama: "" })); setSaveState("idle"); }} placeholder="http://192.168.1.20:11434/v1" placeholderTextColor="#697A90" style={[styles.input, styles.endpointInput, getInputStyle(ollamaEndpointValidation, ollamaEndpointTouched)]} value={ollamaEndpoint} />
+            <TouchableOpacity accessibilityLabel="Ollama Endpoint testen" accessibilityRole="button" activeOpacity={0.75} disabled={endpointTestState.ollama === "checking"} onPress={() => void testEndpoint("ollama", ollamaEndpoint, ollamaEndpointValidation)} style={[styles.endpointTestButton, endpointTestState.ollama === "checking" && styles.endpointTestButtonDisabled]}><IconSymbol name={endpointTestState.ollama === "ready" ? "checkmark.circle.fill" : "bolt.fill"} size={15} color="#061019" /><Text style={styles.endpointTestButtonText}>{endpointTestState.ollama === "checking" ? "Prüfe …" : "Endpoint testen"}</Text></TouchableOpacity>
+          </View>
           <ValidationMessage active={ollamaEndpointTouched} validation={ollamaEndpointValidation} />
+          <EndpointTestFeedback state={endpointTestState.ollama} message={endpointTestMessage.ollama} />
           <Text style={styles.fieldLabel}>LM STUDIO BASIS-URL</Text>
-          <TextInput accessibilityLabel="LM Studio Basis-URL" autoCapitalize="none" autoCorrect={false} keyboardType="url" onBlur={() => setLmstudioEndpointTouched(true)} onChangeText={(value) => { setLmstudioEndpoint(value); setLmstudioEndpointTouched(true); setSaveState("idle"); }} placeholder="http://192.168.1.20:1234/v1" placeholderTextColor="#697A90" style={[styles.input, getInputStyle(lmstudioEndpointValidation, lmstudioEndpointTouched)]} value={lmstudioEndpoint} />
+          <View style={styles.endpointFieldRow}>
+            <TextInput accessibilityLabel="LM Studio Basis-URL" autoCapitalize="none" autoCorrect={false} keyboardType="url" onBlur={() => setLmstudioEndpointTouched(true)} onChangeText={(value) => { setLmstudioEndpoint(value); setLmstudioEndpointTouched(true); setEndpointTestState((current) => ({ ...current, lmstudio: "idle" })); setEndpointTestMessage((current) => ({ ...current, lmstudio: "" })); setSaveState("idle"); }} placeholder="http://192.168.1.20:1234/v1" placeholderTextColor="#697A90" style={[styles.input, styles.endpointInput, getInputStyle(lmstudioEndpointValidation, lmstudioEndpointTouched)]} value={lmstudioEndpoint} />
+            <TouchableOpacity accessibilityLabel="LM Studio Endpoint testen" accessibilityRole="button" activeOpacity={0.75} disabled={endpointTestState.lmstudio === "checking"} onPress={() => void testEndpoint("lmstudio", lmstudioEndpoint, lmstudioEndpointValidation)} style={[styles.endpointTestButton, endpointTestState.lmstudio === "checking" && styles.endpointTestButtonDisabled]}><IconSymbol name={endpointTestState.lmstudio === "ready" ? "checkmark.circle.fill" : "bolt.fill"} size={15} color="#061019" /><Text style={styles.endpointTestButtonText}>{endpointTestState.lmstudio === "checking" ? "Prüfe …" : "Endpoint testen"}</Text></TouchableOpacity>
+          </View>
           <ValidationMessage active={lmstudioEndpointTouched} validation={lmstudioEndpointValidation} />
+          <EndpointTestFeedback state={endpointTestState.lmstudio} message={endpointTestMessage.lmstudio} />
         </View>
         <View style={styles.sectionSpacer}>
           <StudioSection label="Datenschutz" title="Chat-Inhalte auf diesem Gerät" />
@@ -185,6 +216,18 @@ function getInputStyle(validation: FieldValidation, active: boolean) {
   return styles.inputInvalid;
 }
 
+function EndpointTestFeedback({ state, message }: { state: EndpointTestState; message: string }) {
+  if (state === "idle") return null;
+  const ready = state === "ready";
+  const checking = state === "checking";
+  return (
+    <View style={[styles.endpointFeedback, ready ? styles.endpointFeedbackReady : checking ? styles.endpointFeedbackChecking : styles.endpointFeedbackError]}>
+      <IconSymbol name={ready ? "checkmark.circle.fill" : checking ? "bolt.fill" : "exclamationmark.triangle.fill"} size={15} color={ready ? "#45D996" : checking ? "#52D8FF" : "#FF6B7A"} />
+      <Text style={[styles.endpointFeedbackText, ready ? styles.endpointFeedbackTextReady : checking ? styles.endpointFeedbackTextChecking : styles.endpointFeedbackTextError]}>{checking ? "Verbindung zum lokalen Provider wird geprüft …" : message}</Text>
+    </View>
+  );
+}
+
 function ValidationMessage({ active, validation }: { active: boolean; validation: FieldValidation }) {
   if (!active) return null;
   const icon = validation.valid ? "checkmark.circle.fill" : validation.tone === "neutral" ? "exclamationmark.triangle.fill" : "exclamationmark.triangle.fill";
@@ -206,6 +249,19 @@ const styles = StyleSheet.create({
   inputValid: { borderColor: "#45D996" },
   inputStored: { borderColor: "#8B7CFF" },
   inputInvalid: { borderColor: "#FF6B7A" },
+  endpointFieldRow: { alignItems: "stretch", flexDirection: "row", gap: 8 },
+  endpointInput: { flex: 1, minWidth: 0 },
+  endpointTestButton: { alignItems: "center", backgroundColor: "#52D8FF", borderRadius: 12, flexDirection: "row", gap: 5, justifyContent: "center", minHeight: 48, paddingHorizontal: 10 },
+  endpointTestButtonDisabled: { opacity: 0.58 },
+  endpointTestButtonText: { color: "#061019", fontSize: 11, fontWeight: "900" },
+  endpointFeedback: { alignItems: "flex-start", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
+  endpointFeedbackReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.32)" },
+  endpointFeedbackChecking: { backgroundColor: "rgba(82,216,255,0.09)", borderColor: "rgba(82,216,255,0.30)" },
+  endpointFeedbackError: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.32)" },
+  endpointFeedbackText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  endpointFeedbackTextReady: { color: "#70E4AA" },
+  endpointFeedbackTextChecking: { color: "#86DFFF" },
+  endpointFeedbackTextError: { color: "#FF9AA4" },
   validationRow: { alignItems: "flex-start", flexDirection: "row", gap: 7, marginTop: 8 },
   validationText: { flex: 1, fontSize: 12, lineHeight: 17 },
   validationTextSuccess: { color: "#70E4AA" },

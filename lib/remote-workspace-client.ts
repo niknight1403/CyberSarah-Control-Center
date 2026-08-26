@@ -96,6 +96,13 @@ export class RemoteWorkspaceClient {
     return this.request<RemoteHealth>("/api/v1/health");
   }
 
+  testLocalProviderEndpoint(provider: "ollama" | "lmstudio") {
+    return this.request<{ provider: "ollama" | "lmstudio"; status: "ready"; modelCount: number }>("/api/v1/providers/local/test", {
+      method: "POST",
+      body: JSON.stringify({ provider }),
+    });
+  }
+
   attachRepository(input: RepositoryRequest) {
     return this.request<{ workspaceId: string; branch: string }>("/api/v1/repositories/attach", {
       method: "POST",

@@ -111,3 +111,5 @@
 - [x] Ollama- und LM-Studio-Endpoint-URLs in Settings validieren und lokal speichern
 - [x] Gespeicherte lokale Endpoint-URLs an Workspace-Client und Workspace-Service weiterreichen
 - [x] Endpoint-Persistenz und Routing mit deterministischen Tests absichern
+- [x] Direkte Endpoint-Tests für Ollama und LM Studio mit Lade-, Erfolgs- und Fehlerstatus ergänzen
+- [x] Lokale Provider-Healthcheck-Routen tokenfrei und deterministisch validieren

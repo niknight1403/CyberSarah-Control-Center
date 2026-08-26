@@ -454,6 +454,23 @@ app.get("/api/v1/health", requireServiceAuthorization, (_request, response) => {
   response.json({ status: "ready", version: "1.0.0", previewUrl: publicBaseUrl || undefined });
 });
 
+app.post("/api/v1/providers/local/test", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const provider = z.enum(["ollama", "lmstudio"]).parse(request.body?.provider);
+    const configuredEndpoint = getLocalProviderEndpoint(request, provider);
+    const fallbackEndpoint = provider === "ollama" ? process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434/v1" : process.env.LMSTUDIO_BASE_URL ?? "http://127.0.0.1:1234/v1";
+    const endpoint = `${configuredEndpoint ?? fallbackEndpoint}`.replace(/\/+$/, "") + "/models";
+    const providerKey = request.header("X-AI-Provider-Key")?.trim();
+    const upstream = await fetch(endpoint, { headers: providerKey ? { authorization: `Bearer ${providerKey}` } : {}, signal: AbortSignal.timeout(5_000) });
+    const payload = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) throw new Error(`Lokaler ${provider === "ollama" ? "Ollama" : "LM-Studio"}-Endpoint antwortet mit ${upstream.status}.`);
+    const models = Array.isArray(payload.models) ? payload.models : Array.isArray(payload.data) ? payload.data : [];
+    response.json({ provider, status: "ready", modelCount: models.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/v1/repositories/attach", requireServiceAuthorization, async (request, response, next) => {
   try {
     const input = repositorySchema.parse(request.body);

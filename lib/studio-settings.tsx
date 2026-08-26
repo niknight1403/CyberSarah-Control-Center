@@ -99,6 +99,7 @@ type StudioSettingsContextValue = {
   createRepositoryPullRequest: (input: { baseBranch: string; title: string; body: string }) => Promise<{ number: number; url: string; headBranch: string; baseBranch: string }>;
   loadRepositoryQuality: () => Promise<RepositoryQuality>;
   loadWorkspaceHealth: () => Promise<RemoteHealth>;
+  testLocalProviderEndpoint: (provider: "ollama" | "lmstudio", endpoint: string) => Promise<{ provider: "ollama" | "lmstudio"; status: "ready"; modelCount: number }>;
   requestDevelopmentProposal: (input: { prompt: string; activeFile?: string }) => Promise<AgentProposal>;
   setProtectedChatContent: (enabled: boolean) => Promise<void>;
 };
@@ -299,6 +300,19 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return client.getHealth();
   }, [settings.localProviderEndpoints, settings.provider, settings.workspaceUrl]);
 
+  const testLocalProviderEndpoint = useCallback(async (provider: "ollama" | "lmstudio", endpoint: string) => {
+    if (!settings.workspaceUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
+    const [serviceAccessToken, providerApiKey] = await Promise.all([readSecureValue(SERVICE_ACCESS_TOKEN_KEY), readProviderApiKey(provider)]);
+    const client = new RemoteWorkspaceClient({
+      baseUrl: settings.workspaceUrl,
+      serviceAccessToken: serviceAccessToken || undefined,
+      provider,
+      providerApiKey: providerApiKey || undefined,
+      localProviderEndpoints: { [provider]: endpoint },
+    });
+    return client.testLocalProviderEndpoint(provider);
+  }, [settings.workspaceUrl]);
+
   const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string }) => {
     if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");
     const client = await createConnectedClient();
@@ -306,8 +320,8 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, requestDevelopmentProposal, setProtectedChatContent }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, testLocalProviderEndpoint, requestDevelopmentProposal, setProtectedChatContent }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges, testLocalProviderEndpoint],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;
