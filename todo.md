@@ -105,3 +105,4 @@
 - [x] Visuelle Anzeige für lokale KI, Cloud-Provider und aktiven Fallback in der Benutzeroberfläche ergänzen.
 - [x] Neueste CyberSarah-Control-Center-Änderungen zum verbundenen GitHub-Repository pushen und Remote-Stand verifizieren.
 - [ ] Android-APK-Erstellung für CyberSarah Control Center über Publish anstoßen und den Installations-Handoff übergeben.
+- [x] Publish-Hinweis „nicht gepackte Änderungen“ diagnostizieren, Release-Stand checkpointen und APK-Handoff verifizieren.
