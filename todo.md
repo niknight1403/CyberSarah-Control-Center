@@ -1,0 +1,85 @@
+# Project TODO
+
+- [x] Define the portrait-first Custom AI Studio Mobile design and remote-workspace boundary.
+- [x] Replace the template with the dark Workspace, Agent, Preview, and Settings experience.
+- [x] Build a typed local workspace model with file selection, editing, logs, and agent proposals.
+- [x] Add secure device configuration for GitHub tokens and provider profiles.
+- [x] Define server-facing contracts for repository, runtime, Git, and agent operations.
+- [x] Add deployment materials for a Hetzner/VPS workspace service and explain the required environment variables.
+- [x] Generate and apply a custom Custom AI Studio Mobile icon and app branding.
+- [x] Add deterministic tests for workspace state and configuration persistence.
+- [x] Verify TypeScript, tests, and the rendered mobile layout.
+- [x] Create the first complete project checkpoint and provide hand-off guidance.
+- [x] Compress and replace all native launcher assets below the checkpoint size limit, then retry the checkpoint.
+- [x] Fix the settings route crash caused by StudioSettingsProvider not wrapping the root navigator.
+- [x] Add live visual validation for workspace URL and service access token before settings can be saved.
+- [x] Activate repository connection from Settings and surface attachment state in the workspace.
+- [x] Prepare and validate an isolated test repository against the workspace service.
+- [x] Add branch selection and recent commit history to the connected repository view.
+- [x] Add a commit and push bar for changed connected workspace files, with clear state feedback.
+- [x] Add an in-app pull-request creation action after a successful branch push.
+- [x] Add visual merge readiness and CI result indicators to the connected repository card.
+- [x] Add a context-aware development chat with reviewable repository-change proposals and controlled application flow.
+- [x] Persist bounded local development-chat history, proposals, and application state across app restarts.
+- [x] Add an opt-in encrypted native local storage mode for development-chat content with clear platform disclosure.
+- [x] Add a user-controlled encrypted support-backup export for bounded development-chat history.
+- [x] Require an explicit support-sharing confirmation before opening the encrypted backup share sheet.
+- [x] Sprint 1: Add workspace connection diagnostics and manual health refresh.
+- [x] Sprint 2: Add an inspectable local file-diff view before synchronization.
+- [x] Sprint 3: Add protected-branch warnings and explicit push confirmation.
+- [x] Sprint 4: Add pull-request summary and review-state visibility.
+- [x] Sprint 5: Add CI-quality details and a manual status refresh flow.
+- [x] Sprint 6: Scope persisted development-chat sessions to their connected repository.
+- [x] Sprint 7: Allow selective application and controlled reversal of agent-proposed changes.
+- [x] Sprint 8: Add offline draft state and remote-conflict warnings.
+- [x] Sprint 9: Add integrity verification and restore preview for encrypted support backups.
+- [x] Sprint 10: Add a consolidated quality dashboard and mobile robustness improvements.
+- [x] Manus-inspirierte „Nächste sinnvolle Schritte“-Karten für den Entwicklungsbereich hinzufügen.
+- [x] Kontextabhängige Aufgabenempfehlungen mit explizitem Starten und Abschließen umsetzen.
+- [x] Android-taugliche Interaktionen und 44pt-Touch-Ziele für die neue Entwicklungsführung validieren.
+- [x] Detaillierte Code-Diff-Vorschau für vorgeschlagene Schritte vor der Ausführung hinzufügen.
+- [x] Explizite Bestätigung oder Abbruch der empfohlenen Aktion nach Diff-Prüfung umsetzen.
+- [x] Diff-Vorschau und Bestätigungsablauf deterministisch testen und für mobile Bedienung validieren.
+- [ ] Aktueller Sprint: Neustart-Button für den Entwicklungsserver mit Bestätigung, Ladezustand und Statusfeedback abschließen.
+- [ ] Mobile Optimierung für den Android-Build prüfen und erforderliche Anpassungen umsetzen.
+- [x] Android-Build-Konfiguration für die APK-Erzeugung validieren.
+- [ ] GitHub-Zielrepository und Push-Workflow sicher vorbereiten.
+- [ ] Visuelle GitHub-Verbindungsstatusanzeige mit verbunden-, getrennt-, prüfend- und Fehlerzustand hinzufügen.
+- [ ] Manuelle GitHub-Statusprüfung ohne Anzeige sensibler Tokens anbinden.
+- [ ] GitHub-Statusanzeige deterministisch testen und checkpointen.
+- [ ] Mehrere optische Designrichtungen für die mobile Entwicklungsoberfläche als Mockup-Bilder erstellen.
+- [ ] Varianten klar beschriften und als Auswahl zur Designentscheidung bereitstellen.
+- [x] Systemname auf „CyberSarah Control Center“ umstellen und sichtbare Branding-Texte konsistent aktualisieren.
+- [x] App-Branding und Android-Konfiguration nach der Umbenennung validieren.
+- [ ] Dark-Mode-Auswahl im CyberSarah Control Center ergänzen.
+- [ ] Theme-Auswahl dauerhaft und sicher lokal speichern.
+- [ ] Dark-Mode-Kontraste, mobile Bedienung und Wiederherstellung testen.
+- [x] Vier eigenständige visuelle Design-Mockups für CyberSarah Control Center erstellen.
+- [x] Mockup-Varianten beschriften und als Auswahl zur weiteren Umsetzung bereitstellen.
+- [x] Fokussierte Graphite-Glass-Smartphonevorschau für Design B erstellen und bereitstellen.
+- [ ] Mockupbilder zusätzlich als direkt sichtbare Chat-Anhänge bereitstellen.
+- [x] Mockups als echte, direkt anhängbare Bilddateien neu erzeugen und sichtbar bereitstellen.
+- [x] Void Dark als aktive Designrichtung in der Oberfläche festlegen.
+- [x] Plus-Menü im Chat für Dateien, Fotos und Videos ergänzen.
+- [x] Bereich für Skills und Connectoren im Chat integrieren.
+- [x] Anhänge, sichere Zustände und mobile Touch-Ziele testen.
+- [x] Individuelle Toggle-Schalter für Skills im Bereich „Skills & Connectoren“ ergänzen.
+- [x] Skill-Auswahl lokal speichern und beim Start wiederherstellen.
+- [x] Toggle-Zustände in der Agent-Statusanzeige und im mobilen Workflow berücksichtigen.
+- [x] Connectoren im Bereich „Skills & Connectoren“ einzeln konfigurierbar machen.
+- [x] Connector-Konfigurationen sicher speichern und Tokenwerte niemals anzeigen.
+- [x] Individuelle Connector-Zustände, Bearbeiten und Deaktivieren testen.
+- [x] Verbindungstest für Workspace-Service, GitHub und KI-Provider ergänzen.
+- [x] Teststatus mit Laden, Erfolg und verständlichem Fehler je Connector anzeigen.
+- [x] Verbindungstests ohne Token-Leaks deterministisch validieren.
+- [x] Nächsten CyberSarah-Control-Center-Release vollständig validieren.
+- [x] Release-Checkpoint für die Veröffentlichung erstellen.
+- [ ] Veröffentlichung und Android-APK über die Publish-Oberfläche anstoßen.
+- [ ] Verbundenes Ziel-Repository prüfen und für den Release-Workflow vorbereiten.
+- [ ] Android-Release für einen echten Geräte-Test vorbereiten und Publish-Handoff dokumentieren.
+- [ ] Release-Benachrichtigungen für relevante Statusänderungen ergänzen.
+- [ ] GitHub-Ziel `Niknight1403/CyberSarah Control Center` verifizieren und auf einen gültigen Repository-Namen abbilden.
+- [ ] Aktuellen Release-Stand in das verifizierte Zielrepository pushen.
+- [ ] Push-Ergebnis und Zielbranch bestätigen.
+- [x] Aktuelle App-Dateien in das geklonte CyberSarah-Control-Center-Repository kopieren.
+- [x] Änderungen im Zielrepository prüfen und lokalen Commit vorbereiten.

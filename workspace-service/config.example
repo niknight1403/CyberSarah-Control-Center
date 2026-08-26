@@ -1,0 +1,16 @@
+# Copy this file to .env on the VPS before starting Docker Compose.
+PREVIEW_PUBLIC_BASE_URL=https://studio.example.com
+ALLOWED_ORIGIN=https://app.example.com
+SERVICE_ACCESS_TOKEN=replace-with-a-long-random-secret
+WORKSPACES_DIR=/data/workspaces
+
+# Optional on-server provider profile.
+MANAGED_LLM_BASE_URL=
+MANAGED_LLM_API_KEY=
+MANAGED_LLM_MODEL=gpt-4o-mini
+
+# Optional model overrides for user-supplied provider keys.
+OPENAI_MODEL=gpt-4o-mini
+GROQ_MODEL=llama-3.3-70b-versatile
+TOGETHER_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
+ANTHROPIC_MODEL=claude-3-5-haiku-latest
