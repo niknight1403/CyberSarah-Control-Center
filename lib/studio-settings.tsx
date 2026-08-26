@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
-import { getDefaultFreeProvider, providerDefaults, toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
+import { defaultLocalProviderEndpoints, getDefaultFreeProvider, normalizeLocalProviderEndpoints, providerDefaults, toPersistedStudioSettings, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
 import { secureSessionStore } from "@/lib/secure-session-store";
 import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -31,6 +31,7 @@ export type StudioSettings = {
   repositoryUrl: string;
   branch: string;
   provider: ProviderId;
+  localProviderEndpoints: LocalProviderEndpoints;
   workspaceId?: string;
   hasServiceAccessToken: boolean;
   hasGitHubToken: boolean;
@@ -39,10 +40,11 @@ export type StudioSettings = {
   protectChatContent: boolean;
 };
 
-export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" | "hasGitHubToken" | "hasProviderKey" | "providerKeyStatus" | "protectChatContent"> & {
+export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" | "hasGitHubToken" | "hasProviderKey" | "providerKeyStatus" | "localProviderEndpoints" | "protectChatContent"> & {
   serviceAccessToken?: string;
   githubToken?: string;
   providerApiKey?: string;
+  localProviderEndpoints?: Partial<LocalProviderEndpoints>;
   protectChatContent?: boolean;
 };
 export type RemoteWorkspaceChange = { path: string; content: string };
@@ -52,6 +54,7 @@ const defaultSettings: StudioSettings = {
   repositoryUrl: "",
   branch: "main",
   provider: getDefaultFreeProvider(),
+  localProviderEndpoints: defaultLocalProviderEndpoints,
   hasServiceAccessToken: false,
   hasGitHubToken: false,
   hasProviderKey: false,
@@ -119,7 +122,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
         const providerKeyEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed").map(async (option) => [option.id, await hasSecureValue(providerKeyStorageKey(option.id))] as const));
         const providerKeyStatus = Object.fromEntries(providerKeyEntries) as ProviderKeyStatus;
         if (hasProviderKey && parsed.provider && parsed.provider !== "managed") providerKeyStatus[parsed.provider] = true;
-        setSettings({ ...defaultSettings, ...parsed, hasServiceAccessToken, hasGitHubToken, hasProviderKey: Boolean(providerKeyStatus[parsed.provider ?? defaultSettings.provider]), providerKeyStatus });
+        setSettings({ ...defaultSettings, ...parsed, localProviderEndpoints: normalizeLocalProviderEndpoints(parsed.localProviderEndpoints), hasServiceAccessToken, hasGitHubToken, hasProviderKey: Boolean(providerKeyStatus[parsed.provider ?? defaultSettings.provider]), providerKeyStatus });
       } finally {
         setLoading(false);
       }
@@ -129,7 +132,8 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
 
   const saveSettings = useCallback(async (input: StudioSettingsInput) => {
     const nextSettings: StudioSettings = {
-      ...toPersistedStudioSettings({ ...input, protectChatContent: input.protectChatContent ?? settings.protectChatContent }),
+      ...toPersistedStudioSettings({ ...input, localProviderEndpoints: input.localProviderEndpoints ?? settings.localProviderEndpoints, protectChatContent: input.protectChatContent ?? settings.protectChatContent }),
+      localProviderEndpoints: normalizeLocalProviderEndpoints(input.localProviderEndpoints ?? settings.localProviderEndpoints),
       workspaceId: settings.workspaceId,
       hasServiceAccessToken: input.serviceAccessToken?.trim() ? true : settings.hasServiceAccessToken,
       hasGitHubToken: input.githubToken?.trim() ? true : settings.hasGitHubToken,
@@ -144,7 +148,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(nextSettings));
     setSettings(nextSettings);
     return nextSettings;
-  }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken, settings.providerKeyStatus, settings.workspaceId]);
+  }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken, settings.localProviderEndpoints, settings.protectChatContent, settings.providerKeyStatus, settings.workspaceId]);
 
   const setProtectedChatContent = useCallback(async (enabled: boolean) => {
     const nextSettings = { ...settings, protectChatContent: enabled };
@@ -181,6 +185,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       githubToken: input.githubToken?.trim() || storedGitHubToken || undefined,
       provider: storedSettings.provider,
       providerApiKey: input.providerApiKey?.trim() || storedProviderKey || undefined,
+      localProviderEndpoints: storedSettings.localProviderEndpoints,
     });
     const attached = await client.attachRepository({ repositoryUrl: storedSettings.repositoryUrl, branch: storedSettings.branch });
     const files = (await client.listFiles(attached.workspaceId)).files;
@@ -203,9 +208,10 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       githubToken: githubToken || undefined,
       provider: settings.provider,
       providerApiKey: providerApiKey || undefined,
+      localProviderEndpoints: settings.localProviderEndpoints,
     });
     return client.getFile(settings.workspaceId, path);
-  }, [settings.provider, settings.workspaceId, settings.workspaceUrl]);
+  }, [settings.localProviderEndpoints, settings.provider, settings.workspaceId, settings.workspaceUrl]);
 
   const createConnectedClient = useCallback(async () => {
     if (!settings.workspaceUrl || !settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
@@ -220,8 +226,9 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       githubToken: githubToken || undefined,
       provider: settings.provider,
       providerApiKey: providerApiKey || undefined,
+      localProviderEndpoints: settings.localProviderEndpoints,
     });
-  }, [settings.provider, settings.workspaceId, settings.workspaceUrl]);
+  }, [settings.localProviderEndpoints, settings.provider, settings.workspaceId, settings.workspaceUrl]);
 
   const loadRepositoryDetails = useCallback(async () => {
     if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
@@ -288,9 +295,9 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       readSecureValue(GITHUB_TOKEN_KEY),
       readProviderApiKey(settings.provider),
     ]);
-    const client = new RemoteWorkspaceClient({ baseUrl: settings.workspaceUrl, serviceAccessToken: serviceAccessToken || undefined, githubToken: githubToken || undefined, provider: settings.provider, providerApiKey: providerApiKey || undefined });
+    const client = new RemoteWorkspaceClient({ baseUrl: settings.workspaceUrl, serviceAccessToken: serviceAccessToken || undefined, githubToken: githubToken || undefined, provider: settings.provider, providerApiKey: providerApiKey || undefined, localProviderEndpoints: settings.localProviderEndpoints });
     return client.getHealth();
-  }, [settings.provider, settings.workspaceUrl]);
+  }, [settings.localProviderEndpoints, settings.provider, settings.workspaceUrl]);
 
   const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string }) => {
     if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");

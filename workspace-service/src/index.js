@@ -101,6 +101,22 @@ function getGitHubToken(request) {
   return token || undefined;
 }
 
+function getLocalProviderEndpoint(request, provider) {
+  if (provider !== "ollama" && provider !== "lmstudio") return undefined;
+  const rawEndpoint = request.header("X-AI-Provider-Endpoint")?.trim();
+  if (!rawEndpoint) return undefined;
+  let endpoint;
+  try {
+    endpoint = new URL(rawEndpoint);
+  } catch {
+    throw new Error("Die lokale Provider-Endpoint-URL ist ungültig.");
+  }
+  if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+    throw new Error("Die lokale Provider-Endpoint-URL muss eine HTTP(S)-Basisadresse ohne Zugangsdaten, Query oder Fragment sein.");
+  }
+  return rawEndpoint.replace(/\/+$/, "");
+}
+
 function assertRepositoryUrl(repositoryUrl) {
   const parsed = new URL(repositoryUrl);
   if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") {
@@ -381,7 +397,11 @@ async function invokeProvider(request, messages) {
     custom: { baseUrl: process.env.CUSTOM_OPENAI_BASE_URL, key: suppliedKey, model: process.env.CUSTOM_OPENAI_MODEL ?? "local-model" },
     huggingface: { baseUrl: "https://router.huggingface.co/v1/chat/completions", key: boundProviderKey, model: process.env.HF_MODEL ?? "deepseek-ai/DeepSeek-R1:fastest" },
   };
-  const configuration = defaults[provider];
+  const endpointOverride = getLocalProviderEndpoint(request, provider);
+  const configuration = {
+    ...defaults[provider],
+    ...(endpointOverride && (provider === "ollama" || provider === "lmstudio") ? { baseUrl: `${endpointOverride}/chat/completions` } : {}),
+  };
   if (!configuration?.baseUrl || !configuration.key) throw new Error("Für das ausgewählte KI-Profil fehlt ein API-Key oder eine On-Server-Konfiguration.");
 
   const isAnthropic = provider === "anthropic";
@@ -426,7 +446,7 @@ app.use(
       if (!origin || !allowedOrigin || origin === allowedOrigin) return callback(null, true);
       return callback(new Error("Origin ist nicht erlaubt."));
     },
-    allowedHeaders: ["Authorization", "Content-Type", "X-GitHub-Token", "X-AI-Provider", "X-AI-Provider-Key"],
+    allowedHeaders: ["Authorization", "Content-Type", "X-GitHub-Token", "X-AI-Provider", "X-AI-Provider-Key", "X-AI-Provider-Endpoint"],
   }),
 );
 

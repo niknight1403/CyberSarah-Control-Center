@@ -24,11 +24,34 @@ export const providerDefaults: Record<ProviderId, { model: string; freeTierNote:
   huggingface: { model: "deepseek-ai/DeepSeek-R1:fastest", freeTierNote: "Begrenztes monatliches Free-Guthaben; Modell- und Provider-Verfügbarkeit kann sich ändern." },
 };
 
+export type LocalProviderEndpoints = {
+  ollama: string;
+  lmstudio: string;
+};
+
+export const defaultLocalProviderEndpoints: LocalProviderEndpoints = {
+  ollama: "http://127.0.0.1:11434/v1",
+  lmstudio: "http://127.0.0.1:1234/v1",
+};
+
+export function normalizeLocalProviderEndpoint(value: string | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.replace(/\/+$/, "") : fallback;
+}
+
+export function normalizeLocalProviderEndpoints(input?: Partial<LocalProviderEndpoints>): LocalProviderEndpoints {
+  return {
+    ollama: normalizeLocalProviderEndpoint(input?.ollama, defaultLocalProviderEndpoints.ollama),
+    lmstudio: normalizeLocalProviderEndpoint(input?.lmstudio, defaultLocalProviderEndpoints.lmstudio),
+  };
+}
+
 export type PersistedStudioSettings = {
   workspaceUrl: string;
   repositoryUrl: string;
   branch: string;
   provider: ProviderId;
+  localProviderEndpoints?: Partial<LocalProviderEndpoints>;
   protectChatContent: boolean;
 };
 
@@ -42,6 +65,7 @@ export function toPersistedStudioSettings(input: PersistedStudioSettings): Persi
     repositoryUrl: input.repositoryUrl.trim(),
     branch: input.branch.trim() || "main",
     provider: input.provider,
+    localProviderEndpoints: normalizeLocalProviderEndpoints(input.localProviderEndpoints),
     protectChatContent: input.protectChatContent,
   };
 }

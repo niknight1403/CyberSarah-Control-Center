@@ -29,6 +29,27 @@ export function validateWorkspaceUrl(rawValue: string): FieldValidation {
   }
 }
 
+export function validateLocalProviderEndpoint(rawValue: string, providerLabel: string): FieldValidation {
+  const value = rawValue.trim();
+  if (!value) {
+    return { valid: false, tone: "neutral", message: `Eine HTTP(S)-Basisadresse für ${providerLabel} ist erforderlich.` };
+  }
+
+  try {
+    const url = new URL(value);
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password || url.search || url.hash) {
+      return { valid: false, tone: "error", message: "Nutze eine HTTP(S)-Basisadresse ohne Zugangsdaten, Query oder Fragment." };
+    }
+    if (placeholderHosts.has(url.hostname) || url.hostname.endsWith(".example.com")) {
+      return { valid: false, tone: "error", message: "Ersetze die Beispieladresse durch den erreichbaren lokalen Endpoint." };
+    }
+    const localHost = ["localhost", "127.0.0.1", "::1"].includes(url.hostname.toLowerCase());
+    return { valid: true, tone: "success", message: localHost ? "Adresse ist gültig. Auf Android muss localhost auf dem Telefon erreichbar sein." : "Lokaler Provider-Endpoint ist gültig." };
+  } catch {
+    return { valid: false, tone: "error", message: "Gib eine vollständige Adresse wie http://192.168.1.20:11434/v1 ein." };
+  }
+}
+
 export function validateServiceAccessToken(rawValue: string, hasStoredToken: boolean): FieldValidation {
   const value = rawValue.trim();
   if (!value && hasStoredToken) {

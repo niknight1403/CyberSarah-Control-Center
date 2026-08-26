@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateServiceAccessToken, validateWorkspaceUrl } from "../lib/settings-validation";
+import { validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "../lib/settings-validation";
 
 describe("settings validation", () => {
   it("accepts a non-placeholder HTTPS workspace address", () => {
@@ -10,6 +10,13 @@ describe("settings validation", () => {
     expect(validateWorkspaceUrl("http://studio.example-network.de")).toMatchObject({ valid: false, tone: "error" });
     expect(validateWorkspaceUrl("studio.example-network.de")).toMatchObject({ valid: false, tone: "error" });
     expect(validateWorkspaceUrl("https://studio.example.com")).toMatchObject({ valid: false, tone: "error" });
+  });
+
+  it("accepts local HTTP(S) provider endpoints and explains the Android localhost caveat", () => {
+    expect(validateLocalProviderEndpoint("http://127.0.0.1:11434/v1", "Ollama")).toMatchObject({ valid: true, tone: "success" });
+    expect(validateLocalProviderEndpoint("https://ollama.internal.example.com/v1", "Ollama")).toMatchObject({ valid: false, tone: "error" });
+    expect(validateLocalProviderEndpoint("http://192.168.1.20:1234/v1", "LM Studio")).toMatchObject({ valid: true, tone: "success" });
+    expect(validateLocalProviderEndpoint("http://user:password@192.168.1.20:1234/v1", "LM Studio")).toMatchObject({ valid: false, tone: "error" });
   });
 
   it("requires a clean long service token unless one is already securely stored", () => {

@@ -108,3 +108,6 @@
 - [x] Publish-Hinweis „nicht gepackte Änderungen“ diagnostizieren, Release-Stand checkpointen und APK-Handoff verifizieren.
 - [x] Einstellungsseite zur sicheren Verwaltung maskierter KI-Provider-API-Keys ergänzen.
 - [x] Provider-Keys je KI-Anbieter in den Einstellungen unabhängig anzeigen, speichern, maskieren und löschen
+- [x] Ollama- und LM-Studio-Endpoint-URLs in Settings validieren und lokal speichern
+- [x] Gespeicherte lokale Endpoint-URLs an Workspace-Client und Workspace-Service weiterreichen
+- [x] Endpoint-Persistenz und Routing mit deterministischen Tests absichern

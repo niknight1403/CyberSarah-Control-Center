@@ -1,4 +1,4 @@
-import { type ProviderId } from "@/lib/studio-settings-logic";
+import { type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
 
 export type RemoteWorkspaceConfig = {
   baseUrl: string;
@@ -6,6 +6,7 @@ export type RemoteWorkspaceConfig = {
   githubToken?: string;
   provider?: ProviderId;
   providerApiKey?: string;
+  localProviderEndpoints?: Partial<LocalProviderEndpoints>;
   fallbackProvider?: ProviderId;
   fallbackProviderApiKey?: string;
 };
@@ -67,6 +68,7 @@ export function buildWorkspaceHeaders(config: RemoteWorkspaceConfig) {
     ...(config.githubToken ? { "X-GitHub-Token": config.githubToken } : {}),
     ...(config.provider ? { "X-AI-Provider": config.provider } : {}),
     ...(config.providerApiKey ? { "X-AI-Provider-Key": config.providerApiKey } : {}),
+    ...(config.provider && (config.provider === "ollama" || config.provider === "lmstudio") && config.localProviderEndpoints?.[config.provider] ? { "X-AI-Provider-Endpoint": config.localProviderEndpoints[config.provider] } : {}),
   };
 }
 

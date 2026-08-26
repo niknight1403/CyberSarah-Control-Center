@@ -4,7 +4,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { integrationFixture } from "@/constants/integration-fixture";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
-import { type FieldValidation, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
+import { defaultLocalProviderEndpoints } from "@/lib/studio-settings-logic";
+import { type FieldValidation, validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -20,6 +21,10 @@ export default function SettingsScreen() {
   const [serviceAccessToken, setServiceAccessToken] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
+  const [ollamaEndpoint, setOllamaEndpoint] = useState(defaultLocalProviderEndpoints.ollama);
+  const [lmstudioEndpoint, setLmstudioEndpoint] = useState(defaultLocalProviderEndpoints.lmstudio);
+  const [ollamaEndpointTouched, setOllamaEndpointTouched] = useState(false);
+  const [lmstudioEndpointTouched, setLmstudioEndpointTouched] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [workspaceTouched, setWorkspaceTouched] = useState(false);
   const [serviceTokenTouched, setServiceTokenTouched] = useState(false);
@@ -32,11 +37,15 @@ export default function SettingsScreen() {
     setRepositoryUrl(settings.repositoryUrl);
     setBranch(settings.branch);
     setProvider(settings.provider);
+    setOllamaEndpoint(settings.localProviderEndpoints.ollama);
+    setLmstudioEndpoint(settings.localProviderEndpoints.lmstudio);
   }, [loading, settings]);
 
   const workspaceValidation = validateWorkspaceUrl(workspaceUrl);
   const serviceTokenValidation = validateServiceAccessToken(serviceAccessToken, settings.hasServiceAccessToken);
-  const canSave = workspaceValidation.valid && serviceTokenValidation.valid;
+  const ollamaEndpointValidation = validateLocalProviderEndpoint(ollamaEndpoint, "Ollama");
+  const lmstudioEndpointValidation = validateLocalProviderEndpoint(lmstudioEndpoint, "LM Studio");
+  const canSave = workspaceValidation.valid && serviceTokenValidation.valid && ollamaEndpointValidation.valid && lmstudioEndpointValidation.valid;
   const canAttach = canSave && Boolean(repositoryUrl.trim()) && Boolean(branch.trim());
 
   const persistSettings = async () => {
@@ -44,7 +53,7 @@ export default function SettingsScreen() {
     setServiceTokenTouched(true);
     if (!canSave) return;
     setSaveState("saving");
-    await saveSettings({ workspaceUrl, repositoryUrl, branch, provider, serviceAccessToken, githubToken, providerApiKey });
+    await saveSettings({ workspaceUrl, repositoryUrl, branch, provider, serviceAccessToken, githubToken, providerApiKey, localProviderEndpoints: { ollama: ollamaEndpoint, lmstudio: lmstudioEndpoint } });
     setServiceAccessToken("");
     setGithubToken("");
     setProviderApiKey("");
@@ -58,7 +67,7 @@ export default function SettingsScreen() {
     setAttachState("connecting");
     setAttachMessage("");
     try {
-      const attached = await attachRepository({ workspaceUrl, repositoryUrl, branch, provider, serviceAccessToken, githubToken, providerApiKey });
+      const attached = await attachRepository({ workspaceUrl, repositoryUrl, branch, provider, serviceAccessToken, githubToken, providerApiKey, localProviderEndpoints: { ollama: ollamaEndpoint, lmstudio: lmstudioEndpoint } });
       loadRemoteFiles(attached.files);
       setServiceAccessToken("");
       setGithubToken("");
@@ -137,6 +146,16 @@ export default function SettingsScreen() {
               {settings.providerKeyStatus[provider] ? <TouchableOpacity activeOpacity={0.7} onPress={() => void clearProviderKey()} style={styles.clearAction}><Text style={styles.clearActionText}>Provider-Key für {provider.toUpperCase()} entfernen</Text></TouchableOpacity> : null}
             </>
           ) : null}
+        </View>
+        <View style={styles.sectionSpacer}>
+          <StudioSection label="Lokal" title="Provider-Endpoints" />
+          <Text style={styles.fieldHint}>Lege die erreichbare Basisadresse für lokale KI fest. Auf Android zeigt localhost auf das Telefon – verwende für einen Rechner im Netzwerk dessen LAN-, VPN- oder Tailscale-Adresse.</Text>
+          <Text style={styles.fieldLabel}>OLLAMA BASIS-URL</Text>
+          <TextInput accessibilityLabel="Ollama Basis-URL" autoCapitalize="none" autoCorrect={false} keyboardType="url" onBlur={() => setOllamaEndpointTouched(true)} onChangeText={(value) => { setOllamaEndpoint(value); setOllamaEndpointTouched(true); setSaveState("idle"); }} placeholder="http://192.168.1.20:11434/v1" placeholderTextColor="#697A90" style={[styles.input, getInputStyle(ollamaEndpointValidation, ollamaEndpointTouched)]} value={ollamaEndpoint} />
+          <ValidationMessage active={ollamaEndpointTouched} validation={ollamaEndpointValidation} />
+          <Text style={styles.fieldLabel}>LM STUDIO BASIS-URL</Text>
+          <TextInput accessibilityLabel="LM Studio Basis-URL" autoCapitalize="none" autoCorrect={false} keyboardType="url" onBlur={() => setLmstudioEndpointTouched(true)} onChangeText={(value) => { setLmstudioEndpoint(value); setLmstudioEndpointTouched(true); setSaveState("idle"); }} placeholder="http://192.168.1.20:1234/v1" placeholderTextColor="#697A90" style={[styles.input, getInputStyle(lmstudioEndpointValidation, lmstudioEndpointTouched)]} value={lmstudioEndpoint} />
+          <ValidationMessage active={lmstudioEndpointTouched} validation={lmstudioEndpointValidation} />
         </View>
         <View style={styles.sectionSpacer}>
           <StudioSection label="Datenschutz" title="Chat-Inhalte auf diesem Gerät" />

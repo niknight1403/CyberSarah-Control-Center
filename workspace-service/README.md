@@ -25,7 +25,9 @@ Place the service behind an HTTPS reverse proxy such as Caddy or Nginx, forwardi
 | `GET /api/v1/workspaces/:id/runtime` | Returns output and the proxied preview URL. |
 | `POST /api/v1/agent/proposals` | Produces a reviewable unified-diff proposal without mutating files. |
 
-Every endpoint expects `Authorization: Bearer <SERVICE_ACCESS_TOKEN>`. Enter this value in the mobile app as **Service-Zugriffstoken**. Git operations use the token in `X-GitHub-Token` only for the current request. Provider requests use `X-AI-Provider` and `X-AI-Provider-Key` only for the current request. Avoid proxy logs that record request headers.
+Every endpoint expects `Authorization: Bearer <SERVICE_ACCESS_TOKEN>`. Enter this value in the mobile app as **Service-Zugriffstoken**. Git operations use the token in `X-GitHub-Token` only for the current request. Provider requests use `X-AI-Provider` and `X-AI-Provider-Key` only for the current request. For the local providers, the mobile client may additionally send `X-AI-Provider-Endpoint` with an HTTP(S) base URL; the service accepts this header only for Ollama and LM Studio, rejects embedded credentials/query strings, and appends `/chat/completions`. Avoid proxy logs that record request headers.
+
+The mobile settings default to `http://127.0.0.1:11434/v1` for Ollama and `http://127.0.0.1:1234/v1` for LM Studio. On Android, `127.0.0.1` points to the phone itself, not the development computer. Use a LAN, VPN, or Tailscale address when the local model server runs elsewhere. The service can also define VPS-side fallbacks with `OLLAMA_BASE_URL` and `LMSTUDIO_BASE_URL`.
 
 ## GitHub token scope
 

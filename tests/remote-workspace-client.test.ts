@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildWorkspaceHeaders, RemoteWorkspaceClient } from "../lib/remote-workspace-client";
-import { getRepositoryLabel, toPersistedStudioSettings } from "../lib/studio-settings-logic";
+import { defaultLocalProviderEndpoints, getRepositoryLabel, normalizeLocalProviderEndpoints, toPersistedStudioSettings } from "../lib/studio-settings-logic";
 
 describe("workspace service client", () => {
   it("builds request-only headers for configured credentials", () => {
@@ -13,6 +13,17 @@ describe("workspace service client", () => {
     });
   });
 
+  it("sends only the selected local provider endpoint as a transient header", () => {
+    const ollamaHeaders = buildWorkspaceHeaders({ baseUrl: "https://studio.example.com", provider: "ollama", localProviderEndpoints: { ollama: "http://192.168.1.20:11434/v1", lmstudio: "http://192.168.1.20:1234/v1" } });
+    const cloudHeaders = buildWorkspaceHeaders({ baseUrl: "https://studio.example.com", provider: "gemini", localProviderEndpoints: { ollama: "http://192.168.1.20:11434/v1", lmstudio: "http://192.168.1.20:1234/v1" } });
+    expect(ollamaHeaders["X-AI-Provider-Endpoint"]).toBe("http://192.168.1.20:11434/v1");
+    expect(cloudHeaders["X-AI-Provider-Endpoint"]).toBeUndefined();
+  });
+
+  it("normalizes local endpoints and restores defaults for blank values", () => {
+    expect(normalizeLocalProviderEndpoints({ ollama: " http://192.168.1.20:11434/v1/// ", lmstudio: "" })).toEqual({ ollama: "http://192.168.1.20:11434/v1", lmstudio: defaultLocalProviderEndpoints.lmstudio });
+  });
+
   it("reduces a repository URL to a concise workspace label", () => {
     expect(getRepositoryLabel("https://github.com/example-org/custom-ai-studio.git")).toBe("example-org/custom-ai-studio");
   });
@@ -23,6 +34,7 @@ describe("workspace service client", () => {
       repositoryUrl: "https://github.com/example-org/custom-ai-studio.git",
       branch: "main",
       provider: "managed",
+      localProviderEndpoints: defaultLocalProviderEndpoints,
       protectChatContent: false,
     });
   });
