@@ -332,26 +332,48 @@ export default function SettingsScreen() {
           {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Die geschützte Chat-Ablage ist im Web-Build nicht verfügbar. Nutze für verschlüsselte lokale Gesprächsinhalte die native App.</Text></View> : <TouchableOpacity accessibilityRole="switch" accessibilityState={{ checked: settings.protectChatContent }} activeOpacity={0.75} onPress={() => void setProtectedChatContent(!settings.protectChatContent)} style={[styles.protectionRow, settings.protectChatContent && styles.protectionRowEnabled]}><View style={[styles.protectionIndicator, settings.protectChatContent && styles.protectionIndicatorEnabled]}><IconSymbol name={settings.protectChatContent ? "lock.fill" : "lock.open.fill"} size={16} color={settings.protectChatContent ? "#6FE2A9" : "#99A9BC"} /></View><View style={styles.providerText}><Text style={styles.providerLabel}>{settings.protectChatContent ? "Geschützte Chat-Ablage aktiv" : "Geschützte Chat-Ablage deaktiviert"}</Text><Text style={styles.providerDetail}>{settings.protectChatContent ? "Verlauf wird lokal über den geschützten Gerätespeicher verschlüsselt abgelegt. Bestehende Inhalte werden migriert." : "Aktiviere die geräteverschlüsselte Ablage für Gesprächsinhalte. Tokens und Dateiinhalte werden weiterhin nicht gespeichert."}</Text></View></TouchableOpacity>}
         </View>
         <View style={styles.sectionSpacer}>
-          <StudioSection label="Backup" title="Provider-Konfiguration exportieren" />
-          <Text style={styles.fieldHint}>Erstelle ein verschlüsseltes Backup der gespeicherten Cloud-Keys und lokalen Endpoint-URLs. Service- und GitHub-Tokens werden bewusst nicht exportiert. Das Passwort wird nur für diesen Export verwendet und nie gespeichert.</Text>
-          <View style={styles.backupSummary}><Text style={styles.backupSummaryText}>{configuredProviderKeyCount} Cloud-Key{configuredProviderKeyCount === 1 ? "" : "s"} · {configuredEndpointCount} lokale Endpoint{configuredEndpointCount === 1 ? "" : "s"}</Text><Text style={styles.backupSummaryHint}>AES-256-CBC · PBKDF2-SHA256 · HMAC-Integrität</Text></View>
-          <Text style={styles.fieldLabel}>BACKUP-PASSWORT</Text>
-          <TextInput accessibilityHint="Mindestens 12 Zeichen. Das Passwort nicht gemeinsam mit der Backup-Datei weitergeben." accessibilityLabel="Passwort für Settings-Backup" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setBackupPassphrase(value); setBackupState("idle"); setBackupMessage(""); }} placeholder="Mindestens 12 Zeichen" placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={backupPassphrase} />
-          <TouchableOpacity accessibilityLabel="Verschlüsseltes Settings-Backup erstellen und teilen" accessibilityRole="button" activeOpacity={0.75} disabled={backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)} onPress={confirmSettingsBackupExport} style={[styles.backupButton, (backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)) && styles.endpointTestButtonDisabled]}><IconSymbol name="lock.fill" size={15} color="#061019" /><Text style={styles.backupButtonText}>{backupState === "exporting" ? "Backup wird erstellt …" : "Verschlüsseltes Backup teilen"}</Text></TouchableOpacity>
-          {backupState === "shared" || backupState === "error" ? <View style={[styles.backupFeedback, backupState === "shared" ? styles.backupFeedbackReady : styles.backupFeedbackError]}><IconSymbol name={backupState === "shared" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"} size={15} color={backupState === "shared" ? "#45D996" : "#FF6B7A"} /><Text style={[styles.backupFeedbackText, backupState === "shared" ? styles.backupFeedbackTextReady : styles.backupFeedbackTextError]}>{backupMessage}</Text></View> : null}
-        </View>
-        <View style={styles.importCard}>
-          <Text style={styles.importTitle}>Backup wiederherstellen</Text>
-          <Text style={styles.fieldHint}>Wähle eine verschlüsselte .csc-backup-Datei aus. Erst nach korrektem Passwort und deiner Bestätigung werden die enthaltenen Provider-Keys und Endpoints übernommen.</Text>
-          <TouchableOpacity accessibilityLabel="Verschlüsseltes Settings-Backup auswählen" accessibilityRole="button" activeOpacity={0.75} disabled={importState === "picking" || importState === "importing"} onPress={() => void pickSettingsBackup()} style={styles.importPickerButton}><IconSymbol name="folder.fill" size={15} color="#B4A8FF" /><Text style={styles.importPickerButtonText}>{importState === "picking" ? "Datei wird ausgewählt …" : importCandidate ? "Andere Backup-Datei auswählen" : "Backup-Datei auswählen"}</Text></TouchableOpacity>
-          {importCandidate ? <>
-            <View style={styles.importFileRow}><IconSymbol name="doc.fill" size={15} color="#8B7CFF" /><Text style={styles.importFileText} numberOfLines={1}>{importCandidate.filename}</Text></View>
+          <StudioSection label="Backup" title="Provider-Konfiguration sichern" />
+          <View style={styles.backupOverview}>
+            <View style={styles.backupOverviewRow}>
+              <View style={styles.backupOverviewIcon}><IconSymbol name="lock.fill" size={18} color="#C6BFFF" /></View>
+              <View style={styles.backupOverviewCopy}>
+                <Text style={styles.backupOverviewTitle}>Sicherer lokaler Tresor</Text>
+                <Text style={styles.backupOverviewText}>Keys und lokale Endpoints bleiben verschlüsselt und werden erst nach deiner Bestätigung geteilt oder wiederhergestellt.</Text>
+              </View>
+            </View>
+            <View style={styles.backupStatsRow}>
+              <View style={styles.backupStat}><Text style={styles.backupStatValue}>{configuredProviderKeyCount}</Text><Text style={styles.backupStatLabel}>Cloud-Keys</Text></View>
+              <View style={styles.backupStat}><Text style={styles.backupStatValue}>{configuredEndpointCount}</Text><Text style={styles.backupStatLabel}>lokale Endpoints</Text></View>
+              <View style={styles.backupStat}><Text style={styles.backupStatValue}>HMAC</Text><Text style={styles.backupStatLabel}>Integrität</Text></View>
+            </View>
+          </View>
+          <View style={styles.backupActionCard}>
+            <View style={styles.backupActionHeader}>
+              <View style={[styles.backupActionIcon, styles.backupActionIconExport]}><IconSymbol name="lock.fill" size={17} color="#C6BFFF" /></View>
+              <View style={styles.backupActionCopy}><Text style={styles.backupActionTitle}>Export erstellen</Text><Text style={styles.backupActionSubtitle}>Verschlüsselte Datei sicher teilen</Text></View>
+            </View>
+            <Text style={styles.backupActionHint}>Service- und GitHub-Tokens werden bewusst ausgeschlossen. Das Passwort wird nur für diesen Export verwendet und nie gespeichert.</Text>
             <Text style={styles.fieldLabel}>BACKUP-PASSWORT</Text>
-            <TextInput accessibilityHint="Mindestens 12 Zeichen. Das Passwort wird nicht gespeichert." accessibilityLabel="Passwort für Backup-Import" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setImportPassphrase(value); setImportPreview(null); setImportState("ready"); setImportMessage(""); }} placeholder="Passwort der Backup-Datei" placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={importPassphrase} />
-            <TouchableOpacity accessibilityLabel="Backup-Passwort prüfen" accessibilityRole="button" activeOpacity={0.75} disabled={!isValidSettingsBackupPassword(importPassphrase) || importState === "importing"} onPress={inspectSettingsBackup} style={[styles.importInspectButton, (!isValidSettingsBackupPassword(importPassphrase) || importState === "importing") && styles.endpointTestButtonDisabled]}><IconSymbol name="lock.open.fill" size={15} color="#061019" /><Text style={styles.importInspectButtonText}>Backup prüfen</Text></TouchableOpacity>
-            {importPreview ? <View style={styles.importPreviewCard}><Text style={styles.importPreviewTitle}>Vorschau bestätigt</Text><Text style={styles.importPreviewText}>{importPreview.providerIds.length} Cloud-Key{importPreview.providerIds.length === 1 ? "" : "s"} · {importPreview.endpointCount} lokale Endpoint{importPreview.endpointCount === 1 ? "" : "s"}</Text><Text style={styles.importPreviewHint}>Keine Service- oder GitHub-Tokens enthalten</Text><TouchableOpacity accessibilityLabel="Verifiziertes Settings-Backup wiederherstellen" accessibilityRole="button" activeOpacity={0.75} disabled={importState === "importing"} onPress={confirmSettingsBackupImport} style={[styles.restoreButton, importState === "importing" && styles.endpointTestButtonDisabled]}><IconSymbol name="arrow.down.circle.fill" size={15} color="#061019" /><Text style={styles.restoreButtonText}>{importState === "importing" ? "Wird wiederhergestellt …" : "Jetzt wiederherstellen"}</Text></TouchableOpacity></View> : null}
-          </> : null}
-          {importMessage ? <View style={[styles.backupFeedback, importState === "restored" ? styles.backupFeedbackReady : importState === "error" ? styles.backupFeedbackError : styles.backupFeedbackChecking]}><IconSymbol name={importState === "restored" ? "checkmark.circle.fill" : importState === "error" ? "exclamationmark.triangle.fill" : "bolt.fill"} size={15} color={importState === "restored" ? "#45D996" : importState === "error" ? "#FF6B7A" : "#52D8FF"} /><Text style={[styles.backupFeedbackText, importState === "restored" ? styles.backupFeedbackTextReady : importState === "error" ? styles.backupFeedbackTextError : styles.backupFeedbackTextChecking]}>{importMessage}</Text></View> : null}
+            <TextInput accessibilityHint="Mindestens 12 Zeichen. Das Passwort nicht gemeinsam mit der Backup-Datei weitergeben." accessibilityLabel="Passwort für Settings-Backup" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setBackupPassphrase(value); setBackupState("idle"); setBackupMessage(""); }} placeholder="Mindestens 12 Zeichen" placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={backupPassphrase} />
+            <TouchableOpacity accessibilityLabel="Verschlüsseltes Settings-Backup erstellen und teilen" accessibilityRole="button" activeOpacity={0.75} disabled={backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)} onPress={confirmSettingsBackupExport} style={[styles.backupButton, (backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)) && styles.endpointTestButtonDisabled]}><IconSymbol name="lock.fill" size={15} color="#061019" /><Text style={styles.backupButtonText}>{backupState === "exporting" ? "Backup wird erstellt …" : "Verschlüsseltes Backup teilen"}</Text></TouchableOpacity>
+            {backupState === "shared" || backupState === "error" ? <View style={[styles.backupFeedback, backupState === "shared" ? styles.backupFeedbackReady : styles.backupFeedbackError]}><IconSymbol name={backupState === "shared" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"} size={15} color={backupState === "shared" ? "#45D996" : "#FF6B7A"} /><Text style={[styles.backupFeedbackText, backupState === "shared" ? styles.backupFeedbackTextReady : styles.backupFeedbackTextError]}>{backupMessage}</Text></View> : null}
+          </View>
+          <View style={styles.importCard}>
+            <View style={styles.backupActionHeader}>
+              <View style={[styles.backupActionIcon, styles.backupActionIconImport]}><IconSymbol name="arrow.down.circle.fill" size={18} color="#70E4AA" /></View>
+              <View style={styles.backupActionCopy}><Text style={styles.backupActionTitle}>Import wiederherstellen</Text><Text style={styles.backupActionSubtitle}>Gesicherte Konfiguration zurückholen</Text></View>
+            </View>
+            <Text style={styles.backupActionHint}>Wähle eine verschlüsselte .csc-backup-Datei aus. Erst nach korrektem Passwort und deiner Bestätigung werden Werte übernommen.</Text>
+            <TouchableOpacity accessibilityLabel="Verschlüsseltes Settings-Backup auswählen" accessibilityRole="button" activeOpacity={0.75} disabled={importState === "picking" || importState === "importing"} onPress={() => void pickSettingsBackup()} style={styles.importPickerButton}><IconSymbol name="folder.fill" size={15} color="#B4A8FF" /><Text style={styles.importPickerButtonText}>{importState === "picking" ? "Datei wird ausgewählt …" : importCandidate ? "Andere Backup-Datei auswählen" : "Backup-Datei auswählen"}</Text></TouchableOpacity>
+            {importCandidate ? <>
+              <View style={styles.importFileRow}><IconSymbol name="doc.fill" size={15} color="#8B7CFF" /><Text style={styles.importFileText} numberOfLines={1}>{importCandidate.filename}</Text></View>
+              <Text style={styles.fieldLabel}>BACKUP-PASSWORT</Text>
+              <TextInput accessibilityHint="Mindestens 12 Zeichen. Das Passwort wird nicht gespeichert." accessibilityLabel="Passwort für Backup-Import" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setImportPassphrase(value); setImportPreview(null); setImportState("ready"); setImportMessage(""); }} placeholder="Passwort der Backup-Datei" placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={importPassphrase} />
+              <TouchableOpacity accessibilityLabel="Backup-Passwort prüfen" accessibilityRole="button" activeOpacity={0.75} disabled={!isValidSettingsBackupPassword(importPassphrase) || importState === "importing"} onPress={inspectSettingsBackup} style={[styles.importInspectButton, (!isValidSettingsBackupPassword(importPassphrase) || importState === "importing") && styles.endpointTestButtonDisabled]}><IconSymbol name="lock.open.fill" size={15} color="#061019" /><Text style={styles.importInspectButtonText}>Backup prüfen</Text></TouchableOpacity>
+              {importPreview ? <View style={styles.importPreviewCard}><Text style={styles.importPreviewTitle}>Vorschau bestätigt</Text><Text style={styles.importPreviewText}>{importPreview.providerIds.length} Cloud-Key{importPreview.providerIds.length === 1 ? "" : "s"} · {importPreview.endpointCount} lokale Endpoint{importPreview.endpointCount === 1 ? "" : "s"}</Text><Text style={styles.importPreviewHint}>Keine Service- oder GitHub-Tokens enthalten</Text><TouchableOpacity accessibilityLabel="Verifiziertes Settings-Backup wiederherstellen" accessibilityRole="button" activeOpacity={0.75} disabled={importState === "importing"} onPress={confirmSettingsBackupImport} style={[styles.restoreButton, importState === "importing" && styles.endpointTestButtonDisabled]}><IconSymbol name="arrow.down.circle.fill" size={15} color="#061019" /><Text style={styles.restoreButtonText}>{importState === "importing" ? "Wird wiederhergestellt …" : "Jetzt wiederherstellen"}</Text></TouchableOpacity></View> : null}
+            </> : null}
+            {importMessage ? <View style={[styles.backupFeedback, importState === "restored" ? styles.backupFeedbackReady : importState === "error" ? styles.backupFeedbackError : styles.backupFeedbackChecking]}><IconSymbol name={importState === "restored" ? "checkmark.circle.fill" : importState === "error" ? "exclamationmark.triangle.fill" : "bolt.fill"} size={15} color={importState === "restored" ? "#45D996" : importState === "error" ? "#FF6B7A" : "#52D8FF"} /><Text style={[styles.backupFeedbackText, importState === "restored" ? styles.backupFeedbackTextReady : importState === "error" ? styles.backupFeedbackTextError : styles.backupFeedbackTextChecking]}>{importMessage}</Text></View> : null}
+          </View>
         </View>
         {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Im Web-Build werden eingegebene Schlüssel nur in der Browser-Sitzung gehalten. Nutze für produktive Schlüssel die native App oder die serverseitige Provider-Konfiguration.</Text></View> : null}
         <View style={styles.saveArea}>
@@ -433,6 +455,25 @@ const styles = StyleSheet.create({
   backupSummary: { backgroundColor: "#111925", borderColor: "#2B3B51", borderRadius: 13, borderWidth: 1, marginTop: 12, padding: 12 },
   backupSummaryText: { color: "#DCE8F4", fontSize: 12, fontWeight: "800" },
   backupSummaryHint: { color: "#8291A6", fontFamily: "monospace", fontSize: 10, marginTop: 5 },
+  backupOverview: { backgroundColor: "#101B2A", borderColor: "#2B3B51", borderRadius: 16, borderWidth: 1, marginTop: 12, padding: 13 },
+  backupOverviewRow: { alignItems: "flex-start", flexDirection: "row", gap: 10 },
+  backupOverviewIcon: { alignItems: "center", backgroundColor: "#252141", borderRadius: 11, height: 38, justifyContent: "center", width: 38 },
+  backupOverviewCopy: { flex: 1 },
+  backupOverviewTitle: { color: "#F1EEFF", fontSize: 13, fontWeight: "900", marginBottom: 3 },
+  backupOverviewText: { color: "#93A1B5", fontSize: 11, lineHeight: 17 },
+  backupStatsRow: { borderColor: "#29384C", borderTopWidth: 1, flexDirection: "row", gap: 8, marginTop: 13, paddingTop: 11 },
+  backupStat: { flex: 1, minWidth: 0 },
+  backupStatValue: { color: "#C6BFFF", fontSize: 14, fontWeight: "900" },
+  backupStatLabel: { color: "#8190A5", fontSize: 10, lineHeight: 14, marginTop: 2 },
+  backupActionCard: { backgroundColor: "#111925", borderColor: "#2B3B51", borderRadius: 15, borderWidth: 1, marginTop: 12, padding: 13 },
+  backupActionHeader: { alignItems: "center", flexDirection: "row", gap: 10 },
+  backupActionIcon: { alignItems: "center", borderRadius: 11, height: 36, justifyContent: "center", width: 36 },
+  backupActionIconExport: { backgroundColor: "#252141" },
+  backupActionIconImport: { backgroundColor: "#173A2B" },
+  backupActionCopy: { flex: 1 },
+  backupActionTitle: { color: "#EDF3FB", fontSize: 14, fontWeight: "900" },
+  backupActionSubtitle: { color: "#8291A6", fontSize: 11, lineHeight: 16, marginTop: 2 },
+  backupActionHint: { color: "#91A0B3", fontSize: 11, lineHeight: 17, marginTop: 11 },
   backupButton: { alignItems: "center", backgroundColor: "#B4A8FF", borderRadius: 12, flexDirection: "row", gap: 7, justifyContent: "center", marginTop: 12, minHeight: 48, paddingHorizontal: 12 },
   backupButtonText: { color: "#0B0F18", fontSize: 12, fontWeight: "900" },
   backupFeedback: { alignItems: "flex-start", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },

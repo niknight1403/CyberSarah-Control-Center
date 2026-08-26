@@ -134,3 +134,7 @@
 - [x] Verschlüsselte Settings-Backups über die Dokumentenauswahl importieren und authentifizieren
 - [x] Importvorschau und explizite Bestätigung vor dem Überschreiben gespeicherter Provider-Daten ergänzen
 - [x] Restore-Persistenz, Manipulationserkennung und Picker-Abbruch deterministisch testen
+- [x] Erneute Publish-Warnung bei Version 1.0.1 diagnostizieren und den Packstatus dauerhaft bereinigen
+- [x] Backup-Export- und Importbereich im Void-Dark-Design übersichtlicher strukturieren
+- [x] Export-/Import-Aktionen mit klaren Zuständen, Sicherheits-Hinweisen und mobilen Touch-Zielen verfeinern
+- [x] Überarbeiteten Backup-Bereich visuell und funktional regressionsprüfen
