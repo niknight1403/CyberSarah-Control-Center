@@ -125,3 +125,4 @@
 - [x] Sprint 18: CI/CD-Workflows und GitHub-Synchronisation validieren
 - [x] Sprint 19: Vollständige Qualitäts- und Regressionstests ausführen
 - [x] Sprint 20: Android-Release-Preflight und Installations-Handoff vorbereiten
+- [x] Nächsten Release-Preflight ausführen und neuen Publish-Checkpoint erstellen
