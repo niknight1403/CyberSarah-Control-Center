@@ -360,6 +360,8 @@ async function invokeProvider(request, messages) {
   const defaults = {
     managed: { baseUrl: process.env.MANAGED_LLM_BASE_URL, key: process.env.MANAGED_LLM_API_KEY, model: process.env.MANAGED_LLM_MODEL ?? "gpt-4o-mini" },
     openai: { baseUrl: "https://api.openai.com/v1/chat/completions", key: suppliedKey, model: process.env.OPENAI_MODEL ?? "gpt-4o-mini" },
+    gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/models", key: suppliedKey, model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash" },
+    openrouter: { baseUrl: "https://openrouter.ai/api/v1/chat/completions", key: suppliedKey, model: process.env.OPENROUTER_MODEL ?? "openrouter/free" },
     groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: suppliedKey, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
     together: { baseUrl: "https://api.together.xyz/v1/chat/completions", key: suppliedKey, model: process.env.TOGETHER_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
     anthropic: { baseUrl: "https://api.anthropic.com/v1/messages", key: suppliedKey, model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest" },
@@ -368,20 +370,30 @@ async function invokeProvider(request, messages) {
   if (!configuration?.baseUrl || !configuration.key) throw new Error("Für das ausgewählte KI-Profil fehlt ein API-Key oder eine On-Server-Konfiguration.");
 
   const isAnthropic = provider === "anthropic";
-  const response = await fetch(configuration.baseUrl, {
+  const isGemini = provider === "gemini";
+  const endpoint = isGemini ? `${configuration.baseUrl}/${configuration.model}:generateContent` : configuration.baseUrl;
+  const response = await fetch(endpoint, {
     method: "POST",
-    headers: isAnthropic
-      ? { "content-type": "application/json", "x-api-key": configuration.key, "anthropic-version": "2023-06-01" }
-      : { "content-type": "application/json", authorization: `Bearer ${configuration.key}` },
+    headers: isGemini
+      ? { "content-type": "application/json", "x-goog-api-key": configuration.key }
+      : isAnthropic
+        ? { "content-type": "application/json", "x-api-key": configuration.key, "anthropic-version": "2023-06-01" }
+        : { "content-type": "application/json", authorization: `Bearer ${configuration.key}` },
     body: JSON.stringify(
-      isAnthropic
-        ? { model: configuration.model, max_tokens: 1_800, system: messages[0].content, messages: messages.slice(1) }
-        : { model: configuration.model, temperature: 0.2, response_format: { type: "json_object" }, messages },
+      isGemini
+        ? {
+            systemInstruction: { parts: [{ text: messages[0]?.content ?? "" }] },
+            contents: messages.slice(1).map((message) => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] })),
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json", maxOutputTokens: 1_800 },
+          }
+        : isAnthropic
+          ? { model: configuration.model, max_tokens: 1_800, system: messages[0].content, messages: messages.slice(1) }
+          : { model: configuration.model, temperature: 0.2, response_format: { type: "json_object" }, messages },
     ),
   });
   if (!response.ok) throw new Error(`KI-Provider antwortet mit ${response.status}.`);
   const payload = await response.json();
-  const content = isAnthropic ? payload.content?.[0]?.text : payload.choices?.[0]?.message?.content;
+  const content = isGemini ? payload.candidates?.[0]?.content?.parts?.[0]?.text : isAnthropic ? payload.content?.[0]?.text : payload.choices?.[0]?.message?.content;
   if (!content) throw new Error("Der KI-Provider hat keinen Vorschlag zurückgegeben.");
   try {
     return JSON.parse(content);

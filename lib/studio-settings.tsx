@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
-import { toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
+import { providerDefaults, toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
 import { secureSessionStore } from "@/lib/secure-session-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -11,8 +11,10 @@ const PROVIDER_KEY_KEY = "custom-ai-studio.provider-key.v1";
 
 export const providerOptions = [
   { id: "managed", label: "On-Server", detail: "Der Workspace-Service verwaltet den Provider." },
-  { id: "openai", label: "OpenAI", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
-  { id: "groq", label: "Groq", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
+  { id: "openai", label: "OpenAI", detail: `API-Key lokal geschützt · ${providerDefaults.openai.model} · kein garantierter Gratiszugang` },
+  { id: "gemini", label: "Google Gemini", detail: `API-Key lokal geschützt · ${providerDefaults.gemini.model} · Free-Tier abhängig von Konto/Region` },
+  { id: "openrouter", label: "OpenRouter", detail: `API-Key lokal geschützt · ${providerDefaults.openrouter.model} · Free-Modelle nur sofern verfügbar` },
+  { id: "groq", label: "Groq", detail: `API-Key lokal geschützt · ${providerDefaults.groq.model}` },
   { id: "together", label: "Together AI", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
   { id: "anthropic", label: "Anthropic", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
 ] as const;
