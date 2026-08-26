@@ -66,3 +66,6 @@
 - [x] Individuelle Toggle-Schalter für Skills im Bereich „Skills & Connectoren“ ergänzen.
 - [x] Skill-Auswahl lokal speichern und beim Start wiederherstellen.
 - [x] Toggle-Zustände in der Agent-Statusanzeige und im mobilen Workflow berücksichtigen.
+- [x] Connectoren im Bereich „Skills & Connectoren“ einzeln konfigurierbar machen.
+- [x] Connector-Konfigurationen sicher speichern und Tokenwerte niemals anzeigen.
+- [x] Individuelle Connector-Zustände, Bearbeiten und Deaktivieren testen.
