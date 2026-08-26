@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
 import { getDefaultFreeProvider, providerDefaults, toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
 import { secureSessionStore } from "@/lib/secure-session-store";
+import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const PREFERENCES_KEY = "custom-ai-studio.preferences.v1";
@@ -34,10 +35,11 @@ export type StudioSettings = {
   hasServiceAccessToken: boolean;
   hasGitHubToken: boolean;
   hasProviderKey: boolean;
+  providerKeyStatus: ProviderKeyStatus;
   protectChatContent: boolean;
 };
 
-export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" | "hasGitHubToken" | "hasProviderKey" | "protectChatContent"> & {
+export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" | "hasGitHubToken" | "hasProviderKey" | "providerKeyStatus" | "protectChatContent"> & {
   serviceAccessToken?: string;
   githubToken?: string;
   providerApiKey?: string;
@@ -53,6 +55,7 @@ const defaultSettings: StudioSettings = {
   hasServiceAccessToken: false,
   hasGitHubToken: false,
   hasProviderKey: false,
+  providerKeyStatus: {},
   protectChatContent: false,
 };
 
@@ -70,6 +73,10 @@ async function hasSecureValue(key: string) {
 
 async function readSecureValue(key: string) {
   return secureSessionStore.get(key);
+}
+
+async function readProviderApiKey(provider: ProviderId) {
+  return (await readSecureValue(providerKeyStorageKey(provider))) || (await readSecureValue(PROVIDER_KEY_KEY));
 }
 
 type StudioSettingsContextValue = {
@@ -109,7 +116,10 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
           hasSecureValue(GITHUB_TOKEN_KEY),
           hasSecureValue(PROVIDER_KEY_KEY),
         ]);
-        setSettings({ ...defaultSettings, ...parsed, hasServiceAccessToken, hasGitHubToken, hasProviderKey });
+        const providerKeyEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed").map(async (option) => [option.id, await hasSecureValue(providerKeyStorageKey(option.id))] as const));
+        const providerKeyStatus = Object.fromEntries(providerKeyEntries) as ProviderKeyStatus;
+        if (hasProviderKey && parsed.provider && parsed.provider !== "managed") providerKeyStatus[parsed.provider] = true;
+        setSettings({ ...defaultSettings, ...parsed, hasServiceAccessToken, hasGitHubToken, hasProviderKey: Boolean(providerKeyStatus[parsed.provider ?? defaultSettings.provider]), providerKeyStatus });
       } finally {
         setLoading(false);
       }
@@ -123,17 +133,18 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       workspaceId: settings.workspaceId,
       hasServiceAccessToken: input.serviceAccessToken?.trim() ? true : settings.hasServiceAccessToken,
       hasGitHubToken: input.githubToken?.trim() ? true : settings.hasGitHubToken,
-      hasProviderKey: input.providerApiKey?.trim() ? true : settings.hasProviderKey,
+      hasProviderKey: Boolean((input.providerApiKey?.trim() ? updateProviderKeyStatus(settings.providerKeyStatus, input.provider, true) : settings.providerKeyStatus)[input.provider]),
+      providerKeyStatus: input.providerApiKey?.trim() ? updateProviderKeyStatus(settings.providerKeyStatus, input.provider, true) : settings.providerKeyStatus,
     };
 
     if (input.serviceAccessToken?.trim()) await writeSecureValue(SERVICE_ACCESS_TOKEN_KEY, input.serviceAccessToken.trim());
     if (input.githubToken?.trim()) await writeSecureValue(GITHUB_TOKEN_KEY, input.githubToken.trim());
-    if (input.providerApiKey?.trim()) await writeSecureValue(PROVIDER_KEY_KEY, input.providerApiKey.trim());
+    if (input.providerApiKey?.trim()) await writeSecureValue(providerKeyStorageKey(input.provider), input.providerApiKey.trim());
 
     await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(nextSettings));
     setSettings(nextSettings);
     return nextSettings;
-  }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken, settings.workspaceId]);
+  }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken, settings.providerKeyStatus, settings.workspaceId]);
 
   const setProtectedChatContent = useCallback(async (enabled: boolean) => {
     const nextSettings = { ...settings, protectChatContent: enabled };
@@ -152,16 +163,17 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, []);
 
   const clearProviderKey = useCallback(async () => {
+    await deleteSecureValue(providerKeyStorageKey(settings.provider));
     await deleteSecureValue(PROVIDER_KEY_KEY);
-    setSettings((current) => ({ ...current, hasProviderKey: false }));
-  }, []);
+    setSettings((current) => ({ ...current, hasProviderKey: false, providerKeyStatus: updateProviderKeyStatus(current.providerKeyStatus, current.provider, false) }));
+  }, [settings.provider]);
 
   const attachRepository = useCallback(async (input: StudioSettingsInput) => {
     const storedSettings = await saveSettings(input);
     const [storedServiceToken, storedGitHubToken, storedProviderKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
       readSecureValue(GITHUB_TOKEN_KEY),
-      readSecureValue(PROVIDER_KEY_KEY),
+      readProviderApiKey(storedSettings.provider),
     ]);
     const client = new RemoteWorkspaceClient({
       baseUrl: storedSettings.workspaceUrl,
@@ -183,7 +195,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
       readSecureValue(GITHUB_TOKEN_KEY),
-      readSecureValue(PROVIDER_KEY_KEY),
+      readProviderApiKey(settings.provider),
     ]);
     const client = new RemoteWorkspaceClient({
       baseUrl: settings.workspaceUrl,
@@ -200,7 +212,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
       readSecureValue(GITHUB_TOKEN_KEY),
-      readSecureValue(PROVIDER_KEY_KEY),
+      readProviderApiKey(settings.provider),
     ]);
     return new RemoteWorkspaceClient({
       baseUrl: settings.workspaceUrl,
@@ -274,7 +286,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
       readSecureValue(GITHUB_TOKEN_KEY),
-      readSecureValue(PROVIDER_KEY_KEY),
+      readProviderApiKey(settings.provider),
     ]);
     const client = new RemoteWorkspaceClient({ baseUrl: settings.workspaceUrl, serviceAccessToken: serviceAccessToken || undefined, githubToken: githubToken || undefined, provider: settings.provider, providerApiKey: providerApiKey || undefined });
     return client.getHealth();

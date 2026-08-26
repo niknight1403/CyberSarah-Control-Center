@@ -3,6 +3,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { integrationFixture } from "@/constants/integration-fixture";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
+import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { type FieldValidation, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
@@ -118,20 +119,22 @@ export default function SettingsScreen() {
           {providerOptions.map((option) => {
             const selected = option.id === provider;
             return (
-              <TouchableOpacity key={option.id} activeOpacity={0.75} onPress={() => setProvider(option.id)} style={[styles.providerRow, selected && styles.providerRowSelected]}>
+              <TouchableOpacity key={option.id} activeOpacity={0.75} onPress={() => { setProvider(option.id); setProviderApiKey(""); setSaveState("idle"); }} style={[styles.providerRow, selected && styles.providerRowSelected]}>
                 <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioDot} /> : null}</View>
                 <View style={styles.providerText}>
                   <Text style={styles.providerLabel}>{option.label}</Text>
                   <Text style={styles.providerDetail}>{option.detail}</Text>
+                  <Text style={[styles.providerKeyStatus, settings.providerKeyStatus[option.id] && styles.providerKeyStatusConfigured]}>{getProviderKeyStatusLabel(option.id, Boolean(settings.providerKeyStatus[option.id]))}</Text>
                 </View>
               </TouchableOpacity>
             );
           })}
           {provider !== "managed" ? (
             <>
+              <Text style={styles.fieldHint}>Tippe auf ein Provider-Profil, um dessen Key unabhängig zu hinterlegen, zu ersetzen oder zu löschen.</Text>
               <Text style={styles.fieldLabel}>API-KEY FÜR {provider.toUpperCase()}</Text>
-              <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setProviderApiKey} placeholder={settings.hasProviderKey ? "Gespeichert — neuen Key eingeben, um ihn zu ersetzen" : "API-Key eingeben"} placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={providerApiKey} />
-              {settings.hasProviderKey ? <TouchableOpacity activeOpacity={0.7} onPress={() => void clearProviderKey()} style={styles.clearAction}><Text style={styles.clearActionText}>Provider-Key entfernen</Text></TouchableOpacity> : null}
+              <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setProviderApiKey} placeholder={settings.providerKeyStatus[provider] ? "Gespeichert — neuen Key eingeben, um ihn zu ersetzen" : "API-Key eingeben"} placeholderTextColor="#697A90" secureTextEntry style={settings.providerKeyStatus[provider] ? [styles.input, styles.inputStored] : styles.input} value={providerApiKey} />
+              {settings.providerKeyStatus[provider] ? <TouchableOpacity activeOpacity={0.7} onPress={() => void clearProviderKey()} style={styles.clearAction}><Text style={styles.clearActionText}>Provider-Key für {provider.toUpperCase()} entfernen</Text></TouchableOpacity> : null}
             </>
           ) : null}
         </View>
@@ -199,6 +202,8 @@ const styles = StyleSheet.create({
   providerText: { flex: 1 },
   providerLabel: { color: "#EDF3FB", fontSize: 14, fontWeight: "800", marginBottom: 3 },
   providerDetail: { color: "#8291A6", fontSize: 12, lineHeight: 17 },
+  providerKeyStatus: { color: "#8291A6", fontSize: 11, fontWeight: "700", lineHeight: 16, marginTop: 4 },
+  providerKeyStatusConfigured: { color: "#70E4AA" },
   protectionRow: { alignItems: "center", backgroundColor: "#121823", borderColor: "#243247", borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 11, padding: 12 },
   protectionRowEnabled: { backgroundColor: "#12251F", borderColor: "#3B8E68" },
   protectionIndicator: { alignItems: "center", backgroundColor: "#202A38", borderRadius: 10, height: 34, justifyContent: "center", width: 34 },

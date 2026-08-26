@@ -23,3 +23,26 @@ describe("AI provider selection", () => {
     expect(JSON.stringify(headers)).not.toContain("workspace.example");
   });
 });
+
+import { getProviderKeyStatusLabel, hasProviderKey, providerKeyStorageKey, updateProviderKeyStatus } from "../lib/provider-key-logic";
+
+describe("Provider API key management", () => {
+  it("creates a distinct secure storage slot for every provider", () => {
+    expect(providerKeyStorageKey("openai")).not.toBe(providerKeyStorageKey("gemini"));
+    expect(providerKeyStorageKey("openai")).toContain("openai");
+  });
+
+  it("updates one provider status without changing another", () => {
+    const withOpenAi = updateProviderKeyStatus({}, "openai", true);
+    const withGemini = updateProviderKeyStatus(withOpenAi, "gemini", true);
+    const withoutOpenAi = updateProviderKeyStatus(withGemini, "openai", false);
+    expect(hasProviderKey(withoutOpenAi, "openai")).toBe(false);
+    expect(hasProviderKey(withoutOpenAi, "gemini")).toBe(true);
+  });
+
+  it("uses safe, explicit German status labels", () => {
+    expect(getProviderKeyStatusLabel("gemini", true)).toBe("API-Key sicher hinterlegt");
+    expect(getProviderKeyStatusLabel("openai", false)).toBe("Kein API-Key hinterlegt");
+    expect(getProviderKeyStatusLabel("managed", false)).toBe("Serverseitig verwaltet");
+  });
+});
