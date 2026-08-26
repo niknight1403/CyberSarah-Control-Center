@@ -2,6 +2,15 @@ name: CyberSarah Control Center Android Release
 
 on:
   workflow_dispatch:
+    inputs:
+      artifact_type:
+        description: "Android-Artefakt"
+        required: true
+        default: aab
+        type: choice
+        options:
+          - aab
+          - apk
   push:
     tags:
       - "v*.*.*"
@@ -36,9 +45,9 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           author="$(git log -1 --format='%an <%ae>')"
           {
-            echo 'author<<EOF'
+            echo "author<<EOF"
             echo "$author"
-            echo 'EOF'
+            echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm
@@ -55,24 +64,39 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare test report directory
+        run: mkdir -p test-results
+
       - name: Lint
         run: pnpm lint
 
       - name: TypeScript check
         run: pnpm check
 
-      - name: Test suite
-        run: pnpm test
+      - name: Test suite with JUnit report
+        run: pnpm test -- --reporter=verbose --reporter=junit --outputFile=test-results/vitest-junit.xml
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybersarah-test-reports-${{ github.run_id }}
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 14
 
   build:
-    name: Build and deep APK validation
+    name: Build and deep Android validation
     needs: quality
     if: ${{ needs.quality.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
-      apk_size: ${{ steps.validate.outputs.apk_size }}
-      apk_sha256: ${{ steps.validate.outputs.apk_sha256 }}
+      artifact_type: ${{ steps.artifact.outputs.type }}
+      artifact_name: ${{ steps.artifact.outputs.name }}
+      artifact_path: ${{ steps.artifact.outputs.path }}
+      artifact_size: ${{ steps.validate.outputs.artifact_size }}
+      artifact_sha256: ${{ steps.validate.outputs.artifact_sha256 }}
       package_name: ${{ steps.validate.outputs.package_name }}
       version_code: ${{ steps.validate.outputs.version_code }}
       version_name: ${{ steps.validate.outputs.version_name }}
@@ -85,94 +109,101 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Resolve APK artifact path
+      - name: Resolve Android artifact
         id: artifact
         shell: bash
         env:
+          REQUESTED_TYPE: ${{ inputs.artifact_type || vars.ANDROID_ARTIFACT_TYPE || 'aab' }}
+          CONFIGURED_AAB_PATH: ${{ vars.AAB_PATH }}
           CONFIGURED_APK_PATH: ${{ vars.APK_PATH }}
         run: |
           set -euo pipefail
-          apk_path="${CONFIGURED_APK_PATH:-dist/CyberSarah-Control-Center-1.0.1.apk}"
-          if [[ ! -f "$apk_path" ]]; then
-            echo "APK nicht gefunden: $apk_path"
-            echo "Der Managed-Publish-Build muss das APK vor diesem Workflow-Schritt unter APK_PATH bereitstellen."
+          artifact_type="${REQUESTED_TYPE,,}"
+          case "$artifact_type" in
+            aab)
+              artifact_path="${CONFIGURED_AAB_PATH:-dist/CyberSarah-Control-Center-1.0.1.aab}"
+              ;;
+            apk)
+              artifact_path="${CONFIGURED_APK_PATH:-dist/CyberSarah-Control-Center-1.0.1.apk}"
+              ;;
+            *)
+              echo "Unbekannter Artefakttyp: $artifact_type"
+              exit 1
+              ;;
+          esac
+          test -f "$artifact_path" || {
+            echo "Android-Artefakt nicht gefunden: $artifact_path"
+            echo "Der Managed-Publish-Build muss die Datei vor diesem Workflow-Schritt bereitstellen."
             exit 1
-          fi
-          echo "path=$apk_path" >> "$GITHUB_OUTPUT"
+          }
+          echo "type=$artifact_type" >> "$GITHUB_OUTPUT"
+          echo "path=$artifact_path" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$artifact_path")" >> "$GITHUB_OUTPUT"
 
-      - name: Validate APK integrity and inspect with aapt2
+      - name: Validate Android artifact
         id: validate
         shell: bash
         env:
-          APK_PATH: ${{ steps.artifact.outputs.path }}
+          ARTIFACT_TYPE: ${{ steps.artifact.outputs.type }}
+          ARTIFACT_PATH: ${{ steps.artifact.outputs.path }}
           EXPECTED_PACKAGE: ${{ vars.ANDROID_PACKAGE_NAME }}
           EXPECTED_VERSION_CODE: ${{ vars.ANDROID_VERSION_CODE }}
           CONFIGURED_VERSION_NAME: ${{ vars.ANDROID_VERSION_NAME }}
         run: |
           set -euo pipefail
+          test -s "$ARTIFACT_PATH"
+          unzip -t "$ARTIFACT_PATH" >/dev/null
 
-          test -n "$EXPECTED_PACKAGE" || { echo "ANDROID_PACKAGE_NAME ist nicht gesetzt."; exit 1; }
-          test -s "$APK_PATH"
-          unzip -t "$APK_PATH" >/dev/null
+          artifact_sha256="$(sha256sum "$ARTIFACT_PATH" | awk '{print $1}')"
+          artifact_size_bytes="$(stat -c '%s' "$ARTIFACT_PATH")"
+          artifact_size="$(awk -v bytes="$artifact_size_bytes" 'BEGIN { printf "%.2f MiB", bytes / 1048576 }')"
+          echo "Artefakt: $ARTIFACT_TYPE, Größe: $artifact_size, SHA-256: $artifact_sha256"
 
-          apk_sha256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
-          apk_size_bytes="$(stat -c '%s' "$APK_PATH")"
-          apk_size="$(awk -v bytes="$apk_size_bytes" 'BEGIN { printf "%.2f MiB", bytes / 1048576 }')"
-          echo "APK SHA-256: $apk_sha256"
-          echo "APK-Größe: $apk_size"
+          actual_package=""
+          actual_version_code=""
+          actual_version_name=""
 
-          aapt2_bin="$(command -v aapt2 || true)"
-          if [[ -z "$aapt2_bin" && -n "${ANDROID_HOME:-}" ]]; then
-            aapt2_bin="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 2>/dev/null | sort -V | tail -n 1 || true)"
-          fi
-          if [[ -z "$aapt2_bin" ]]; then
-            echo "aapt2 wurde auf dem Runner nicht gefunden."
-            exit 1
-          fi
-
-          badging_file="${RUNNER_TEMP}/apk-badging.txt"
-          "$aapt2_bin" dump badging "$APK_PATH" > "$badging_file"
-
-          package_line="$(grep -m1 '^package:' "$badging_file" || true)"
-          version_line="$(grep -m1 '^package:' "$badging_file" || true)"
-          actual_package="$(sed -n "s/.*name='\\([^']*\\)' .*/\\1/p" <<< "$package_line")"
-          actual_version_code="$(sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p" <<< "$version_line")"
-          actual_version_name="$(sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p" <<< "$version_line")"
-
-          if [[ "$actual_package" != "$EXPECTED_PACKAGE" ]]; then
-            echo "Package Name stimmt nicht: erwartet '$EXPECTED_PACKAGE', gefunden '$actual_package'."
-            exit 1
-          fi
-
-          if [[ -n "$EXPECTED_VERSION_CODE" && "$actual_version_code" != "$EXPECTED_VERSION_CODE" ]]; then
-            echo "Version Code stimmt nicht: erwartet '$EXPECTED_VERSION_CODE', gefunden '$actual_version_code'."
-            exit 1
-          fi
-
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            expected_version_name="${GITHUB_REF_NAME#v}"
+          if [[ "$ARTIFACT_TYPE" == "apk" ]]; then
+            test -n "$EXPECTED_PACKAGE" || { echo "ANDROID_PACKAGE_NAME ist nicht gesetzt."; exit 1; }
+            aapt2_bin="$(command -v aapt2 || true)"
+            if [[ -z "$aapt2_bin" && -n "${ANDROID_HOME:-}" ]]; then
+              aapt2_bin="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 2>/dev/null | sort -V | tail -n 1 || true)"
+            fi
+            test -n "$aapt2_bin" || { echo "aapt2 wurde auf dem Runner nicht gefunden."; exit 1; }
+            badging_file="${RUNNER_TEMP}/apk-badging.txt"
+            "$aapt2_bin" dump badging "$ARTIFACT_PATH" > "$badging_file"
+            package_line="$(grep -m1 '^package:' "$badging_file" || true)"
+            actual_package="$(sed -n "s/.*name='\\([^']*\\)' .*/\\1/p" <<< "$package_line")"
+            actual_version_code="$(sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p" <<< "$package_line")"
+            actual_version_name="$(sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p" <<< "$package_line")"
+            [[ "$actual_package" == "$EXPECTED_PACKAGE" ]] || { echo "Package Name stimmt nicht: erwartet '$EXPECTED_PACKAGE', gefunden '$actual_package'."; exit 1; }
+            if [[ -n "$EXPECTED_VERSION_CODE" ]]; then
+              [[ "$actual_version_code" == "$EXPECTED_VERSION_CODE" ]] || { echo "Version Code stimmt nicht: erwartet '$EXPECTED_VERSION_CODE', gefunden '$actual_version_code'."; exit 1; }
+            fi
           else
-            expected_version_name="$CONFIGURED_VERSION_NAME"
-          fi
-          if [[ -z "$expected_version_name" ]]; then
-            echo "Für workflow_dispatch muss ANDROID_VERSION_NAME gesetzt sein."
-            exit 1
-          fi
-          if [[ "$actual_version_name" != "$expected_version_name" ]]; then
-            echo "Version Name stimmt nicht: erwartet '$expected_version_name', gefunden '$actual_version_name'."
-            exit 1
+            # AAB ist ein ZIP-Container. Diese Strukturprüfung blockiert
+            # beschädigte oder offensichtlich falsche Archive vor dem Upload.
+            unzip -l "$ARTIFACT_PATH" | grep -F 'base/manifest/AndroidManifest.xml' >/dev/null || {
+              echo "AAB enthält keine base/manifest/AndroidManifest.xml."
+              exit 1
+            }
+            unzip -l "$ARTIFACT_PATH" | grep -F 'BundleConfig.pb' >/dev/null || {
+              echo "AAB enthält keine BundleConfig.pb."
+              exit 1
+            }
+            echo "AAB-Strukturprüfung erfolgreich; Package/Version werden zusätzlich von Google Play beim Bundle-Upload geprüft."
           fi
 
-          echo "apk_size=$apk_size" >> "$GITHUB_OUTPUT"
-          echo "apk_sha256=$apk_sha256" >> "$GITHUB_OUTPUT"
+          echo "artifact_size=$artifact_size" >> "$GITHUB_OUTPUT"
+          echo "artifact_sha256=$artifact_sha256" >> "$GITHUB_OUTPUT"
           echo "package_name=$actual_package" >> "$GITHUB_OUTPUT"
           echo "version_code=$actual_version_code" >> "$GITHUB_OUTPUT"
           echo "version_name=$actual_version_name" >> "$GITHUB_OUTPUT"
 
-      - name: Upload validated APK artifact
+      - name: Upload validated Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cybersarah-android-release
+          name: cybersarah-android-${{ steps.artifact.outputs.type }}
           path: ${{ steps.artifact.outputs.path }}
           if-no-files-found: error
           retention-days: 7
@@ -188,14 +219,15 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      tester_url: ${{ steps.play-upload.outputs.tester_url }}
+      upload_target: ${{ steps.play-upload.outputs.upload_target }}
       upload_version_code: ${{ steps.play-upload.outputs.version_code }}
+      tester_url: ${{ steps.play-upload.outputs.tester_url }}
 
     steps:
-      - name: Download validated APK
+      - name: Download validated Android artifact
         uses: actions/download-artifact@v4
         with:
-          name: cybersarah-android-release
+          name: cybersarah-android-${{ needs.build.outputs.artifact_type }}
           path: dist
 
       - name: Authenticate with Google Cloud via OIDC
@@ -208,36 +240,89 @@ jobs:
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/androidpublisher
 
-      - name: Upload APK to Internal App Sharing
+      - name: Upload APK to Internal App Sharing or AAB to Internal Track
         id: play-upload
         shell: bash
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          PACKAGE_NAME: ${{ needs.build.outputs.package_name }}
-          VERSION_CODE: ${{ needs.build.outputs.version_code }}
-          APK_PATH: dist/CyberSarah-Control-Center-1.0.1.apk
+          PACKAGE_NAME: ${{ needs.build.outputs.package_name || vars.ANDROID_PACKAGE_NAME }}
+          VERSION_CODE_EXPECTED: ${{ needs.build.outputs.version_code }}
+          ARTIFACT_TYPE: ${{ needs.build.outputs.artifact_type }}
+          ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
+          AAB_PATH: dist/${{ needs.build.outputs.artifact_name }}
+          APK_PATH: dist/${{ needs.build.outputs.artifact_name }}
         run: |
           set -euo pipefail
-          test -s "$APK_PATH"
-          response_file="${RUNNER_TEMP}/internal-app-sharing-response.json"
-          http_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-            -H 'Content-Type: application/vnd.android.package-archive' \
-            --data-binary "@${APK_PATH}" \
-            "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/internalappsharing/${PACKAGE_NAME}/artifacts/apk")"
+          test -n "$ACCESS_TOKEN"
+          test -s "$AAB_PATH"
+          api_base="https://androidpublisher.googleapis.com"
 
-          if [[ "$http_code" != 2* ]]; then
-            echo "Google-Play-Upload fehlgeschlagen (HTTP ${http_code})."
-            exit 1
-          fi
+          if [[ "$ARTIFACT_TYPE" == "apk" ]]; then
+            response_file="${RUNNER_TEMP}/internal-app-sharing-response.json"
+            http_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              -H 'Content-Type: application/vnd.android.package-archive' \
+              --data-binary "@${APK_PATH}" \
+              "${api_base}/upload/androidpublisher/v3/applications/internalappsharing/${PACKAGE_NAME}/artifacts/apk")"
+            if [[ "$http_code" != 2* ]]; then
+              echo "APK-Upload zu Internal App Sharing fehlgeschlagen (HTTP ${http_code})."
+              exit 1
+            fi
+            tester_url="$(jq -r '.downloadUrl // .download_url // empty' "$response_file")"
+            echo "upload_target=internal-app-sharing" >> "$GITHUB_OUTPUT"
+            echo "version_code=${VERSION_CODE_EXPECTED:-unknown}" >> "$GITHUB_OUTPUT"
+            [[ -z "$tester_url" ]] || echo "tester_url=$tester_url" >> "$GITHUB_OUTPUT"
+            echo "APK erfolgreich zu Internal App Sharing hochgeladen."
+          else
+            edit_file="${RUNNER_TEMP}/edit.json"
+            bundle_file="${RUNNER_TEMP}/bundle.json"
+            track_file="${RUNNER_TEMP}/track.json"
 
-          tester_url="$(jq -r '.downloadUrl // .download_url // empty' "$response_file")"
-          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          if [[ -n "$tester_url" ]]; then
-            echo "tester_url=$tester_url" >> "$GITHUB_OUTPUT"
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d '{}' \
+              "${api_base}/androidpublisher/v3/applications/${PACKAGE_NAME}/edits" > "$edit_file"
+            edit_id="$(jq -r '.id // empty' "$edit_file")"
+            test -n "$edit_id" || { echo "Google Play hat keine Edit-ID zurückgegeben."; exit 1; }
+
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              -H 'Content-Type: application/octet-stream' \
+              --data-binary "@${AAB_PATH}" \
+              "${api_base}/upload/androidpublisher/v3/applications/${PACKAGE_NAME}/edits/${edit_id}/bundles" > "$bundle_file"
+            version_code="$(jq -r '.versionCode // empty' "$bundle_file")"
+            test -n "$version_code" || { echo "Google Play hat keinen Versioncode zurückgegeben."; exit 1; }
+
+            version_name="${GITHUB_REF_NAME#v}"
+            if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
+              version_name="${{ vars.ANDROID_VERSION_NAME }}"
+            fi
+            test -n "$version_name" || { echo "ANDROID_VERSION_NAME ist für workflow_dispatch erforderlich."; exit 1; }
+            jq -n \
+              --arg version_code "$version_code" \
+              --arg version_name "$version_name" \
+              '{releases:[{name:$version_name,versionCodes:[$version_code],status:"completed",releaseNotes:[{language:"de-DE",text:("Interner Test von CyberSarah Control Center " + $version_name + ".")}]}]}' > "$track_file"
+
+            curl --fail-with-body --silent --show-error \
+              -X PUT \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              --data-binary "@${track_file}" \
+              "${api_base}/androidpublisher/v3/applications/${PACKAGE_NAME}/edits/${edit_id}/tracks/internal" >/dev/null
+
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              "${api_base}/androidpublisher/v3/applications/${PACKAGE_NAME}/edits/${edit_id}:commit" >/dev/null
+
+            echo "upload_target=internal-track" >> "$GITHUB_OUTPUT"
+            echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+            echo "AAB erfolgreich in den Google-Play-Internal-Track veröffentlicht."
           fi
-          echo "Google-Play-Upload erfolgreich."
 
   notify:
     name: Smart status and Slack notification
@@ -280,18 +365,25 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           UPLOAD_RESULT: ${{ needs.upload.result }}
-          APK_SIZE: ${{ needs.build.outputs.apk_size || 'nicht verfügbar' }}
-          APK_SHA256: ${{ needs.build.outputs.apk_sha256 || 'nicht verfügbar' }}
-          VERSION_NAME: ${{ needs.build.outputs.version_name || 'nicht verfügbar' }}
+          ARTIFACT_TYPE: ${{ needs.build.outputs.artifact_type || 'nicht verfügbar' }}
+          ARTIFACT_SIZE: ${{ needs.build.outputs.artifact_size || 'nicht verfügbar' }}
+          ARTIFACT_SHA256: ${{ needs.build.outputs.artifact_sha256 || 'nicht verfügbar' }}
+          UPLOAD_TARGET: ${{ needs.upload.outputs.upload_target || 'nicht verfügbar' }}
+          UPLOAD_VERSION_CODE: ${{ needs.upload.outputs.upload_version_code || 'nicht verfügbar' }}
           TESTER_URL: ${{ needs.upload.outputs.tester_url || '' }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           case "$STATUS" in
-            SUCCESS) color="#2eb67d"; summary="APK validiert und erfolgreich hochgeladen." ;;
+            SUCCESS) color="#2eb67d"; summary="Android-Artefakt validiert und erfolgreich veröffentlicht." ;;
             CANCELLED) color="#ecb22e"; summary="Release-Workflow wurde manuell abgebrochen." ;;
-            *) color="#e01e5a"; summary="Quality Gate, Build-Validierung oder Upload ist fehlgeschlagen." ;;
+            *) color="#e01e5a"; summary="Quality Gate, Artefaktprüfung oder Google-Play-Upload ist fehlgeschlagen." ;;
           esac
+
+          tester_text="nicht verfügbar"
+          if [[ -n "$TESTER_URL" ]]; then
+            tester_text="<${TESTER_URL}|Internal App Sharing öffnen>"
+          fi
 
           payload="$(jq -n \
             --arg title "CyberSarah Control Center · ${STATUS}" \
@@ -304,10 +396,12 @@ jobs:
             --arg quality "$QUALITY_RESULT" \
             --arg build "$BUILD_RESULT" \
             --arg upload "$UPLOAD_RESULT" \
-            --arg size "$APK_SIZE" \
-            --arg apksha "${APK_SHA256:0:16}…" \
-            --arg version "$VERSION_NAME" \
-            --arg tester "$TESTER_URL" \
+            --arg type "$ARTIFACT_TYPE" \
+            --arg size "$ARTIFACT_SIZE" \
+            --arg hash "${ARTIFACT_SHA256:0:16}…" \
+            --arg target "$UPLOAD_TARGET" \
+            --arg version "$UPLOAD_VERSION_CODE" \
+            --arg tester "$tester_text" \
             --arg run "$RUN_URL" \
             '{attachments:[{color:$color,blocks:[
               {type:"header",text:{type:"plain_text",text:$title}},
@@ -320,11 +414,12 @@ jobs:
                 {type:"mrkdwn",text:("*Quality:*\\n" + $quality)},
                 {type:"mrkdwn",text:("*Build:*\\n" + $build)},
                 {type:"mrkdwn",text:("*Upload:*\\n" + $upload)},
-                {type:"mrkdwn",text:("*Version:*\\n" + $version)},
-                {type:"mrkdwn",text:("*APK-Größe:*\\n" + $size)},
-                {type:"mrkdwn",text:("*SHA-256:*\\n`" + $apksha + "`")}
+                {type:"mrkdwn",text:("*Artefakt:*\\n" + $type)},
+                {type:"mrkdwn",text:("*Größe:*\\n" + $size)},
+                {type:"mrkdwn",text:("*SHA-256:*\\n`" + $hash + "`")},
+                {type:"mrkdwn",text:("*Versioncode:*\\n" + $version)}
               ]},
-              {type:"section",text:{type:"mrkdwn",text:("*Tester-Link:*\\n" + (if $tester == "" then "nicht verfügbar" else "<" + $tester + "|Internal App Sharing öffnen>" end))}},
+              {type:"section",text:{type:"mrkdwn",text:("*Tester-Link:*\\n" + $tester)}},
               {type:"actions",elements:[{type:"button",text:{type:"plain_text",text:"GitHub Actions öffnen"},url:$run}]}
             ]}]}')"
 

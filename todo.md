@@ -142,3 +142,4 @@
 - [x] Übersprungenen auth.logout-Test aktivieren und die Cookie-Löschung vollständig validieren
 - [x] Auth-Testkorrektur in das Zielrepository synchronisieren und Pull Request vorbereiten
 - [x] Hardened GitHub-Actions-Release-Workflow mit Quality Gates, APK/aapt2-Validierung, Protected Upload und Slack-Status implementieren
+- [x] AAB-Upload in den Internal-Track und GitHub-Testbericht-Artefakte in den Release-Workflow integrieren
