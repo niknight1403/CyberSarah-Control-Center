@@ -127,3 +127,4 @@
 - [x] Sprint 20: Android-Release-Preflight und Installations-Handoff vorbereiten
 - [x] Nächsten Release-Preflight ausführen und neuen Publish-Checkpoint erstellen
 - [x] Publish-Warnung „nicht gepackte Änderungen“ für Version 1.0.1 beheben und Packstatus erneut validieren
+- [x] Sprint 21: Release-Status und Publish-Handoff im Workspace sichtbar und nachvollziehbar machen

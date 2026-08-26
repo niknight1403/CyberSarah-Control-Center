@@ -16,9 +16,16 @@ describe("development guidance", () => {
     expect(guidance.primary.tone).toBe("warning");
   });
 
-  it("shows the agent as the productive next step once the workspace is healthy", () => {
+  it("prioritizes the publish handoff after a pushed, green release", () => {
     const guidance = getDevelopmentGuidance({ ...readyInput, lastGitAction: "pushed" });
-    expect(guidance.primary.action).toBe("agent");
+    expect(guidance.primary.action).toBe("release");
+    expect(guidance.primary.actionLabel).toBe("Publish öffnen");
     expect(guidance.completion).toContain("veröffentlicht");
+  });
+
+  it("keeps the agent as the productive next step before a push", () => {
+    const guidance = getDevelopmentGuidance(readyInput);
+    expect(guidance.primary.action).toBe("agent");
+    expect(guidance.completion).toBeUndefined();
   });
 });

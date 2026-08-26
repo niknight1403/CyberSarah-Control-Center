@@ -212,6 +212,11 @@ export default function WorkspaceScreen() {
       setGuidanceFeedback("Die CI-Qualität wird aktualisiert.");
       return;
     }
+    if (action === "release") {
+      Alert.alert("Release bereit", "Der Branch ist synchronisiert und die Qualitätsprüfung ist grün. Öffne jetzt die Publish-Oberfläche, um den verwalteten Android-APK-Build zu starten.", [{ text: "Schließen", style: "cancel" }]);
+      setGuidanceFeedback("Der Release-Handoff ist bereit. Starte den APK-Build über Publish.");
+      return;
+    }
     const firstChangedFile = changedRemoteFiles[0];
     if (firstChangedFile) {
       selectFile(firstChangedFile.id);
