@@ -43,6 +43,44 @@ const agentSchema = z.object({
   prompt: z.string().min(1).max(8_000),
   activeFile: z.string().max(500).optional(),
 });
+const auditEventSchema = z.object({
+  eventId: z.string().min(1).max(160),
+  action: z.enum(["build", "test", "commit", "push", "pull_request", "ci", "release"]),
+  status: z.enum(["started", "passed", "failed", "cancelled"]),
+  repository: z.string().max(300).optional(),
+  branch: z.string().max(120).optional(),
+  commitSha: z.string().max(80).optional(),
+  runId: z.string().max(160).optional(),
+  message: z.string().max(1_000).optional(),
+  metadata: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  occurredAt: z.string().datetime().optional(),
+});
+
+const auditLogFile = path.resolve(process.env.EXTERNAL_ACTION_AUDIT_LOG ?? path.join(workspacesDirectory, "external-actions.jsonl"));
+const externalActionAuditService = {
+  sanitize(event) {
+    const metadata = event.metadata ? Object.fromEntries(Object.entries(event.metadata).map(([key, value]) => [key, /(token|secret|password|authorization|cookie|api[-_]?key)/i.test(key) ? "[REDACTED]" : value])) : undefined;
+    return { ...event, metadata, occurredAt: event.occurredAt ?? new Date().toISOString() };
+  },
+  async record(event) {
+    const safeEvent = this.sanitize(event);
+    try {
+      await fs.mkdir(path.dirname(auditLogFile), { recursive: true });
+      await fs.appendFile(auditLogFile, `${JSON.stringify(safeEvent)}\\n`, "utf8");
+    } catch (error) {
+      console.warn(JSON.stringify({ scope: "externalActionAuditService", status: "local-log-failed", message: error instanceof Error ? error.message : "unknown" }));
+    }
+    const sink = process.env.EXTERNAL_ACTION_AUDIT_URL?.trim();
+    if (sink) {
+      try {
+        await fetch(sink, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(safeEvent), signal: AbortSignal.timeout(3_000) });
+      } catch (error) {
+        console.warn(JSON.stringify({ scope: "externalActionAuditService", status: "sink-failed", message: error instanceof Error ? error.message : "unknown" }));
+      }
+    }
+    return safeEvent;
+  },
+};
 
 function isServiceAuthorized(request) {
   if (!serviceAccessToken) return process.env.NODE_ENV !== "production";
@@ -319,31 +357,58 @@ function normalizeAgentProposal(proposal, allowedFiles) {
 async function invokeProvider(request, messages) {
   const provider = request.header("X-AI-Provider") ?? "managed";
   const suppliedKey = request.header("X-AI-Provider-Key")?.trim();
+  const environmentKeyByProvider = {
+    managed: process.env.MANAGED_LLM_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    gemini: process.env.GEMINI_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    together: process.env.TOGETHER_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    huggingface: process.env.HF_TOKEN,
+  };
+  const boundProviderKey = suppliedKey || environmentKeyByProvider[provider];
   const defaults = {
-    managed: { baseUrl: process.env.MANAGED_LLM_BASE_URL, key: process.env.MANAGED_LLM_API_KEY, model: process.env.MANAGED_LLM_MODEL ?? "gpt-4o-mini" },
-    openai: { baseUrl: "https://api.openai.com/v1/chat/completions", key: suppliedKey, model: process.env.OPENAI_MODEL ?? "gpt-4o-mini" },
-    groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: suppliedKey, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
-    together: { baseUrl: "https://api.together.xyz/v1/chat/completions", key: suppliedKey, model: process.env.TOGETHER_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-    anthropic: { baseUrl: "https://api.anthropic.com/v1/messages", key: suppliedKey, model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest" },
+    managed: { baseUrl: process.env.MANAGED_LLM_BASE_URL, key: boundProviderKey, model: process.env.MANAGED_LLM_MODEL ?? "gpt-4o-mini" },
+    openai: { baseUrl: "https://api.openai.com/v1/chat/completions", key: boundProviderKey, model: process.env.OPENAI_MODEL ?? "gpt-4o-mini" },
+    gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/models", key: boundProviderKey, model: process.env.GEMINI_MODEL ?? "gemini-3.6-flash" },
+    openrouter: { baseUrl: "https://openrouter.ai/api/v1/chat/completions", key: boundProviderKey, model: process.env.OPENROUTER_MODEL ?? "openrouter/free" },
+    groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: boundProviderKey, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
+    together: { baseUrl: "https://api.together.xyz/v1/chat/completions", key: boundProviderKey, model: process.env.TOGETHER_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+    anthropic: { baseUrl: "https://api.anthropic.com/v1/messages", key: boundProviderKey, model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest" },
+    ollama: { baseUrl: `${process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434/v1"}/chat/completions`, key: suppliedKey || "local", model: process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b" },
+    lmstudio: { baseUrl: `${process.env.LMSTUDIO_BASE_URL ?? "http://127.0.0.1:1234/v1"}/chat/completions`, key: suppliedKey || "local", model: process.env.LMSTUDIO_MODEL ?? "local-model" },
+    custom: { baseUrl: process.env.CUSTOM_OPENAI_BASE_URL, key: suppliedKey, model: process.env.CUSTOM_OPENAI_MODEL ?? "local-model" },
+    huggingface: { baseUrl: "https://router.huggingface.co/v1/chat/completions", key: boundProviderKey, model: process.env.HF_MODEL ?? "deepseek-ai/DeepSeek-R1:fastest" },
   };
   const configuration = defaults[provider];
   if (!configuration?.baseUrl || !configuration.key) throw new Error("Für das ausgewählte KI-Profil fehlt ein API-Key oder eine On-Server-Konfiguration.");
 
   const isAnthropic = provider === "anthropic";
-  const response = await fetch(configuration.baseUrl, {
+  const isGemini = provider === "gemini";
+  const endpoint = isGemini ? `${configuration.baseUrl}/${configuration.model}:generateContent` : configuration.baseUrl;
+  const response = await fetch(endpoint, {
     method: "POST",
-    headers: isAnthropic
-      ? { "content-type": "application/json", "x-api-key": configuration.key, "anthropic-version": "2023-06-01" }
-      : { "content-type": "application/json", authorization: `Bearer ${configuration.key}` },
+    headers: isGemini
+      ? { "content-type": "application/json", "x-goog-api-key": configuration.key }
+      : isAnthropic
+        ? { "content-type": "application/json", "x-api-key": configuration.key, "anthropic-version": "2023-06-01" }
+        : { "content-type": "application/json", authorization: `Bearer ${configuration.key}` },
     body: JSON.stringify(
-      isAnthropic
-        ? { model: configuration.model, max_tokens: 1_800, system: messages[0].content, messages: messages.slice(1) }
-        : { model: configuration.model, temperature: 0.2, response_format: { type: "json_object" }, messages },
+      isGemini
+        ? {
+            systemInstruction: { parts: [{ text: messages[0]?.content ?? "" }] },
+            contents: messages.slice(1).map((message) => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] })),
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json", maxOutputTokens: 1_800 },
+          }
+        : isAnthropic
+          ? { model: configuration.model, max_tokens: 1_800, system: messages[0].content, messages: messages.slice(1) }
+          : { model: configuration.model, temperature: 0.2, response_format: { type: "json_object" }, messages },
     ),
   });
   if (!response.ok) throw new Error(`KI-Provider antwortet mit ${response.status}.`);
   const payload = await response.json();
-  const content = isAnthropic ? payload.content?.[0]?.text : payload.choices?.[0]?.message?.content;
+  const content = isGemini ? payload.candidates?.[0]?.content?.parts?.[0]?.text : isAnthropic ? payload.content?.[0]?.text : payload.choices?.[0]?.message?.content;
   if (!content) throw new Error("Der KI-Provider hat keinen Vorschlag zurückgegeben.");
   try {
     return JSON.parse(content);
@@ -469,6 +534,7 @@ app.post("/api/v1/workspaces/:workspaceId/git/commit", requireServiceAuthorizati
     await git(["add", "--all"], workspacePath, getGitHubToken(request));
     const { stdout } = await git(["-c", `user.name=${gitCommitAuthorName}`, "-c", `user.email=${gitCommitAuthorEmail}`, "commit", "-m", message], workspacePath, getGitHubToken(request));
     const { stdout: hash } = await git(["rev-parse", "--short", "HEAD"], workspacePath, getGitHubToken(request));
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "commit", status: "passed", branch: (await git(["branch", "--show-current"], workspacePath, getGitHubToken(request))).stdout.trim(), commitSha: hash.trim(), message: "Lokaler Commit erstellt." });
     response.json({ committed: true, hash: hash.trim(), output: stdout });
   } catch (error) {
     next(error);
@@ -481,6 +547,8 @@ app.post("/api/v1/workspaces/:workspaceId/git/push", requireServiceAuthorization
     const { stdout: branchOutput } = await git(["branch", "--show-current"], workspacePath, getGitHubToken(request));
     const branch = branchNameSchema.parse(branchOutput.trim());
     const { stdout } = await git(["push", "origin", `HEAD:refs/heads/${branch}`], workspacePath, getGitHubToken(request));
+    const { stdout: commitSha } = await git(["rev-parse", "HEAD"], workspacePath, getGitHubToken(request));
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "push", status: "passed", branch, commitSha: commitSha.trim(), message: "Branch erfolgreich zum Remote übertragen." });
     response.json({ pushed: true, branch, output: stdout });
   } catch (error) {
     next(error);
@@ -501,7 +569,18 @@ app.post("/api/v1/workspaces/:workspaceId/git/pull-request", requireServiceAutho
       head: headBranch,
       base: input.baseBranch,
     });
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "pull_request", status: "passed", branch: headBranch, message: `Pull Request #${pullRequest.number} erstellt.` });
     response.status(201).json({ ...pullRequest, headBranch, baseBranch: input.baseBranch });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/v1/audit/external-action", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const input = auditEventSchema.parse(request.body);
+    const event = await externalActionAuditService.record(input);
+    response.status(202).json({ accepted: true, eventId: event.eventId });
   } catch (error) {
     next(error);
   }

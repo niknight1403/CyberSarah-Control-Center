@@ -1,9 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
-import { toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
-import * as SecureStore from "expo-secure-store";
+import { getDefaultFreeProvider, providerDefaults, toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
+import { secureSessionStore } from "@/lib/secure-session-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Platform } from "react-native";
 
 const PREFERENCES_KEY = "custom-ai-studio.preferences.v1";
 const SERVICE_ACCESS_TOKEN_KEY = "custom-ai-studio.service-access-token.v1";
@@ -12,10 +11,16 @@ const PROVIDER_KEY_KEY = "custom-ai-studio.provider-key.v1";
 
 export const providerOptions = [
   { id: "managed", label: "On-Server", detail: "Der Workspace-Service verwaltet den Provider." },
-  { id: "openai", label: "OpenAI", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
-  { id: "groq", label: "Groq", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
+  { id: "openai", label: "OpenAI", detail: `API-Key lokal geschützt · ${providerDefaults.openai.model} · kein garantierter Gratiszugang` },
+  { id: "gemini", label: "Google Gemini", detail: `API-Key lokal geschützt oder per Server-Key · ${providerDefaults.gemini.model} · Free-Tier abhängig von Konto/Region` },
+  { id: "openrouter", label: "OpenRouter", detail: `API-Key lokal geschützt · ${providerDefaults.openrouter.model} · Free-Modelle nur sofern verfügbar` },
+  { id: "groq", label: "Groq", detail: `API-Key lokal geschützt · ${providerDefaults.groq.model}` },
   { id: "together", label: "Together AI", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
   { id: "anthropic", label: "Anthropic", detail: "API-Key verbleibt verschlüsselt auf dem Gerät." },
+  { id: "ollama", label: "Ollama lokal", detail: `Kein Cloud-Key · ${providerDefaults.ollama.model} · eigener Server erforderlich` },
+  { id: "lmstudio", label: "LM Studio lokal", detail: `Kein Cloud-Key · ${providerDefaults.lmstudio.model} · eigener Server erforderlich` },
+  { id: "custom", label: "Eigener OpenAI-kompatibler Endpoint", detail: `Eigener Endpoint · ${providerDefaults.custom.model} · URL im Workspace-Service konfigurieren` },
+  { id: "huggingface", label: "Hugging Face", detail: `Token lokal geschützt · ${providerDefaults.huggingface.model} · begrenztes Free-Guthaben` },
 ] as const;
 
 export type { ProviderId } from "@/lib/studio-settings-logic";
@@ -44,7 +49,7 @@ const defaultSettings: StudioSettings = {
   workspaceUrl: "",
   repositoryUrl: "",
   branch: "main",
-  provider: "managed",
+  provider: getDefaultFreeProvider(),
   hasServiceAccessToken: false,
   hasGitHubToken: false,
   hasProviderKey: false,
@@ -52,29 +57,19 @@ const defaultSettings: StudioSettings = {
 };
 
 async function writeSecureValue(key: string, value: string) {
-  if (Platform.OS === "web") {
-    if (typeof sessionStorage !== "undefined") sessionStorage.setItem(key, value);
-    return;
-  }
-  await SecureStore.setItemAsync(key, value);
+  await secureSessionStore.set(key, value);
 }
 
 async function deleteSecureValue(key: string) {
-  if (Platform.OS === "web") {
-    if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(key);
-    return;
-  }
-  await SecureStore.deleteItemAsync(key);
+  await secureSessionStore.remove(key);
 }
 
 async function hasSecureValue(key: string) {
-  if (Platform.OS === "web") return typeof sessionStorage !== "undefined" && Boolean(sessionStorage.getItem(key));
-  return Boolean(await SecureStore.getItemAsync(key));
+  return secureSessionStore.has(key);
 }
 
 async function readSecureValue(key: string) {
-  if (Platform.OS === "web") return typeof sessionStorage !== "undefined" ? sessionStorage.getItem(key) : null;
-  return SecureStore.getItemAsync(key);
+  return secureSessionStore.get(key);
 }
 
 type StudioSettingsContextValue = {

@@ -1,0 +1,55 @@
+name: CyberSarah Control Center CI
+
+on:
+  push:
+    branches: [main, next-development]
+  pull_request:
+    branches: [main, next-development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript validation
+        run: pnpm check
+
+      - name: Deterministic test suite
+        run: pnpm test
+
+      - name: Workspace service syntax validation
+        run: node --check workspace-service/src/index.js
+
+      - name: Workspace service build
+        run: pnpm build
+
+      - name: Audit CI result
+        if: always()
+        env:
+          AUDIT_ACTION: ci
+          AUDIT_STATUS: ${{ job.status == 'success' && 'passed' || 'failed' }}
+          AUDIT_MESSAGE: ${{ job.status == 'success' && 'CI, TypeScript, Tests und Workspace-Service-Build erfolgreich.' || 'Mindestens eine CI-Prüfung ist fehlgeschlagen.' }}
+          EXTERNAL_ACTION_AUDIT_URL: ${{ secrets.EXTERNAL_ACTION_AUDIT_URL }}
+          AUDIT_AUTH_TOKEN: ${{ secrets.SERVICE_ACCESS_TOKEN }}
+        run: node scripts/ci-audit.mjs

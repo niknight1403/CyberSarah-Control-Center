@@ -1,4 +1,28 @@
-export type ProviderId = "managed" | "openai" | "groq" | "together" | "anthropic";
+export type ProviderId = "managed" | "openai" | "gemini" | "openrouter" | "groq" | "together" | "anthropic" | "ollama" | "lmstudio" | "custom" | "huggingface";
+
+export const freeProviderIds: readonly ProviderId[] = ["gemini", "openrouter", "groq", "ollama", "lmstudio", "huggingface"];
+
+export function isFreeTierProvider(provider: ProviderId) {
+  return freeProviderIds.includes(provider);
+}
+
+export function getDefaultFreeProvider(): ProviderId {
+  return "gemini";
+}
+
+export const providerDefaults: Record<ProviderId, { model: string; freeTierNote: string }> = {
+  managed: { model: "gpt-4o-mini", freeTierNote: "On-Server-Konfiguration" },
+  openai: { model: "gpt-4o-mini", freeTierNote: "Kosten und Limits hängen vom OpenAI-Konto ab." },
+  gemini: { model: "gemini-3.6-flash", freeTierNote: "Kostenlose Nutzung hängt von Region, Konto und aktuellem Google-AI-Studio-Limit ab." },
+  openrouter: { model: "openrouter/free", freeTierNote: "Verwendet den OpenRouter-Free-Router, sofern verfügbar; Limits können sich ändern." },
+  groq: { model: "llama-3.3-70b-versatile", freeTierNote: "Kosten und Limits hängen vom Groq-Konto ab." },
+  together: { model: "meta-llama/Llama-3.3-70B-Instruct-Turbo", freeTierNote: "Kosten und Limits hängen vom Together-Konto ab." },
+  anthropic: { model: "claude-3-5-haiku-latest", freeTierNote: "Kosten und Limits hängen vom Anthropic-Konto ab." },
+  ollama: { model: "qwen2.5-coder:7b", freeTierNote: "Kostenlos lokal; benötigt einen erreichbaren Ollama-Server." },
+  lmstudio: { model: "local-model", freeTierNote: "Kostenlos lokal; benötigt einen laufenden LM-Studio-Server." },
+  custom: { model: "local-model", freeTierNote: "OpenAI-kompatibler eigener Endpoint; Kosten und Limits bestimmst du selbst." },
+  huggingface: { model: "deepseek-ai/DeepSeek-R1:fastest", freeTierNote: "Begrenztes monatliches Free-Guthaben; Modell- und Provider-Verfügbarkeit kann sich ändern." },
+};
 
 export type PersistedStudioSettings = {
   workspaceUrl: string;
