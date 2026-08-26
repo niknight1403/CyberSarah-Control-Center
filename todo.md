@@ -42,7 +42,7 @@
 - [x] Diff-Vorschau und Bestätigungsablauf deterministisch testen und für mobile Bedienung validieren.
 - [ ] Aktueller Sprint: Neustart-Button für den Entwicklungsserver mit Bestätigung, Ladezustand und Statusfeedback abschließen.
 - [ ] Mobile Optimierung für den Android-Build prüfen und erforderliche Anpassungen umsetzen.
-- [ ] Android-Build-Konfiguration für die APK-Erzeugung validieren.
+- [x] Android-Build-Konfiguration für die APK-Erzeugung validieren.
 - [ ] GitHub-Zielrepository und Push-Workflow sicher vorbereiten.
 - [ ] Visuelle GitHub-Verbindungsstatusanzeige mit verbunden-, getrennt-, prüfend- und Fehlerzustand hinzufügen.
 - [ ] Manuelle GitHub-Statusprüfung ohne Anzeige sensibler Tokens anbinden.
@@ -72,3 +72,6 @@
 - [x] Verbindungstest für Workspace-Service, GitHub und KI-Provider ergänzen.
 - [x] Teststatus mit Laden, Erfolg und verständlichem Fehler je Connector anzeigen.
 - [x] Verbindungstests ohne Token-Leaks deterministisch validieren.
+- [x] Nächsten CyberSarah-Control-Center-Release vollständig validieren.
+- [x] Release-Checkpoint für die Veröffentlichung erstellen.
+- [ ] Veröffentlichung und Android-APK über die Publish-Oberfläche anstoßen.
