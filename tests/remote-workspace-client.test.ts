@@ -81,6 +81,19 @@ describe("workspace service client", () => {
     vi.unstubAllGlobals();
   });
 
+  it("falls back from an unavailable local provider without crashing the agent flow", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ proposal: { summary: "Fallback erreichbar.", rationale: "Der Cloud-Fallback antwortet.", changes: [], affectedFiles: [] } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new RemoteWorkspaceClient({ baseUrl: "https://studio.example.com", serviceAccessToken: "service-secret", provider: "ollama", fallbackProvider: "gemini" });
+    await expect(client.requestAgentProposal({ prompt: "Prüfe den Status" })).resolves.toMatchObject({ summary: "Fallback erreichbar.", changes: [] });
+    expect(fetchMock.mock.calls[0][1].headers["X-AI-Provider"]).toBe("ollama");
+    expect(fetchMock.mock.calls[1][1].headers["X-AI-Provider"]).toBe("gemini");
+    expect(fetchMock.mock.calls[1][1].headers["X-AI-Provider-Key"]).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
   it("sends a bounded development request with the active file to the proposal endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ summary: "Use a shared token.", rationale: "It prevents duplicated constants.", changes: [{ path: "src/fixture.ts", content: "export const token = 1;\n", explanation: "Centralize the value." }], affectedFiles: ["src/fixture.ts"] }) });
     vi.stubGlobal("fetch", fetchMock);

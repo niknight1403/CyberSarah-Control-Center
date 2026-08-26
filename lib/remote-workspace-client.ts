@@ -1,4 +1,4 @@
-import type { ProviderId } from "@/lib/studio-settings";
+import { type ProviderId } from "@/lib/studio-settings-logic";
 
 export type RemoteWorkspaceConfig = {
   baseUrl: string;
@@ -6,6 +6,8 @@ export type RemoteWorkspaceConfig = {
   githubToken?: string;
   provider?: ProviderId;
   providerApiKey?: string;
+  fallbackProvider?: ProviderId;
+  fallbackProviderApiKey?: string;
 };
 
 export type RemoteHealth = {
@@ -53,6 +55,8 @@ export type RepositoryQuality = {
   };
   reviews: { reviewerCount: number; approvedCount: number; requestedChangesCount: number };
 };
+
+const LOCAL_PROVIDER_IDS = new Set<ProviderId>(["ollama", "lmstudio", "custom"]);
 
 export function buildWorkspaceHeaders(config: RemoteWorkspaceConfig) {
   return {
@@ -142,10 +146,28 @@ export class RemoteWorkspaceClient {
     return this.request<RepositoryQuality>(`/api/v1/workspaces/${workspaceId}/git/quality`);
   }
 
-  requestAgentProposal(input: AgentRequest) {
-    return this.request<AgentProposal>("/api/v1/agent/proposals", {
+  private async requestAgentProposalDirect(input: AgentRequest) {
+    const response = await this.request<AgentProposal | { proposal: AgentProposal }>("/api/v1/agent/proposals", {
       method: "POST",
       body: JSON.stringify(input),
+    });
+    return "proposal" in response ? response.proposal : response;
+  }
+
+  requestAgentProposal(input: AgentRequest) {
+    return this.requestAgentProposalDirect(input).catch(async (error) => {
+      const provider = this.config.provider;
+      if (!provider || !LOCAL_PROVIDER_IDS.has(provider)) throw error;
+      const fallbackProvider = this.config.fallbackProvider ?? "gemini";
+      if (fallbackProvider === provider) throw error;
+      const fallbackClient = new RemoteWorkspaceClient({
+        ...this.config,
+        provider: fallbackProvider,
+        providerApiKey: this.config.fallbackProviderApiKey,
+        fallbackProvider: undefined,
+        fallbackProviderApiKey: undefined,
+      });
+      return fallbackClient.requestAgentProposalDirect(input);
     });
   }
 }

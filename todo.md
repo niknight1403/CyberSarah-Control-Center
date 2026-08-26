@@ -77,7 +77,7 @@
 - [ ] Veröffentlichung und Android-APK über die Publish-Oberfläche anstoßen.
 - [x] Verbundenes Ziel-Repository prüfen und für den Release-Workflow vorbereiten.
 - [ ] Android-Release für einen echten Geräte-Test vorbereiten und Publish-Handoff dokumentieren.
-- [ ] Release-Benachrichtigungen für relevante Statusänderungen ergänzen.
+- [x] Release-Benachrichtigungen für relevante Statusänderungen ergänzen.
 - [x] GitHub-Ziel `Niknight1403/CyberSarah Control Center` verifizieren und auf einen gültigen Repository-Namen abbilden.
 - [x] Aktuellen Release-Stand in das verifizierte Zielrepository pushen.
 - [x] Push-Ergebnis und Zielbranch bestätigen.
@@ -90,12 +90,15 @@
 - [x] todo.md mit dem tatsächlichen Projektstand abgleichen und veraltete offene Punkte korrigieren.
 - [ ] Android-APK-Erstellung über die Publish-Oberfläche anstoßen und den Build-Handoff abschließen.
 - [x] Media-Picker-, SecureStore- und Push-Benachrichtigungsabstraktionen mit deterministischen Tests absichern.
-- [ ] CI/CD-Release-Benachrichtigungen, strukturiertes Logging und Audit-Protokollierung ergänzen.
+- [x] CI/CD-Release-Benachrichtigungen, strukturiertes Logging und Audit-Protokollierung ergänzen.
 - [x] Release-Stand für den Publish-Handoff final validieren.
 - [x] CyberSarah Control Center für den Android-APK-Handoff über Publish vorbereiten und Release-Status validieren.
 - [x] Medienauswahl um Bildvorschauen, Dateityp-Fallbacks und Ladeanimationen für den mobilen Test-Flow erweitern.
 - [x] OpenAI, Google Gemini und OpenRouter als sichere, optional nutzbare Provider für den Agenten integrieren.
 - [x] Konfigurierten KI-Provider per sicherem Agenten-E2E-Test gegen den Workspace-Service validieren.
-- [ ] CI/CD-Audit- und Release-Status mit tokenfreiem Logging prüfen beziehungsweise abschließen.
-- [ ] Finalen Release-Commit und einen releasebereiten Checkpoint für Publish erstellen.
+- [x] CI/CD-Audit- und Release-Status mit tokenfreiem Logging prüfen beziehungsweise abschließen.
+- [x] Finalen Release-Commit und einen releasebereiten Checkpoint für Publish erstellen.
 - [x] Kostenlose oder Free-Tier-geeignete Entwicklungs-KI recherchieren und nur sicher integrierbare Provider in CyberSarah Control Center aufnehmen.
+- [x] Provider-Healthchecks, Auto-Binding und Graceful-Degradation für Cloud- und Local-AI validieren.
+- [x] CI/CD-Audit und Release-Benachrichtigungsstatus abschließen.
+- [x] Finalen Release-Commit erstellen und einen Publish-bereiten Checkpoint speichern.

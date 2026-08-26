@@ -1,8 +1,10 @@
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { createReleaseNotification, type ReleaseStatus } from "@/lib/release-notification-logic";
 import { getPushStatusMessage } from "@/lib/push-notifications-logic";
 export { getPushStatusMessage } from "@/lib/push-notifications-logic";
+export { createReleaseNotification, isTerminalReleaseStatus } from "@/lib/release-notification-logic";
 
 export type PushRegistrationResult = {
   supported: boolean;
@@ -50,6 +52,12 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
   } catch {
     return { supported: true, permission: "granted", token: null, reason: "registration-failed" };
   }
+}
+
+export async function notifyReleaseStatus(status: ReleaseStatus, detail?: string) {
+  if (Platform.OS === "web") return false;
+  await Notifications.scheduleNotificationAsync({ content: createReleaseNotification(status, detail), trigger: null });
+  return true;
 }
 
 export function subscribeToPushNotifications(handlers: PushNotificationHandlers = {}) {
