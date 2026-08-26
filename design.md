@@ -1,8 +1,8 @@
-# Custom AI Studio Mobile – Interface Design
+# CyberSarah Control Center – Interface Design
 
 ## Product intent
 
-Custom AI Studio Mobile is a **mobile control surface** for a repository-based development workspace. It brings the highest-frequency actions of a desktop-like coding environment into a deliberate, portrait-first flow: inspecting a project, reviewing and editing an active file, reading agent output, watching build activity, and securely configuring a remote workspace connection. The device does not attempt to execute untrusted repositories locally. Execution, hot reload, terminal commands, and repository mutation are delegated to an explicitly configured workspace service running on the user's own server.
+CyberSarah Control Center is a **mobile control surface** for a repository-based development workspace. It brings the highest-frequency actions of a desktop-like coding environment into a deliberate, portrait-first flow: inspecting a project, reviewing and editing an active file, reading agent output, watching build activity, and securely configuring a remote workspace connection. The device does not attempt to execute untrusted repositories locally. Execution, hot reload, terminal commands, and repository mutation are delegated to an explicitly configured workspace service running on the user's own server.
 
 The interaction model deliberately condenses the requested three-column desktop workspace into three persistent mobile destinations. This makes every primary action reachable with one thumb while retaining a clear conceptual mapping to the requested file explorer, editor, console, AI chat, and preview.
 

@@ -44,3 +44,10 @@
 - [ ] Mobile Optimierung für den Android-Build prüfen und erforderliche Anpassungen umsetzen.
 - [ ] Android-Build-Konfiguration für die APK-Erzeugung validieren.
 - [ ] GitHub-Zielrepository und Push-Workflow sicher vorbereiten.
+- [ ] Visuelle GitHub-Verbindungsstatusanzeige mit verbunden-, getrennt-, prüfend- und Fehlerzustand hinzufügen.
+- [ ] Manuelle GitHub-Statusprüfung ohne Anzeige sensibler Tokens anbinden.
+- [ ] GitHub-Statusanzeige deterministisch testen und checkpointen.
+- [ ] Mehrere optische Designrichtungen für die mobile Entwicklungsoberfläche als Mockup-Bilder erstellen.
+- [ ] Varianten klar beschriften und als Auswahl zur Designentscheidung bereitstellen.
+- [x] Systemname auf „CyberSarah Control Center“ umstellen und sichtbare Branding-Texte konsistent aktualisieren.
+- [x] App-Branding und Android-Konfiguration nach der Umbenennung validieren.
