@@ -103,3 +103,5 @@
 - [x] CI/CD-Audit und Release-Benachrichtigungsstatus abschließen.
 - [x] Finalen Release-Commit erstellen und einen Publish-bereiten Checkpoint speichern.
 - [x] Visuelle Anzeige für lokale KI, Cloud-Provider und aktiven Fallback in der Benutzeroberfläche ergänzen.
+- [x] Neueste CyberSarah-Control-Center-Änderungen zum verbundenen GitHub-Repository pushen und Remote-Stand verifizieren.
+- [ ] Android-APK-Erstellung für CyberSarah Control Center über Publish anstoßen und den Installations-Handoff übergeben.
