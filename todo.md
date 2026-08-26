@@ -140,4 +140,4 @@
 - [x] Überarbeiteten Backup-Bereich visuell und funktional regressionsprüfen
 - [x] Version 1.0.1 als konsistenten, getesteten und publishbereiten Release-Stand herstellen
 - [x] Übersprungenen auth.logout-Test aktivieren und die Cookie-Löschung vollständig validieren
-- [ ] Auth-Testkorrektur in das Zielrepository synchronisieren und Pull Request vorbereiten
+- [x] Auth-Testkorrektur in das Zielrepository synchronisieren und Pull Request vorbereiten
