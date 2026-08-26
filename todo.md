@@ -131,3 +131,6 @@
 - [x] Verschlüsseltes Settings-Backup für Cloud-API-Keys und lokale Provider-Endpoints exportieren
 - [x] Passwort- und Freigabebestätigung vor dem Teilen des Settings-Backups erzwingen
 - [x] Secret-Isolation, Backup-Integrität und native Share-Pipeline deterministisch testen
+- [x] Verschlüsselte Settings-Backups über die Dokumentenauswahl importieren und authentifizieren
+- [x] Importvorschau und explizite Bestätigung vor dem Überschreiben gespeicherter Provider-Daten ergänzen
+- [x] Restore-Persistenz, Manipulationserkennung und Picker-Abbruch deterministisch testen

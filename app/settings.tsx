@@ -6,7 +6,7 @@ import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studi
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
 import { type FieldValidation, validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
-import { getSettingsBackupShareConfirmation, isValidSettingsBackupPassword } from "@/lib/settings-backup";
+import { getSettingsBackupRestoreConfirmation, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, pickEncryptedSettingsBackup, previewEncryptedSettingsBackup, type SettingsBackupImportCandidate, type SettingsBackupPreview } from "@/lib/settings-backup";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -16,7 +16,7 @@ type LocalProviderId = "ollama" | "lmstudio";
 type EndpointTestState = "idle" | "checking" | "ready" | "error";
 
 export default function SettingsScreen() {
-  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, exportSettingsBackup, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings, testCloudProvider, testLocalProviderEndpoint } = useStudioSettings();
+  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, exportSettingsBackup, loading, readAttachedFile, restoreSettingsBackup, saveSettings, setProtectedChatContent, settings, testCloudProvider, testLocalProviderEndpoint } = useStudioSettings();
   const { loadRemoteFiles } = useWorkspace();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
@@ -41,6 +41,11 @@ export default function SettingsScreen() {
   const [backupPassphrase, setBackupPassphrase] = useState("");
   const [backupState, setBackupState] = useState<"idle" | "exporting" | "shared" | "error">("idle");
   const [backupMessage, setBackupMessage] = useState("");
+  const [importCandidate, setImportCandidate] = useState<SettingsBackupImportCandidate | null>(null);
+  const [importPreview, setImportPreview] = useState<SettingsBackupPreview | null>(null);
+  const [importPassphrase, setImportPassphrase] = useState("");
+  const [importState, setImportState] = useState<"idle" | "picking" | "ready" | "importing" | "restored" | "error">("idle");
+  const [importMessage, setImportMessage] = useState("");
 
   useEffect(() => {
     if (loading) return;
@@ -141,6 +146,75 @@ export default function SettingsScreen() {
       setBackupMessage(error instanceof Error ? error.message : "Das Settings-Backup konnte nicht erstellt werden.");
     } finally {
       setBackupPassphrase("");
+    }
+  };
+
+  const pickSettingsBackup = async () => {
+    if (Platform.OS === "web") {
+      setImportState("error");
+      setImportMessage("Der Settings-Import ist für die native App vorgesehen.");
+      return;
+    }
+    setImportState("picking");
+    setImportMessage("");
+    try {
+      const candidate = await pickEncryptedSettingsBackup();
+      if (!candidate) {
+        setImportState("idle");
+        return;
+      }
+      setImportCandidate(candidate);
+      setImportPreview(null);
+      setImportPassphrase("");
+      setImportState("ready");
+      setImportMessage("Datei ausgewählt. Gib jetzt das Backup-Passwort ein, um die Vorschau zu prüfen.");
+    } catch (error) {
+      setImportState("error");
+      setImportMessage(error instanceof Error ? error.message : "Die Backup-Datei konnte nicht ausgewählt werden.");
+    }
+  };
+
+  const inspectSettingsBackup = () => {
+    if (!importCandidate) return;
+    if (!isValidSettingsBackupPassword(importPassphrase)) {
+      setImportState("error");
+      setImportMessage("Das Backup-Passwort muss mindestens 12 Zeichen enthalten.");
+      return;
+    }
+    try {
+      const preview = previewEncryptedSettingsBackup(importCandidate.backup, importPassphrase);
+      setImportPreview(preview);
+      setImportState("ready");
+      setImportMessage("Integrität bestätigt. Prüfe die Vorschau, bevor vorhandene Werte überschrieben werden.");
+    } catch (error) {
+      setImportPreview(null);
+      setImportState("error");
+      setImportMessage(error instanceof Error ? error.message : "Passwort oder Backup-Datei sind ungültig.");
+    }
+  };
+
+  const confirmSettingsBackupImport = () => {
+    if (!importCandidate || !importPreview) return;
+    const confirmation = getSettingsBackupRestoreConfirmation(importPreview);
+    Alert.alert(confirmation.title, confirmation.message, [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Jetzt wiederherstellen", style: "destructive", onPress: () => void performSettingsBackupImport() },
+    ]);
+  };
+
+  const performSettingsBackupImport = async () => {
+    if (!importCandidate || !importPreview) return;
+    setImportState("importing");
+    setImportMessage("");
+    try {
+      const result = await restoreSettingsBackup(importCandidate.backup, importPassphrase);
+      setImportState("restored");
+      setImportMessage(`${result.providerIds.length} Cloud-Key${result.providerIds.length === 1 ? "" : "s"} und ${result.endpointCount} lokale Endpoint${result.endpointCount === 1 ? "" : "s"} wurden wiederhergestellt. Service- und GitHub-Tokens blieben unverändert.`);
+    } catch (error) {
+      setImportState("error");
+      setImportMessage(error instanceof Error ? error.message : "Das Settings-Backup konnte nicht wiederhergestellt werden.");
+    } finally {
+      setImportPassphrase("");
     }
   };
 
@@ -266,6 +340,19 @@ export default function SettingsScreen() {
           <TouchableOpacity accessibilityLabel="Verschlüsseltes Settings-Backup erstellen und teilen" accessibilityRole="button" activeOpacity={0.75} disabled={backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)} onPress={confirmSettingsBackupExport} style={[styles.backupButton, (backupState === "exporting" || !isValidSettingsBackupPassword(backupPassphrase)) && styles.endpointTestButtonDisabled]}><IconSymbol name="lock.fill" size={15} color="#061019" /><Text style={styles.backupButtonText}>{backupState === "exporting" ? "Backup wird erstellt …" : "Verschlüsseltes Backup teilen"}</Text></TouchableOpacity>
           {backupState === "shared" || backupState === "error" ? <View style={[styles.backupFeedback, backupState === "shared" ? styles.backupFeedbackReady : styles.backupFeedbackError]}><IconSymbol name={backupState === "shared" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"} size={15} color={backupState === "shared" ? "#45D996" : "#FF6B7A"} /><Text style={[styles.backupFeedbackText, backupState === "shared" ? styles.backupFeedbackTextReady : styles.backupFeedbackTextError]}>{backupMessage}</Text></View> : null}
         </View>
+        <View style={styles.importCard}>
+          <Text style={styles.importTitle}>Backup wiederherstellen</Text>
+          <Text style={styles.fieldHint}>Wähle eine verschlüsselte .csc-backup-Datei aus. Erst nach korrektem Passwort und deiner Bestätigung werden die enthaltenen Provider-Keys und Endpoints übernommen.</Text>
+          <TouchableOpacity accessibilityLabel="Verschlüsseltes Settings-Backup auswählen" accessibilityRole="button" activeOpacity={0.75} disabled={importState === "picking" || importState === "importing"} onPress={() => void pickSettingsBackup()} style={styles.importPickerButton}><IconSymbol name="folder.fill" size={15} color="#B4A8FF" /><Text style={styles.importPickerButtonText}>{importState === "picking" ? "Datei wird ausgewählt …" : importCandidate ? "Andere Backup-Datei auswählen" : "Backup-Datei auswählen"}</Text></TouchableOpacity>
+          {importCandidate ? <>
+            <View style={styles.importFileRow}><IconSymbol name="doc.fill" size={15} color="#8B7CFF" /><Text style={styles.importFileText} numberOfLines={1}>{importCandidate.filename}</Text></View>
+            <Text style={styles.fieldLabel}>BACKUP-PASSWORT</Text>
+            <TextInput accessibilityHint="Mindestens 12 Zeichen. Das Passwort wird nicht gespeichert." accessibilityLabel="Passwort für Backup-Import" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setImportPassphrase(value); setImportPreview(null); setImportState("ready"); setImportMessage(""); }} placeholder="Passwort der Backup-Datei" placeholderTextColor="#697A90" secureTextEntry style={styles.input} value={importPassphrase} />
+            <TouchableOpacity accessibilityLabel="Backup-Passwort prüfen" accessibilityRole="button" activeOpacity={0.75} disabled={!isValidSettingsBackupPassword(importPassphrase) || importState === "importing"} onPress={inspectSettingsBackup} style={[styles.importInspectButton, (!isValidSettingsBackupPassword(importPassphrase) || importState === "importing") && styles.endpointTestButtonDisabled]}><IconSymbol name="lock.open.fill" size={15} color="#061019" /><Text style={styles.importInspectButtonText}>Backup prüfen</Text></TouchableOpacity>
+            {importPreview ? <View style={styles.importPreviewCard}><Text style={styles.importPreviewTitle}>Vorschau bestätigt</Text><Text style={styles.importPreviewText}>{importPreview.providerIds.length} Cloud-Key{importPreview.providerIds.length === 1 ? "" : "s"} · {importPreview.endpointCount} lokale Endpoint{importPreview.endpointCount === 1 ? "" : "s"}</Text><Text style={styles.importPreviewHint}>Keine Service- oder GitHub-Tokens enthalten</Text><TouchableOpacity accessibilityLabel="Verifiziertes Settings-Backup wiederherstellen" accessibilityRole="button" activeOpacity={0.75} disabled={importState === "importing"} onPress={confirmSettingsBackupImport} style={[styles.restoreButton, importState === "importing" && styles.endpointTestButtonDisabled]}><IconSymbol name="arrow.down.circle.fill" size={15} color="#061019" /><Text style={styles.restoreButtonText}>{importState === "importing" ? "Wird wiederhergestellt …" : "Jetzt wiederherstellen"}</Text></TouchableOpacity></View> : null}
+          </> : null}
+          {importMessage ? <View style={[styles.backupFeedback, importState === "restored" ? styles.backupFeedbackReady : importState === "error" ? styles.backupFeedbackError : styles.backupFeedbackChecking]}><IconSymbol name={importState === "restored" ? "checkmark.circle.fill" : importState === "error" ? "exclamationmark.triangle.fill" : "bolt.fill"} size={15} color={importState === "restored" ? "#45D996" : importState === "error" ? "#FF6B7A" : "#52D8FF"} /><Text style={[styles.backupFeedbackText, importState === "restored" ? styles.backupFeedbackTextReady : importState === "error" ? styles.backupFeedbackTextError : styles.backupFeedbackTextChecking]}>{importMessage}</Text></View> : null}
+        </View>
         {Platform.OS === "web" ? <View style={styles.webWarning}><IconSymbol name="exclamationmark.triangle.fill" size={17} color="#F6BA5E" /><Text style={styles.webWarningText}>Im Web-Build werden eingegebene Schlüssel nur in der Browser-Sitzung gehalten. Nutze für produktive Schlüssel die native App oder die serverseitige Provider-Konfiguration.</Text></View> : null}
         <View style={styles.saveArea}>
           <View style={[styles.readinessCard, canSave ? styles.readinessCardReady : styles.readinessCardPending]}>
@@ -351,9 +438,25 @@ const styles = StyleSheet.create({
   backupFeedback: { alignItems: "flex-start", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
   backupFeedbackReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.32)" },
   backupFeedbackError: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.32)" },
+  backupFeedbackChecking: { backgroundColor: "rgba(82,216,255,0.09)", borderColor: "rgba(82,216,255,0.30)" },
   backupFeedbackText: { flex: 1, fontSize: 12, lineHeight: 17 },
   backupFeedbackTextReady: { color: "#70E4AA" },
   backupFeedbackTextError: { color: "#FF9AA4" },
+  backupFeedbackTextChecking: { color: "#86DFFF" },
+  importCard: { backgroundColor: "#0F1723", borderColor: "#26364B", borderRadius: 15, borderWidth: 1, marginTop: 14, padding: 13 },
+  importTitle: { color: "#EDF3FB", fontSize: 14, fontWeight: "800", marginBottom: 6 },
+  importPickerButton: { alignItems: "center", borderColor: "#625A9B", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, justifyContent: "center", minHeight: 44, paddingHorizontal: 12 },
+  importPickerButtonText: { color: "#C6BFFF", fontSize: 12, fontWeight: "800" },
+  importFileRow: { alignItems: "center", backgroundColor: "#151F2E", borderRadius: 10, flexDirection: "row", gap: 7, marginTop: 10, paddingHorizontal: 10, paddingVertical: 9 },
+  importFileText: { color: "#DCE8F4", flex: 1, fontSize: 12, fontWeight: "700" },
+  importInspectButton: { alignItems: "center", backgroundColor: "#8B7CFF", borderRadius: 11, flexDirection: "row", gap: 7, justifyContent: "center", marginTop: 11, minHeight: 44, paddingHorizontal: 12 },
+  importInspectButtonText: { color: "#0B0F18", fontSize: 12, fontWeight: "900" },
+  importPreviewCard: { backgroundColor: "#12251F", borderColor: "#3B8E68", borderRadius: 12, borderWidth: 1, marginTop: 12, padding: 11 },
+  importPreviewTitle: { color: "#70E4AA", fontSize: 12, fontWeight: "900" },
+  importPreviewText: { color: "#DCEFE4", fontSize: 12, fontWeight: "800", marginTop: 5 },
+  importPreviewHint: { color: "#94C9AB", fontSize: 11, lineHeight: 16, marginTop: 4 },
+  restoreButton: { alignItems: "center", backgroundColor: "#70E4AA", borderRadius: 10, flexDirection: "row", gap: 7, justifyContent: "center", marginTop: 10, minHeight: 44, paddingHorizontal: 12 },
+  restoreButtonText: { color: "#07130D", fontSize: 12, fontWeight: "900" },
   clearAction: { alignSelf: "flex-start", marginTop: 10 },
   clearActionText: { color: "#FF8792", fontSize: 12, fontWeight: "800" },
   providerRow: { alignItems: "center", backgroundColor: "#121823", borderColor: "#243247", borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 11, marginBottom: 8, padding: 12 },

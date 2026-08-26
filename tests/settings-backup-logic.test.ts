@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEncryptedSettingsBackup, getEncryptedSettingsBackupPreview, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, verifyEncryptedSettingsBackup } from "../lib/settings-backup-logic";
+import { createEncryptedSettingsBackup, decryptEncryptedSettingsBackup, getEncryptedSettingsBackupPreview, getSettingsBackupRestoreConfirmation, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, verifyEncryptedSettingsBackup } from "../lib/settings-backup-logic";
 
 const input = {
   providerKeys: { openai: "sk-test-secret", gemini: "AIza-test-secret" },
@@ -29,6 +29,17 @@ describe("settings backup logic", () => {
     const backup = createEncryptedSettingsBackup(input);
     expect(getEncryptedSettingsBackupPreview(backup, input.passphrase)).toEqual({ createdAt: input.createdAt, providerIds: ["openai", "gemini"], endpointCount: 2 });
     expect(verifyEncryptedSettingsBackup(backup, "wrong password").valid).toBe(false);
+  });
+
+  it("decrypts only after authentication and returns restorable values", () => {
+    const backup = createEncryptedSettingsBackup(input);
+    expect(decryptEncryptedSettingsBackup(backup, input.passphrase)).toMatchObject({
+      providerKeys: input.providerKeys,
+      localProviderEndpoints: input.localProviderEndpoints,
+      preview: { providerIds: ["openai", "gemini"], endpointCount: 2 },
+    });
+    expect(() => decryptEncryptedSettingsBackup(backup, "wrong password")).toThrow("nicht sicher verifiziert");
+    expect(getSettingsBackupRestoreConfirmation({ createdAt: input.createdAt, providerIds: ["openai"], endpointCount: 2 }).message).toContain("Service- und GitHub-Tokens bleiben unverändert");
   });
 
   it("detects tampering and warns not to share the password with the file", () => {

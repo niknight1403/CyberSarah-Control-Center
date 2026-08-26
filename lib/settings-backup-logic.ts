@@ -1,5 +1,6 @@
 import CryptoJS from "crypto-js";
-import type { LocalProviderEndpoints } from "./studio-settings-logic";
+import { providerDefaults, normalizeLocalProviderEndpoints, type LocalProviderEndpoints, type ProviderId } from "./studio-settings-logic";
+import { validateLocalProviderEndpoint } from "./settings-validation";
 
 export const SETTINGS_BACKUP_FORMAT = "cybersarah-control-center.encrypted-settings-backup";
 export const SETTINGS_BACKUP_VERSION = 1;
@@ -29,6 +30,12 @@ export type SettingsBackupPreview = {
 
 export type SettingsBackupVerification = { valid: boolean; reason?: string };
 
+export type RestoredSettingsBackup = {
+  providerKeys: Partial<Record<ProviderId, string>>;
+  localProviderEndpoints: LocalProviderEndpoints;
+  preview: SettingsBackupPreview;
+};
+
 function bytesToWordArray(bytes: Uint8Array) {
   const words: number[] = [];
   for (let index = 0; index < bytes.length; index += 1) {
@@ -53,14 +60,14 @@ function createMacPayload(backup: Omit<EncryptedSettingsBackup, "cipher"> & { ci
   return [backup.format, backup.version, backup.createdAt, backup.kdf.name, backup.kdf.iterations, backup.kdf.salt, backup.cipher.name, backup.cipher.iv, backup.cipher.ciphertext].join("|");
 }
 
-function isEncryptedSettingsBackup(value: unknown): value is EncryptedSettingsBackup {
+export function isSupportedEncryptedSettingsBackup(value: unknown): value is EncryptedSettingsBackup {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<EncryptedSettingsBackup>;
   return candidate.format === SETTINGS_BACKUP_FORMAT && candidate.version === SETTINGS_BACKUP_VERSION && typeof candidate.createdAt === "string" && candidate.kdf?.name === "PBKDF2-SHA256" && typeof candidate.kdf.iterations === "number" && typeof candidate.kdf.salt === "string" && candidate.cipher?.name === "AES-256-CBC+HMAC-SHA256" && typeof candidate.cipher.iv === "string" && typeof candidate.cipher.ciphertext === "string" && typeof candidate.cipher.mac === "string";
 }
 
 function getVerifiedBackup(backup: unknown, passphrase: string) {
-  if (!isEncryptedSettingsBackup(backup) || !isValidSettingsBackupPassword(passphrase)) return null;
+  if (!isSupportedEncryptedSettingsBackup(backup) || !isValidSettingsBackupPassword(passphrase)) return null;
   try {
     const salt = CryptoJS.enc.Base64.parse(backup.kdf.salt);
     const { macKey } = deriveKeys(passphrase, salt);
@@ -80,6 +87,13 @@ export function getSettingsBackupShareConfirmation() {
   return {
     title: "Verschlüsseltes Provider-Backup teilen?",
     message: "Die Datei enthält Cloud-API-Keys und lokale Provider-URLs. Sie ist mit deinem Passwort verschlüsselt. Teile sie nur über einen vertrauenswürdigen Kanal und sende das Passwort niemals zusammen mit der Datei.",
+  };
+}
+
+export function getSettingsBackupRestoreConfirmation(preview: SettingsBackupPreview) {
+  return {
+    title: "Provider-Konfiguration wiederherstellen?",
+    message: `${preview.providerIds.length} Cloud-Key${preview.providerIds.length === 1 ? "" : "s"} und ${preview.endpointCount} lokale Endpoint${preview.endpointCount === 1 ? "" : "s"} werden aus dem verifizierten Backup übernommen. Vorhandene Werte für dieselben Provider werden überschrieben; Service- und GitHub-Tokens bleiben unverändert.`,
   };
 }
 
@@ -105,24 +119,52 @@ export function createEncryptedSettingsBackup(input: { providerKeys: Record<stri
 }
 
 export function verifyEncryptedSettingsBackup(backup: unknown, passphrase: string): SettingsBackupVerification {
-  if (!isEncryptedSettingsBackup(backup)) return { valid: false, reason: "Das Settings-Backup-Format ist ungültig oder wird nicht unterstützt." };
+  if (!isSupportedEncryptedSettingsBackup(backup)) return { valid: false, reason: "Das Settings-Backup-Format ist ungültig oder wird nicht unterstützt." };
   if (!isValidSettingsBackupPassword(passphrase)) return { valid: false, reason: "Das Backup-Passwort ist ungültig." };
   return getVerifiedBackup(backup, passphrase) ? { valid: true } : { valid: false, reason: "Integritätsprüfung fehlgeschlagen. Datei oder Passwort stimmen nicht überein." };
 }
 
-export function getEncryptedSettingsBackupPreview(backup: unknown, passphrase: string): SettingsBackupPreview {
+function decryptVerifiedBackupPayload(verifiedBackup: EncryptedSettingsBackup, passphrase: string) {
+  const salt = CryptoJS.enc.Base64.parse(verifiedBackup.kdf.salt);
+  const iv = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.iv);
+  const ciphertext = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.ciphertext);
+  const { encryptionKey } = deriveKeys(passphrase, salt);
+  const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext });
+  const plaintext = CryptoJS.AES.decrypt(cipherParams, encryptionKey, { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }).toString(CryptoJS.enc.Utf8);
+  const payload = JSON.parse(plaintext) as Partial<SettingsBackupPayload>;
+  const providerKeyPayload = payload.providerKeys;
+  const endpointPayload = payload.localProviderEndpoints;
+  if (payload.scope !== "provider-settings" || !providerKeyPayload || typeof providerKeyPayload !== "object" || !endpointPayload || typeof endpointPayload !== "object") throw new Error("Das Settings-Backup enthält keinen unterstützten Provider-Konfigurationsumfang.");
+  return { ...payload, providerKeys: providerKeyPayload, localProviderEndpoints: endpointPayload };
+}
+
+function getRestoredBackup(backup: unknown, passphrase: string): RestoredSettingsBackup {
   const verifiedBackup = getVerifiedBackup(backup, passphrase);
   if (!verifiedBackup) throw new Error("Das Settings-Backup konnte nicht sicher verifiziert werden.");
   try {
-    const salt = CryptoJS.enc.Base64.parse(verifiedBackup.kdf.salt);
-    const iv = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.iv);
-    const ciphertext = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.ciphertext);
-    const { encryptionKey } = deriveKeys(passphrase, salt);
-    const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext });
-    const plaintext = CryptoJS.AES.decrypt(cipherParams, encryptionKey, { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }).toString(CryptoJS.enc.Utf8);
-    const payload = JSON.parse(plaintext) as Partial<SettingsBackupPayload>;
-    return { createdAt: typeof payload.createdAt === "string" ? payload.createdAt : verifiedBackup.createdAt, providerIds: payload.providerKeys && typeof payload.providerKeys === "object" ? Object.keys(payload.providerKeys) : [], endpointCount: payload.localProviderEndpoints && typeof payload.localProviderEndpoints === "object" ? Object.values(payload.localProviderEndpoints).filter((endpoint) => typeof endpoint === "string" && endpoint.length > 0).length : 0 };
-  } catch {
-    throw new Error("Das verifizierte Settings-Backup enthält keine lesbare Vorschau.");
+    const payload = decryptVerifiedBackupPayload(verifiedBackup, passphrase);
+    const providerKeys: Partial<Record<ProviderId, string>> = {};
+    const providerKeyPayload = payload.providerKeys ?? {};
+    for (const [provider, key] of Object.entries(providerKeyPayload)) {
+      if (Object.hasOwn(providerDefaults, provider) && typeof key === "string" && key.trim().length > 0 && key.length <= 512) providerKeys[provider as ProviderId] = key.trim();
+    }
+    const endpointPayload = (payload.localProviderEndpoints ?? {}) as Partial<LocalProviderEndpoints>;
+    const localProviderEndpoints = normalizeLocalProviderEndpoints({ ollama: typeof endpointPayload.ollama === "string" ? endpointPayload.ollama : undefined, lmstudio: typeof endpointPayload.lmstudio === "string" ? endpointPayload.lmstudio : undefined });
+    for (const [endpoint, label] of [[localProviderEndpoints.ollama, "Ollama"], [localProviderEndpoints.lmstudio, "LM Studio"]] as const) {
+      if (!validateLocalProviderEndpoint(endpoint, label).valid) throw new Error(`Das Backup enthält eine ungültige ${label}-Endpoint-URL.`);
+    }
+    const preview: SettingsBackupPreview = { createdAt: typeof payload.createdAt === "string" ? payload.createdAt : verifiedBackup.createdAt, providerIds: Object.keys(providerKeys), endpointCount: Object.values(localProviderEndpoints).filter(Boolean).length };
+    return { providerKeys, localProviderEndpoints, preview };
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Backup")) throw error;
+    throw new Error("Das verifizierte Settings-Backup enthält keine gültige Provider-Konfiguration.");
   }
+}
+
+export function decryptEncryptedSettingsBackup(backup: unknown, passphrase: string): RestoredSettingsBackup {
+  return getRestoredBackup(backup, passphrase);
+}
+
+export function getEncryptedSettingsBackupPreview(backup: unknown, passphrase: string): SettingsBackupPreview {
+  return getRestoredBackup(backup, passphrase).preview;
 }
