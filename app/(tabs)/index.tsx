@@ -1,7 +1,9 @@
 import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
+import { NextStepGuide } from "@/components/studio/next-step-guide";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { getDevelopmentGuidance, type DevelopmentGuidanceAction } from "@/lib/development-guidance-logic";
 import { getFileDiffSummaries } from "@/lib/file-diff-logic";
 import { getProtectedBranchWarning, isProtectedBranch } from "@/lib/protected-branch-logic";
 import type { RemoteHealth, RepositoryQuality } from "@/lib/remote-workspace-client";
@@ -40,10 +42,12 @@ export default function WorkspaceScreen() {
   const [healthCheckedAt, setHealthCheckedAt] = useState<string | null>(null);
   const [remoteAhead, setRemoteAhead] = useState(false);
   const [remoteCheckAvailable, setRemoteCheckAvailable] = useState(true);
+  const [guidanceFeedback, setGuidanceFeedback] = useState("");
   const changedRemoteFiles = useMemo(() => files.filter((file) => file.changed && file.remote), [files]);
   const diffSummaries = useMemo(() => getFileDiffSummaries(changedRemoteFiles.map((file) => ({ path: file.path, before: file.remoteContent ?? "", after: file.content }))), [changedRemoteFiles]);
   const currentBranchIsProtected = isProtectedBranch(settings.branch);
   const syncState = getWorkspaceSyncState(changedRemoteFiles.length, remoteAhead);
+  const guidance = useMemo(() => getDevelopmentGuidance({ hasWorkspaceService, hasRepository: hasAttachedRepository, changedFileCount: changedRemoteFiles.length, hasConflictRisk: syncState.hasConflictRisk, serviceHealthy: healthState === "ready" && serviceHealth?.status === "ready", ciState: qualityState, ciFailed: quality?.ci.failed ?? 0, branch: settings.branch, lastGitAction: gitAction }), [changedRemoteFiles.length, gitAction, hasAttachedRepository, hasWorkspaceService, healthState, quality?.ci.failed, qualityState, serviceHealth?.status, settings.branch, syncState.hasConflictRisk]);
 
   const refreshHealth = useCallback(async () => {
     if (!hasWorkspaceService) return;
@@ -180,6 +184,40 @@ export default function WorkspaceScreen() {
     }
   };
 
+  const handleGuidanceAction = (action: DevelopmentGuidanceAction) => {
+    setGuidanceFeedback("");
+    if (action === "settings") {
+      router.push("/settings" as never);
+      return;
+    }
+    if (action === "agent") {
+      router.push("/agent" as never);
+      return;
+    }
+    if (action === "health") {
+      void refreshHealth();
+      setGuidanceFeedback("Die Service-Diagnose wird aktualisiert.");
+      return;
+    }
+    if (action === "repository") {
+      void refreshRepository();
+      setGuidanceFeedback("Branch-, Commit- und Qualitätsdaten werden aktualisiert.");
+      return;
+    }
+    if (action === "quality") {
+      void refreshQuality();
+      setGuidanceFeedback("Die CI-Qualität wird aktualisiert.");
+      return;
+    }
+    const firstChangedFile = changedRemoteFiles[0];
+    if (firstChangedFile) {
+      selectFile(firstChangedFile.id);
+      setGuidanceFeedback(`„${firstChangedFile.name}“ ist ausgewählt. Die Diff-Vorschau und Commit-Leiste folgen im Editorbereich.`);
+    } else {
+      setGuidanceFeedback("Keine lokalen Remote-Änderungen zum Prüfen vorhanden.");
+    }
+  };
+
   return (
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <FlatList
@@ -189,6 +227,7 @@ export default function WorkspaceScreen() {
         ListHeaderComponent={
           <>
             <StudioHeader eyebrow="Custom AI Studio" title="Workspace" actionIcon="gearshape.fill" actionLabel="Workspace-Einstellungen" onAction={() => router.push("/settings" as never)} />
+            <NextStepGuide actionMessage={guidanceFeedback} completion={guidance.completion} guidance={guidance} onAction={handleGuidanceAction} />
             <View style={styles.projectCard}>
               <View style={styles.projectTopLine}>
                 <View style={styles.projectIdentity}>

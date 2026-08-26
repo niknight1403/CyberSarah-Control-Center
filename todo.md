@@ -34,3 +34,6 @@
 - [x] Sprint 8: Add offline draft state and remote-conflict warnings.
 - [x] Sprint 9: Add integrity verification and restore preview for encrypted support backups.
 - [x] Sprint 10: Add a consolidated quality dashboard and mobile robustness improvements.
+- [x] Manus-inspirierte „Nächste sinnvolle Schritte“-Karten für den Entwicklungsbereich hinzufügen.
+- [x] Kontextabhängige Aufgabenempfehlungen mit explizitem Starten und Abschließen umsetzen.
+- [x] Android-taugliche Interaktionen und 44pt-Touch-Ziele für die neue Entwicklungsführung validieren.
