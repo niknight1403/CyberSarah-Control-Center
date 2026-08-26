@@ -87,6 +87,14 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
+      "expo-notifications",
+      {
+        color: "#8B7CFF",
+        defaultChannel: "default",
+        enableBackgroundRemoteNotifications: false,
+      },
+    ],
+    [
       "expo-secure-store",
       {
         configureAndroidBackup: true,

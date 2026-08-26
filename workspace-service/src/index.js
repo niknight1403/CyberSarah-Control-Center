@@ -43,6 +43,44 @@ const agentSchema = z.object({
   prompt: z.string().min(1).max(8_000),
   activeFile: z.string().max(500).optional(),
 });
+const auditEventSchema = z.object({
+  eventId: z.string().min(1).max(160),
+  action: z.enum(["build", "test", "commit", "push", "pull_request", "ci", "release"]),
+  status: z.enum(["started", "passed", "failed", "cancelled"]),
+  repository: z.string().max(300).optional(),
+  branch: z.string().max(120).optional(),
+  commitSha: z.string().max(80).optional(),
+  runId: z.string().max(160).optional(),
+  message: z.string().max(1_000).optional(),
+  metadata: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  occurredAt: z.string().datetime().optional(),
+});
+
+const auditLogFile = path.resolve(process.env.EXTERNAL_ACTION_AUDIT_LOG ?? path.join(workspacesDirectory, "external-actions.jsonl"));
+const externalActionAuditService = {
+  sanitize(event) {
+    const metadata = event.metadata ? Object.fromEntries(Object.entries(event.metadata).map(([key, value]) => [key, /(token|secret|password|authorization|cookie|api[-_]?key)/i.test(key) ? "[REDACTED]" : value])) : undefined;
+    return { ...event, metadata, occurredAt: event.occurredAt ?? new Date().toISOString() };
+  },
+  async record(event) {
+    const safeEvent = this.sanitize(event);
+    try {
+      await fs.mkdir(path.dirname(auditLogFile), { recursive: true });
+      await fs.appendFile(auditLogFile, `${JSON.stringify(safeEvent)}\\n`, "utf8");
+    } catch (error) {
+      console.warn(JSON.stringify({ scope: "externalActionAuditService", status: "local-log-failed", message: error instanceof Error ? error.message : "unknown" }));
+    }
+    const sink = process.env.EXTERNAL_ACTION_AUDIT_URL?.trim();
+    if (sink) {
+      try {
+        await fetch(sink, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(safeEvent), signal: AbortSignal.timeout(3_000) });
+      } catch (error) {
+        console.warn(JSON.stringify({ scope: "externalActionAuditService", status: "sink-failed", message: error instanceof Error ? error.message : "unknown" }));
+      }
+    }
+    return safeEvent;
+  },
+};
 
 function isServiceAuthorized(request) {
   if (!serviceAccessToken) return process.env.NODE_ENV !== "production";
@@ -469,6 +507,7 @@ app.post("/api/v1/workspaces/:workspaceId/git/commit", requireServiceAuthorizati
     await git(["add", "--all"], workspacePath, getGitHubToken(request));
     const { stdout } = await git(["-c", `user.name=${gitCommitAuthorName}`, "-c", `user.email=${gitCommitAuthorEmail}`, "commit", "-m", message], workspacePath, getGitHubToken(request));
     const { stdout: hash } = await git(["rev-parse", "--short", "HEAD"], workspacePath, getGitHubToken(request));
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "commit", status: "passed", branch: (await git(["branch", "--show-current"], workspacePath, getGitHubToken(request))).stdout.trim(), commitSha: hash.trim(), message: "Lokaler Commit erstellt." });
     response.json({ committed: true, hash: hash.trim(), output: stdout });
   } catch (error) {
     next(error);
@@ -481,6 +520,8 @@ app.post("/api/v1/workspaces/:workspaceId/git/push", requireServiceAuthorization
     const { stdout: branchOutput } = await git(["branch", "--show-current"], workspacePath, getGitHubToken(request));
     const branch = branchNameSchema.parse(branchOutput.trim());
     const { stdout } = await git(["push", "origin", `HEAD:refs/heads/${branch}`], workspacePath, getGitHubToken(request));
+    const { stdout: commitSha } = await git(["rev-parse", "HEAD"], workspacePath, getGitHubToken(request));
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "push", status: "passed", branch, commitSha: commitSha.trim(), message: "Branch erfolgreich zum Remote übertragen." });
     response.json({ pushed: true, branch, output: stdout });
   } catch (error) {
     next(error);
@@ -501,7 +542,18 @@ app.post("/api/v1/workspaces/:workspaceId/git/pull-request", requireServiceAutho
       head: headBranch,
       base: input.baseBranch,
     });
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "pull_request", status: "passed", branch: headBranch, message: `Pull Request #${pullRequest.number} erstellt.` });
     response.status(201).json({ ...pullRequest, headBranch, baseBranch: input.baseBranch });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/v1/audit/external-action", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const input = auditEventSchema.parse(request.body);
+    const event = await externalActionAuditService.record(input);
+    response.status(202).json({ accepted: true, eventId: event.eventId });
   } catch (error) {
     next(error);
   }

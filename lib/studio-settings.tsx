@@ -1,9 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
 import { toPersistedStudioSettings, type ProviderId } from "@/lib/studio-settings-logic";
-import * as SecureStore from "expo-secure-store";
+import { secureSessionStore } from "@/lib/secure-session-store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Platform } from "react-native";
 
 const PREFERENCES_KEY = "custom-ai-studio.preferences.v1";
 const SERVICE_ACCESS_TOKEN_KEY = "custom-ai-studio.service-access-token.v1";
@@ -52,29 +51,19 @@ const defaultSettings: StudioSettings = {
 };
 
 async function writeSecureValue(key: string, value: string) {
-  if (Platform.OS === "web") {
-    if (typeof sessionStorage !== "undefined") sessionStorage.setItem(key, value);
-    return;
-  }
-  await SecureStore.setItemAsync(key, value);
+  await secureSessionStore.set(key, value);
 }
 
 async function deleteSecureValue(key: string) {
-  if (Platform.OS === "web") {
-    if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(key);
-    return;
-  }
-  await SecureStore.deleteItemAsync(key);
+  await secureSessionStore.remove(key);
 }
 
 async function hasSecureValue(key: string) {
-  if (Platform.OS === "web") return typeof sessionStorage !== "undefined" && Boolean(sessionStorage.getItem(key));
-  return Boolean(await SecureStore.getItemAsync(key));
+  return secureSessionStore.has(key);
 }
 
 async function readSecureValue(key: string) {
-  if (Platform.OS === "web") return typeof sessionStorage !== "undefined" ? sessionStorage.getItem(key) : null;
-  return SecureStore.getItemAsync(key);
+  return secureSessionStore.get(key);
 }
 
 type StudioSettingsContextValue = {

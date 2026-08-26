@@ -89,3 +89,7 @@
 - [x] Aufgaben- und Issue-Übersicht für `next-development` aus GitHub und dem lokalen Projektregister erstellen.
 - [x] todo.md mit dem tatsächlichen Projektstand abgleichen und veraltete offene Punkte korrigieren.
 - [ ] Android-APK-Erstellung über die Publish-Oberfläche anstoßen und den Build-Handoff abschließen.
+- [ ] Media-Picker-, SecureStore- und Push-Benachrichtigungsabstraktionen mit deterministischen Tests absichern.
+- [ ] CI/CD-Release-Benachrichtigungen, strukturiertes Logging und Audit-Protokollierung ergänzen.
+- [x] Release-Stand für den Publish-Handoff final validieren.
+- [x] CyberSarah Control Center für den Android-APK-Handoff über Publish vorbereiten und Release-Status validieren.
