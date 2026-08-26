@@ -69,3 +69,6 @@
 - [x] Connectoren im Bereich „Skills & Connectoren“ einzeln konfigurierbar machen.
 - [x] Connector-Konfigurationen sicher speichern und Tokenwerte niemals anzeigen.
 - [x] Individuelle Connector-Zustände, Bearbeiten und Deaktivieren testen.
+- [x] Verbindungstest für Workspace-Service, GitHub und KI-Provider ergänzen.
+- [x] Teststatus mit Laden, Erfolg und verständlichem Fehler je Connector anzeigen.
+- [x] Verbindungstests ohne Token-Leaks deterministisch validieren.
