@@ -126,3 +126,4 @@
 - [x] Sprint 19: Vollständige Qualitäts- und Regressionstests ausführen
 - [x] Sprint 20: Android-Release-Preflight und Installations-Handoff vorbereiten
 - [x] Nächsten Release-Preflight ausführen und neuen Publish-Checkpoint erstellen
+- [x] Publish-Warnung „nicht gepackte Änderungen“ für Version 1.0.1 beheben und Packstatus erneut validieren
