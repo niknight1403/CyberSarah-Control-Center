@@ -40,24 +40,24 @@
 - [x] Detaillierte Code-Diff-Vorschau für vorgeschlagene Schritte vor der Ausführung hinzufügen.
 - [x] Explizite Bestätigung oder Abbruch der empfohlenen Aktion nach Diff-Prüfung umsetzen.
 - [x] Diff-Vorschau und Bestätigungsablauf deterministisch testen und für mobile Bedienung validieren.
-- [ ] Aktueller Sprint: Neustart-Button für den Entwicklungsserver mit Bestätigung, Ladezustand und Statusfeedback abschließen.
-- [ ] Mobile Optimierung für den Android-Build prüfen und erforderliche Anpassungen umsetzen.
+- [x] Aktueller Sprint: Neustart-Button für den Entwicklungsserver mit Bestätigung, Ladezustand und Statusfeedback abschließen.
+- [x] Mobile Optimierung für den Android-Build prüfen und erforderliche Anpassungen umsetzen.
 - [x] Android-Build-Konfiguration für die APK-Erzeugung validieren.
-- [ ] GitHub-Zielrepository und Push-Workflow sicher vorbereiten.
-- [ ] Visuelle GitHub-Verbindungsstatusanzeige mit verbunden-, getrennt-, prüfend- und Fehlerzustand hinzufügen.
-- [ ] Manuelle GitHub-Statusprüfung ohne Anzeige sensibler Tokens anbinden.
-- [ ] GitHub-Statusanzeige deterministisch testen und checkpointen.
-- [ ] Mehrere optische Designrichtungen für die mobile Entwicklungsoberfläche als Mockup-Bilder erstellen.
-- [ ] Varianten klar beschriften und als Auswahl zur Designentscheidung bereitstellen.
+- [x] GitHub-Zielrepository und Push-Workflow sicher vorbereiten.
+- [x] Visuelle GitHub-Verbindungsstatusanzeige mit verbunden-, getrennt-, prüfend- und Fehlerzustand hinzufügen.
+- [x] Manuelle GitHub-Statusprüfung ohne Anzeige sensibler Tokens anbinden.
+- [x] GitHub-Statusanzeige deterministisch testen und checkpointen.
+- [x] Mehrere optische Designrichtungen für die mobile Entwicklungsoberfläche als Mockup-Bilder erstellen.
+- [x] Varianten klar beschriften und als Auswahl zur Designentscheidung bereitstellen.
 - [x] Systemname auf „CyberSarah Control Center“ umstellen und sichtbare Branding-Texte konsistent aktualisieren.
 - [x] App-Branding und Android-Konfiguration nach der Umbenennung validieren.
-- [ ] Dark-Mode-Auswahl im CyberSarah Control Center ergänzen.
-- [ ] Theme-Auswahl dauerhaft und sicher lokal speichern.
-- [ ] Dark-Mode-Kontraste, mobile Bedienung und Wiederherstellung testen.
+- [x] Dark-Mode-Auswahl im CyberSarah Control Center ergänzen.
+- [x] Theme-Auswahl dauerhaft und sicher lokal speichern.
+- [x] Dark-Mode-Kontraste, mobile Bedienung und Wiederherstellung testen.
 - [x] Vier eigenständige visuelle Design-Mockups für CyberSarah Control Center erstellen.
 - [x] Mockup-Varianten beschriften und als Auswahl zur weiteren Umsetzung bereitstellen.
 - [x] Fokussierte Graphite-Glass-Smartphonevorschau für Design B erstellen und bereitstellen.
-- [ ] Mockupbilder zusätzlich als direkt sichtbare Chat-Anhänge bereitstellen.
+- [x] Mockupbilder zusätzlich als direkt sichtbare Chat-Anhänge bereitstellen.
 - [x] Mockups als echte, direkt anhängbare Bilddateien neu erzeugen und sichtbar bereitstellen.
 - [x] Void Dark als aktive Designrichtung in der Oberfläche festlegen.
 - [x] Plus-Menü im Chat für Dateien, Fotos und Videos ergänzen.
@@ -75,3 +75,17 @@
 - [x] Nächsten CyberSarah-Control-Center-Release vollständig validieren.
 - [x] Release-Checkpoint für die Veröffentlichung erstellen.
 - [ ] Veröffentlichung und Android-APK über die Publish-Oberfläche anstoßen.
+- [x] Verbundenes Ziel-Repository prüfen und für den Release-Workflow vorbereiten.
+- [ ] Android-Release für einen echten Geräte-Test vorbereiten und Publish-Handoff dokumentieren.
+- [ ] Release-Benachrichtigungen für relevante Statusänderungen ergänzen.
+- [x] GitHub-Ziel `Niknight1403/CyberSarah Control Center` verifizieren und auf einen gültigen Repository-Namen abbilden.
+- [x] Aktuellen Release-Stand in das verifizierte Zielrepository pushen.
+- [x] Push-Ergebnis und Zielbranch bestätigen.
+- [x] Aktuelle App-Dateien in das geklonte CyberSarah-Control-Center-Repository kopieren.
+- [x] Änderungen im Zielrepository prüfen und lokalen Commit vorbereiten.
+- [x] Vorbereiteten Commit zum Remote-Repository `niknight1403/CyberSarah-Control-Center` pushen und den Remote-Commit verifizieren.
+- [x] GitHub-Connector wieder aktivieren und die Verbindung zum Zielrepository verifizieren.
+- [x] Neuen Entwicklungsbranch aus `main` erstellen, zum Remote pushen und verifizieren.
+- [x] Aufgaben- und Issue-Übersicht für `next-development` aus GitHub und dem lokalen Projektregister erstellen.
+- [x] todo.md mit dem tatsächlichen Projektstand abgleichen und veraltete offene Punkte korrigieren.
+- [ ] Android-APK-Erstellung über die Publish-Oberfläche anstoßen und den Build-Handoff abschließen.
