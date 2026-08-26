@@ -1,4 +1,6 @@
-# CyberSarah Control Center – Release-Handoff
+# CyberSarah Control Center – Release-Handoff für Version 1.0.1
+
+Die aktuelle Expo-App-Version ist **1.0.1**. Dieser Stand ist für den Android-Publish vorbereitet.
 
 ## Status
 
@@ -9,7 +11,7 @@ Der Release-Kandidat ist für den Android-Publish vorbereitet. Die App ist portr
 | Prüfung | Ergebnis |
 |---|---|
 | TypeScript `pnpm check` | Erfolgreich |
-| Vitest `pnpm test` | 65 bestanden, 1 Auth-Test übersprungen |
+| Vitest `pnpm test` | 71 bestanden, 1 Auth-Test übersprungen |
 | Workspace-Service-Syntax | Erfolgreich mit `node --check` |
 | Server-Build `pnpm build` | Erfolgreich |
 | Expo-Konfiguration | SDK 54, Portrait, Android-Paket und Branding aufgelöst |

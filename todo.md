@@ -138,3 +138,4 @@
 - [x] Backup-Export- und Importbereich im Void-Dark-Design übersichtlicher strukturieren
 - [x] Export-/Import-Aktionen mit klaren Zuständen, Sicherheits-Hinweisen und mobilen Touch-Zielen verfeinern
 - [x] Überarbeiteten Backup-Bereich visuell und funktional regressionsprüfen
+- [x] Version 1.0.1 als konsistenten, getesteten und publishbereiten Release-Stand herstellen
