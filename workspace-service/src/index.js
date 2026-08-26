@@ -101,6 +101,13 @@ function getGitHubToken(request) {
   return token || undefined;
 }
 
+function safeProviderError(error, fallback) {
+  if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return `${fallback} Zeitüberschreitung.`;
+  if (error instanceof TypeError) return `${fallback} Netzwerkverbindung nicht erreichbar.`;
+  const message = error instanceof Error ? error.message : "";
+  return message && !/key|token|authorization|bearer/i.test(message) ? message.slice(0, 240) : fallback;
+}
+
 function getLocalProviderEndpoint(request, provider) {
   if (provider !== "ollama" && provider !== "lmstudio") return undefined;
   const rawEndpoint = request.header("X-AI-Provider-Endpoint")?.trim();
@@ -482,7 +489,7 @@ app.post("/api/v1/providers/cloud/test", requireServiceAuthorization, async (req
     const models = Array.isArray(payload.data) ? payload.data : Array.isArray(payload.models) ? payload.models : [];
     response.json({ provider, status: "ready", model: models[0]?.id || models[0]?.name || "Verbindung bestätigt", modelCount: models.length });
   } catch (error) {
-    next(error);
+    next(new Error(safeProviderError(error, "Cloud-Provider konnte nicht geprüft werden.")));
   }
 });
 
@@ -499,7 +506,7 @@ app.post("/api/v1/providers/local/test", requireServiceAuthorization, async (req
     const models = Array.isArray(payload.models) ? payload.models : Array.isArray(payload.data) ? payload.data : [];
     response.json({ provider, status: "ready", modelCount: models.length });
   } catch (error) {
-    next(error);
+    next(new Error(safeProviderError(error, "Lokaler Provider konnte nicht geprüft werden.")));
   }
 });
 

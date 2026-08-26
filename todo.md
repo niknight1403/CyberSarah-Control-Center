@@ -118,10 +118,10 @@
 - [x] Sprint 11: Cloud-Provider-Key-Verbindungstests mit sicherem Statusfeedback abschließen
 - [x] Sprint 12: Einheitliches Provider-Statusmodell für lokale, Cloud- und Fallback-Anfragen umsetzen
 - [x] Sprint 13: Settings-UX, Validierung und sichere Key-Verwaltung härten
-- [ ] Sprint 14: Agenten-Fallback und Provider-Fehlerpfade verbessern
-- [ ] Sprint 15: Repository-Workflow und Audit-Feedback abrunden
-- [ ] Sprint 16: Medien-, Offline- und Fehlerzustände für Android härten
-- [ ] Sprint 17: Push- und Release-Benachrichtigungsfluss prüfen
-- [ ] Sprint 18: CI/CD-Workflows und GitHub-Synchronisation validieren
-- [ ] Sprint 19: Vollständige Qualitäts- und Regressionstests ausführen
-- [ ] Sprint 20: Android-Release-Preflight und Installations-Handoff vorbereiten
+- [x] Sprint 14: Agenten-Fallback und Provider-Fehlerpfade verbessern
+- [x] Sprint 15: Repository-Workflow und Audit-Feedback abrunden
+- [x] Sprint 16: Medien-, Offline- und Fehlerzustände für Android härten
+- [x] Sprint 17: Push- und Release-Benachrichtigungsfluss prüfen
+- [x] Sprint 18: CI/CD-Workflows und GitHub-Synchronisation validieren
+- [x] Sprint 19: Vollständige Qualitäts- und Regressionstests ausführen
+- [x] Sprint 20: Android-Release-Preflight und Installations-Handoff vorbereiten
