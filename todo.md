@@ -40,3 +40,7 @@
 - [x] Detaillierte Code-Diff-Vorschau für vorgeschlagene Schritte vor der Ausführung hinzufügen.
 - [x] Explizite Bestätigung oder Abbruch der empfohlenen Aktion nach Diff-Prüfung umsetzen.
 - [x] Diff-Vorschau und Bestätigungsablauf deterministisch testen und für mobile Bedienung validieren.
+- [ ] Aktueller Sprint: Neustart-Button für den Entwicklungsserver mit Bestätigung, Ladezustand und Statusfeedback abschließen.
+- [ ] Mobile Optimierung für den Android-Build prüfen und erforderliche Anpassungen umsetzen.
+- [ ] Android-Build-Konfiguration für die APK-Erzeugung validieren.
+- [ ] GitHub-Zielrepository und Push-Workflow sicher vorbereiten.
