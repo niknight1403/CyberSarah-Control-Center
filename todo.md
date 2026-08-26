@@ -93,3 +93,4 @@
 - [ ] CI/CD-Release-Benachrichtigungen, strukturiertes Logging und Audit-Protokollierung ergänzen.
 - [x] Release-Stand für den Publish-Handoff final validieren.
 - [x] CyberSarah Control Center für den Android-APK-Handoff über Publish vorbereiten und Release-Status validieren.
+- [x] Medienauswahl um Bildvorschauen, Dateityp-Fallbacks und Ladeanimationen für den mobilen Test-Flow erweitern.
