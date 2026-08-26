@@ -141,3 +141,4 @@
 - [x] Version 1.0.1 als konsistenten, getesteten und publishbereiten Release-Stand herstellen
 - [x] Übersprungenen auth.logout-Test aktivieren und die Cookie-Löschung vollständig validieren
 - [x] Auth-Testkorrektur in das Zielrepository synchronisieren und Pull Request vorbereiten
+- [x] Hardened GitHub-Actions-Release-Workflow mit Quality Gates, APK/aapt2-Validierung, Protected Upload und Slack-Status implementieren

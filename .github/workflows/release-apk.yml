@@ -1,0 +1,354 @@
+name: CyberSarah Control Center Android Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9"
+
+jobs:
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      commit_author: ${{ steps.commit-meta.outputs.author }}
+      commit_sha: ${{ steps.commit-meta.outputs.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Capture commit metadata
+        id: commit-meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          author="$(git log -1 --format='%an <%ae>')"
+          {
+            echo 'author<<EOF'
+            echo "$author"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: TypeScript check
+        run: pnpm check
+
+      - name: Test suite
+        run: pnpm test
+
+  build:
+    name: Build and deep APK validation
+    needs: quality
+    if: ${{ needs.quality.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      apk_size: ${{ steps.validate.outputs.apk_size }}
+      apk_sha256: ${{ steps.validate.outputs.apk_sha256 }}
+      package_name: ${{ steps.validate.outputs.package_name }}
+      version_code: ${{ steps.validate.outputs.version_code }}
+      version_name: ${{ steps.validate.outputs.version_name }}
+      commit_sha: ${{ needs.quality.outputs.commit_sha }}
+      commit_author: ${{ needs.quality.outputs.commit_author }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Resolve APK artifact path
+        id: artifact
+        shell: bash
+        env:
+          CONFIGURED_APK_PATH: ${{ vars.APK_PATH }}
+        run: |
+          set -euo pipefail
+          apk_path="${CONFIGURED_APK_PATH:-dist/CyberSarah-Control-Center-1.0.1.apk}"
+          if [[ ! -f "$apk_path" ]]; then
+            echo "APK nicht gefunden: $apk_path"
+            echo "Der Managed-Publish-Build muss das APK vor diesem Workflow-Schritt unter APK_PATH bereitstellen."
+            exit 1
+          fi
+          echo "path=$apk_path" >> "$GITHUB_OUTPUT"
+
+      - name: Validate APK integrity and inspect with aapt2
+        id: validate
+        shell: bash
+        env:
+          APK_PATH: ${{ steps.artifact.outputs.path }}
+          EXPECTED_PACKAGE: ${{ vars.ANDROID_PACKAGE_NAME }}
+          EXPECTED_VERSION_CODE: ${{ vars.ANDROID_VERSION_CODE }}
+          CONFIGURED_VERSION_NAME: ${{ vars.ANDROID_VERSION_NAME }}
+        run: |
+          set -euo pipefail
+
+          test -n "$EXPECTED_PACKAGE" || { echo "ANDROID_PACKAGE_NAME ist nicht gesetzt."; exit 1; }
+          test -s "$APK_PATH"
+          unzip -t "$APK_PATH" >/dev/null
+
+          apk_sha256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
+          apk_size_bytes="$(stat -c '%s' "$APK_PATH")"
+          apk_size="$(awk -v bytes="$apk_size_bytes" 'BEGIN { printf "%.2f MiB", bytes / 1048576 }')"
+          echo "APK SHA-256: $apk_sha256"
+          echo "APK-Größe: $apk_size"
+
+          aapt2_bin="$(command -v aapt2 || true)"
+          if [[ -z "$aapt2_bin" && -n "${ANDROID_HOME:-}" ]]; then
+            aapt2_bin="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 2>/dev/null | sort -V | tail -n 1 || true)"
+          fi
+          if [[ -z "$aapt2_bin" ]]; then
+            echo "aapt2 wurde auf dem Runner nicht gefunden."
+            exit 1
+          fi
+
+          badging_file="${RUNNER_TEMP}/apk-badging.txt"
+          "$aapt2_bin" dump badging "$APK_PATH" > "$badging_file"
+
+          package_line="$(grep -m1 '^package:' "$badging_file" || true)"
+          version_line="$(grep -m1 '^package:' "$badging_file" || true)"
+          actual_package="$(sed -n "s/.*name='\\([^']*\\)' .*/\\1/p" <<< "$package_line")"
+          actual_version_code="$(sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p" <<< "$version_line")"
+          actual_version_name="$(sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p" <<< "$version_line")"
+
+          if [[ "$actual_package" != "$EXPECTED_PACKAGE" ]]; then
+            echo "Package Name stimmt nicht: erwartet '$EXPECTED_PACKAGE', gefunden '$actual_package'."
+            exit 1
+          fi
+
+          if [[ -n "$EXPECTED_VERSION_CODE" && "$actual_version_code" != "$EXPECTED_VERSION_CODE" ]]; then
+            echo "Version Code stimmt nicht: erwartet '$EXPECTED_VERSION_CODE', gefunden '$actual_version_code'."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            expected_version_name="${GITHUB_REF_NAME#v}"
+          else
+            expected_version_name="$CONFIGURED_VERSION_NAME"
+          fi
+          if [[ -z "$expected_version_name" ]]; then
+            echo "Für workflow_dispatch muss ANDROID_VERSION_NAME gesetzt sein."
+            exit 1
+          fi
+          if [[ "$actual_version_name" != "$expected_version_name" ]]; then
+            echo "Version Name stimmt nicht: erwartet '$expected_version_name', gefunden '$actual_version_name'."
+            exit 1
+          fi
+
+          echo "apk_size=$apk_size" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=$apk_sha256" >> "$GITHUB_OUTPUT"
+          echo "package_name=$actual_package" >> "$GITHUB_OUTPUT"
+          echo "version_code=$actual_version_code" >> "$GITHUB_OUTPUT"
+          echo "version_name=$actual_version_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload validated APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybersarah-android-release
+          path: ${{ steps.artifact.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7
+
+  upload:
+    name: Protected Google Play upload
+    needs: build
+    if: ${{ needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: play-internal
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      tester_url: ${{ steps.play-upload.outputs.tester_url }}
+      upload_version_code: ${{ steps.play-upload.outputs.version_code }}
+
+    steps:
+      - name: Download validated APK
+        uses: actions/download-artifact@v4
+        with:
+          name: cybersarah-android-release
+          path: dist
+
+      - name: Authenticate with Google Cloud via OIDC
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.PLAY_PUBLISHER_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Upload APK to Internal App Sharing
+        id: play-upload
+        shell: bash
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: ${{ needs.build.outputs.package_name }}
+          VERSION_CODE: ${{ needs.build.outputs.version_code }}
+          APK_PATH: dist/CyberSarah-Control-Center-1.0.1.apk
+        run: |
+          set -euo pipefail
+          test -s "$APK_PATH"
+          response_file="${RUNNER_TEMP}/internal-app-sharing-response.json"
+          http_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H 'Content-Type: application/vnd.android.package-archive' \
+            --data-binary "@${APK_PATH}" \
+            "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/internalappsharing/${PACKAGE_NAME}/artifacts/apk")"
+
+          if [[ "$http_code" != 2* ]]; then
+            echo "Google-Play-Upload fehlgeschlagen (HTTP ${http_code})."
+            exit 1
+          fi
+
+          tester_url="$(jq -r '.downloadUrl // .download_url // empty' "$response_file")"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          if [[ -n "$tester_url" ]]; then
+            echo "tester_url=$tester_url" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Google-Play-Upload erfolgreich."
+
+  notify:
+    name: Smart status and Slack notification
+    needs: [quality, build, upload]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Determine final status
+        id: status
+        shell: bash
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          UPLOAD_RESULT: ${{ needs.upload.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$QUALITY_RESULT" == "cancelled" || "$BUILD_RESULT" == "cancelled" || "$UPLOAD_RESULT" == "cancelled" ]]; then
+            status="CANCELLED"
+          elif [[ "$QUALITY_RESULT" == "failure" || "$BUILD_RESULT" == "failure" || "$UPLOAD_RESULT" == "failure" ]]; then
+            status="FAILED"
+          elif [[ "$QUALITY_RESULT" == "success" && "$BUILD_RESULT" == "success" && "$UPLOAD_RESULT" == "success" ]]; then
+            status="SUCCESS"
+          else
+            status="FAILED"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Send Slack release notification
+        if: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        shell: bash
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
+          STATUS: ${{ steps.status.outputs.status }}
+          COMMIT_AUTHOR: ${{ needs.quality.outputs.commit_author || github.actor }}
+          COMMIT_SHA: ${{ needs.build.outputs.commit_sha || github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          UPLOAD_RESULT: ${{ needs.upload.result }}
+          APK_SIZE: ${{ needs.build.outputs.apk_size || 'nicht verfügbar' }}
+          APK_SHA256: ${{ needs.build.outputs.apk_sha256 || 'nicht verfügbar' }}
+          VERSION_NAME: ${{ needs.build.outputs.version_name || 'nicht verfügbar' }}
+          TESTER_URL: ${{ needs.upload.outputs.tester_url || '' }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          case "$STATUS" in
+            SUCCESS) color="#2eb67d"; summary="APK validiert und erfolgreich hochgeladen." ;;
+            CANCELLED) color="#ecb22e"; summary="Release-Workflow wurde manuell abgebrochen." ;;
+            *) color="#e01e5a"; summary="Quality Gate, Build-Validierung oder Upload ist fehlgeschlagen." ;;
+          esac
+
+          payload="$(jq -n \
+            --arg title "CyberSarah Control Center · ${STATUS}" \
+            --arg color "$color" \
+            --arg summary "$summary" \
+            --arg author "$COMMIT_AUTHOR" \
+            --arg sha "${COMMIT_SHA:0:12}" \
+            --arg ref "$REF_NAME" \
+            --arg event "$EVENT_NAME" \
+            --arg quality "$QUALITY_RESULT" \
+            --arg build "$BUILD_RESULT" \
+            --arg upload "$UPLOAD_RESULT" \
+            --arg size "$APK_SIZE" \
+            --arg apksha "${APK_SHA256:0:16}…" \
+            --arg version "$VERSION_NAME" \
+            --arg tester "$TESTER_URL" \
+            --arg run "$RUN_URL" \
+            '{attachments:[{color:$color,blocks:[
+              {type:"header",text:{type:"plain_text",text:$title}},
+              {type:"section",text:{type:"mrkdwn",text:$summary}},
+              {type:"section",fields:[
+                {type:"mrkdwn",text:("*Commit-Autor:*\\n" + $author)},
+                {type:"mrkdwn",text:("*Commit:*\\n`" + $sha + "`")},
+                {type:"mrkdwn",text:("*Tag/Branch:*\\n`" + $ref + "`")},
+                {type:"mrkdwn",text:("*Event:*\\n" + $event)},
+                {type:"mrkdwn",text:("*Quality:*\\n" + $quality)},
+                {type:"mrkdwn",text:("*Build:*\\n" + $build)},
+                {type:"mrkdwn",text:("*Upload:*\\n" + $upload)},
+                {type:"mrkdwn",text:("*Version:*\\n" + $version)},
+                {type:"mrkdwn",text:("*APK-Größe:*\\n" + $size)},
+                {type:"mrkdwn",text:("*SHA-256:*\\n`" + $apksha + "`")}
+              ]},
+              {type:"section",text:{type:"mrkdwn",text:("*Tester-Link:*\\n" + (if $tester == "" then "nicht verfügbar" else "<" + $tester + "|Internal App Sharing öffnen>" end))}},
+              {type:"actions",elements:[{type:"button",text:{type:"plain_text",text:"GitHub Actions öffnen"},url:$run}]}
+            ]}]}')"
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H 'Content-Type: application/json' \
+            --data "$payload" \
+            "$SLACK_WEBHOOK_URL"
+
+      - name: Write release summary
+        if: always()
+        env:
+          STATUS: ${{ steps.status.outputs.status }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          UPLOAD_RESULT: ${{ needs.upload.result }}
+        run: |
+          {
+            echo "## CyberSarah Control Center – Android Release"
+            echo ""
+            echo "| Job | Status |"
+            echo "|---|---|"
+            echo "| Quality | ${QUALITY_RESULT} |"
+            echo "| Build | ${BUILD_RESULT} |"
+            echo "| Upload | ${UPLOAD_RESULT} |"
+            echo "| Final | ${STATUS} |"
+          } >> "$GITHUB_STEP_SUMMARY"
