@@ -51,3 +51,15 @@
 - [ ] Varianten klar beschriften und als Auswahl zur Designentscheidung bereitstellen.
 - [x] Systemname auf „CyberSarah Control Center“ umstellen und sichtbare Branding-Texte konsistent aktualisieren.
 - [x] App-Branding und Android-Konfiguration nach der Umbenennung validieren.
+- [ ] Dark-Mode-Auswahl im CyberSarah Control Center ergänzen.
+- [ ] Theme-Auswahl dauerhaft und sicher lokal speichern.
+- [ ] Dark-Mode-Kontraste, mobile Bedienung und Wiederherstellung testen.
+- [x] Vier eigenständige visuelle Design-Mockups für CyberSarah Control Center erstellen.
+- [x] Mockup-Varianten beschriften und als Auswahl zur weiteren Umsetzung bereitstellen.
+- [x] Fokussierte Graphite-Glass-Smartphonevorschau für Design B erstellen und bereitstellen.
+- [ ] Mockupbilder zusätzlich als direkt sichtbare Chat-Anhänge bereitstellen.
+- [x] Mockups als echte, direkt anhängbare Bilddateien neu erzeugen und sichtbar bereitstellen.
+- [x] Void Dark als aktive Designrichtung in der Oberfläche festlegen.
+- [x] Plus-Menü im Chat für Dateien, Fotos und Videos ergänzen.
+- [x] Bereich für Skills und Connectoren im Chat integrieren.
+- [x] Anhänge, sichere Zustände und mobile Touch-Ziele testen.
