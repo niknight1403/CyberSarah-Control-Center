@@ -139,3 +139,4 @@
 - [x] Export-/Import-Aktionen mit klaren Zuständen, Sicherheits-Hinweisen und mobilen Touch-Zielen verfeinern
 - [x] Überarbeiteten Backup-Bereich visuell und funktional regressionsprüfen
 - [x] Version 1.0.1 als konsistenten, getesteten und publishbereiten Release-Stand herstellen
+- [x] Übersprungenen auth.logout-Test aktivieren und die Cookie-Löschung vollständig validieren
