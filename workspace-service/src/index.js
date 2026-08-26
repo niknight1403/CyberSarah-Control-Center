@@ -357,14 +357,29 @@ function normalizeAgentProposal(proposal, allowedFiles) {
 async function invokeProvider(request, messages) {
   const provider = request.header("X-AI-Provider") ?? "managed";
   const suppliedKey = request.header("X-AI-Provider-Key")?.trim();
+  const environmentKeyByProvider = {
+    managed: process.env.MANAGED_LLM_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    gemini: process.env.GEMINI_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    together: process.env.TOGETHER_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    huggingface: process.env.HF_TOKEN,
+  };
+  const boundProviderKey = suppliedKey || environmentKeyByProvider[provider];
   const defaults = {
-    managed: { baseUrl: process.env.MANAGED_LLM_BASE_URL, key: process.env.MANAGED_LLM_API_KEY, model: process.env.MANAGED_LLM_MODEL ?? "gpt-4o-mini" },
-    openai: { baseUrl: "https://api.openai.com/v1/chat/completions", key: suppliedKey, model: process.env.OPENAI_MODEL ?? "gpt-4o-mini" },
-    gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/models", key: suppliedKey, model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash" },
-    openrouter: { baseUrl: "https://openrouter.ai/api/v1/chat/completions", key: suppliedKey, model: process.env.OPENROUTER_MODEL ?? "openrouter/free" },
-    groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: suppliedKey, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
-    together: { baseUrl: "https://api.together.xyz/v1/chat/completions", key: suppliedKey, model: process.env.TOGETHER_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-    anthropic: { baseUrl: "https://api.anthropic.com/v1/messages", key: suppliedKey, model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest" },
+    managed: { baseUrl: process.env.MANAGED_LLM_BASE_URL, key: boundProviderKey, model: process.env.MANAGED_LLM_MODEL ?? "gpt-4o-mini" },
+    openai: { baseUrl: "https://api.openai.com/v1/chat/completions", key: boundProviderKey, model: process.env.OPENAI_MODEL ?? "gpt-4o-mini" },
+    gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/models", key: boundProviderKey, model: process.env.GEMINI_MODEL ?? "gemini-3.6-flash" },
+    openrouter: { baseUrl: "https://openrouter.ai/api/v1/chat/completions", key: boundProviderKey, model: process.env.OPENROUTER_MODEL ?? "openrouter/free" },
+    groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: boundProviderKey, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
+    together: { baseUrl: "https://api.together.xyz/v1/chat/completions", key: boundProviderKey, model: process.env.TOGETHER_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+    anthropic: { baseUrl: "https://api.anthropic.com/v1/messages", key: boundProviderKey, model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest" },
+    ollama: { baseUrl: `${process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434/v1"}/chat/completions`, key: suppliedKey || "local", model: process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b" },
+    lmstudio: { baseUrl: `${process.env.LMSTUDIO_BASE_URL ?? "http://127.0.0.1:1234/v1"}/chat/completions`, key: suppliedKey || "local", model: process.env.LMSTUDIO_MODEL ?? "local-model" },
+    custom: { baseUrl: process.env.CUSTOM_OPENAI_BASE_URL, key: suppliedKey, model: process.env.CUSTOM_OPENAI_MODEL ?? "local-model" },
+    huggingface: { baseUrl: "https://router.huggingface.co/v1/chat/completions", key: boundProviderKey, model: process.env.HF_MODEL ?? "deepseek-ai/DeepSeek-R1:fastest" },
   };
   const configuration = defaults[provider];
   if (!configuration?.baseUrl || !configuration.key) throw new Error("Für das ausgewählte KI-Profil fehlt ein API-Key oder eine On-Server-Konfiguration.");

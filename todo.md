@@ -95,3 +95,7 @@
 - [x] CyberSarah Control Center für den Android-APK-Handoff über Publish vorbereiten und Release-Status validieren.
 - [x] Medienauswahl um Bildvorschauen, Dateityp-Fallbacks und Ladeanimationen für den mobilen Test-Flow erweitern.
 - [x] OpenAI, Google Gemini und OpenRouter als sichere, optional nutzbare Provider für den Agenten integrieren.
+- [x] Konfigurierten KI-Provider per sicherem Agenten-E2E-Test gegen den Workspace-Service validieren.
+- [ ] CI/CD-Audit- und Release-Status mit tokenfreiem Logging prüfen beziehungsweise abschließen.
+- [ ] Finalen Release-Commit und einen releasebereiten Checkpoint für Publish erstellen.
+- [x] Kostenlose oder Free-Tier-geeignete Entwicklungs-KI recherchieren und nur sicher integrierbare Provider in CyberSarah Control Center aufnehmen.
