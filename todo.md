@@ -63,3 +63,6 @@
 - [x] Plus-Menü im Chat für Dateien, Fotos und Videos ergänzen.
 - [x] Bereich für Skills und Connectoren im Chat integrieren.
 - [x] Anhänge, sichere Zustände und mobile Touch-Ziele testen.
+- [x] Individuelle Toggle-Schalter für Skills im Bereich „Skills & Connectoren“ ergänzen.
+- [x] Skill-Auswahl lokal speichern und beim Start wiederherstellen.
+- [x] Toggle-Zustände in der Agent-Statusanzeige und im mobilen Workflow berücksichtigen.
