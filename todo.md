@@ -128,3 +128,13 @@
 - [x] Nächsten Release-Preflight ausführen und neuen Publish-Checkpoint erstellen
 - [x] Publish-Warnung „nicht gepackte Änderungen“ für Version 1.0.1 beheben und Packstatus erneut validieren
 - [x] Sprint 21: Release-Status und Publish-Handoff im Workspace sichtbar und nachvollziehbar machen
+- [x] Verschlüsseltes Settings-Backup für Cloud-API-Keys und lokale Provider-Endpoints exportieren
+- [x] Passwort- und Freigabebestätigung vor dem Teilen des Settings-Backups erzwingen
+- [x] Secret-Isolation, Backup-Integrität und native Share-Pipeline deterministisch testen
+- [x] Verschlüsselte Settings-Backups über die Dokumentenauswahl importieren und authentifizieren
+- [x] Importvorschau und explizite Bestätigung vor dem Überschreiben gespeicherter Provider-Daten ergänzen
+- [x] Restore-Persistenz, Manipulationserkennung und Picker-Abbruch deterministisch testen
+- [x] Erneute Publish-Warnung bei Version 1.0.1 diagnostizieren und den Packstatus dauerhaft bereinigen
+- [x] Backup-Export- und Importbereich im Void-Dark-Design übersichtlicher strukturieren
+- [x] Export-/Import-Aktionen mit klaren Zuständen, Sicherheits-Hinweisen und mobilen Touch-Zielen verfeinern
+- [x] Überarbeiteten Backup-Bereich visuell und funktional regressionsprüfen
