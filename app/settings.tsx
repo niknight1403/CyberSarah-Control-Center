@@ -4,7 +4,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { integrationFixture } from "@/constants/integration-fixture";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
-import { defaultLocalProviderEndpoints } from "@/lib/studio-settings-logic";
+import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
 import { type FieldValidation, validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
@@ -15,7 +15,7 @@ type LocalProviderId = "ollama" | "lmstudio";
 type EndpointTestState = "idle" | "checking" | "ready" | "error";
 
 export default function SettingsScreen() {
-  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings, testLocalProviderEndpoint } = useStudioSettings();
+  const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, loading, readAttachedFile, saveSettings, setProtectedChatContent, settings, testCloudProvider, testLocalProviderEndpoint } = useStudioSettings();
   const { loadRemoteFiles } = useWorkspace();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
@@ -30,6 +30,8 @@ export default function SettingsScreen() {
   const [lmstudioEndpointTouched, setLmstudioEndpointTouched] = useState(false);
   const [endpointTestState, setEndpointTestState] = useState<Record<LocalProviderId, EndpointTestState>>({ ollama: "idle", lmstudio: "idle" });
   const [endpointTestMessage, setEndpointTestMessage] = useState<Record<LocalProviderId, string>>({ ollama: "", lmstudio: "" });
+  const [cloudTestState, setCloudTestState] = useState<EndpointTestState>("idle");
+  const [cloudTestMessage, setCloudTestMessage] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [workspaceTouched, setWorkspaceTouched] = useState(false);
   const [serviceTokenTouched, setServiceTokenTouched] = useState(false);
@@ -52,6 +54,7 @@ export default function SettingsScreen() {
   const lmstudioEndpointValidation = validateLocalProviderEndpoint(lmstudioEndpoint, "LM Studio");
   const canSave = workspaceValidation.valid && serviceTokenValidation.valid && ollamaEndpointValidation.valid && lmstudioEndpointValidation.valid;
   const canAttach = canSave && Boolean(repositoryUrl.trim()) && Boolean(branch.trim());
+  const selectedCloudProvider = cloudProviderIds.includes(provider as CloudProviderId) ? (provider as CloudProviderId) : null;
 
   const testEndpoint = async (localProvider: LocalProviderId, endpoint: string, validation: FieldValidation) => {
     if (!validation.valid) {
@@ -68,6 +71,25 @@ export default function SettingsScreen() {
     } catch (error) {
       setEndpointTestState((current) => ({ ...current, [localProvider]: "error" }));
       setEndpointTestMessage((current) => ({ ...current, [localProvider]: error instanceof Error ? error.message : "Der lokale Endpoint ist nicht erreichbar." }));
+    }
+  };
+
+  const testSelectedCloudProvider = async () => {
+    if (!selectedCloudProvider) return;
+    if (!settings.providerKeyStatus[selectedCloudProvider] && !providerApiKey.trim()) {
+      setCloudTestState("error");
+      setCloudTestMessage("Für diesen Cloud-Provider ist kein gespeicherter API-Key vorhanden.");
+      return;
+    }
+    setCloudTestState("checking");
+    setCloudTestMessage("");
+    try {
+      const result = await testCloudProvider(selectedCloudProvider, providerApiKey.trim() || undefined);
+      setCloudTestState("ready");
+      setCloudTestMessage(`${result.modelCount} Modell${result.modelCount === 1 ? "" : "e"} verfügbar; ${result.model} wurde erkannt.`);
+    } catch (error) {
+      setCloudTestState("error");
+      setCloudTestMessage(error instanceof Error ? error.message : "Der Cloud-Provider konnte nicht bestätigt werden.");
     }
   };
 
@@ -151,7 +173,7 @@ export default function SettingsScreen() {
           {providerOptions.map((option) => {
             const selected = option.id === provider;
             return (
-              <TouchableOpacity key={option.id} activeOpacity={0.75} onPress={() => { setProvider(option.id); setProviderApiKey(""); setSaveState("idle"); }} style={[styles.providerRow, selected && styles.providerRowSelected]}>
+              <TouchableOpacity key={option.id} activeOpacity={0.75} onPress={() => { setProvider(option.id); setProviderApiKey(""); setCloudTestState("idle"); setCloudTestMessage(""); setSaveState("idle"); }} style={[styles.providerRow, selected && styles.providerRowSelected]}>
                 <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioDot} /> : null}</View>
                 <View style={styles.providerText}>
                   <Text style={styles.providerLabel}>{option.label}</Text>
@@ -165,8 +187,12 @@ export default function SettingsScreen() {
             <>
               <Text style={styles.fieldHint}>Tippe auf ein Provider-Profil, um dessen Key unabhängig zu hinterlegen, zu ersetzen oder zu löschen.</Text>
               <Text style={styles.fieldLabel}>API-KEY FÜR {provider.toUpperCase()}</Text>
-              <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setProviderApiKey} placeholder={settings.providerKeyStatus[provider] ? "Gespeichert — neuen Key eingeben, um ihn zu ersetzen" : "API-Key eingeben"} placeholderTextColor="#697A90" secureTextEntry style={settings.providerKeyStatus[provider] ? [styles.input, styles.inputStored] : styles.input} value={providerApiKey} />
+              <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setProviderApiKey(value); setCloudTestState("idle"); setCloudTestMessage(""); }} placeholder={settings.providerKeyStatus[provider] ? "Gespeichert — neuen Key eingeben, um ihn zu ersetzen" : "API-Key eingeben"} placeholderTextColor="#697A90" secureTextEntry style={settings.providerKeyStatus[provider] ? [styles.input, styles.inputStored] : styles.input} value={providerApiKey} />
               {settings.providerKeyStatus[provider] ? <TouchableOpacity activeOpacity={0.7} onPress={() => void clearProviderKey()} style={styles.clearAction}><Text style={styles.clearActionText}>Provider-Key für {provider.toUpperCase()} entfernen</Text></TouchableOpacity> : null}
+              {selectedCloudProvider ? <>
+                <TouchableOpacity accessibilityLabel={`${provider} Verbindung testen`} accessibilityRole="button" activeOpacity={0.75} disabled={cloudTestState === "checking"} onPress={() => void testSelectedCloudProvider()} style={[styles.cloudTestButton, cloudTestState === "checking" && styles.endpointTestButtonDisabled]}><IconSymbol name={cloudTestState === "ready" ? "checkmark.circle.fill" : "bolt.fill"} size={15} color="#52D8FF" /><Text style={styles.cloudTestButtonText}>{cloudTestState === "checking" ? "Cloud-Key wird geprüft …" : "Verbindung testen"}</Text></TouchableOpacity>
+                <EndpointTestFeedback scope="cloud" state={cloudTestState} message={cloudTestMessage} />
+              </> : null}
             </>
           ) : null}
         </View>
@@ -216,14 +242,14 @@ function getInputStyle(validation: FieldValidation, active: boolean) {
   return styles.inputInvalid;
 }
 
-function EndpointTestFeedback({ state, message }: { state: EndpointTestState; message: string }) {
+function EndpointTestFeedback({ scope = "local", state, message }: { scope?: "local" | "cloud"; state: EndpointTestState; message: string }) {
   if (state === "idle") return null;
   const ready = state === "ready";
   const checking = state === "checking";
   return (
     <View style={[styles.endpointFeedback, ready ? styles.endpointFeedbackReady : checking ? styles.endpointFeedbackChecking : styles.endpointFeedbackError]}>
       <IconSymbol name={ready ? "checkmark.circle.fill" : checking ? "bolt.fill" : "exclamationmark.triangle.fill"} size={15} color={ready ? "#45D996" : checking ? "#52D8FF" : "#FF6B7A"} />
-      <Text style={[styles.endpointFeedbackText, ready ? styles.endpointFeedbackTextReady : checking ? styles.endpointFeedbackTextChecking : styles.endpointFeedbackTextError]}>{checking ? "Verbindung zum lokalen Provider wird geprüft …" : message}</Text>
+      <Text style={[styles.endpointFeedbackText, ready ? styles.endpointFeedbackTextReady : checking ? styles.endpointFeedbackTextChecking : styles.endpointFeedbackTextError]}>{checking ? `${scope === "cloud" ? "Cloud-Key" : "Verbindung zum lokalen Provider"} wird geprüft …` : message}</Text>
     </View>
   );
 }
@@ -254,6 +280,8 @@ const styles = StyleSheet.create({
   endpointTestButton: { alignItems: "center", backgroundColor: "#52D8FF", borderRadius: 12, flexDirection: "row", gap: 5, justifyContent: "center", minHeight: 48, paddingHorizontal: 10 },
   endpointTestButtonDisabled: { opacity: 0.58 },
   endpointTestButtonText: { color: "#061019", fontSize: 11, fontWeight: "900" },
+  cloudTestButton: { alignItems: "center", alignSelf: "flex-start", borderColor: "#2B677E", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 12, minHeight: 44, paddingHorizontal: 12 },
+  cloudTestButtonText: { color: "#8EDDF0", fontSize: 12, fontWeight: "800" },
   endpointFeedback: { alignItems: "flex-start", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
   endpointFeedbackReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.32)" },
   endpointFeedbackChecking: { backgroundColor: "rgba(82,216,255,0.09)", borderColor: "rgba(82,216,255,0.30)" },

@@ -25,6 +25,7 @@ Place the service behind an HTTPS reverse proxy such as Caddy or Nginx, forwardi
 | `GET /api/v1/workspaces/:id/runtime` | Returns output and the proxied preview URL. |
 | `POST /api/v1/agent/proposals` | Produces a reviewable unified-diff proposal without mutating files. |
 | `POST /api/v1/providers/local/test` | Checks the configured Ollama or LM Studio `/v1/models` endpoint and returns a token-free readiness result. |
+| `POST /api/v1/providers/cloud/test` | Checks one supported cloud provider's authenticated model endpoint using the selected key for that request only. |
 
 Every endpoint expects `Authorization: Bearer <SERVICE_ACCESS_TOKEN>`. Enter this value in the mobile app as **Service-Zugriffstoken**. Git operations use the token in `X-GitHub-Token` only for the current request. Provider requests use `X-AI-Provider` and `X-AI-Provider-Key` only for the current request. For the local providers, the mobile client may additionally send `X-AI-Provider-Endpoint` with an HTTP(S) base URL; the service accepts this header only for Ollama and LM Studio, rejects embedded credentials/query strings, and appends `/chat/completions`. Avoid proxy logs that record request headers.
 

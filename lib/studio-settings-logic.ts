@@ -1,6 +1,8 @@
 export type ProviderId = "managed" | "openai" | "gemini" | "openrouter" | "groq" | "together" | "anthropic" | "ollama" | "lmstudio" | "custom" | "huggingface";
 
 export const freeProviderIds: readonly ProviderId[] = ["gemini", "openrouter", "groq", "ollama", "lmstudio", "huggingface"];
+export type CloudProviderId = Exclude<ProviderId, "managed" | "ollama" | "lmstudio" | "custom">;
+export const cloudProviderIds: readonly CloudProviderId[] = ["openai", "gemini", "openrouter", "groq", "together", "anthropic", "huggingface"];
 
 export function isFreeTierProvider(provider: ProviderId) {
   return freeProviderIds.includes(provider);

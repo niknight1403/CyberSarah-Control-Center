@@ -36,6 +36,17 @@ describe("workspace service client", () => {
     vi.unstubAllGlobals();
   });
 
+  it("tests a cloud provider key through the workspace service without exposing it in the payload", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ provider: "openai", status: "ready", model: "gpt-4o-mini", modelCount: 4 }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new RemoteWorkspaceClient({ baseUrl: "https://studio.example.com", serviceAccessToken: "service-secret", provider: "openai", providerApiKey: "provider-secret" });
+    await expect(client.testCloudProvider("openai")).resolves.toEqual({ provider: "openai", status: "ready", model: "gpt-4o-mini", modelCount: 4 });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://studio.example.com/api/v1/providers/cloud/test");
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ provider: "openai" }));
+    expect(fetchMock.mock.calls[0][1].headers["X-AI-Provider-Key"]).toBe("provider-secret");
+    vi.unstubAllGlobals();
+  });
+
   it("reduces a repository URL to a concise workspace label", () => {
     expect(getRepositoryLabel("https://github.com/example-org/custom-ai-studio.git")).toBe("example-org/custom-ai-studio");
   });

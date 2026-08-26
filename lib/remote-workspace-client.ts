@@ -1,4 +1,4 @@
-import { type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
+import { type CloudProviderId, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
 
 export type RemoteWorkspaceConfig = {
   baseUrl: string;
@@ -98,6 +98,13 @@ export class RemoteWorkspaceClient {
 
   testLocalProviderEndpoint(provider: "ollama" | "lmstudio") {
     return this.request<{ provider: "ollama" | "lmstudio"; status: "ready"; modelCount: number }>("/api/v1/providers/local/test", {
+      method: "POST",
+      body: JSON.stringify({ provider }),
+    });
+  }
+
+  testCloudProvider(provider: CloudProviderId) {
+    return this.request<{ provider: CloudProviderId; status: "ready"; model: string; modelCount: number }>("/api/v1/providers/cloud/test", {
       method: "POST",
       body: JSON.stringify({ provider }),
     });

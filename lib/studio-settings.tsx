@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
-import { defaultLocalProviderEndpoints, getDefaultFreeProvider, normalizeLocalProviderEndpoints, providerDefaults, toPersistedStudioSettings, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
+import { defaultLocalProviderEndpoints, getDefaultFreeProvider, normalizeLocalProviderEndpoints, providerDefaults, toPersistedStudioSettings, type CloudProviderId, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
 import { secureSessionStore } from "@/lib/secure-session-store";
 import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -100,6 +100,7 @@ type StudioSettingsContextValue = {
   loadRepositoryQuality: () => Promise<RepositoryQuality>;
   loadWorkspaceHealth: () => Promise<RemoteHealth>;
   testLocalProviderEndpoint: (provider: "ollama" | "lmstudio", endpoint: string) => Promise<{ provider: "ollama" | "lmstudio"; status: "ready"; modelCount: number }>;
+  testCloudProvider: (provider: CloudProviderId, apiKey?: string) => Promise<{ provider: CloudProviderId; status: "ready"; model: string; modelCount: number }>;
   requestDevelopmentProposal: (input: { prompt: string; activeFile?: string }) => Promise<AgentProposal>;
   setProtectedChatContent: (enabled: boolean) => Promise<void>;
 };
@@ -313,6 +314,14 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return client.testLocalProviderEndpoint(provider);
   }, [settings.workspaceUrl]);
 
+  const testCloudProvider = useCallback(async (provider: CloudProviderId, apiKey?: string) => {
+    if (!settings.workspaceUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
+    const [serviceAccessToken, storedProviderKey] = await Promise.all([readSecureValue(SERVICE_ACCESS_TOKEN_KEY), readProviderApiKey(provider)]);
+    if (!apiKey?.trim() && !storedProviderKey) throw new Error("Für diesen Cloud-Provider ist kein gespeicherter API-Key vorhanden.");
+    const client = new RemoteWorkspaceClient({ baseUrl: settings.workspaceUrl, serviceAccessToken: serviceAccessToken || undefined, provider, providerApiKey: apiKey?.trim() || storedProviderKey || undefined });
+    return client.testCloudProvider(provider);
+  }, [settings.workspaceUrl]);
+
   const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string }) => {
     if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");
     const client = await createConnectedClient();
@@ -320,8 +329,8 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, testLocalProviderEndpoint, requestDevelopmentProposal, setProtectedChatContent }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges, testLocalProviderEndpoint],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, testLocalProviderEndpoint, testCloudProvider, requestDevelopmentProposal, setProtectedChatContent }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges, testCloudProvider, testLocalProviderEndpoint],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;

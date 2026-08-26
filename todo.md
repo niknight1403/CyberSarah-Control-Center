@@ -113,3 +113,15 @@
 - [x] Endpoint-Persistenz und Routing mit deterministischen Tests absichern
 - [x] Direkte Endpoint-Tests für Ollama und LM Studio mit Lade-, Erfolgs- und Fehlerstatus ergänzen
 - [x] Lokale Provider-Healthcheck-Routen tokenfrei und deterministisch validieren
+- [x] Verbindungstest-Buttons für gespeicherte Cloud-Provider-API-Keys ergänzen
+- [x] Cloud-Provider-Key-Healthcheck tokenfrei und provider-spezifisch validieren
+- [x] Sprint 11: Cloud-Provider-Key-Verbindungstests mit sicherem Statusfeedback abschließen
+- [x] Sprint 12: Einheitliches Provider-Statusmodell für lokale, Cloud- und Fallback-Anfragen umsetzen
+- [x] Sprint 13: Settings-UX, Validierung und sichere Key-Verwaltung härten
+- [ ] Sprint 14: Agenten-Fallback und Provider-Fehlerpfade verbessern
+- [ ] Sprint 15: Repository-Workflow und Audit-Feedback abrunden
+- [ ] Sprint 16: Medien-, Offline- und Fehlerzustände für Android härten
+- [ ] Sprint 17: Push- und Release-Benachrichtigungsfluss prüfen
+- [ ] Sprint 18: CI/CD-Workflows und GitHub-Synchronisation validieren
+- [ ] Sprint 19: Vollständige Qualitäts- und Regressionstests ausführen
+- [ ] Sprint 20: Android-Release-Preflight und Installations-Handoff vorbereiten

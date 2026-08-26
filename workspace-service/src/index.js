@@ -454,6 +454,38 @@ app.get("/api/v1/health", requireServiceAuthorization, (_request, response) => {
   response.json({ status: "ready", version: "1.0.0", previewUrl: publicBaseUrl || undefined });
 });
 
+app.post("/api/v1/providers/cloud/test", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const provider = z.enum(["openai", "gemini", "openrouter", "groq", "together", "anthropic", "huggingface"]).parse(request.body?.provider);
+    const providerKey = request.header("X-AI-Provider-Key")?.trim() || {
+      openai: process.env.OPENAI_API_KEY,
+      gemini: process.env.GEMINI_API_KEY,
+      openrouter: process.env.OPENROUTER_API_KEY,
+      groq: process.env.GROQ_API_KEY,
+      together: process.env.TOGETHER_API_KEY,
+      anthropic: process.env.ANTHROPIC_API_KEY,
+      huggingface: process.env.HF_TOKEN,
+    }[provider];
+    if (!providerKey) throw new Error("Für den ausgewählten Cloud-Provider ist kein API-Key verfügbar.");
+    const checks = {
+      openai: { url: "https://api.openai.com/v1/models", headers: { authorization: `Bearer ${providerKey}` } },
+      gemini: { url: "https://generativelanguage.googleapis.com/v1beta/models", headers: { "x-goog-api-key": providerKey } },
+      openrouter: { url: "https://openrouter.ai/api/v1/models", headers: { authorization: `Bearer ${providerKey}` } },
+      groq: { url: "https://api.groq.com/openai/v1/models", headers: { authorization: `Bearer ${providerKey}` } },
+      together: { url: "https://api.together.xyz/v1/models", headers: { authorization: `Bearer ${providerKey}` } },
+      anthropic: { url: "https://api.anthropic.com/v1/models", headers: { "x-api-key": providerKey, "anthropic-version": "2023-06-01" } },
+      huggingface: { url: "https://router.huggingface.co/v1/models", headers: { authorization: `Bearer ${providerKey}` } },
+    };
+    const upstream = await fetch(checks[provider].url, { headers: checks[provider].headers, signal: AbortSignal.timeout(8_000) });
+    const payload = await upstream.json().catch(() => ({}));
+    if (!upstream.ok) throw new Error(`Cloud-Provider antwortet mit ${upstream.status}.`);
+    const models = Array.isArray(payload.data) ? payload.data : Array.isArray(payload.models) ? payload.models : [];
+    response.json({ provider, status: "ready", model: models[0]?.id || models[0]?.name || "Verbindung bestätigt", modelCount: models.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/v1/providers/local/test", requireServiceAuthorization, async (request, response, next) => {
   try {
     const provider = z.enum(["ollama", "lmstudio"]).parse(request.body?.provider);
