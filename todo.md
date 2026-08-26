@@ -37,3 +37,6 @@
 - [x] Manus-inspirierte „Nächste sinnvolle Schritte“-Karten für den Entwicklungsbereich hinzufügen.
 - [x] Kontextabhängige Aufgabenempfehlungen mit explizitem Starten und Abschließen umsetzen.
 - [x] Android-taugliche Interaktionen und 44pt-Touch-Ziele für die neue Entwicklungsführung validieren.
+- [x] Detaillierte Code-Diff-Vorschau für vorgeschlagene Schritte vor der Ausführung hinzufügen.
+- [x] Explizite Bestätigung oder Abbruch der empfohlenen Aktion nach Diff-Prüfung umsetzen.
+- [x] Diff-Vorschau und Bestätigungsablauf deterministisch testen und für mobile Bedienung validieren.

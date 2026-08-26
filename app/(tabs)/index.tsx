@@ -1,10 +1,11 @@
 import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
+import { DiffConfirmationSheet } from "@/components/studio/diff-confirmation-sheet";
 import { NextStepGuide } from "@/components/studio/next-step-guide";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { getDevelopmentGuidance, type DevelopmentGuidanceAction } from "@/lib/development-guidance-logic";
-import { getFileDiffSummaries } from "@/lib/file-diff-logic";
+import { getDevelopmentGuidance, type DevelopmentGuidanceAction, type DevelopmentGuidanceStep } from "@/lib/development-guidance-logic";
+import { getDetailedFileDiffPreviews, getFileDiffSummaries } from "@/lib/file-diff-logic";
 import { getProtectedBranchWarning, isProtectedBranch } from "@/lib/protected-branch-logic";
 import type { RemoteHealth, RepositoryQuality } from "@/lib/remote-workspace-client";
 import { useStudioSettings } from "@/lib/studio-settings";
@@ -43,8 +44,10 @@ export default function WorkspaceScreen() {
   const [remoteAhead, setRemoteAhead] = useState(false);
   const [remoteCheckAvailable, setRemoteCheckAvailable] = useState(true);
   const [guidanceFeedback, setGuidanceFeedback] = useState("");
+  const [pendingGuidanceStep, setPendingGuidanceStep] = useState<DevelopmentGuidanceStep | null>(null);
   const changedRemoteFiles = useMemo(() => files.filter((file) => file.changed && file.remote), [files]);
   const diffSummaries = useMemo(() => getFileDiffSummaries(changedRemoteFiles.map((file) => ({ path: file.path, before: file.remoteContent ?? "", after: file.content }))), [changedRemoteFiles]);
+  const detailedDiffPreviews = useMemo(() => getDetailedFileDiffPreviews(changedRemoteFiles.map((file) => ({ path: file.path, before: file.remoteContent ?? "", after: file.content }))), [changedRemoteFiles]);
   const currentBranchIsProtected = isProtectedBranch(settings.branch);
   const syncState = getWorkspaceSyncState(changedRemoteFiles.length, remoteAhead);
   const guidance = useMemo(() => getDevelopmentGuidance({ hasWorkspaceService, hasRepository: hasAttachedRepository, changedFileCount: changedRemoteFiles.length, hasConflictRisk: syncState.hasConflictRisk, serviceHealthy: healthState === "ready" && serviceHealth?.status === "ready", ciState: qualityState, ciFailed: quality?.ci.failed ?? 0, branch: settings.branch, lastGitAction: gitAction }), [changedRemoteFiles.length, gitAction, hasAttachedRepository, hasWorkspaceService, healthState, quality?.ci.failed, qualityState, serviceHealth?.status, settings.branch, syncState.hasConflictRisk]);
@@ -218,6 +221,18 @@ export default function WorkspaceScreen() {
     }
   };
 
+  const requestGuidanceAction = (action: DevelopmentGuidanceAction) => {
+    const step = [guidance.primary, ...guidance.secondary].find((candidate) => candidate.action === action);
+    if (step) setPendingGuidanceStep(step);
+  };
+
+  const confirmGuidanceAction = () => {
+    if (!pendingGuidanceStep) return;
+    const action = pendingGuidanceStep.action;
+    setPendingGuidanceStep(null);
+    handleGuidanceAction(action);
+  };
+
   return (
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <FlatList
@@ -227,7 +242,7 @@ export default function WorkspaceScreen() {
         ListHeaderComponent={
           <>
             <StudioHeader eyebrow="Custom AI Studio" title="Workspace" actionIcon="gearshape.fill" actionLabel="Workspace-Einstellungen" onAction={() => router.push("/settings" as never)} />
-            <NextStepGuide actionMessage={guidanceFeedback} completion={guidance.completion} guidance={guidance} onAction={handleGuidanceAction} />
+            <NextStepGuide actionMessage={guidanceFeedback} completion={guidance.completion} guidance={guidance} onAction={requestGuidanceAction} />
             <View style={styles.projectCard}>
               <View style={styles.projectTopLine}>
                 <View style={styles.projectIdentity}>
@@ -384,6 +399,7 @@ export default function WorkspaceScreen() {
         }}
         showsVerticalScrollIndicator={false}
       />
+      <DiffConfirmationSheet onCancel={() => setPendingGuidanceStep(null)} onConfirm={confirmGuidanceAction} previews={detailedDiffPreviews} step={pendingGuidanceStep} visible={Boolean(pendingGuidanceStep)} />
     </ScreenContainer>
   );
 }
