@@ -44,6 +44,20 @@ jobs:
       - name: Workspace service build
         run: pnpm build
 
+      - name: Write release handoff artifact
+        if: always()
+        env:
+          CI_STATUS: ${{ job.status == 'success' && 'passed' || 'failed' }}
+        run: node scripts/write-release-handoff.mjs
+
+      - name: Upload release handoff artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybersarah-release-handoff-${{ github.run_id }}
+          path: release-handoff.json
+          if-no-files-found: warn
+
       - name: Audit CI result
         if: always()
         env:
