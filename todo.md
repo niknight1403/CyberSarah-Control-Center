@@ -141,3 +141,4 @@
 
 - [x] Sprint 22: Typisierte Release-Preflight-Validierung für Version, Android-Paket, Portrait-Modus und Build-Befehl ergänzen und testen.
 - [x] Sprint 24: Einheitliche, tokenfreie Provider-Fehlerklassifizierung für Timeout, Auth, Rate-Limit, Netzwerk und Konfiguration ergänzen und testen.
+- [x] Sprint 25: Repository-gebundene Offline-Aktionswarteschlange mit Retry- und Konfliktblockierung ergänzen und testen.
