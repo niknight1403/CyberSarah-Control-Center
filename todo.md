@@ -138,3 +138,5 @@
 - [x] Backup-Export- und Importbereich im Void-Dark-Design übersichtlicher strukturieren
 - [x] Export-/Import-Aktionen mit klaren Zuständen, Sicherheits-Hinweisen und mobilen Touch-Zielen verfeinern
 - [x] Überarbeiteten Backup-Bereich visuell und funktional regressionsprüfen
+
+- [x] Sprint 22: Typisierte Release-Preflight-Validierung für Version, Android-Paket, Portrait-Modus und Build-Befehl ergänzen und testen.
