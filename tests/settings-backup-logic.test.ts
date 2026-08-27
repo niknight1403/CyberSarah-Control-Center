@@ -42,6 +42,16 @@ describe("settings backup logic", () => {
     expect(getSettingsBackupRestoreConfirmation({ createdAt: input.createdAt, providerIds: ["openai"], endpointCount: 2 }).message).toContain("Service- und GitHub-Tokens bleiben unverändert");
   });
 
+  it("rejects oversized provider keys and endpoint URLs before encryption", () => {
+    expect(() => createEncryptedSettingsBackup({ ...input, providerKeys: { openai: "x".repeat(513) } })).toThrow("Provider-Key");
+    expect(() => createEncryptedSettingsBackup({ ...input, localProviderEndpoints: { ollama: `http://${"a".repeat(2050)}`, lmstudio: "" } })).toThrow("Endpoint-URL");
+  });
+
+  it("rejects an excessive number of providers before encryption", () => {
+    const providerKeys = Object.fromEntries(Array.from({ length: 17 }, (_, index) => [`provider-${index}`, `key-${index}`]));
+    expect(() => createEncryptedSettingsBackup({ ...input, providerKeys })).toThrow("zu viele Provider");
+  });
+
   it("detects tampering and warns not to share the password with the file", () => {
     const backup = createEncryptedSettingsBackup(input);
     const tampered = { ...backup, cipher: { ...backup.cipher, ciphertext: `${backup.cipher.ciphertext}x` } };

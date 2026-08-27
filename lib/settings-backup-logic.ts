@@ -5,6 +5,9 @@ import { validateLocalProviderEndpoint } from "./settings-validation";
 export const SETTINGS_BACKUP_FORMAT = "cybersarah-control-center.encrypted-settings-backup";
 export const SETTINGS_BACKUP_VERSION = 1;
 export const SETTINGS_BACKUP_ITERATIONS = 310_000;
+export const SETTINGS_BACKUP_MAX_PROVIDER_KEY_LENGTH = 512;
+export const SETTINGS_BACKUP_MAX_ENDPOINT_LENGTH = 2048;
+export const SETTINGS_BACKUP_MAX_PROVIDER_COUNT = 16;
 
 type SettingsBackupPayload = {
   scope: "provider-settings";
@@ -100,8 +103,15 @@ export function getSettingsBackupRestoreConfirmation(preview: SettingsBackupPrev
 export function createEncryptedSettingsBackup(input: { providerKeys: Record<string, string>; localProviderEndpoints: LocalProviderEndpoints; passphrase: string; salt: Uint8Array; iv: Uint8Array; createdAt: string }): EncryptedSettingsBackup {
   if (!isValidSettingsBackupPassword(input.passphrase)) throw new Error("Das Backup-Passwort muss mindestens 12 Zeichen enthalten.");
   if (input.salt.length < 16 || input.iv.length !== 16) throw new Error("Die Verschlüsselungsparameter sind ungültig.");
-  const providerKeys = Object.fromEntries(Object.entries(input.providerKeys).filter(([provider, key]) => provider.trim().length > 0 && key.trim().length > 0).map(([provider, key]) => [provider, key.trim()]));
-  const payload: SettingsBackupPayload = { scope: "provider-settings", createdAt: input.createdAt, providerKeys, localProviderEndpoints: input.localProviderEndpoints, excluded: ["serviceAccessToken", "githubToken", "chatHistory", "fullGeneratedFileContents"] };
+  const providerEntries = Object.entries(input.providerKeys)
+    .filter(([provider, key]) => provider.trim().length > 0 && key.trim().length > 0)
+    .map(([provider, key]) => [provider.trim(), key.trim()] as const);
+  if (providerEntries.length > SETTINGS_BACKUP_MAX_PROVIDER_COUNT) throw new Error("Das Settings-Backup enthält zu viele Provider.");
+  if (providerEntries.some(([, key]) => key.length > SETTINGS_BACKUP_MAX_PROVIDER_KEY_LENGTH)) throw new Error("Ein Provider-Key überschreitet die zulässige Länge.");
+  const providerKeys = Object.fromEntries(providerEntries);
+  const endpoints = normalizeLocalProviderEndpoints(input.localProviderEndpoints);
+  if (Object.values(endpoints).some((endpoint) => endpoint && endpoint.length > SETTINGS_BACKUP_MAX_ENDPOINT_LENGTH)) throw new Error("Eine lokale Endpoint-URL überschreitet die zulässige Länge.");
+  const payload: SettingsBackupPayload = { scope: "provider-settings", createdAt: input.createdAt, providerKeys, localProviderEndpoints: endpoints, excluded: ["serviceAccessToken", "githubToken", "chatHistory", "fullGeneratedFileContents"] };
   const plainPayload = JSON.stringify(payload);
   const salt = bytesToWordArray(input.salt);
   const iv = bytesToWordArray(input.iv);
@@ -146,7 +156,7 @@ function getRestoredBackup(backup: unknown, passphrase: string): RestoredSetting
     const providerKeys: Partial<Record<ProviderId, string>> = {};
     const providerKeyPayload = payload.providerKeys ?? {};
     for (const [provider, key] of Object.entries(providerKeyPayload)) {
-      if (Object.hasOwn(providerDefaults, provider) && typeof key === "string" && key.trim().length > 0 && key.length <= 512) providerKeys[provider as ProviderId] = key.trim();
+      if (Object.hasOwn(providerDefaults, provider) && typeof key === "string" && key.trim().length > 0 && key.length <= SETTINGS_BACKUP_MAX_PROVIDER_KEY_LENGTH) providerKeys[provider as ProviderId] = key.trim();
     }
     const endpointPayload = (payload.localProviderEndpoints ?? {}) as Partial<LocalProviderEndpoints>;
     const localProviderEndpoints = normalizeLocalProviderEndpoints({ ollama: typeof endpointPayload.ollama === "string" ? endpointPayload.ollama : undefined, lmstudio: typeof endpointPayload.lmstudio === "string" ? endpointPayload.lmstudio : undefined });
