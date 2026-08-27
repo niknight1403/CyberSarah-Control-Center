@@ -16,3 +16,11 @@ export function createReleaseNotification(status: ReleaseStatus, detail?: string
 export function isTerminalReleaseStatus(status: ReleaseStatus) {
   return status === "passed" || status === "failed" || status === "cancelled";
 }
+
+export function shouldNotifyReleaseStatus(previous: ReleaseStatus | undefined, next: ReleaseStatus) {
+  return previous !== next;
+}
+
+export function getReleaseNotificationPriority(status: ReleaseStatus) {
+  return status === "failed" ? "high" as const : status === "cancelled" ? "default" as const : "default" as const;
+}

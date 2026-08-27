@@ -143,3 +143,4 @@
 - [x] Sprint 24: Einheitliche, tokenfreie Provider-Fehlerklassifizierung für Timeout, Auth, Rate-Limit, Netzwerk und Konfiguration ergänzen und testen.
 - [x] Sprint 25: Repository-gebundene Offline-Aktionswarteschlange mit Retry- und Konfliktblockierung ergänzen und testen.
 - [x] Sprint 26: Strukturierte, tokenfreie Healthcheck-Auswertung für Speicher, API und Provider-Status ergänzen und testen.
+- [x] Sprint 27: Release-Benachrichtigungen um Zustandswechsel-Deduplizierung und Prioritätsauswahl erweitern und testen.
