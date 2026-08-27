@@ -146,3 +146,4 @@
 - [x] Sprint 27: Release-Benachrichtigungen um Zustandswechsel-Deduplizierung und Prioritätsauswahl erweitern und testen.
 - [x] Sprint 28: Tokenfreies CI-Release-Handoff-Artefakt mit sicherem Status und Upload-Schritt ergänzen und validieren.
 - [x] Sprint 29: Deterministische Android-Release-Readiness-Prüfung für Portrait-Modus, Paket-ID, Version und native Assets ergänzen und testen.
+- [x] Sprint 30: Zentrales Betriebshandbuch für Entwicklung, Render, Hetzner/systemd, ntfy, Backups und Android-Handoff ergänzen.
