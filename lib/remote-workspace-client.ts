@@ -22,9 +22,17 @@ export type RepositoryRequest = {
   branch: string;
 };
 
+export type AgentContextFile = {
+  name: string;
+  content: string;
+  mimeType?: string;
+  size?: number;
+};
+
 export type AgentRequest = {
   prompt: string;
   activeFile?: string;
+  contextFiles?: AgentContextFile[];
 };
 
 export type AgentProposal = {

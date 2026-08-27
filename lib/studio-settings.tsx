@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
+import { type AgentContextFile, type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
 import { defaultLocalProviderEndpoints, getDefaultFreeProvider, normalizeLocalProviderEndpoints, providerDefaults, toPersistedStudioSettings, type CloudProviderId, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
 import { secureSessionStore } from "@/lib/secure-session-store";
 import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
@@ -104,7 +104,7 @@ type StudioSettingsContextValue = {
   testCloudProvider: (provider: CloudProviderId, apiKey?: string) => Promise<{ provider: CloudProviderId; status: "ready"; model: string; modelCount: number }>;
   exportSettingsBackup: (passphrase: string) => Promise<SettingsBackupExportResult>;
   restoreSettingsBackup: (backup: unknown, passphrase: string) => Promise<SettingsBackupRestoreResult>;
-  requestDevelopmentProposal: (input: { prompt: string; activeFile?: string }) => Promise<AgentProposal>;
+  requestDevelopmentProposal: (input: { prompt: string; activeFile?: string; contextFiles?: AgentContextFile[] }) => Promise<AgentProposal>;
   setProtectedChatContent: (enabled: boolean) => Promise<void>;
 };
 
@@ -349,10 +349,10 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     return { ...restored.preview, filename: "importiertes Settings-Backup" };
   }, [settings]);
 
-  const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string }) => {
+  const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string; contextFiles?: AgentContextFile[] }) => {
     if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");
     const client = await createConnectedClient();
-    return client.requestAgentProposal({ prompt: input.prompt.trim(), activeFile: input.activeFile });
+    return client.requestAgentProposal({ prompt: input.prompt.trim(), activeFile: input.activeFile, contextFiles: input.contextFiles });
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(
