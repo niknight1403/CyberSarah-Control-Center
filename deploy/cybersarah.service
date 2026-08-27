@@ -1,0 +1,31 @@
+[Unit]
+Description=CyberSarah Control Center
+Documentation=https://github.com/niknight1403/CyberSarah-Control-Center
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/cybersarah
+EnvironmentFile=-/opt/cybersarah/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+# Use a login shell so pnpm installed through the user's Node setup is found.
+ExecStart=/bin/bash -lc 'exec pnpm start'
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGINT
+
+# Basic service hardening.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+UMask=027
+
+[Install]
+WantedBy=multi-user.target
