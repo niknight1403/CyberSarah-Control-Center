@@ -6,16 +6,14 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ubuntu
-Group=ubuntu
-WorkingDirectory=/opt/cybersarah
-EnvironmentFile=-/opt/cybersarah/.env
+User=cybersarah
+Group=cybersarah
+WorkingDirectory=/opt/cybersarah-control-center
+EnvironmentFile=/opt/cybersarah-control-center/.env
 Environment=NODE_ENV=production
 Environment=PORT=3000
-
-# Use a login shell so pnpm installed through the user's Node setup is found.
-ExecStart=/bin/bash -lc 'exec pnpm start'
-Restart=on-failure
+ExecStart=/usr/bin/pnpm start
+Restart=always
 RestartSec=5
 TimeoutStopSec=20
 KillSignal=SIGINT
