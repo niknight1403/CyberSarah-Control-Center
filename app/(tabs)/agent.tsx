@@ -26,7 +26,7 @@ type ChatAttachment = MediaAttachment;
 type ConnectorTestStatus = "idle" | "testing" | "success" | "error";
 type ConnectorTestState = { status: ConnectorTestStatus; message?: string };
 
-const attachmentKinds: Array<{ kind: ChatAttachment["kind"]; label: string; icon: "doc.text.fill" | "photo" | "video.fill" }> = [
+const attachmentKinds: { kind: ChatAttachment["kind"]; label: string; icon: "doc.text.fill" | "photo" | "video.fill" }[] = [
   { kind: "datei", label: "Datei", icon: "doc.text.fill" },
   { kind: "foto", label: "Foto", icon: "photo" },
   { kind: "video", label: "Video", icon: "video.fill" },

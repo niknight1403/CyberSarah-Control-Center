@@ -23,7 +23,7 @@ export default function WorkspaceScreen() {
   const hasAttachedRepository = Boolean(settings.workspaceId);
   const repositoryLabel = getRepositoryLabel(settings.repositoryUrl);
   const [branches, setBranches] = useState<string[]>([]);
-  const [commits, setCommits] = useState<Array<{ shortHash: string; author: string; committedAt: string; message: string }>>([]);
+  const [commits, setCommits] = useState<{ shortHash: string; author: string; committedAt: string; message: string }[]>([]);
   const [repositoryState, setRepositoryState] = useState<"idle" | "loading" | "ready" | "switching" | "error">("idle");
   const [repositoryError, setRepositoryError] = useState("");
   const [quality, setQuality] = useState<RepositoryQuality | null>(null);
