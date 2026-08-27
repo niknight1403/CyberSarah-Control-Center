@@ -11,6 +11,8 @@ import { getSupportShareConfirmation } from "@/lib/support-backup-logic";
 import { useMediaPicker } from "@/hooks/use-media-picker";
 import type { MediaAttachment } from "@/lib/media-picker";
 import { formatProjectContext, readProjectContext } from "@/lib/project-upload-reader";
+import { RepositoryConnectCard } from "@/components/studio/repository-connect-card";
+import { parseRepositoryChatIntent } from "@/lib/repository-intent-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useState } from "react";
@@ -40,8 +42,8 @@ const initialMessages: ChatMessage[] = [{
 }];
 
 export default function AgentScreen() {
-  const { files, markFilesSynced, selectedFile, updateFile } = useWorkspace();
-  const { loadRepositoryDetails, loadWorkspaceHealth, requestDevelopmentProposal, settings, syncRemoteChanges } = useStudioSettings();
+  const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } = useWorkspace();
+  const { attachRepository, loadRepositoryDetails, loadWorkspaceHealth, requestDevelopmentProposal, settings, syncRemoteChanges } = useStudioSettings();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [prompt, setPrompt] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -61,6 +63,7 @@ export default function AgentScreen() {
   const [loadingPreviewIds, setLoadingPreviewIds] = useState<Record<string, boolean>>({});
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showRepositoryCard, setShowRepositoryCard] = useState(false);
   const [skillPreferences, setSkillPreferences] = useState<SkillPreferences>(DEFAULT_SKILL_PREFERENCES);
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
@@ -127,6 +130,13 @@ export default function AgentScreen() {
 
   const submitPrompt = async () => {
     const normalizedPrompt = prompt.trim();
+    const intent = parseRepositoryChatIntent(normalizedPrompt);
+    if (intent.type === "connect_repository") {
+      setMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", content: normalizedPrompt || `Verbinde ${intent.repositoryUrl}.` }]);
+      setPrompt("");
+      setShowRepositoryCard(true);
+      return;
+    }
     if ((!normalizedPrompt && attachments.length === 0) || !readyForChat || isThinking) return;
     const attachmentSummary = attachments.length ? `\n\nAnhänge: ${attachments.map((attachment) => `${attachment.kind} „${attachment.name}“`).join(", ")}` : "";
     setMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", content: `${normalizedPrompt || "Bitte prüfe diese Anhänge."}${attachmentSummary}` }]);
@@ -299,7 +309,8 @@ export default function AgentScreen() {
           ListHeaderComponent={<>
             <StudioHeader eyebrow="CYBERSARAH · ENTWICKLUNGSRAUM" title="Chat" />
             <View style={styles.chatHero}><View style={styles.chatHeroIcon}><IconSymbol name="sparkles" size={19} color="#D8D3FF" /></View><View style={styles.chatHeroCopy}><Text style={styles.chatHeroTitle}>Was möchtest du weiterentwickeln?</Text><Text style={styles.chatHeroText}>Verbinde dein CyberSarah-revenue-os Repository oder teile ausgewählte Projektdateien für einen reviewbaren Vorschlag.</Text></View></View>
-            <View style={styles.promptChips}>{["Analysiere die Architektur", "Verbessere die mobile UX", "Prüfe die nächsten Fehler"].map((suggestion) => <TouchableOpacity key={suggestion} accessibilityRole="button" onPress={() => setPrompt(suggestion)} style={styles.promptChip}><Text style={styles.promptChipText}>{suggestion}</Text></TouchableOpacity>)}</View>
+            <View style={styles.promptChips}>{["CyberSarah-revenue-os verbinden", "Analysiere die Architektur", "Verbessere die mobile UX", "Prüfe die nächsten Fehler"].map((suggestion) => <TouchableOpacity key={suggestion} accessibilityRole="button" onPress={() => { setPrompt(suggestion); if (suggestion.startsWith("CyberSarah")) setShowRepositoryCard(true); }} style={styles.promptChip}><Text style={styles.promptChipText}>{suggestion}</Text></TouchableOpacity>)}</View>
+            {showRepositoryCard ? <RepositoryConnectCard onClose={() => setShowRepositoryCard(false)} onConnect={(input) => attachRepository({ workspaceUrl: settings.workspaceUrl, repositoryUrl: input.repositoryUrl, branch: input.branch, provider: settings.provider, localProviderEndpoints: settings.localProviderEndpoints, protectChatContent: settings.protectChatContent }).then((result) => { loadRemoteFiles(result.files); setMessages((current) => [...current, { id: `repository-${Date.now()}`, role: "agent", content: `Repository verbunden. ${result.files.length} Dateien auf Branch ${result.branch} stehen jetzt als Projektkontext bereit.`, state: "ready" }]); return result; })} /> : null}
             <View style={[styles.readinessCard, readyForChat ? styles.readinessReady : styles.readinessWaiting]}><View style={styles.readinessIcon}><IconSymbol name="sparkles" size={17} color={readyForChat ? "#B9B2FF" : "#F6BA5E"} /></View><View style={styles.readinessCopy}><Text style={styles.readinessTitle}>{readyForChat ? "Entwicklungs-Chat bereit" : "Verbindung für den Agenten fehlt"}</Text><Text style={styles.readinessText}>{readyForChat ? `Projektkontext aus ${contextLabel} · ${providerLabel}` : hasRepository ? "Hinterlege für das gewählte KI-Profil einen Schlüssel oder nutze ein konfiguriertes On-Server-Profil." : "Verbinde zuerst ein Repository und einen Workspace-Service in den Einstellungen."}</Text></View></View>
             <View style={[styles.providerStatusCard, providerStatus.tone === "warning" ? styles.providerStatusWarning : providerStatus.tone === "ready" ? styles.providerStatusLocal : styles.providerStatusCloud]}><View style={styles.providerStatusIcon}>{providerActivity === "requesting" ? <ActivityIndicator color="#52D8FF" size="small" /> : <View style={[styles.providerStatusDot, providerStatus.tone === "warning" ? styles.providerStatusDotWarning : providerStatus.tone === "ready" ? styles.providerStatusDotLocal : styles.providerStatusDotCloud]} />}</View><View style={styles.providerStatusCopy}><Text style={styles.providerStatusEyebrow}>AKTIVER KI-KANAL</Text><Text style={styles.providerStatusTitle}>{providerStatus.title}</Text><Text numberOfLines={2} style={styles.providerStatusText}>{providerStatus.detail}</Text></View><StatusBadge label={providerStatus.badge} tone={providerStatus.tone} /></View>
             <View style={styles.contextRow}><View style={styles.contextChip}><IconSymbol name="doc.text.fill" size={14} color="#8B7CFF" /><Text numberOfLines={1} style={styles.contextText}>{contextLabel}</Text></View><StatusBadge label={readyForChat ? "Kontrolliert" : "Offline"} tone={readyForChat ? "accent" : "warning"} /></View>
