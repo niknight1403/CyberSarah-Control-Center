@@ -2,25 +2,39 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Setup EAS
         run: npm install -g eas-cli
 
-      - name: Build APK
+      - name: Build Android APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas build --platform android --profile preview --non-interactive
 
+      - name: Summary
+        run: |
+          {
+            echo "## Android Build v${{ github.ref_name }}"
+            echo "- APK: https://expo.dev/accounts/niko1403/builds"
+          } >> "$GITHUB_STEP_SUMMARY"

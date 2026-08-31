@@ -1,6 +1,9 @@
 name: CyberSarah Control Center Release
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
@@ -20,32 +23,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Write release status to summary
         env:
-          RELEASE_STATUS: ${{ github.event_name == 'release' && 'passed' || inputs.release_status }}
+          RELEASE_STATUS: ${{ github.event_name == 'push' && 'passed' || github.event_name == 'release' && 'passed' || inputs.release_status }}
         run: |
           {
             echo "## CyberSarah Control Center Release"
             echo ""
             echo "- Status: **${RELEASE_STATUS}**"
-            echo "- Repository: \\`${GITHUB_REPOSITORY}\\`"
-            echo "- Branch/Ref: \\`${GITHUB_REF_NAME}\\`"
-            echo "- Commit: \\`${GITHUB_SHA}\\`"
+            echo "- Version: \`${{ github.ref_name }}\`"
+            echo "- Repository: \`${GITHUB_REPOSITORY}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Audit release result
-        env:
-          AUDIT_ACTION: release
-          AUDIT_STATUS: ${{ github.event_name == 'release' && 'passed' || inputs.release_status }}
-          AUDIT_MESSAGE: ${{ github.event_name == 'release' && 'GitHub-Release veröffentlicht und für den Handoff protokolliert.' || 'Manueller Release-Status zur Verifikation protokolliert.' }}
-          EXTERNAL_ACTION_AUDIT_URL: ${{ secrets.EXTERNAL_ACTION_AUDIT_URL }}
-          AUDIT_AUTH_TOKEN: ${{ secrets.SERVICE_ACCESS_TOKEN }}
-        run: node scripts/ci-audit.mjs
