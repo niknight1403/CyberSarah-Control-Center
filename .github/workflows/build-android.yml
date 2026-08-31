@@ -16,20 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Setup EAS
-        run: pnpm add -g eas-cli
+        run: npm install -g eas-cli
 
       - name: Build Android APK
         env:
