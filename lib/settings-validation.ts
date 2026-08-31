@@ -14,8 +14,10 @@ export function validateWorkspaceUrl(rawValue: string): FieldValidation {
 
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:") {
-      return { valid: false, tone: "error", message: "Nutze eine HTTPS-Adresse, damit Zugangsdaten geschützt übertragen werden." };
+    if (!['https:', 'http:'].includes(url.protocol)) {
+      return { valid: false, tone: 'error', message: 'Nutze eine HTTPS- oder HTTP-Adresse.' };
+    }
+      return { valid: false, tone: 'error', message: 'HTTP nur fuer direkte IP-Adressen.' };
     }
     if (!url.hostname || url.username || url.password) {
       return { valid: false, tone: "error", message: "Die Adresse darf keine eingebetteten Zugangsdaten enthalten." };
