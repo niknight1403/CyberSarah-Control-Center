@@ -30,6 +30,7 @@ export function validateLocalProviderEndpoint(rawValue: string, providerName: st
     const url = new URL(value);
     if (!["https:", "http:"].includes(url.protocol)) return { valid: false, tone: "error", message: "Nutze http oder https." };
     if (!url.hostname || url.username || url.password) return { valid: false, tone: "error", message: "Die Adresse ist ungueltig." };
+    if (placeholderHosts.has(url.hostname) || url.hostname.endsWith(".example.com")) return { valid: false, tone: "error", message: "Ersetze den Platzhalter." };
     if (url.protocol === "http:" && !isIpAddress(url.hostname)) return { valid: false, tone: "error", message: `Fuer ${providerName}-Domains ist HTTPS erforderlich.` };
     return { valid: true, tone: "success", message: `${providerName}-Endpunkt ist gueltig.` };
   } catch { return { valid: false, tone: "error", message: "Gib eine gueltige URL ein." }; }
