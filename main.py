@@ -43,18 +43,24 @@ class CyberSarahControlCenter:
     def send_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Send the generated payload using the client."""
         if hasattr(self.client, "generate"):
-            response = self.client.generate(
+            return self.client.generate(
                 model=payload["model"],
                 prompt=payload["prompt"],
                 options=payload.get("options", {}),
             )
-        else:
-            response = self.client(
-                model=payload["model"],
-                prompt=payload["prompt"],
-                options=payload.get("options", {}),
-            )
-        return response
+        return self.client(
+            model=payload["model"],
+            prompt=payload["prompt"],
+            options=payload.get("options", {}),
+        )
+
+    def extract_response_text(self, raw_response: Any) -> str:
+        """Extract only the output text from an Ollama response object or dict."""
+        if isinstance(raw_response, dict):
+            return raw_response.get("response", "")
+        if hasattr(raw_response, "response"):
+            return getattr(raw_response, "response", "")
+        return str(raw_response)
 
 
 if __name__ == "__main__":
@@ -71,8 +77,10 @@ if __name__ == "__main__":
     print(json.dumps(payload, indent=2))
 
     try:
-        response = app.send_request(payload)
-        print("\n--- Response Received ---")
-        print(response)
+        raw_response = app.send_request(payload)
+        clean_text = app.extract_response_text(raw_response)
+
+        print("\n--- Clean Response Text ---")
+        print(clean_text)
     except Exception as e:
         print(f"\nRequest failed: {e}")
