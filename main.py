@@ -1,8 +1,22 @@
 import json
 from typing import Any, Dict
 
+try:
+    from ollama import Client
+except ImportError:
+    from ollamafreeapi import client as Client
+
 
 class CyberSarahControlCenter:
+
+    def __init__(self, base_url: str = "http://localhost:11434"):
+        if callable(Client):
+            try:
+                self.client = Client(host=base_url)
+            except TypeError:
+                self.client = Client
+        else:
+            self.client = Client
 
     def generate_api_request(
         self, model_name: str, prompt: str, **kwargs
@@ -26,16 +40,39 @@ class CyberSarahControlCenter:
 
         return {"model": model_name, "prompt": prompt, "options": options}
 
+    def send_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Send the generated payload using the client."""
+        if hasattr(self.client, "generate"):
+            response = self.client.generate(
+                model=payload["model"],
+                prompt=payload["prompt"],
+                options=payload.get("options", {}),
+            )
+        else:
+            response = self.client(
+                model=payload["model"],
+                prompt=payload["prompt"],
+                options=payload.get("options", {}),
+            )
+        return response
+
 
 if __name__ == "__main__":
     app = CyberSarahControlCenter()
 
-    request_payload = app.generate_api_request(
-        model_name="llama3",
+    payload = app.generate_api_request(
+        model_name="tinyllama",
         prompt="Analyze system logs for security vulnerabilities.",
         temperature=0.5,
         seed=42,
     )
 
-    print("--- Generated JSON Payload ---")
-    print(json.dumps(request_payload, indent=2))
+    print("--- Sending API Request ---")
+    print(json.dumps(payload, indent=2))
+
+    try:
+        response = app.send_request(payload)
+        print("\n--- Response Received ---")
+        print(response)
+    except Exception as e:
+        print(f"\nRequest failed: {e}")
