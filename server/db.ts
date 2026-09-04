@@ -1,6 +1,17 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { billingSubscriptions, InsertUser, users } from "../drizzle/schema";
+
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com").trim().toLowerCase();
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function isAdministratorEmail(email: string | null | undefined) {
+  return Boolean(email && normalizeEmail(email) === ADMIN_EMAIL);
+}
+
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -52,12 +63,12 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    if (isAdministratorEmail(user.email) || user.openId === ENV.ownerOpenId) {
       values.role = "admin";
       updateSet.role = "admin";
+    } else if (user.role !== undefined) {
+      values.role = user.role;
+      updateSet.role = user.role;
     }
 
     if (!values.lastSignedIn) {
@@ -89,4 +100,83 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  const result = await db.select().from(users).where(eq(users.email, normalizeEmail(email))).limit(1);
+  return result[0];
+}
+
+export async function createLocalUser(input: { openId: string; email: string; name?: string; passwordHash: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  const email = normalizeEmail(input.email);
+  if (await getUserByEmail(email)) throw new Error("Für diese E-Mail-Adresse existiert bereits ein Konto.");
+  await db.insert(users).values({
+    openId: input.openId,
+    email,
+    name: input.name?.trim() || null,
+    passwordHash: input.passwordHash,
+    loginMethod: "password",
+    role: isAdministratorEmail(email) ? "admin" : "user",
+    lastSignedIn: new Date(),
+  });
+  const user = await getUserByOpenId(input.openId);
+  if (!user) throw new Error("Das neue Konto konnte nicht geladen werden.");
+  return user;
+}
+
+export async function touchUserSession(openId: string) {
+  const db = await getDb();
+  if (!db) return;
+  const user = await getUserByOpenId(openId);
+  if (!user) return;
+  await db.update(users).set({
+    lastSignedIn: new Date(),
+    ...(isAdministratorEmail(user.email) ? { role: "admin" as const } : {}),
+  }).where(eq(users.id, user.id));
+}
+
+export async function setStripeCustomerId(userId: number, stripeCustomerId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  await db.update(users).set({ stripeCustomerId }).where(eq(users.id, userId));
+}
+
+export async function getUserByStripeCustomerId(stripeCustomerId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  const result = await db.select().from(users).where(eq(users.stripeCustomerId, stripeCustomerId)).limit(1);
+  return result[0];
+}
+
+export async function upsertBillingSubscription(input: {
+  userId: number;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  stripePriceId?: string | null;
+  status: string;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd?: Date | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  await db.insert(billingSubscriptions).values(input).onDuplicateKeyUpdate({
+    set: {
+      stripeCustomerId: input.stripeCustomerId,
+      stripePriceId: input.stripePriceId ?? null,
+      status: input.status,
+      cancelAtPeriodEnd: input.cancelAtPeriodEnd,
+      currentPeriodEnd: input.currentPeriodEnd ?? null,
+    },
+  });
+}
+
+export async function getBillingSubscriptionForUser(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  const result = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.userId, userId)).limit(1);
+  return result[0];
+}
+
+export { ADMIN_EMAIL, isAdministratorEmail };

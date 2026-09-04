@@ -14,6 +14,7 @@ import { formatProjectContext, readProjectContext } from "@/lib/project-upload-r
 import { RepositoryConnectCard } from "@/components/studio/repository-connect-card";
 import { parseRepositoryChatIntent } from "@/lib/repository-intent-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
+import { trpc } from "@/lib/trpc";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
@@ -43,7 +44,7 @@ const initialMessages: ChatMessage[] = [{
 
 export default function AgentScreen() {
   const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } = useWorkspace();
-  const { attachRepository, loadRepositoryDetails, loadWorkspaceHealth, requestDevelopmentProposal, settings, syncRemoteChanges } = useStudioSettings();
+  const { attachRepository, loadRepositoryDetails, loadWorkspaceHealth, settings, syncRemoteChanges } = useStudioSettings();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [prompt, setPrompt] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -68,12 +69,33 @@ export default function AgentScreen() {
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
   const { busy: mediaPickerBusy, pickFiles: pickFilesFromDevice, pickPhotos, pickVideos } = useMediaPicker();
+  const developmentChatMutation = trpc.developmentChat.send.useMutation();
   const hasRepository = Boolean(settings.workspaceId);
   const chatWorkspaceId = settings.workspaceId;
   const providerLabel = getProviderLabel(settings.provider);
   const providerStatus = getProviderStatusCopy(settings.provider, providerActivity, lastProviderUsed);
   const readyForChat = hasRepository && (settings.provider === "managed" || settings.hasProviderKey);
   const contextLabel = useMemo(() => `${selectedFile.name} · ${settings.branch}`, [selectedFile.name, settings.branch]);
+
+  const requestDevelopmentChat = async (content: string): Promise<AgentProposal> => {
+    const conversation: { role: "user" | "assistant"; content: string }[] = messages
+      .filter((message) => message.role === "user" || message.role === "agent")
+      .slice(-10)
+      .map((message) => ({ role: message.role === "agent" ? "assistant" as const : "user" as const, content: message.content }));
+    const requestMessages: { role: "user" | "assistant"; content: string }[] = [...conversation, { role: "user" as const, content }].slice(-12);
+    const result = await developmentChatMutation.mutateAsync({
+      provider: settings.provider,
+      messages: requestMessages,
+    });
+    return {
+      summary: result.content,
+      rationale: `Antwort von ${result.providerUsed} · Modell ${result.model}`,
+      changes: [],
+      affectedFiles: [],
+      providerUsed: result.providerUsed,
+      fallbackUsed: false,
+    };
+  };
 
   useEffect(() => {
     let active = true;
@@ -152,7 +174,7 @@ export default function AgentScreen() {
       const contextNotice = projectContext.skipped.length ? `\n\nNicht übernommen: ${projectContext.skipped.join(", ")}` : "";
       if (contextNotice) setChatError(`Einige Anhänge wurden aus Sicherheitsgründen übersprungen: ${projectContext.skipped.join(", ")}`);
       const contextualPrompt = `${enabledSkills ? `Aktive Skills: ${enabledSkills}\n\n` : ""}${normalizedPrompt}${projectContextText}`;
-      const proposal = await requestDevelopmentProposal({ prompt: contextualPrompt, activeFile: selectedFile.remote ? selectedFile.path : undefined, contextFiles: projectContext.files });
+      const proposal = await requestDevelopmentChat(contextualPrompt);
       setLastProviderUsed(proposal.providerUsed ?? settings.provider);
       setProviderActivity(proposal.fallbackUsed ? "fallback" : "active");
       const content = proposal.changes.length ? `${proposal.summary}\n\n${proposal.rationale}\n\n${proposal.changes.length} Datei(en) zur Überprüfung bereit.` : `${proposal.summary}\n\n${proposal.rationale}`;
@@ -255,7 +277,7 @@ export default function AgentScreen() {
         await loadRepositoryDetails();
       } else {
         if (!readyForChat) throw new Error("Der KI-Provider ist noch nicht vollständig konfiguriert.");
-        await requestDevelopmentProposal({ prompt: "Verbindungstest: Antworte ausschließlich mit OK." });
+        await requestDevelopmentChat("Verbindungstest: Antworte ausschließlich mit OK.");
       }
       setConnectorTests((current) => ({ ...current, [connector]: { status: "success", message: "Verbindung bestätigt" } }));
     } catch {

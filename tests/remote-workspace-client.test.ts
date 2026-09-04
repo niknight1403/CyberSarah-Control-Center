@@ -122,7 +122,7 @@ describe("workspace service client", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ proposal: { summary: "Fallback erreichbar.", rationale: "Der Cloud-Fallback antwortet.", changes: [], affectedFiles: [] } }) });
     vi.stubGlobal("fetch", fetchMock);
     const client = new RemoteWorkspaceClient({ baseUrl: "https://studio.example.com", serviceAccessToken: "service-secret", provider: "ollama", fallbackProvider: "gemini" });
-    await expect(client.requestAgentProposal({ prompt: "Prüfe den Status" })).resolves.toMatchObject({ summary: "Fallback erreichbar.", changes: [] });
+    await expect(client.requestAgentProposal({ workspaceId: "workspace", prompt: "Prüfe den Status" })).resolves.toMatchObject({ summary: "Fallback erreichbar.", changes: [] });
     expect(fetchMock.mock.calls[0][1].headers["X-AI-Provider"]).toBe("ollama");
     expect(fetchMock.mock.calls[1][1].headers["X-AI-Provider"]).toBe("gemini");
     expect(fetchMock.mock.calls[1][1].headers["X-AI-Provider-Key"]).toBeUndefined();
@@ -133,9 +133,9 @@ describe("workspace service client", () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ summary: "Use a shared token.", rationale: "It prevents duplicated constants.", changes: [{ path: "src/fixture.ts", content: "export const token = 1;\n", explanation: "Centralize the value." }], affectedFiles: ["src/fixture.ts"] }) });
     vi.stubGlobal("fetch", fetchMock);
     const client = new RemoteWorkspaceClient({ baseUrl: "https://studio.example.com", serviceAccessToken: "service-secret", provider: "managed" });
-    await expect(client.requestAgentProposal({ prompt: "Extract a shared token", activeFile: "src/fixture.ts" })).resolves.toMatchObject({ changes: [{ path: "src/fixture.ts" }] });
+    await expect(client.requestAgentProposal({ workspaceId: "workspace-123", prompt: "Extract a shared token", activeFile: "src/fixture.ts" })).resolves.toMatchObject({ changes: [{ path: "src/fixture.ts" }] });
     expect(fetchMock.mock.calls[0][0]).toBe("https://studio.example.com/api/v1/agent/proposals");
-    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ prompt: "Extract a shared token", activeFile: "src/fixture.ts" }));
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ workspaceId: "workspace-123", prompt: "Extract a shared token", activeFile: "src/fixture.ts" }));
     vi.unstubAllGlobals();
   });
 });

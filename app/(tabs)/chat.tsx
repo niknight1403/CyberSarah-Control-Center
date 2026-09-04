@@ -9,6 +9,7 @@ import type { MediaAttachment } from "@/lib/media-picker";
 import { formatProjectContext, readProjectContext } from "@/lib/project-upload-reader";
 import { RepositoryConnectCard } from "@/components/studio/repository-connect-card";
 import { useStudioSettings } from "@/lib/studio-settings";
+import { trpc } from "@/lib/trpc";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
@@ -27,7 +28,7 @@ const initialMessages: ChatMessage[] = [{ id: "agent-intro", role: "agent", cont
 
 export default function ChatScreen() {
   const { loadRemoteFiles, selectedFile } = useWorkspace();
-  const { attachRepository, loadRepositoryDetails, loadWorkspaceHealth, requestDevelopmentProposal, settings } = useStudioSettings();
+  const { attachRepository, loadRepositoryDetails, loadWorkspaceHealth, settings } = useStudioSettings();
   const [activeTab, setActiveTab] = useState<InnerTab>("chat");
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [prompt, setPrompt] = useState("");
@@ -42,11 +43,23 @@ export default function ChatScreen() {
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
   const { busy: mediaPickerBusy, pickFiles: pickFilesFromDevice, pickPhotos, pickVideos } = useMediaPicker();
+  const developmentChatMutation = trpc.developmentChat.send.useMutation();
   const chatWorkspaceId = settings.workspaceId;
   const providerLabel = getProviderLabel(settings.provider);
-  const providerStatus = getProviderStatusCopy(settings.provider, providerActivity, lastProviderUsed);
-  const readyForChat = Boolean(settings.workspaceId) && (settings.provider === "managed" || settings.hasProviderKey);
+  const readyForChat = settings.provider === "managed" || settings.hasProviderKey;
   const contextLabel = useMemo(() => selectedFile.name + " - " + settings.branch, [selectedFile.name, settings.branch]);
+
+  const requestDevelopmentChat = async (content: string) => {
+    const conversation: { role: "user" | "assistant"; content: string }[] = messages
+      .filter((message) => message.role === "user" || message.role === "agent")
+      .slice(-10)
+      .map((message) => ({ role: message.role === "agent" ? "assistant" as const : "user" as const, content: message.content }));
+    const requestMessages: { role: "user" | "assistant"; content: string }[] = [...conversation, { role: "user" as const, content }].slice(-12);
+    return developmentChatMutation.mutateAsync({
+      provider: settings.provider,
+      messages: requestMessages,
+    });
+  };
 
   useEffect(() => {
     let active = true;
@@ -75,7 +88,7 @@ export default function ChatScreen() {
       if (parsed.length) setMessages(parsed);
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [chatWorkspaceId]);
+  }, [chatWorkspaceId, settings.protectChatContent]);
 
   const updateConnectorPreference = (connector: ConnectorId) => {
     setConnectorPreferences((current) => {
@@ -102,7 +115,7 @@ export default function ChatScreen() {
         await loadRepositoryDetails();
       } else {
         if (!readyForChat) throw new Error("KI-Provider nicht konfiguriert.");
-        await requestDevelopmentProposal({ prompt: "Verbindungstest: Antworte nur mit OK." });
+        await requestDevelopmentChat("Verbindungstest: Antworte nur mit OK.");
       }
       setConnectorTests((c) => ({ ...c, [connector]: { status: "success", message: "Verbindung bestaetigt" } }));
     } catch {
@@ -124,9 +137,9 @@ export default function ChatScreen() {
     setLastProviderUsed(settings.provider);
     try {
       const fileContext = attachments.length ? formatProjectContext((await readProjectContext(attachments)).files) : "";
-      const result = await requestDevelopmentProposal({ prompt: fileContext ? text + "\n\n" + fileContext : text });
+      const result = await requestDevelopmentChat(fileContext ? text + "\n\n" + fileContext : text);
       setProviderActivity("idle");
-      const agentMsg: ChatMessage = { id: "agent-" + Date.now(), role: "agent", content: result.summary, state: "ready", proposal: result };
+      const agentMsg: ChatMessage = { id: "agent-" + Date.now(), role: "agent", content: result.content + "\n\nAntwort von " + result.providerUsed + " · " + result.model, state: "ready" };
       setMessages((cur) => {
         const next = [...cur.filter((m) => !m.id.startsWith("thinking-")), agentMsg];
         void saveDevelopmentChatHistory(serializeDevelopmentChatHistory(next), settings.protectChatContent, chatWorkspaceId).catch(() => undefined);

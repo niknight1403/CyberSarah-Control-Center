@@ -352,7 +352,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   const requestDevelopmentProposal = useCallback(async (input: { prompt: string; activeFile?: string; contextFiles?: AgentContextFile[] }) => {
     if (!settings.workspaceId) throw new Error("Verbinde zuerst ein Repository, bevor du einen Entwicklungsauftrag sendest.");
     const client = await createConnectedClient();
-    return client.requestAgentProposal({ prompt: input.prompt.trim(), activeFile: input.activeFile, contextFiles: input.contextFiles });
+    return client.requestAgentProposal({ workspaceId: settings.workspaceId, prompt: input.prompt.trim(), activeFile: input.activeFile, contextFiles: input.contextFiles });
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(

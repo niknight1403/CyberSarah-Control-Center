@@ -1,31 +1,12 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
-import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-
-function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.listen(port, () => {
-      server.close(() => resolve(true));
-    });
-    server.on("error", () => resolve(false));
-  });
-}
-
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
-  for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) {
-      return port;
-    }
-  }
-  throw new Error(`No available port found starting from ${startPort}`);
-}
+import { processStripeWebhook } from "../billing";
 
 async function startServer() {
   const app = express();
@@ -52,6 +33,16 @@ async function startServer() {
     next();
   });
 
+  app.post("/api/billing/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    try {
+      const result = await processStripeWebhook(req.body as Buffer, req.header("stripe-signature"));
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("[Stripe] Webhook-Verarbeitung fehlgeschlagen:", error instanceof Error ? error.message : "Unbekannter Fehler");
+      res.status(400).json({ error: "Webhook konnte nicht verifiziert oder verarbeitet werden." });
+    }
+  });
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -70,13 +61,7 @@ async function startServer() {
     }),
   );
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
+  const port = parseInt(process.env.PORT || "3000", 10);
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
   });

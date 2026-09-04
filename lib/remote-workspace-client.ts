@@ -30,6 +30,7 @@ export type AgentContextFile = {
 };
 
 export type AgentRequest = {
+  workspaceId: string;
   prompt: string;
   activeFile?: string;
   contextFiles?: AgentContextFile[];
@@ -92,12 +93,28 @@ export class RemoteWorkspaceClient {
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.config.baseUrl}${path}`, {
-      ...init,
-      headers: { ...this.requestHeaders, ...init?.headers },
-    });
-    if (!response.ok) throw new Error(`Workspace-Service antwortet mit ${response.status}.`);
-    return (await response.json()) as T;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45_000);
+    try {
+      const response = await fetch(`${this.config.baseUrl}${path}`, {
+        ...init,
+        headers: { ...this.requestHeaders, ...init?.headers },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => undefined) as { error?: unknown } | undefined;
+        const message = typeof payload?.error === "string" ? payload.error : `Workspace-Service antwortet mit ${response.status}.`;
+        throw new Error(message);
+      }
+      return (await response.json()) as T;
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new Error("Der Workspace-Service antwortet nicht. Prüfe die Service-URL und die Netzwerkverbindung.");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   getHealth() {
@@ -175,7 +192,7 @@ export class RemoteWorkspaceClient {
   private async requestAgentProposalDirect(input: AgentRequest) {
     const response = await this.request<AgentProposal | { proposal: AgentProposal }>("/api/v1/agent/proposals", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify({ workspaceId: input.workspaceId, prompt: input.prompt, ...(input.activeFile ? { activeFile: input.activeFile } : {}) }),
     });
     const proposal = "proposal" in response ? response.proposal : response;
     return { ...proposal, providerUsed: this.config.provider, fallbackUsed: false };
