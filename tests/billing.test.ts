@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getStripeMode, validateStripeSecretKey } from "../server/billing";
+import {
+  getStripeMode,
+  isStripeSubscriptionEvent,
+  validateStripeSecretKey,
+} from "../server/billing";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -30,5 +34,21 @@ describe("Stripe configuration", () => {
   it("rejects unknown modes", () => {
     vi.stubEnv("STRIPE_MODE", "sandbox");
     expect(() => getStripeMode()).toThrow(/STRIPE_MODE/);
+  });
+
+  it("routes subscription lifecycle events for database synchronization", () => {
+    expect(isStripeSubscriptionEvent("customer.subscription.created")).toBe(
+      true,
+    );
+    expect(isStripeSubscriptionEvent("customer.subscription.updated")).toBe(
+      true,
+    );
+    expect(isStripeSubscriptionEvent("customer.subscription.deleted")).toBe(
+      true,
+    );
+    expect(isStripeSubscriptionEvent("customer.subscription.paused")).toBe(
+      true,
+    );
+    expect(isStripeSubscriptionEvent("invoice.paid")).toBe(false);
   });
 });

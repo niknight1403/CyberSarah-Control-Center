@@ -154,6 +154,30 @@ export async function syncStripeSubscription(
   });
 }
 
+async function syncInvoiceSubscription(
+  stripe: Stripe,
+  invoice: Stripe.Invoice,
+) {
+  const subscriptionReference =
+    invoice.parent?.subscription_details?.subscription;
+  if (!subscriptionReference) return;
+  const subscription =
+    typeof subscriptionReference === "string"
+      ? await stripe.subscriptions.retrieve(subscriptionReference)
+      : subscriptionReference;
+  await syncStripeSubscription(subscription);
+}
+
+export function isStripeSubscriptionEvent(eventType: string) {
+  return new Set([
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+    "customer.subscription.paused",
+    "customer.subscription.resumed",
+  ]).has(eventType);
+}
+
 export async function processStripeWebhook(
   payload: Buffer,
   signature: string | undefined,
@@ -165,12 +189,14 @@ export async function processStripeWebhook(
     signature,
     requiredEnvironment("STRIPE_WEBHOOK_SECRET"),
   );
-  if (
-    event.type === "customer.subscription.created" ||
-    event.type === "customer.subscription.updated" ||
-    event.type === "customer.subscription.deleted"
-  ) {
+  if (isStripeSubscriptionEvent(event.type)) {
     await syncStripeSubscription(event.data.object as Stripe.Subscription);
+  }
+  if (
+    event.type === "invoice.paid" ||
+    event.type === "invoice.payment_failed"
+  ) {
+    await syncInvoiceSubscription(stripe, event.data.object as Stripe.Invoice);
   }
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;

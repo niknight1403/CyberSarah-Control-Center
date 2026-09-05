@@ -6,6 +6,7 @@ import * as ReactNative from "react-native";
 const bundleId = "com.app.customaistudiomobile";
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
+export const DEFAULT_API_BASE_URL = "https://app.cybersarah-ki.com";
 
 const env = {
   portal: process.env.EXPO_PUBLIC_OAUTH_PORTAL_URL ?? "",
@@ -22,12 +23,12 @@ export const OAUTH_SERVER_URL = env.server;
 export const APP_ID = env.appId;
 export const OWNER_OPEN_ID = env.ownerId;
 export const OWNER_NAME = env.ownerName;
-export const API_BASE_URL = env.apiBaseUrl;
+export const API_BASE_URL = env.apiBaseUrl || DEFAULT_API_BASE_URL;
 
 /**
- * Get the API base URL, deriving from current hostname if not set.
- * Metro runs on 8081, API server runs on 3000.
- * URL pattern: https://PORT-sandboxid.region.domain
+ * Get the API base URL. A build-time EXPO_PUBLIC_API_BASE_URL override is
+ * supported for controlled development/staging; production defaults to the
+ * live backend and never falls back to localhost or a test IP.
  */
 export function getApiBaseUrl(): string {
   // If API_BASE_URL is set, use it
@@ -36,7 +37,11 @@ export function getApiBaseUrl(): string {
   }
 
   // On web, derive from the current preview host when no explicit API URL is configured.
-  if (ReactNative.Platform.OS === "web" && typeof window !== "undefined" && window.location) {
+  if (
+    ReactNative.Platform.OS === "web" &&
+    typeof window !== "undefined" &&
+    window.location
+  ) {
     const { protocol, hostname, port } = window.location;
     // Local development uses Expo on 8081 and the API on 3000.
     if (port === "8081") return `${protocol}//${hostname}:3000`;
@@ -44,11 +49,11 @@ export function getApiBaseUrl(): string {
     const apiHostname = hostname.replace(/^8081-/, "3000-");
     if (apiHostname !== hostname) return `${protocol}//${apiHostname}`;
     // If the app is served directly by the API, keep the same origin.
-    if (port === "3000" || port === "") return `${protocol}//${hostname}${port ? `:${port}` : ""}`;
+    if (port === "3000" || port === "")
+      return `${protocol}//${hostname}${port ? `:${port}` : ""}`;
   }
 
-  // Fallback to empty (will use relative URL)
-  return "";
+  return DEFAULT_API_BASE_URL;
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";
