@@ -164,3 +164,4 @@
 - [ ] GitHub-Push, Release und APK-Action nur nach grüner Validierung und ohne unzulässige Secrets ausführen.
 - [ ] Manuelle Voraussetzungen wie EXPO_TOKEN, EAS-Build, echter Android-Gerätetest und Publish-Oberfläche transparent dokumentieren.
 - [ ] Quellengebundenen Abschlussbericht mit Commit-, Run- und Release-Status erstellen.
+- [x] EAS-APK-Action nach belegtem Free-Tier-Buildkontingent auf manuelle workflow_dispatch-Ausführung umstellen und die Einschränkung im Release-Handoff berücksichtigen.
