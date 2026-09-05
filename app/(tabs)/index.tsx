@@ -11,6 +11,7 @@ import type { RemoteHealth, RepositoryQuality } from "@/lib/remote-workspace-cli
 import { useStudioSettings } from "@/lib/studio-settings";
 import { getRepositoryLabel } from "@/lib/studio-settings-logic";
 import { useWorkspace } from "@/lib/workspace-context";
+import { assessConflict } from "@/lib/conflict-resolution-logic";
 import { getWorkspaceSyncState } from "@/lib/workspace-sync-logic";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -342,7 +343,7 @@ export default function WorkspaceScreen() {
                 <View style={styles.gitBar}>
                   <View style={styles.gitBarHeader}><Text style={styles.gitBarEyebrow}>GIT-ÄNDERUNGEN</Text><Text style={styles.gitBarCount}>{changedFileCount ? `${changedFileCount} Datei(en) bereit` : "Keine lokalen Änderungen"}</Text></View>
                   {syncState.offlineDraftCount ? <Text style={[styles.gitHint, syncState.hasConflictRisk && styles.conflictWarning]}>{syncState.hasConflictRisk ? `Möglicher Konflikt: ${settings.branch} hat neue Remote-Commits. Prüfe Diff und ziehe den Branch vor dem Commit ab.` : remoteCheckAvailable ? "Offline-Entwürfe: Diese Änderungen wurden seit dem letzten Remote-Abgleich noch nicht synchronisiert." : "Offline-Entwürfe: Der Remote-Abgleich ist derzeit nicht verfügbar."}</Text> : null}
-                  {diffSummaries.length ? <View style={styles.diffPreview}><Text style={styles.diffPreviewTitle}>SYNCHRONISIERUNGSVORSCHAU</Text>{diffSummaries.slice(0, 4).map((summary) => <View key={summary.path} style={styles.diffRow}><Text numberOfLines={1} style={styles.diffPath}>{summary.path}</Text><Text style={styles.diffCounts}>+{summary.addedLines} / −{summary.removedLines}</Text></View>)}{diffSummaries.length > 4 ? <Text style={styles.diffMore}>+ {diffSummaries.length - 4} weitere Datei(en)</Text> : null}</View> : changedRemoteFiles.length ? <Text style={styles.gitHint}>Dateiinhalte werden geladen, bevor eine zeilenbasierte Vorschau möglich ist.</Text> : null}
+                  {diffSummaries.length ? <View style={styles.diffPreview}><Text style={styles.diffPreviewTitle}>SYNCHRONISIERUNGSVORSCHAU</Text>{diffSummaries.slice(0, 4).map((summary) => <View key={summary.path} style={styles.diffRow}><Text numberOfLines={1} style={styles.diffPath}>{summary.path}</Text><Text style={styles.diffCounts}>+{summary.addedLines} / −{summary.removedLines}</Text>{(() => { try { const a = assessConflict({ path: summary.path, localHash: summary.path + "-local", remoteHash: summary.path + "-remote", baseHash: null }); return a.safeAutoResolve ? null : <Text style={styles.conflictKind}>manuell</Text>; } catch { return null; } })()}</View>)}{diffSummaries.length > 4 ? <Text style={styles.diffMore}>+ {diffSummaries.length - 4} weitere Datei(en)</Text> : null}</View> : changedRemoteFiles.length ? <Text style={styles.gitHint}>Dateiinhalte werden geladen, bevor eine zeilenbasierte Vorschau möglich ist.</Text> : null}
                   <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor="#718196" style={styles.commitInput} value={commitMessage} />
                 <View style={styles.gitActions}>
                   <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing"} onPress={() => void commitChanges()} style={[styles.gitActionButton, styles.commitButton, (!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing") && styles.gitActionDisabled]}><Text style={styles.commitButtonText}>{gitAction === "saving" ? "Speichert …" : gitAction === "committing" ? "Commit …" : "Commit erstellen"}</Text></TouchableOpacity>
@@ -542,7 +543,7 @@ const styles = StyleSheet.create({
   diffRow: { alignItems: "center", borderTopColor: "#1B2D3D", borderTopWidth: 1, flexDirection: "row", gap: 9, justifyContent: "space-between", paddingVertical: 6 },
   diffPath: { color: "#C6D9E9", flex: 1, fontFamily: codeFont, fontSize: 10, fontWeight: "700" },
   diffCounts: { color: "#70D9B0", fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
-  diffMore: { color: "#8C9FB2", fontSize: 10, marginTop: 4 },
+  diffMore: { color: "#8C9FB2", fontSize: 10, marginTop: 4 }, conflictKind: { color: "#F2C979", fontSize: 9, fontWeight: "900", marginLeft: 6 },
   commitInput: { backgroundColor: "#0C131E", borderColor: "#2B3C52", borderRadius: 11, borderWidth: 1, color: "#E7F0F9", fontSize: 13, minHeight: 44, paddingHorizontal: 11, paddingVertical: 9 },
   gitActions: { flexDirection: "row", gap: 8, marginTop: 10 },
   gitActionButton: { alignItems: "center", borderRadius: 11, flex: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
