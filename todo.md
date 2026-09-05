@@ -161,7 +161,7 @@
 - [x] Sprint 30: Betriebs- und Release-Dokumentation gegen OPERATIONS.md, RELEASE_HANDOFF.md und PLAY_STORE_BEREITSCHAFT.md abgleichen.
 - [x] Sprint 31: Gesamt-Regression, Preflight, Secret-Scan, Build und Git-Status in sauberer Umgebung ausführen.
 - [x] Veralteten Flutter-APK-Workflow nicht als Expo-APK-Workflow verwenden; tatsächlichen EAS-Workflow prüfen und korrigieren, falls erforderlich.
-- [ ] GitHub-Push, Release und APK-Action nur nach grüner Validierung und ohne unzulässige Secrets ausführen.
+- [x] GitHub-Push, Release und APK-Action nur nach grüner Validierung und ohne unzulässige Secrets ausführen.
 - [ ] Manuelle Voraussetzungen wie EXPO_TOKEN, EAS-Build, echter Android-Gerätetest und Publish-Oberfläche transparent dokumentieren.
-- [ ] Quellengebundenen Abschlussbericht mit Commit-, Run- und Release-Status erstellen.
+- [x] Quellengebundener Abschlussbericht mit Commit-, Run- und Release-Status erstellen.
 - [x] EAS-APK-Action nach belegtem Free-Tier-Buildkontingent auf manuelle workflow_dispatch-Ausführung umstellen und die Einschränkung im Release-Handoff berücksichtigen.
