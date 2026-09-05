@@ -12,6 +12,7 @@ import {
   processStripeWebhook,
 } from "../billing";
 import { sdk } from "./sdk";
+import { createSecurityMiddleware } from "./security";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
   try {
@@ -26,29 +27,8 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Enable CORS for all routes - reflect the request origin to support credentials
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin) {
-      res.header("Access-Control-Allow-Origin", origin);
-    }
-    res.header(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, OPTIONS",
-    );
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-    );
-    res.header("Access-Control-Allow-Credentials", "true");
-
-    // Handle preflight requests
-    if (req.method === "OPTIONS") {
-      res.sendStatus(200);
-      return;
-    }
-    next();
-  });
+  app.set("trust proxy", process.env.TRUST_PROXY === "true");
+  app.use(createSecurityMiddleware());
 
   app.post(
     "/api/billing/stripe/webhook",
@@ -65,11 +45,9 @@ async function startServer() {
           "[Stripe] Webhook-Verarbeitung fehlgeschlagen:",
           error instanceof Error ? error.message : "Unbekannter Fehler",
         );
-        res
-          .status(400)
-          .json({
-            error: "Webhook konnte nicht verifiziert oder verarbeitet werden.",
-          });
+        res.status(400).json({
+          error: "Webhook konnte nicht verifiziert oder verarbeitet werden.",
+        });
       }
     },
   );

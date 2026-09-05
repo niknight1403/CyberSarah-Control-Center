@@ -71,4 +71,11 @@ pm2 restart cybersarah-backend --update-env
 pm2 logs cybersarah-backend --lines 100
 ```
 
+Für die vollständige Prüfung von `.env`, Health-Endpoint, MySQL, PM2 und Nginx:
+
+```bash
+cd /opt/cybersarah-control-center
+./scripts/validate-production.sh
+```
+
 In der Stripe-Dashboard-Konfiguration muss der Endpoint auf `https://app.cybersarah-ki.com/api/billing/stripe/webhook` zeigen und mindestens die oben genannten Subscription- und Checkout-Events abonnieren. Ein absichtlich ungültiger oder fehlender `stripe-signature`-Header muss mit HTTP 400 abgewiesen werden.
