@@ -44,7 +44,13 @@ export type RemoteCommit = {
 export type RemoteBranches = { currentBranch: string; branches: string[] };
 export type RepositoryQuality = {
   branch: string;
-  pullRequest: { number: number; title: string; url: string; headBranch: string; baseBranch: string } | null;
+  pullRequest: {
+    number: number;
+    title: string;
+    url: string;
+    headBranch: string;
+    baseBranch: string;
+  } | null;
   merge: { state: string; label: string };
   ci: {
     state: string;
@@ -53,27 +59,54 @@ export type RepositoryQuality = {
     passed: number;
     failed: number;
     pending: number;
-    checks: Array<{ name: string; status: string; conclusion: string | null; url: string | null }>;
+    checks: Array<{
+      name: string;
+      status: string;
+      conclusion: string | null;
+      url: string | null;
+    }>;
   };
-  reviews: { reviewerCount: number; approvedCount: number; requestedChangesCount: number };
+  reviews: {
+    reviewerCount: number;
+    approvedCount: number;
+    requestedChangesCount: number;
+  };
 };
 
-const LOCAL_PROVIDER_IDS = new Set<ProviderId>(["ollama", "lmstudio", "custom"]);
+const LOCAL_PROVIDER_IDS = new Set<ProviderId>(["ollama", "lmstudio"]);
+const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+export class WorkspaceRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message = `Workspace-Service antwortet mit ${status}.`,
+  ) {
+    super(message);
+    this.name = "WorkspaceRequestError";
+  }
+}
+
+export function isTransientProviderError(error: unknown) {
+  if (error instanceof WorkspaceRequestError)
+    return TRANSIENT_HTTP_STATUSES.has(error.status);
+  return error instanceof TypeError;
+}
 
 export function buildWorkspaceHeaders(config: RemoteWorkspaceConfig) {
   return {
     "Content-Type": "application/json",
-    ...(config.serviceAccessToken ? { Authorization: `Bearer ${config.serviceAccessToken}` } : {}),
+    ...(config.serviceAccessToken
+      ? { Authorization: `Bearer ${config.serviceAccessToken}` }
+      : {}),
     ...(config.githubToken ? { "X-GitHub-Token": config.githubToken } : {}),
     ...(config.provider ? { "X-AI-Provider": config.provider } : {}),
-    ...(config.providerApiKey ? { "X-AI-Provider-Key": config.providerApiKey } : {}),
+    ...(config.providerApiKey
+      ? { "X-AI-Provider-Key": config.providerApiKey }
+      : {}),
   };
 }
 
-/**
- * Client-side contract for the user's self-hosted workspace service.
- * The service, not the mobile app, performs process execution and filesystem actions.
- */
+/** Client-side contract for the user's self-hosted workspace service. */
 export class RemoteWorkspaceClient {
   constructor(private readonly config: RemoteWorkspaceConfig) {}
 
@@ -82,85 +115,126 @@ export class RemoteWorkspaceClient {
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.config.baseUrl}${path}`, {
-      ...init,
-      headers: { ...this.requestHeaders, ...init?.headers },
-    });
-    if (!response.ok) throw new Error(`Workspace-Service antwortet mit ${response.status}.`);
+    let response: Response;
+    try {
+      response = await fetch(`${this.config.baseUrl}${path}`, {
+        ...init,
+        headers: { ...this.requestHeaders, ...init?.headers },
+      });
+    } catch (error) {
+      throw error;
+    }
+    if (!response.ok) throw new WorkspaceRequestError(response.status);
     return (await response.json()) as T;
   }
 
   getHealth() {
     return this.request<RemoteHealth>("/api/v1/health");
   }
-
   attachRepository(input: RepositoryRequest) {
-    return this.request<{ workspaceId: string; branch: string }>("/api/v1/repositories/attach", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
+    return this.request<{ workspaceId: string; branch: string }>(
+      "/api/v1/repositories/attach",
+      { method: "POST", body: JSON.stringify(input) },
+    );
   }
-
   listFiles(workspaceId: string) {
-    return this.request<{ files: string[] }>(`/api/v1/workspaces/${workspaceId}/files`);
+    return this.request<{ files: string[] }>(
+      `/api/v1/workspaces/${workspaceId}/files`,
+    );
   }
-
   getFile(workspaceId: string, path: string) {
-    return this.request<{ path: string; content: string }>(`/api/v1/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`);
+    return this.request<{ path: string; content: string }>(
+      `/api/v1/workspaces/${workspaceId}/file?path=${encodeURIComponent(path)}`,
+    );
   }
   writeFile(workspaceId: string, path: string, content: string) {
-    return this.request<{ saved: boolean; path: string }>(`/api/v1/workspaces/${workspaceId}/file`, {
-      method: "PUT",
-      body: JSON.stringify({ path, content }),
-    });
+    return this.request<{ saved: boolean; path: string }>(
+      `/api/v1/workspaces/${workspaceId}/file`,
+      { method: "PUT", body: JSON.stringify({ path, content }) },
+    );
   }
   getGitStatus(workspaceId: string) {
-    return this.request<{ status: string; remoteAhead: boolean; localAhead: boolean; remoteCheckAvailable: boolean }>(`/api/v1/workspaces/${workspaceId}/git/status`);
+    return this.request<{
+      status: string;
+      remoteAhead: boolean;
+      localAhead: boolean;
+      remoteCheckAvailable: boolean;
+    }>(`/api/v1/workspaces/${workspaceId}/git/status`);
   }
   listBranches(workspaceId: string) {
-    return this.request<RemoteBranches>(`/api/v1/workspaces/${workspaceId}/git/branches`);
+    return this.request<RemoteBranches>(
+      `/api/v1/workspaces/${workspaceId}/git/branches`,
+    );
   }
   checkoutBranch(workspaceId: string, branch: string) {
-    return this.request<{ branch: string; files: string[] }>(`/api/v1/workspaces/${workspaceId}/git/checkout`, {
-      method: "POST",
-      body: JSON.stringify({ branch }),
-    });
+    return this.request<{ branch: string; files: string[] }>(
+      `/api/v1/workspaces/${workspaceId}/git/checkout`,
+      { method: "POST", body: JSON.stringify({ branch }) },
+    );
   }
   listCommits(workspaceId: string, limit = 10) {
-    return this.request<{ commits: RemoteCommit[] }>(`/api/v1/workspaces/${workspaceId}/git/commits?limit=${limit}`);
+    return this.request<{ commits: RemoteCommit[] }>(
+      `/api/v1/workspaces/${workspaceId}/git/commits?limit=${limit}`,
+    );
   }
   commit(workspaceId: string, message: string) {
-    return this.request<{ committed: boolean; hash: string; output: string }>(`/api/v1/workspaces/${workspaceId}/git/commit`, {
-      method: "POST",
-      body: JSON.stringify({ message }),
-    });
+    return this.request<{ committed: boolean; hash: string; output: string }>(
+      `/api/v1/workspaces/${workspaceId}/git/commit`,
+      { method: "POST", body: JSON.stringify({ message }) },
+    );
   }
   push(workspaceId: string) {
-    return this.request<{ pushed: boolean; branch: string; output: string }>(`/api/v1/workspaces/${workspaceId}/git/push`, { method: "POST" });
+    return this.request<{ pushed: boolean; branch: string; output: string }>(
+      `/api/v1/workspaces/${workspaceId}/git/push`,
+      { method: "POST" },
+    );
   }
-  createPullRequest(workspaceId: string, input: { baseBranch: string; title: string; body: string }) {
-    return this.request<{ number: number; url: string; state: string; title: string; headBranch: string; baseBranch: string }>(`/api/v1/workspaces/${workspaceId}/git/pull-request`, {
+  createPullRequest(
+    workspaceId: string,
+    input: { baseBranch: string; title: string; body: string },
+  ) {
+    return this.request<{
+      number: number;
+      url: string;
+      state: string;
+      title: string;
+      headBranch: string;
+      baseBranch: string;
+    }>(`/api/v1/workspaces/${workspaceId}/git/pull-request`, {
       method: "POST",
       body: JSON.stringify(input),
     });
   }
   getRepositoryQuality(workspaceId: string) {
-    return this.request<RepositoryQuality>(`/api/v1/workspaces/${workspaceId}/git/quality`);
+    return this.request<RepositoryQuality>(
+      `/api/v1/workspaces/${workspaceId}/git/quality`,
+    );
   }
 
   private async requestAgentProposalDirect(input: AgentRequest) {
-    const response = await this.request<AgentProposal | { proposal: AgentProposal }>("/api/v1/agent/proposals", {
+    const response = await this.request<
+      AgentProposal | { proposal: AgentProposal }
+    >("/api/v1/agent/proposals", {
       method: "POST",
       body: JSON.stringify(input),
     });
     const proposal = "proposal" in response ? response.proposal : response;
-    return { ...proposal, providerUsed: this.config.provider, fallbackUsed: false };
+    return {
+      ...proposal,
+      providerUsed: this.config.provider,
+      fallbackUsed: false,
+    };
   }
 
   requestAgentProposal(input: AgentRequest) {
     return this.requestAgentProposalDirect(input).catch(async (error) => {
       const provider = this.config.provider;
-      if (!provider || !LOCAL_PROVIDER_IDS.has(provider)) throw error;
+      if (
+        !provider ||
+        !LOCAL_PROVIDER_IDS.has(provider) ||
+        !isTransientProviderError(error)
+      )
+        throw error;
       const fallbackProvider = this.config.fallbackProvider ?? "gemini";
       if (fallbackProvider === provider) throw error;
       const fallbackClient = new RemoteWorkspaceClient({
@@ -170,7 +244,9 @@ export class RemoteWorkspaceClient {
         fallbackProvider: undefined,
         fallbackProviderApiKey: undefined,
       });
-      return fallbackClient.requestAgentProposalDirect(input).then((proposal) => ({ ...proposal, fallbackUsed: true }));
+      return fallbackClient
+        .requestAgentProposalDirect(input)
+        .then((proposal) => ({ ...proposal, fallbackUsed: true }));
     });
   }
 }
