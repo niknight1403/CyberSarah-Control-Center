@@ -50,15 +50,21 @@ jobs:
       - name: Build APK with EAS
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive --wait
+        run: |
+          eas build --platform android --profile preview --non-interactive --wait --json > eas-build.json
+          cat eas-build.json
 
       - name: Download APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           mkdir -p artifacts
-          eas build:download --platform android --latest --non-interactive \
-            --output "artifacts/CyberSarah-Control-Center-${GITHUB_REF_NAME}.apk"
+          build_id="$(jq -r 'if type == "array" then .[0].id else .id end' eas-build.json)"
+          test -n "$build_id" && test "$build_id" != "null"
+          eas build:download --build-id "$build_id" --non-interactive
+          apk_path="$(find . -type f -name '*.apk' -not -path './artifacts/*' -print -quit)"
+          test -n "$apk_path"
+          mv "$apk_path" "artifacts/CyberSarah-Control-Center-${GITHUB_REF_NAME}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
