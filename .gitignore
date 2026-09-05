@@ -33,6 +33,10 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Sensitive deployment credentials
+projektschlüssel.json
+.secrets/
+
 # typescript
 *.tsbuildinfo
 

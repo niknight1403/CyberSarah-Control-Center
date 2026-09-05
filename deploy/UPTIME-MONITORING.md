@@ -1,6 +1,6 @@
 # Uptime-Monitoring für `/api/health`
 
-Das Skript `scripts/uptime-monitor.sh` prüft standardmäßig `http://127.0.0.1:3001/api/health`. Es erwartet HTTP 200 und den JSON-Inhalt `"ok":true`. Erfolgreiche Prüfungen liefern Exitcode `0`; Verbindungs-, Timeout-, HTTP- oder Inhaltsfehler liefern Exitcode `1` und werden mit Zeitstempel, HTTP-Status, Curl-Exitcode und Latenz protokolliert.
+Das Skript `scripts/uptime-monitor.sh` prüft standardmäßig `http://127.0.0.1:3000/api/health`, also denselben Port wie der Produktionsservice. Es erwartet HTTP 200 und den JSON-Inhalt `"ok":true`. Erfolgreiche Prüfungen liefern Exitcode `0`; Verbindungs-, Timeout-, HTTP- oder Inhaltsfehler liefern Exitcode `1` und werden mit Zeitstempel, HTTP-Status, Curl-Exitcode und Latenz protokolliert.
 
 ## Installation auf CyberSarah-pro
 
@@ -27,9 +27,9 @@ Das Log sollte Zeilen wie `status=UP http=200` enthalten. Bei einem Fehler ersch
 ## Optionaler direkter Check
 
 ```bash
-HEALTH_URL=http://127.0.0.1:3001/api/health \
+HEALTH_URL=http://127.0.0.1:3000/api/health \
 LOG_FILE=/var/log/cybersarah-health.log \
 /usr/local/bin/cybersarah-health
 ```
 
-Für eine Prüfung über den Reverse Proxy kann `HEALTH_URL` im Service auf die öffentliche oder lokale Proxy-Adresse gesetzt werden. Für die isolierte Backend-Prüfung bleibt `127.0.0.1:3001` die eindeutige Zieladresse.
+Für eine Prüfung über den Reverse Proxy kann `HEALTH_URL` im Service auf die öffentliche oder lokale Proxy-Adresse gesetzt werden. Für die isolierte Backend-Prüfung ist `127.0.0.1:3000` die eindeutige Zieladresse.
