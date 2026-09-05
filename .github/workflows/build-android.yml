@@ -4,40 +4,75 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: read
 
 jobs:
-  build-android:
+  validate-and-build-apk:
+    name: Validate and build APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.12.0
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup EAS
-        run: npm install -g eas-cli
+      - name: TypeScript validation
+        run: pnpm check
 
-      - name: Build Android APK
+      - name: Test suite
+        run: pnpm test
+
+      - name: Production server build
+        run: pnpm build
+
+      - name: Validate Expo configuration
+        run: npx expo config --type public
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@latest
+
+      - name: Build APK with EAS
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive
+        run: eas build --platform android --profile preview --non-interactive --wait
 
-      - name: Summary
+      - name: Download APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          eas build:download --platform android --latest --non-interactive \
+            --output "artifacts/CyberSarah-Control-Center-${GITHUB_REF_NAME}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybersarah-control-center-${{ github.ref_name }}-apk
+          path: artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Write build summary
         run: |
           {
-            echo "## Android Build ${{ github.ref_name }}"
-            echo "- APK: https://expo.dev/accounts/niko1403/builds"
+            echo "## CyberSarah Control Center Android APK"
+            echo "- Release: \\`${GITHUB_REF_NAME}\\`"
+            echo "- Commit: \\`${GITHUB_SHA}\\`"
+            echo "- Artifact: \\`cybersarah-control-center-${GITHUB_REF_NAME}-apk\\`"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,13 @@
+[Unit]
+Description=CyberSarah Control Center uptime health check
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/cybersarah-control-center
+Environment=HEALTH_URL=http://127.0.0.1:3001/api/health
+Environment=CURL_TIMEOUT_SECONDS=10
+Environment=LOG_FILE=/var/log/cybersarah-health.log
+ExecStart=/opt/cybersarah-control-center/scripts/uptime-monitor.sh

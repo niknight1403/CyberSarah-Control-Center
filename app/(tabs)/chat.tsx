@@ -3,7 +3,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { loadDevelopmentChatHistory, parseDevelopmentChatHistory, saveDevelopmentChatHistory, serializeDevelopmentChatHistory, type DevelopmentChatHistoryMessage } from "@/lib/development-chat-history";
 import type { AgentProposal } from "@/lib/remote-workspace-client";
-import { getProviderLabel, getProviderStatusCopy, type ProviderActivity } from "@/lib/provider-status-logic";
+import { getProviderLabel } from "@/lib/provider-status-logic";
 import { useMediaPicker } from "@/hooks/use-media-picker";
 import type { MediaAttachment } from "@/lib/media-picker";
 import { formatProjectContext, readProjectContext } from "@/lib/project-upload-reader";
@@ -33,8 +33,6 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [prompt, setPrompt] = useState("");
   const [isThinking, setIsThinking] = useState(false);
-  const [providerActivity, setProviderActivity] = useState<ProviderActivity>("idle");
-  const [lastProviderUsed, setLastProviderUsed] = useState(settings.provider);
   const [chatError, setChatError] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
@@ -135,12 +133,9 @@ export default function ChatScreen() {
     const thinkingMsg: ChatMessage = { id: "thinking-" + Date.now(), role: "agent", content: "Analyse wird vorbereitet ..." };
     setMessages((cur) => [...cur, userMsg, thinkingMsg]);
     setIsThinking(true);
-    setProviderActivity("requesting");
-    setLastProviderUsed(settings.provider);
     try {
       const fileContext = attachments.length ? formatProjectContext((await readProjectContext(attachments)).files) : "";
       const result = await requestDevelopmentChat(fileContext ? text + "\n\n" + fileContext : text);
-      setProviderActivity("idle");
       const agentMsg: ChatMessage = { id: "agent-" + Date.now(), role: "agent", content: result.content + "\n\nAntwort von " + result.providerUsed + " · " + result.model, state: "ready" };
       setMessages((cur) => {
         const next = [...cur.filter((m) => !m.id.startsWith("thinking-")), agentMsg];
@@ -149,7 +144,6 @@ export default function ChatScreen() {
       });
       setAttachments([]);
     } catch (error) {
-      setProviderActivity("idle");
       setMessages((cur) => cur.filter((m) => !m.id.startsWith("thinking-")));
       setChatError(error instanceof Error ? error.message : "Anfrage fehlgeschlagen.");
     } finally {
