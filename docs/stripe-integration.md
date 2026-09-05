@@ -16,6 +16,15 @@ APP_BASE_URL=https://app.cybersarah-ki.com
 
 ## Endpunkte und Ablauf
 
+Die geschützten Express-Endpunkte für externe Web- oder Mobile-Clients sind:
+
+```text
+POST /api/billing/stripe/checkout
+POST /api/billing/stripe/portal
+```
+
+Beide verlangen eine gültige Session per `Authorization: Bearer <token>` oder Session-Cookie. Die Antwort enthält nur die von Stripe erzeugte HTTPS-URL und niemals Secret- oder API-Schlüssel.
+
 Authentifizierte Nutzer rufen die tRPC-Mutation `billing.checkout` auf. Das Backend erstellt oder verwendet den Stripe-Kunden, legt eine abonnementbasierte Checkout-Session an und liefert ausschließlich deren HTTPS-URL an die App zurück. Die Account-Ansicht öffnet diese URL und zeigt anschließend den gespeicherten Abonnementstatus an.
 
 Die Mutation `billing.portal` erzeugt eine Stripe-Billing-Portal-Session für bereits bekannte Kunden. Der öffentliche Webhook-Endpunkt lautet:
