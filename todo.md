@@ -168,3 +168,14 @@
 - [ ] APK-Erstellungsprozess über den Expo/EAS-Workflow per workflow_dispatch starten und Build-Status sowie APK-Artefakt verifizieren.
 - [x] workflow_dispatch-Lauf `33980785566` auf `main` gestartet und Ergebnis geprüft; EAS blockiert den Android-Build wegen ausgeschöpftem Free-Tier-Kontingent.
 - [x] Vollständige Projektübergabe beziehungsweise Eigentumsbestätigung für den GitHub-Benutzer Niknight1403 prüfen und dokumentieren.
+
+- [x] Sprint 32: Deterministisches Provider-Nutzungsbudget mit Verbrauchsstufen und Zulassungsentscheidung ergänzen und testen.
+- [x] Sprint 33: Entwicklungschats deterministisch komprimieren und entfernte Inhalte als stabil hashenden Verdauungseintrag führen.
+- [x] Sprint 34: Lokal/Remote-Sync-Konflikte klassifizieren und nur eindeutig sichere Auflösungen automatisch zulassen.
+- [x] Sprint 35: Agenten-Vorschläge priorisiert, dedupliziert und mit kontrolliertem Ablauf in einer Warteschlange führen.
+- [x] Sprint 36: Integritätsgeprüfte Änderungs-Snapshots mit einmaligem Rollback absichern.
+- [x] Sprint 37: Audit-Log deterministisch rotieren und tokenfrei exportieren.
+- [x] Sprint 38: Provider anhand gemessener Latenz (EWMA) bewerten und Fallback-Empfehlungen begründen.
+- [x] Sprint 39: Changelog aus Conventional Commits deterministisch erzeugen und sensible Werte redigieren.
+- [x] Sprint 40: Offline-Warteschlange mit exponentiellem Backoff und Konfliktblockierung versehen.
+- [x] Sprint 41: Gesamt-Regression mit TypeScript, 181 Tests, Build, Service-Syntax und Secret-Scan erfolgreich abschließen.
