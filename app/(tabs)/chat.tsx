@@ -14,6 +14,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { rankProviders, type LatencySample, type ProviderScore } from "@/lib/provider-latency-logic";
 import { DEFAULT_CONNECTOR_PREFERENCES, enabledConnectorCount, normalizeConnectorPreferences, CONNECTOR_PREFERENCE_STORAGE_KEY, toggleConnector, type ConnectorId, type ConnectorPreferences } from "@/lib/connector-preferences-logic";
 import { DEFAULT_SKILL_PREFERENCES, enabledSkillCount, normalizeSkillPreferences, SKILL_PREFERENCE_STORAGE_KEY, toggleSkill, type SkillId, type SkillPreferences } from "@/lib/skill-preferences-logic";
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -39,6 +40,7 @@ export default function ChatScreen() {
   const [showRepositoryCard, setShowRepositoryCard] = useState(false);
   const [skillPreferences, setSkillPreferences] = useState<SkillPreferences>(DEFAULT_SKILL_PREFERENCES);
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
+  const [latencyScores, setLatencyScores] = useState<ProviderScore[]>([]);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
   const { busy: mediaPickerBusy, pickFiles: pickFilesFromDevice, pickPhotos, pickVideos } = useMediaPicker();
   const developmentChatMutation = trpc.developmentChat.send.useMutation();
@@ -108,6 +110,7 @@ export default function ChatScreen() {
 
   const testConnector = async (connector: ConnectorId) => {
     setConnectorTests((c) => ({ ...c, [connector]: { status: "testing", message: "Pruefung laeuft ..." } }));
+    const startMs = Date.now();
     try {
       if (connector === "workspace") await loadWorkspaceHealth();
       else if (connector === "github") {
@@ -117,7 +120,13 @@ export default function ChatScreen() {
         if (!readyForChat) throw new Error("KI-Provider nicht konfiguriert.");
         await requestDevelopmentChat("Verbindungstest: Antworte nur mit OK.");
       }
-      setConnectorTests((c) => ({ ...c, [connector]: { status: "success", message: "Verbindung bestaetigt" } }));
+      const endMs = Date.now();
+      const sample: LatencySample = { providerId: connector, latencyMs: endMs - startMs, timestampMs: endMs };
+      const scores = rankProviders([sample], { nowMs: endMs, maxSampleAgeMs: 300000, degradedThresholdMs: 2000 });
+      setLatencyScores(scores);
+      const score = scores.find((s) => s.providerId === connector);
+      const rec = score ? " (" + score.recommendation + ", " + Math.round(sample.latencyMs) + "ms)" : "";
+      setConnectorTests((c) => ({ ...c, [connector]: { status: "success", message: "Verbindung bestaetigt" + rec } }));
     } catch {
       setConnectorTests((c) => ({ ...c, [connector]: { status: "error", message: "Verbindung fehlgeschlagen" } }));
     }
