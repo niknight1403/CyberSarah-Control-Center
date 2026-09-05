@@ -148,3 +148,19 @@
 - [x] Sprint 29: Deterministische Android-Release-Readiness-Prüfung für Portrait-Modus, Paket-ID, Version und native Assets ergänzen und testen.
 - [x] Sprint 30: Zentrales Betriebshandbuch für Entwicklung, Render, Hetzner/systemd, ntfy, Backups und Android-Handoff ergänzen.
 - [x] Sprint 31: Vollständigen Release-Preflight mit TypeScript, 92 Tests, Build, Syntaxprüfungen, Secret-Scan und Diff-Prüfung erfolgreich abschließen.
+
+- [x] Quellengebundene Neubewertung der Sprints 22–31 ausschließlich anhand der Projektdateien, Sprintpläne und Repository-Workflows durchführen.
+- [x] Sprint 22: Release-Metadaten gegen app.config.ts, eas.json und bestehende Preflight-Logik validieren.
+- [x] Sprint 23: Konfigurations- und Backup-Grenzen gegen bestehende Security-/Backup-Tests validieren.
+- [x] Sprint 24: Provider-Fehlerklassen und tokenfreie Statusausgaben gegen die vorhandene Provider-Logik validieren.
+- [x] Sprint 25: Offline-Aufgabenstatus und Retry-/Konfliktlogik gegen die vorhandene Queue-Implementierung validieren.
+- [x] Sprint 26: Healthcheck-Struktur und Warnstufen gegen die vorhandenen Healthcheck-Module validieren.
+- [x] Sprint 27: Benachrichtigungs-Deduplizierung und Zustandswechsel gegen die vorhandenen Release-Notification-Module validieren.
+- [x] Sprint 28: CI/CD-Release-Handoff und Artefaktworkflow gegen ci.yml, release.yml und write-release-handoff.mjs validieren.
+- [x] Sprint 29: Android-/Portrait-Regressionen gegen app.config.ts, eas.json und Android-Tests validieren.
+- [x] Sprint 30: Betriebs- und Release-Dokumentation gegen OPERATIONS.md, RELEASE_HANDOFF.md und PLAY_STORE_BEREITSCHAFT.md abgleichen.
+- [x] Sprint 31: Gesamt-Regression, Preflight, Secret-Scan, Build und Git-Status in sauberer Umgebung ausführen.
+- [x] Veralteten Flutter-APK-Workflow nicht als Expo-APK-Workflow verwenden; tatsächlichen EAS-Workflow prüfen und korrigieren, falls erforderlich.
+- [ ] GitHub-Push, Release und APK-Action nur nach grüner Validierung und ohne unzulässige Secrets ausführen.
+- [ ] Manuelle Voraussetzungen wie EXPO_TOKEN, EAS-Build, echter Android-Gerätetest und Publish-Oberfläche transparent dokumentieren.
+- [ ] Quellengebundenen Abschlussbericht mit Commit-, Run- und Release-Status erstellen.

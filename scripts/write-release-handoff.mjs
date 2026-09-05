@@ -1,9 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-const output = resolve(process.env.RELEASE_HANDOFF_OUTPUT ?? "release-handoff.json");
+const output = resolve(
+  process.env.RELEASE_HANDOFF_OUTPUT ?? "release-handoff.json",
+);
 const allowedStatus = new Set(["passed", "failed", "cancelled", "started"]);
-const status = allowedStatus.has(process.env.CI_STATUS ?? "") ? process.env.CI_STATUS : "unknown";
+const status = allowedStatus.has(process.env.CI_STATUS ?? "")
+  ? process.env.CI_STATUS
+  : "unknown";
 const handoff = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),

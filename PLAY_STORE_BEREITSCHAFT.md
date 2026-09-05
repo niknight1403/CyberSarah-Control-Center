@@ -29,7 +29,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 ### Beschreibungen & Inhalte
 - [ ] Kurzbeschreibung (max. 80 Zeichen)
 - [ ] Vollständige Beschreibung (max. 4000 Zeichen)
-- [ ] Versionshinweise für Version 1.0.4
+- [ ] Versionshinweise für Version 1.0.10
 
 ### Datenschutz & Rechtliches
 - [x] Datenschutzrichtlinien-URL
