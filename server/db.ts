@@ -1,8 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { billingSubscriptions, InsertUser, users } from "../drizzle/schema";
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com").trim().toLowerCase();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
+  .trim()
+  .toLowerCase();
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -27,6 +29,21 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+export async function checkDatabaseHealth() {
+  const db = await getDb();
+  if (!db) return false;
+  try {
+    await db.execute(sql`SELECT 1`);
+    return true;
+  } catch (error) {
+    console.warn(
+      "[Database] Readiness probe failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+    return false;
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -95,7 +112,11 @@ export async function getUserByOpenId(openId: string) {
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
@@ -103,15 +124,25 @@ export async function getUserByOpenId(openId: string) {
 export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
-  const result = await db.select().from(users).where(eq(users.email, normalizeEmail(email))).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, normalizeEmail(email)))
+    .limit(1);
   return result[0];
 }
 
-export async function createLocalUser(input: { openId: string; email: string; name?: string; passwordHash: string }) {
+export async function createLocalUser(input: {
+  openId: string;
+  email: string;
+  name?: string;
+  passwordHash: string;
+}) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
   const email = normalizeEmail(input.email);
-  if (await getUserByEmail(email)) throw new Error("Für diese E-Mail-Adresse existiert bereits ein Konto.");
+  if (await getUserByEmail(email))
+    throw new Error("Für diese E-Mail-Adresse existiert bereits ein Konto.");
   await db.insert(users).values({
     openId: input.openId,
     email,
@@ -131,13 +162,19 @@ export async function touchUserSession(openId: string) {
   if (!db) return;
   const user = await getUserByOpenId(openId);
   if (!user) return;
-  await db.update(users).set({
-    lastSignedIn: new Date(),
-    ...(isAdministratorEmail(user.email) ? { role: "admin" as const } : {}),
-  }).where(eq(users.id, user.id));
+  await db
+    .update(users)
+    .set({
+      lastSignedIn: new Date(),
+      ...(isAdministratorEmail(user.email) ? { role: "admin" as const } : {}),
+    })
+    .where(eq(users.id, user.id));
 }
 
-export async function setStripeCustomerId(userId: number, stripeCustomerId: string) {
+export async function setStripeCustomerId(
+  userId: number,
+  stripeCustomerId: string,
+) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
   await db.update(users).set({ stripeCustomerId }).where(eq(users.id, userId));
@@ -146,7 +183,11 @@ export async function setStripeCustomerId(userId: number, stripeCustomerId: stri
 export async function getUserByStripeCustomerId(stripeCustomerId: string) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
-  const result = await db.select().from(users).where(eq(users.stripeCustomerId, stripeCustomerId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.stripeCustomerId, stripeCustomerId))
+    .limit(1);
   return result[0];
 }
 
@@ -161,38 +202,52 @@ export async function upsertBillingSubscription(input: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
-  await db.insert(billingSubscriptions).values(input).onDuplicateKeyUpdate({
-    set: {
-      stripeCustomerId: input.stripeCustomerId,
-      stripePriceId: input.stripePriceId ?? null,
-      status: input.status,
-      cancelAtPeriodEnd: input.cancelAtPeriodEnd,
-      currentPeriodEnd: input.currentPeriodEnd ?? null,
-    },
-  });
+  await db
+    .insert(billingSubscriptions)
+    .values(input)
+    .onDuplicateKeyUpdate({
+      set: {
+        stripeCustomerId: input.stripeCustomerId,
+        stripePriceId: input.stripePriceId ?? null,
+        status: input.status,
+        cancelAtPeriodEnd: input.cancelAtPeriodEnd,
+        currentPeriodEnd: input.currentPeriodEnd ?? null,
+      },
+    });
 }
 
 export async function getBillingSubscriptionForUser(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
-  const result = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.userId, userId)).limit(1);
+  const result = await db
+    .select()
+    .from(billingSubscriptions)
+    .where(eq(billingSubscriptions.userId, userId))
+    .limit(1);
   return result[0];
 }
 
-export async function ensureAdminAccount(input: { email: string; name: string; passwordHash: string }) {
+export async function ensureAdminAccount(input: {
+  email: string;
+  name: string;
+  passwordHash: string;
+}) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
   const email = normalizeEmail(input.email);
   const existing = await getUserByEmail(email);
   if (existing) {
-    await db.update(users).set({
-      name: input.name,
-      email,
-      passwordHash: input.passwordHash,
-      loginMethod: "password",
-      role: "admin",
-      lastSignedIn: new Date(),
-    }).where(eq(users.id, existing.id));
+    await db
+      .update(users)
+      .set({
+        name: input.name,
+        email,
+        passwordHash: input.passwordHash,
+        loginMethod: "password",
+        role: "admin",
+        lastSignedIn: new Date(),
+      })
+      .where(eq(users.id, existing.id));
   } else {
     await db.insert(users).values({
       openId: `local_admin_${crypto.randomUUID()}`,
@@ -205,7 +260,8 @@ export async function ensureAdminAccount(input: { email: string; name: string; p
     });
   }
   const saved = await getUserByEmail(email);
-  if (!saved) throw new Error("Das Admin-Konto konnte nicht verifiziert werden.");
+  if (!saved)
+    throw new Error("Das Admin-Konto konnte nicht verifiziert werden.");
   return saved;
 }
 

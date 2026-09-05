@@ -29,6 +29,10 @@ Verschlüsselte Settings-Backups enthalten nur Provider-Konfigurationen und loka
 
 Die Android-Konfiguration ist portrait-orientiert und verwendet das CyberSarah-Control-Center-Branding. Der APK-Build wird über die verwaltete Publish-Oberfläche gestartet. Nach dem Download ist ein Test auf einem echten Android-Gerät erforderlich; insbesondere Login, Workspace-Service, SecureStore, Medienauswahl, lokale Provider-Endpoints und Push-Berechtigungen sind zu prüfen.
 
+## Monitoring-Endpunkte
+
+`GET /api/health` prüft die Prozess-Erreichbarkeit. `GET /api/ready` führt zusätzlich einen echten MySQL-Readiness-Check mit `SELECT 1` aus und antwortet bei nicht erreichbarer Datenbank mit HTTP 503. Prometheus-kompatible Prozessmetriken sind unter `GET /api/metrics` verfügbar; in Produktion ist dafür `Authorization: Bearer $METRICS_TOKEN` erforderlich.
+
 ## Sicherheitsregeln
 
 Zugangsdaten, Topic-URLs, API-Keys, private SSH-Schlüssel und vollständige Tokens dürfen nicht in Git, Issues, CI-Ausgaben oder Chat-Nachrichten erscheinen. Bei versehentlich offengelegten Werten ist der betreffende Secret sofort zu widerrufen und neu zu erzeugen.

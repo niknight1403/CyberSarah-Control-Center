@@ -52,6 +52,7 @@ stripe_webhook="$(ask_secret 'STRIPE_WEBHOOK_SECRET (whsec_...)')"
 [[ "$stripe_webhook" == whsec_* ]] || { echo "STRIPE_WEBHOOK_SECRET muss mit whsec_ beginnen." >&2; exit 1; }
 
 service_token="$(ask_secret 'SERVICE_ACCESS_TOKEN')"
+metrics_token="$(ask_secret 'METRICS_TOKEN')"
 forge_url="${BUILT_IN_FORGE_API_URL:-}"
 forge_key="${BUILT_IN_FORGE_API_KEY:-}"
 read -r -p "BUILT_IN_FORGE_API_URL (optional): " forge_url_input
@@ -73,6 +74,7 @@ STRIPE_PRICE_ID=$stripe_price
 STRIPE_WEBHOOK_SECRET=$stripe_webhook
 
 SERVICE_ACCESS_TOKEN=$service_token
+METRICS_TOKEN=$metrics_token
 BUILT_IN_FORGE_API_URL=$forge_url
 BUILT_IN_FORGE_API_KEY=$forge_key
 EOF

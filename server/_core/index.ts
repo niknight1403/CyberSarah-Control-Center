@@ -13,6 +13,8 @@ import {
 } from "../billing";
 import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
+import { checkDatabaseHealth } from "../db";
+import { metricsHandler, requestMetricsMiddleware } from "./observability";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
   try {
@@ -29,6 +31,7 @@ async function startServer() {
 
   app.set("trust proxy", process.env.TRUST_PROXY === "true");
   app.use(createSecurityMiddleware());
+  app.use(requestMetricsMiddleware);
 
   app.post(
     "/api/billing/stripe/webhook",
@@ -93,6 +96,17 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
+
+  app.get("/api/ready", async (_req, res) => {
+    const database = await checkDatabaseHealth();
+    res.status(database ? 200 : 503).json({
+      ok: database,
+      checks: { database },
+      timestamp: Date.now(),
+    });
+  });
+
+  app.get("/api/metrics", metricsHandler);
 
   app.use(
     "/api/trpc",
