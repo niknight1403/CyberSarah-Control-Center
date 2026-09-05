@@ -179,3 +179,4 @@
 - [x] Sprint 39: Changelog aus Conventional Commits deterministisch erzeugen und sensible Werte redigieren.
 - [x] Sprint 40: Offline-Warteschlange mit exponentiellem Backoff und Konfliktblockierung versehen.
 - [x] Sprint 41: Gesamt-Regression mit TypeScript, 181 Tests, Build, Service-Syntax und Secret-Scan erfolgreich abschließen.
+- [x] Sprint 42: Nutzungsbudget in die Qualitätstafel einbinden — Badge, Verbrauchsanzeige und begründete Zulassungsentscheidung erscheinen tokenfrei im Qualitätszentrum.
