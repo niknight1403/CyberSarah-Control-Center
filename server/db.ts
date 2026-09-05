@@ -179,4 +179,34 @@ export async function getBillingSubscriptionForUser(userId: number) {
   return result[0];
 }
 
+export async function ensureAdminAccount(input: { email: string; name: string; passwordHash: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  const email = normalizeEmail(input.email);
+  const existing = await getUserByEmail(email);
+  if (existing) {
+    await db.update(users).set({
+      name: input.name,
+      email,
+      passwordHash: input.passwordHash,
+      loginMethod: "password",
+      role: "admin",
+      lastSignedIn: new Date(),
+    }).where(eq(users.id, existing.id));
+  } else {
+    await db.insert(users).values({
+      openId: `local_admin_${crypto.randomUUID()}`,
+      email,
+      name: input.name,
+      passwordHash: input.passwordHash,
+      loginMethod: "password",
+      role: "admin",
+      lastSignedIn: new Date(),
+    });
+  }
+  const saved = await getUserByEmail(email);
+  if (!saved) throw new Error("Das Admin-Konto konnte nicht verifiziert werden.");
+  return saved;
+}
+
 export { ADMIN_EMAIL, isAdministratorEmail };

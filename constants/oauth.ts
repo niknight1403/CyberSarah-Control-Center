@@ -35,14 +35,16 @@ export function getApiBaseUrl(): string {
     return API_BASE_URL.replace(/\/$/, "");
   }
 
-  // On web, derive from current hostname by replacing port 8081 with 3000
+  // On web, derive from the current preview host when no explicit API URL is configured.
   if (ReactNative.Platform.OS === "web" && typeof window !== "undefined" && window.location) {
-    const { protocol, hostname } = window.location;
-    // Pattern: 8081-sandboxid.region.domain -> 3000-sandboxid.region.domain
+    const { protocol, hostname, port } = window.location;
+    // Local development uses Expo on 8081 and the API on 3000.
+    if (port === "8081") return `${protocol}//${hostname}:3000`;
+    // Hosted previews encode the port in the hostname (8081-... -> 3000-...).
     const apiHostname = hostname.replace(/^8081-/, "3000-");
-    if (apiHostname !== hostname) {
-      return `${protocol}//${apiHostname}`;
-    }
+    if (apiHostname !== hostname) return `${protocol}//${apiHostname}`;
+    // If the app is served directly by the API, keep the same origin.
+    if (port === "3000" || port === "") return `${protocol}//${hostname}${port ? `:${port}` : ""}`;
   }
 
   // Fallback to empty (will use relative URL)

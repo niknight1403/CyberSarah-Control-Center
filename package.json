@@ -1,6 +1,6 @@
 {
   "name": "app-template",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:seed-admin": "tsx scripts/seed-admin.ts",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs"

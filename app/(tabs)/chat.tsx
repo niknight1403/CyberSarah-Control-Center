@@ -55,10 +55,12 @@ export default function ChatScreen() {
       .slice(-10)
       .map((message) => ({ role: message.role === "agent" ? "assistant" as const : "user" as const, content: message.content }));
     const requestMessages: { role: "user" | "assistant"; content: string }[] = [...conversation, { role: "user" as const, content }].slice(-12);
-    return developmentChatMutation.mutateAsync({
-      provider: settings.provider,
-      messages: requestMessages,
+    const request = developmentChatMutation.mutateAsync({ provider: settings.provider, messages: requestMessages });
+    const timeout = new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error("Die KI-Anfrage hat das Zeitlimit überschritten. Bitte Provider oder Verbindung prüfen.")), 65_000);
+      request.finally(() => clearTimeout(timer)).catch(() => undefined);
     });
+    return Promise.race([request, timeout]);
   };
 
   useEffect(() => {
