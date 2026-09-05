@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3001/api/health}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 CURL_TIMEOUT_SECONDS="${CURL_TIMEOUT_SECONDS:-10}"
 LOG_FILE="${LOG_FILE:-/var/log/cybersarah-health.log}"
 
