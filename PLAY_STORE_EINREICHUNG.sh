@@ -27,14 +27,14 @@ check_step() {
   
   if eval "$command" > /dev/null 2>&1; then
     echo -e "${GREEN}✓ BESTANDEN${NC}"
-    ((pass_count++))
+    pass_count=$((pass_count + 1))
   else
     if [ "$is_warning" = true ]; then
       echo -e "${YELLOW}⚠ WARNUNG${NC}"
-      ((warn_count++))
+      warn_count=$((warn_count + 1))
     else
       echo -e "${RED}✗ FEHLER${NC}"
-      ((fail_count++))
+      fail_count=$((fail_count + 1))
     fi
   fi
 }
@@ -42,14 +42,14 @@ check_step() {
 warn_step() {
   local step=$1
   echo -e "${YELLOW}⚠ TODO: $step${NC}"
-  ((warn_count++))
+  warn_count=$((warn_count + 1))
 }
 
 # ============================================================
 # 1. BUILD & ABHÄNGIGKEITEN
 # ============================================================
 echo -e "\n${YELLOW}1. Build & Abhängigkeiten${NC}"
-check_step "Node-Version kompatibel" "node --version | grep -E 'v(18|19|20|21)' > /dev/null"
+check_step "Node-Version kompatibel" "node --version | grep -E 'v(18|20|22)' > /dev/null"
 check_step "pnpm installiert" "pnpm --version > /dev/null"
 check_step "Abhängigkeiten installiert" "[ -d node_modules ]"
 
@@ -74,6 +74,7 @@ check_step "Workspace-Service-Syntax" "node --check workspace-service/src/index.
 echo -e "\n${YELLOW}4. Build-Validierung${NC}"
 check_step "Server-Build erfolgreich" "pnpm build"
 check_step "App-Config gültig TypeScript" "grep -q 'export default config' app.config.ts"
+check_step "Live-API-Default gesetzt" "grep -q 'https://app.cybersarah-ki.com' constants/oauth.ts"
 
 # ============================================================
 # 5. KONFIGURATION-VALIDIERUNG
@@ -114,7 +115,7 @@ check_step "Splash-Screen vorhanden" "[ -f assets/images/splash-icon.png ]"
 # 8. DOKUMENTATION
 # ============================================================
 echo -e "\n${YELLOW}8. Dokumentation${NC}"
-check_step "README vorhanden" "[ -f README.md ]"
+check_step "Betriebsdokumentation vorhanden" "[ -f README.md ] || [ -f docs/OPERATIONS.md ]"
 check_step "Datenschutzrichtlinie vorhanden" "[ -f DATENSCHUTZ.md ]"
 check_step "Play Store Checkliste vorhanden" "[ -f PLAY_STORE_BEREITSCHAFT.md ]"
 check_step "Release-Handoff vorhanden" "[ -f RELEASE_HANDOFF.md ]"
@@ -125,7 +126,7 @@ check_step "Release-Handoff vorhanden" "[ -f RELEASE_HANDOFF.md ]"
 echo -e "\n${YELLOW}9. Git-Status${NC}"
 check_step "Keine ungespeicherten Änderungen" "git diff --quiet" true
 check_step "Keine unverfolgten Dateien" "[ -z \"\$(git ls-files --others --exclude-standard)\" ]" true
-check_step "Auf main oder Release-Branch" "git rev-parse --abbrev-ref HEAD | grep -E 'main|release' > /dev/null" true
+check_step "Auf freigegebenem Branch" "git rev-parse --abbrev-ref HEAD | grep -E '^(main|next-development|release/)' > /dev/null" true
 
 # ============================================================
 # 10. UMGEBUNG

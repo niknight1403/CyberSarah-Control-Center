@@ -3,6 +3,8 @@
 ## Status
 Sprint 32: Play Store Ready – Compliance, Metadaten und Store-Einreichung
 
+Die Mobile-App verwendet standardmäßig `https://app.cybersarah-ki.com` als Backend. Ein anderer Endpoint darf nur explizit über `EXPO_PUBLIC_API_BASE_URL` für eine kontrollierte Entwicklungs- oder Staging-Umgebung gesetzt werden.
+
 Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiven Release ab.
 
 ## Store-Listing-Anforderungen
@@ -84,7 +86,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 
 ### Funktionales Testing
 - [x] Typprüfung erfolgreich (`pnpm check`)
-- [x] Alle Tests bestanden (`pnpm test` – 92 bestanden)
+- [x] Alle Tests bestanden (`pnpm test` – 115 bestanden)
 - [x] Build erfolgreich (`pnpm build`)
 - [x] Keine Konsolenfehler oder -warnungen auf echtem Gerät
 
@@ -187,7 +189,7 @@ Aktuelle Unterstützung:
 | Datenschutzrichtlinie vorhanden | ⏳ | Dokumentenerstellung ausstehend |
 | Keine hardcodierten Geheimnisse | ✅ | Im Code-Review überprüft |
 | TypeScript-Checks erfolgreich | ✅ | Alle Typen validiert |
-| Tests erfolgreich (92/92) | ✅ | Vollständige Test-Suite grün |
+| Tests erfolgreich (115/115) | ✅ | Vollständige Test-Suite grün |
 | Echtgerät-Test | ⏳ | Gerät-Test ausstehend |
 | Store-Listing vollständig | ⏳ | Metadaten & Assets ausstehend |
 
