@@ -1,11 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /opt/cybersarah-control-center
+REPO_DIR="/opt/cybersarah-control-center"
+cd "$REPO_DIR"
 git fetch origin main
 git pull --ff-only origin main
-npm install
-npm run build
-pm2 restart cybersarah-backend --update-env
+pnpm install --frozen-lockfile
+pnpm run build
+
+if pm2 describe cybersarah-backend >/dev/null 2>&1; then
+  pm2 restart cybersarah-backend --update-env
+elif pm2 describe cybersarah-control-center >/dev/null 2>&1; then
+  echo "PM2-App cybersarah-backend nicht gefunden; starte cybersarah-control-center neu."
+  pm2 restart cybersarah-control-center --update-env
+else
+  echo "Keine passende PM2-App gefunden." >&2
+  exit 1
+fi
+
 pm2 save
-pm2 status cybersarah-backend
+pm2 status
