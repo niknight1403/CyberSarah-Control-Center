@@ -146,19 +146,17 @@ describe("workspace service client", () => {
   });
 
   it("creates a pull request only through the typed post-push endpoint", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          number: 17,
-          url: "https://github.com/example/repo/pull/17",
-          state: "open",
-          title: "Ship feature",
-          headBranch: "release",
-          baseBranch: "main",
-        }),
-      });
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        number: 17,
+        url: "https://github.com/example/repo/pull/17",
+        state: "open",
+        title: "Ship feature",
+        headBranch: "release",
+        baseBranch: "main",
+      }),
+    });
     vi.stubGlobal("fetch", fetchMock);
     const client = new RemoteWorkspaceClient({
       baseUrl: "https://studio.example.com",
@@ -178,36 +176,34 @@ describe("workspace service client", () => {
   });
 
   it("loads merge readiness and CI results from the typed quality endpoint", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          branch: "release",
-          pullRequest: {
-            number: 1,
-            title: "Ship",
-            url: "https://github.com/example/repo/pull/1",
-            headBranch: "release",
-            baseBranch: "main",
-          },
-          merge: { state: "ready", label: "Merge bereit" },
-          ci: {
-            state: "passed",
-            label: "CI bestanden",
-            total: 1,
-            passed: 1,
-            failed: 0,
-            pending: 0,
-            checks: [],
-          },
-          reviews: {
-            reviewerCount: 2,
-            approvedCount: 1,
-            requestedChangesCount: 1,
-          },
-        }),
-      });
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        branch: "release",
+        pullRequest: {
+          number: 1,
+          title: "Ship",
+          url: "https://github.com/example/repo/pull/1",
+          headBranch: "release",
+          baseBranch: "main",
+        },
+        merge: { state: "ready", label: "Merge bereit" },
+        ci: {
+          state: "passed",
+          label: "CI bestanden",
+          total: 1,
+          passed: 1,
+          failed: 0,
+          pending: 0,
+          checks: [],
+        },
+        reviews: {
+          reviewerCount: 2,
+          approvedCount: 1,
+          requestedChangesCount: 1,
+        },
+      }),
+    });
     vi.stubGlobal("fetch", fetchMock);
     const client = new RemoteWorkspaceClient({
       baseUrl: "https://studio.example.com",
@@ -261,23 +257,21 @@ describe("workspace service client", () => {
   });
 
   it("sends a bounded development request with the active file to the proposal endpoint", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          summary: "Use a shared token.",
-          rationale: "It prevents duplicated constants.",
-          changes: [
-            {
-              path: "src/fixture.ts",
-              content: "export const token = 1;\n",
-              explanation: "Centralize the value.",
-            },
-          ],
-          affectedFiles: ["src/fixture.ts"],
-        }),
-      });
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        summary: "Use a shared token.",
+        rationale: "It prevents duplicated constants.",
+        changes: [
+          {
+            path: "src/fixture.ts",
+            content: "export const token = 1;\n",
+            explanation: "Centralize the value.",
+          },
+        ],
+        affectedFiles: ["src/fixture.ts"],
+      }),
+    });
     vi.stubGlobal("fetch", fetchMock);
     const client = new RemoteWorkspaceClient({
       baseUrl: "https://studio.example.com",
@@ -367,19 +361,17 @@ describe("workspace service client", () => {
     );
     vi.unstubAllGlobals();
 
-    const directFetch = vi
-      .fn()
-      .mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          proposal: {
-            summary: "Direct",
-            rationale: "Available",
-            changes: [],
-            affectedFiles: [],
-          },
-        }),
-      });
+    const directFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        proposal: {
+          summary: "Direct",
+          rationale: "Available",
+          changes: [],
+          affectedFiles: [],
+        },
+      }),
+    });
     vi.stubGlobal("fetch", directFetch);
     const directClient = new RemoteWorkspaceClient({
       baseUrl: "https://studio.example.com",
@@ -400,6 +392,22 @@ describe("workspace service client", () => {
       baseUrl: "https://studio.example.com",
       provider: "gemini",
       fallbackProvider: "openrouter",
+    });
+    await expect(
+      client.requestAgentProposal({ prompt: "test" }),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+  it("treats custom providers as cloud by default and does not auto-fallback", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new RemoteWorkspaceClient({
+      baseUrl: "https://studio.example.com",
+      provider: "custom",
+      fallbackProvider: "gemini",
     });
     await expect(
       client.requestAgentProposal({ prompt: "test" }),
