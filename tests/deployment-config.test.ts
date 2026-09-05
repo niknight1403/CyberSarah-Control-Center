@@ -29,11 +29,18 @@ describe("production deployment configuration", () => {
   it("documents the same production path, user, and health endpoint as the units", () => {
     const systemdGuide = readProjectFile("deploy/README-systemd.md");
     const monitoringGuide = readProjectFile("deploy/UPTIME-MONITORING.md");
+    const setupScript = readProjectFile("scripts/setup-production-env.sh");
+    const easConfig = readProjectFile("eas.json");
 
     expect(systemdGuide).toContain("/opt/cybersarah-control-center");
     expect(systemdGuide).toContain("cybersarah");
     expect(systemdGuide).not.toContain("/opt/cybersarah/.env");
     expect(monitoringGuide).toContain("http://127.0.0.1:3000/api/health");
     expect(monitoringGuide).not.toContain("127.0.0.1:3001");
+    expect(setupScript).toContain('SERVICE_USER="${CYBERSARAH_SERVICE_USER:-cybersarah}"');
+    expect(setupScript).toContain('chown "$SERVICE_USER:$SERVICE_GROUP" "$ENV_FILE"');
+    expect(setupScript).not.toContain("chown root:root");
+    expect(easConfig).toContain('serviceAccountKeyPath": ".secrets/google-play-service-account.json"');
+    expect(easConfig).toContain('releaseStatus": "draft"');
   });
 });
