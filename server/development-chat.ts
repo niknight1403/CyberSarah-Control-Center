@@ -169,6 +169,27 @@ async function callManaged(messages: ChatMessage[], requestedModel?: string) {
   return { content: extractContent(result), model: result.model };
 }
 
+function isTransientChatError(error: unknown) {
+  if (error instanceof TRPCError) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(408|425|429|500|502|503|504)\b/.test(message) ||
+    (error instanceof TypeError) ||
+    (error instanceof Error && error.name === "AbortError");
+}
+
+function getFallbackProvider(provider: ProviderId) {
+  const fallback = getEnv("AI_FALLBACK_PROVIDER");
+  if (!fallback || fallback === provider || fallback === "managed" && provider === "managed") return undefined;
+  const parsed = providerSchema.safeParse(fallback);
+  return parsed.success ? parsed.data : undefined;
+}
+
+async function callProvider(provider: ProviderId, messages: ChatMessage[], model?: string) {
+  if (provider === "managed") return callManaged(messages, model);
+  if (provider === "anthropic") return callAnthropic(messages, model);
+  return callOpenAICompatibleProvider(provider, messages, model);
+}
+
 export const developmentChatRouter = router({
   providers: protectedProcedure.query(() => ({
     providers: [
@@ -187,14 +208,19 @@ export const developmentChatRouter = router({
   })),
   send: protectedProcedure.input(chatInputSchema).mutation(async ({ input }) => {
     try {
-      const reply = input.provider === "managed"
-        ? await callManaged(input.messages, input.model)
-        : input.provider === "anthropic"
-          ? await callAnthropic(input.messages, input.model)
-          : await callOpenAICompatibleProvider(input.provider, input.messages, input.model);
-      return { ...reply, providerUsed: input.provider, receivedAt: new Date().toISOString() };
+      const reply = await callProvider(input.provider, input.messages, input.model);
+      return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
+      const fallbackProvider = isTransientChatError(error) ? getFallbackProvider(input.provider) : undefined;
+      if (fallbackProvider) {
+        try {
+          const reply = await callProvider(fallbackProvider, input.messages, input.model);
+          return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
+        } catch (fallbackError) {
+          throw new TRPCError({ code: "BAD_GATEWAY", message: fallbackError instanceof Error ? fallbackError.message : "Der KI-Fallback-Provider konnte den Entwicklungsauftrag nicht verarbeiten." });
+        }
+      }
       throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "Der KI-Provider konnte den Entwicklungsauftrag nicht verarbeiten." });
     }
   }),
