@@ -165,3 +165,5 @@
 - [ ] Manuelle Voraussetzungen wie EXPO_TOKEN, EAS-Build, echter Android-Gerätetest und Publish-Oberfläche transparent dokumentieren.
 - [x] Quellengebundener Abschlussbericht mit Commit-, Run- und Release-Status erstellen.
 - [x] EAS-APK-Action nach belegtem Free-Tier-Buildkontingent auf manuelle workflow_dispatch-Ausführung umstellen und die Einschränkung im Release-Handoff berücksichtigen.
+- [ ] APK-Erstellungsprozess über den Expo/EAS-Workflow per workflow_dispatch starten und Build-Status sowie APK-Artefakt verifizieren.
+- [x] workflow_dispatch-Lauf `33980785566` auf `main` gestartet und Ergebnis geprüft; EAS blockiert den Android-Build wegen ausgeschöpftem Free-Tier-Kontingent.
