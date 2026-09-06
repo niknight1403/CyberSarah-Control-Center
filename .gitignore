@@ -18,6 +18,13 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Google-Play-Service-Account (Projektschlüssel) darf niemals ins Repository
+*-private-key*.json
+*service-account*.json
+play-service-account*.json
+projektschl*.json
+*schlssel*.json
+
 # Metro
 .metro-health-check*
 

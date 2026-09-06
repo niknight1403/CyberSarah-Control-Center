@@ -20,6 +20,12 @@ Der Release-Kandidat ist für den Android-Publish vorbereitet. Die App ist portr
 
 Der Android-Build wird ausschließlich über die **Publish-Schaltfläche** der Management-Oberfläche gestartet. Der aktuelle Projektstand muss zuerst als Checkpoint vorliegen. Danach in der Management-Oberfläche **Publish** wählen, den Android-Build anstoßen und das erzeugte APK-Artefakt über den dort angezeigten Download-Link abrufen. Ein manueller APK-Build im Sandbox-Terminal wird nicht ausgeführt, damit der verwaltete Build-Prozess und seine Ressourcenlimits eingehalten werden.
 
+## Google-Play-Service-Account
+
+Die Play-Store-Einreichung verwendet den Service-Account `play-uploader@cybersarah-revenue-os.iam.gserviceaccount.com` (Projekt `cybersarah-revenue-os`). Der zugehörige Projektschlüssel (JSON mit privatem Schlüssel) ist ein Geheimnis und darf **niemals** im Repository abgelegt werden — `.gitignore` blockt die gängigen Dateinamen und `PLAY_STORE_EINREICHUNG.sh` prüft vor jeder Einreichung, dass kein privater Schlüssel im Repo liegt.
+
+Für den manuellen EAS-Submit wird der Schlüssel ausschließlich außerhalb des Repos bereitgestellt: als lokale Schlüsseldatei, die über den `serviceAccountKeyPath` der Submit-Konfiguration bzw. die zugehörige EAS-Option referenziert wird, oder als EAS-Geheimnis. `eas.json` reicht die Produktionseinreichung bereits in den internen Test-Track (`submit.production.android.track: "internal"`).
+
 ## Realgerät-Test
 
 Nach dem APK-Download die App auf einem Android-Gerät installieren und nacheinander den Workspace-Service, einen Cloud-Key sowie einen LAN- oder VPN-Endpoint für Ollama beziehungsweise LM Studio testen. Für lokale Provider darf nicht automatisch `127.0.0.1` verwendet werden, wenn der Modellserver auf einem anderen Rechner läuft. In diesem Fall ist die erreichbare LAN-, VPN- oder Tailscale-Adresse einzutragen.
