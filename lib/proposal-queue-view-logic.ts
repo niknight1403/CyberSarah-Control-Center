@@ -19,6 +19,12 @@ export type ProposalSource = {
   changes: Array<{ path: string; content: string }>;
   createdAtMs: number;
   state: "ready" | "applying" | "applied" | "error" | "reverting" | "reverted";
+  /**
+   * Expliziter Zustand aus der Bedienoberfläche; muss über
+   * `requestProposalTransition` geprüft worden sein. Endgültige
+   * Chat-Zustände (angewendet, zurückgenommen) gewinnen stets.
+   */
+  statusOverride?: ProposalStatus;
 };
 
 export type ProposalQueueViewConfig = {
@@ -85,6 +91,17 @@ export function sanitizeProposalTitle(summary: string): string {
   return `${firstLine.slice(0, 57)}…`;
 }
 
+/**
+ * Ermittelt den maßgeblichen Warteschlangen-Status eines Vorschlags: Der
+ * explizite Bedienungs-Zustand gewinnt, endgültige Chat-Zustände sind
+ * unverletzlich.
+ */
+export function resolveProposalStatus(source: ProposalSource): ProposalStatus {
+  const mapped = mapChatState(source.state);
+  if (mapped === "applied" || mapped === "rejected") return mapped;
+  return source.statusOverride ?? mapped;
+}
+
 function buildQueueProposal(source: ProposalSource, config: ProposalQueueViewConfig): QueueProposal {
   const paths = [...new Set(source.changes.map((change) => change.path))].sort();
   const targetPath = paths.length ? paths.join(", ") : "—";
@@ -99,7 +116,7 @@ function buildQueueProposal(source: ProposalSource, config: ProposalQueueViewCon
     priority: config.defaultPriority,
     createdAtMs: source.createdAtMs,
     expiresAtMs: source.createdAtMs + config.ttlMs,
-    status: mapChatState(source.state),
+    status: resolveProposalStatus(source),
   };
 }
 
@@ -229,3 +246,5 @@ export function buildProposalQueueView(sources: ProposalSource[], config: Propos
 export function requestProposalTransition(current: ProposalStatus, target: ProposalStatus) {
   return transitionProposal(current, target);
 }
+
+export type { ProposalStatus };

@@ -24,7 +24,10 @@ import {
 import {
   buildProposalQueueView,
   DEFAULT_PROPOSAL_QUEUE_TTL_MS,
+  requestProposalTransition,
+  resolveProposalStatus,
   type ProposalSource,
+  type ProposalStatus,
 } from "@/lib/proposal-queue-view-logic";
 import type { AgentProposal } from "@/lib/remote-workspace-client";
 import {
@@ -140,6 +143,10 @@ export default function AgentScreen() {
   const [selectedProposalPaths, setSelectedProposalPaths] = useState<
     Record<string, string[]>
   >({});
+  const [queueStatusOverrides, setQueueStatusOverrides] = useState<
+    Record<string, ProposalStatus>
+  >({});
+
   // Sprint 45: Vorschlagswarteschlange nach Sprint-35-Logik. Ordnung, Ablauf,
   // Duplikat- und Überlaufbehandlung stammen unverändert aus der geprüften
   // Zustandsmaschine; das Limit folgt der bestehenden Verlaufskonfiguration.
@@ -167,9 +174,10 @@ export default function AgentScreen() {
           })),
           createdAtMs: nowMs - (messages.length - index) * 1000,
           state,
+          statusOverride: queueStatusOverrides[message.id],
         };
       });
-  }, [messages]);
+  }, [messages, queueStatusOverrides]);
 
   const proposalQueueView = useMemo(() => {
     if (!proposalSources.length) return null;
@@ -184,6 +192,35 @@ export default function AgentScreen() {
       return null;
     }
   }, [proposalSources]);
+
+  const proposalMessages = useMemo(() => {
+    const lookup = new Map<string, AgentProposal>();
+    for (const message of messages) {
+      if (message.proposal) lookup.set(message.id, message.proposal);
+    }
+    return lookup;
+  }, [messages]);
+
+  // Bedienung ausschließlich über die geprüfte Sprint-35-Zustandsmaschine;
+  // abgelehnte Übergänge werden mit ihrer begründeten reason gemeldet.
+  const queueTransition = (messageId: string, target: ProposalStatus) => {
+    const source = proposalSources.find(
+      (candidate) => candidate.messageId === messageId,
+    );
+    if (!source) return;
+    const result = requestProposalTransition(
+      resolveProposalStatus(source),
+      target,
+    );
+    if (!result.allowed) {
+      Alert.alert("Warteschlange", result.reason);
+      return;
+    }
+    setQueueStatusOverrides((current) => ({
+      ...current,
+      [messageId]: target,
+    }));
+  };
 
   const [appliedSnapshots, setAppliedSnapshots] = useState<
     Record<string, ProposalFileSnapshot[]>
@@ -901,26 +938,84 @@ export default function AgentScreen() {
                         {proposalQueueView.summary.summaryText}
                       </Text>
                       {proposalQueueView.items.slice(0, 6).map((item) => (
-                        <View key={item.id} style={styles.proposalQueueRow}>
-                          <View style={styles.proposalQueueRowMain}>
-                            <Text
-                              numberOfLines={1}
-                              style={styles.proposalQueueTitle}
-                            >
-                              {item.title}
-                            </Text>
-                            <Text
-                              numberOfLines={1}
-                              style={styles.proposalQueueMetaSmall}
-                            >
-                              {item.pathLabel} · {item.priorityLabel} ·{" "}
-                              {item.expiryLabel}
-                            </Text>
+                        <View key={item.id}>
+                          <View style={styles.proposalQueueRow}>
+                            <View style={styles.proposalQueueRowMain}>
+                              <Text
+                                numberOfLines={1}
+                                style={styles.proposalQueueTitle}
+                              >
+                                {item.title}
+                              </Text>
+                              <Text
+                                numberOfLines={1}
+                                style={styles.proposalQueueMetaSmall}
+                              >
+                                {item.pathLabel} · {item.priorityLabel} ·{" "}
+                                {item.expiryLabel}
+                              </Text>
+                            </View>
+                            <StatusBadge
+                              label={item.badgeLabel}
+                              tone={item.badgeTone}
+                            />
                           </View>
-                          <StatusBadge
-                            label={item.badgeLabel}
-                            tone={item.badgeTone}
-                          />
+                          {item.actionable ? (
+                            <View style={styles.proposalQueueActions}>
+                              {item.status === "pending" ? (
+                                <TouchableOpacity
+                                  accessibilityRole="button"
+                                  activeOpacity={0.75}
+                                  onPress={() =>
+                                    queueTransition(item.id, "review")
+                                  }
+                                  style={styles.proposalQueueAction}
+                                >
+                                  <Text style={styles.proposalQueueActionText}>
+                                    Ansehen
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : null}
+                              {item.status === "review" &&
+                              proposalMessages.get(item.id) ? (
+                                <TouchableOpacity
+                                  accessibilityRole="button"
+                                  activeOpacity={0.75}
+                                  onPress={() =>
+                                    void applyProposal(
+                                      item.id,
+                                      proposalMessages.get(item.id)!,
+                                    )
+                                  }
+                                  style={[
+                                    styles.proposalQueueAction,
+                                    styles.proposalQueueActionPrimary,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.proposalQueueActionText,
+                                      styles.proposalQueueActionTextPrimary,
+                                    ]}
+                                  >
+                                    Anwenden
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : null}
+                              <TouchableOpacity
+                                accessibilityRole="button"
+                                activeOpacity={0.75}
+                                onPress={() =>
+                                  queueTransition(item.id, "rejected")
+                                }
+                                style={styles.proposalQueueAction}
+                              >
+                                <Text style={styles.proposalQueueActionText}>
+                                  Ablehnen
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : null}
                         </View>
                       ))}
                       {proposalQueueView.items.length > 6 ? (
@@ -1824,6 +1919,32 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     marginTop: 2,
   },
+  proposalQueueActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 2,
+    paddingBottom: 8,
+  },
+  proposalQueueAction: {
+    alignItems: "center",
+    borderColor: "#2B3C52",
+    borderRadius: 9,
+    borderWidth: 1,
+    minHeight: 28,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  proposalQueueActionPrimary: {
+    backgroundColor: "#1E3A5F",
+    borderColor: "#3D5A85",
+  },
+  proposalQueueActionText: {
+    color: "#BCCCE0",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  proposalQueueActionTextPrimary: { color: "#D8EFFF" },
   proposalQueueMore: {
     color: "#8C9FB2",
     fontSize: 10,

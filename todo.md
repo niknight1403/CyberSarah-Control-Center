@@ -182,4 +182,4 @@
 - [x] Sprint 42: Nutzungsbudget in die Qualitätstafel einbinden — Badge, Verbrauchsanzeige und begründete Zulassungsentscheidung erscheinen tokenfrei im Qualitätszentrum.
 - [x] Sprint 43: Provider-Latenz-Ranking in den Verbindungstest integrieren — Latenzmessungen werden aufgezeichnet, Ranking und Fallback-Empfehlung angezeigt.
 - [x] Sprint 44: Sync-Konfliktansicht im Workspace ergänzen — die Konfliktklasse je Datei ist in der Diff-Ansicht sichtbar, unsichere Auflösungen blockieren den Sync.
-- [x] Sprint 45: Vorschlagswarteschlange im Agentenbereich anzeigen — priorisiert mit Zustand, Ablaufdatum und Duplikatschutz nach der Sprint-35-Zustandsmaschine, tokenfreie Ansicht mit 11 deterministischen Tests.
+- [x] Sprint 45: Vorschlagswarteschlange im Agentenbereich anzeigen — priorisiert mit Zustand, Ablaufdatum und Duplikatschutz nach der Sprint-35-Zustandsmaschine, tokenfreie Ansicht; Bedienung (Ansehen, Anwenden, Ablehnen) direkt in der Warteschlange über geprüfte Übergänge, endgültige Chat-Zustände bleiben unverletzlich; 15 deterministische Tests.

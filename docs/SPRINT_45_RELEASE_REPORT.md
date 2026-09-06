@@ -10,8 +10,8 @@ Sprint 45 setzt die Vorschlagswarteschlange im Agentenbereich um. Grundlage ist 
 | Bereich | Datei | Inhalt |
 |---|---|---|
 | Ansichtsmodul | `lib/proposal-queue-view-logic.ts` | Überführt Chat-Vorschläge in die Sprint-35-Queue (Ordnung, Ablauf, Duplikat- und Überlaufbehandlung über `evaluateProposalQueue`), stellt tokenfreie Ansichtselemente und Zusammenfassung bereit |
-| Tests | `tests/proposal-queue-view-logic.test.ts` | 11 deterministische Tests: Zustandsabbildung, Ordnung, Duplikatschutz, Ablauf, Überlauf, Titel-Sanitisierung, Übergangsdelegation, Tokenfreiheit |
-| Oberfläche | `app/(tabs)/agent.tsx` | Sektion „Agenten-Vorschläge" in der Chat-Ansicht: priorisierte Einträge mit Status-Badge, Priorität, Ablaufhinweis und Queue-Zusammenfassung |
+| Tests | `tests/proposal-queue-view-logic.test.ts` | 15 deterministische Tests: Zustandsabbildung, Ordnung, Duplikatschutz, Ablauf, Überlauf, Titel-Sanitisierung, Übergangsdelegation, Bedienungs-Overrides, Unverletzlichkeit endgültiger Zustände, Tokenfreiheit |
+| Oberfläche | `app/(tabs)/agent.tsx` | Sektion „Agenten-Vorschläge" in der Chat-Ansicht: priorisierte Einträge mit Status-Badge, Priorität, Ablaufhinweis und Queue-Zusammenfassung; direkte Bedienung — „Ansehen" (`pending → review`), „Anwenden" (über den bestehenden Apply-Fluss) und „Ablehnen" (`→ rejected`), jeder Wechsel validiert über `requestProposalTransition`, abgelehnte Übergänge melden die begründete `reason` |
 
 ## Umsetzung im Detail
 
@@ -21,13 +21,14 @@ Sprint 45 setzt die Vorschlagswarteschlange im Agentenbereich um. Grundlage ist 
 - **Sichtbarkeit**: Aktive Einträge folgen der geprüften Reihenfolge; abgeschlossene und abgelaufene Einträge reihen sich dahinter ein. Verworfene Duplikate und Überlauf-Einträge erscheinen nicht als Zeilen, sondern ausschließlich als Zähler in der Zusammenfassung.
 - **Tokenfreiheit**: Titel werden auf die erste Zeile mit 58-Zeichen-Limit sanitisert; ein Test beweist die Abwesenheit von Token-Mustern in der gesamten Ansichtsausgabe.
 - **Limit**: `maxQueued` folgt der bestehenden Verlaufskonfiguration (`DEVELOPMENT_CHAT_HISTORY_LIMIT = 24`).
+- **Bedienungs-Overrides**: Die Warteschlange führt einen expliziten Bedienungs-Zustand je Vorschlag (`statusOverride`), der nur über geprüfte Übergänge gesetzt wird. Endgültige Chat-Zustände (`applied`, zurückgenommen) sind unverletzlich und gewinnen stets über den Override; `resolveProposalStatus` regelt dies deterministisch.
 
 ## Validierung
 
 | Prüfung | Ergebnis |
 |---|---|
 | TypeScript `npx tsc --noEmit` | Erfolgreich |
-| Vitest `pnpm test` | 43 Testdateien, 201 Tests bestanden (42 Dateien / 190 Tests vor Sprint 45) |
+| Vitest `pnpm test` | 43 Testdateien, 205 Tests bestanden (42 Dateien / 190 Tests vor Sprint 45) |
 | Server-Build `pnpm build` | Erfolgreich |
 | Secret-Scan der geänderten Dateien | Erfolgreich (einzige Treffer sind Negativ-Fixtures der Tokenfreiheit-Tests) |
 

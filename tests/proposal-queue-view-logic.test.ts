@@ -3,6 +3,7 @@ import {
   buildProposalQueueView,
   DEFAULT_PROPOSAL_QUEUE_TTL_MS,
   requestProposalTransition,
+  resolveProposalStatus,
   sanitizeProposalTitle,
   type ProposalSource,
 } from "../lib/proposal-queue-view-logic";
@@ -144,6 +145,54 @@ describe("proposal queue view logic", () => {
     expect(requestProposalTransition("applied", "pending").allowed).toBe(false);
     expect(requestProposalTransition("expired", "review").allowed).toBe(false);
     expect(requestProposalTransition("pending", "pending").allowed).toBe(false);
+  });
+
+  it("applies the reviewed override from the queue controls", () => {
+    const view = buildProposalQueueView(
+      [source({ statusOverride: "review" })],
+      config(),
+    );
+    expect(view.items[0].status).toBe("review");
+    expect(view.items[0].badgeLabel).toBe("In Prüfung");
+    expect(view.items[0].badgeTone).toBe("accent");
+    expect(view.items[0].actionable).toBe(true);
+  });
+
+  it("applies the rejected override from the queue controls", () => {
+    const view = buildProposalQueueView(
+      [source({ statusOverride: "rejected" })],
+      config(),
+    );
+    expect(view.items[0].status).toBe("rejected");
+    expect(view.items[0].badgeLabel).toBe("Abgelehnt");
+    expect(view.items[0].actionable).toBe(false);
+    expect(view.summary.rejectedCount).toBe(1);
+    expect(view.summary.queuedCount).toBe(0);
+  });
+
+  it("keeps final chat states inviolable against overrides", () => {
+    expect(
+      resolveProposalStatus(source({ state: "applied", statusOverride: "review" })),
+    ).toBe("applied");
+    expect(
+      resolveProposalStatus(source({ state: "applied", statusOverride: "review" })),
+    ).toBe("applied");
+    expect(
+      resolveProposalStatus(source({ state: "reverted", statusOverride: "pending" })),
+    ).toBe("rejected");
+  });
+
+  it("resolves queue controls only through validated transitions", () => {
+    const first = requestProposalTransition("pending", "review");
+    expect(first.allowed).toBe(true);
+    expect(first.nextStatus).toBe("review");
+    const view = buildProposalQueueView(
+      [source({ statusOverride: first.nextStatus ?? undefined })],
+      config(),
+    );
+    expect(view.items[0].status).toBe("review");
+    const invalid = requestProposalTransition("review", "pending");
+    expect(invalid.allowed).toBe(false);
   });
 
   it("produces token-free view output", () => {
