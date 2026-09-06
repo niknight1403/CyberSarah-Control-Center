@@ -19,6 +19,18 @@ Diese Datei dokumentiert die geplante Weiterentwicklung nach Sprint 41. Die Spri
 | 50 | Chat-Kompression in die Verlaufspersistenz integrieren | Gespeicherte Entwicklungschats werden beim Überschreiten konfigurierbarer Grenzen deterministisch komprimiert; Verdauungseinträge bleiben stabil hashbar. |
 | 51 | Gesamt-Regression, Release-Preflight und Abschluss | TypeScript, Tests, Build, Service-Syntax, Secret-Scan und Git-Status sind erfolgreich; Abschlussbericht liegt vor. |
 
+## Detailplanung Sprint 45 — Vorschlagswarteschlange im Agentenbereich
+
+Grundlage ist das in Sprint 35 verifizierte Modul `lib/proposal-queue-logic.ts` (9 deterministische Tests in `tests/proposal-queue-logic.test.ts`); die Oberflächenanbindung erfolgt in `app/(tabs)/agent.tsx`:
+
+1. **Datenmodell**: Jeder Agenten-Vorschlag aus dem Entwicklungschat wird als `AgentProposal` geführt — mit Ziel-Pfad, Inhalts-Hash, Priorität (`low`, `normal`, `high`, `critical`), Erstellungs- und Ablaufzeitstempel sowie Status (`pending`, `review`, `applied`, `rejected`, `expired`).
+2. **Queue-Bewertung**: `evaluateProposalQueue` übernimmt die Ordnung — abgelaufene Vorschläge werden deterministisch auf `expired` gesetzt, Duplikate (gleicher Ziel-Pfad und Inhalts-Hash) verworfen (der älteste Eintrag bleibt erhalten), Sortierung nach Priorität und dann Erstellungszeit, Überlauf verwirft die niedrigst priorisierten Einträge.
+3. **Zustandsübergänge**: Bedienung ausschließlich über `transitionProposal` aus demselben Modul; die geprüfte Zustandsmaschine erlaubt `pending → review|rejected|expired`, `review → applied|rejected|expired`; angewendete, abgelehnte und abgelaufene Vorschläge sind endgültig — keine Sprünge oder Rückholungen.
+4. **Anzeige im Agentenbereich**: Priorisierte Liste mit Status-Badge, Priorität, Ablaufdatum und Hinweisen auf verworfene Duplikate; abgelaufene Vorschläge bleiben sichtbar, sind aber nicht mehr anwendbar. Die Darstellung bleibt tokenfrei (keine Inhalte, Secrets oder Endpoints).
+5. **Speichergrenze**: Das Warteschlangenlimit (`maxQueued`) wird konfigurierbar aus der bestehenden Studio-Konfiguration bezogen; die Bewertung bleibt deterministisch und damit testbar.
+
+Akzeptanzkriterium (unverändert): Agenten-Vorschläge erscheinen priorisiert mit Zustand, Ablaufdatum und Duplikatschutz; Zustandsübergänge folgen der geprüften Zustandsmaschine.
+
 ## Manuelle Handoff-Punkte (bleiben Nutzeraktionen)
 
 - Android-Publish und APK-Erzeugung über die Publish-Oberfläche anstoßen; das EAS-Buildkontingent ist extern verwaltet und kann aus der Sandbox nicht verbraucht werden.
