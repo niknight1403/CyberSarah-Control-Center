@@ -16,11 +16,12 @@ import {
   DEVELOPMENT_CHAT_HISTORY_LIMIT,
   type DevelopmentChatHistoryMessage,
 } from "@/lib/development-chat-history";
+import { getSelectedProposalChanges } from "@/lib/proposal-application-logic";
 import {
-  captureProposalSnapshots,
-  getSelectedProposalChanges,
-  type ProposalFileSnapshot,
-} from "@/lib/proposal-application-logic";
+  buildProposalSnapshots,
+  restoreProposalSnapshots,
+  type ChangeSnapshot,
+} from "@/lib/proposal-snapshot-flow-logic";
 import {
   buildProposalQueueView,
   DEFAULT_PROPOSAL_QUEUE_TTL_MS,
@@ -223,7 +224,7 @@ export default function AgentScreen() {
   };
 
   const [appliedSnapshots, setAppliedSnapshots] = useState<
-    Record<string, ProposalFileSnapshot[]>
+    Record<string, ChangeSnapshot[]>
   >({});
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [loadingPreviewIds, setLoadingPreviewIds] = useState<
@@ -512,7 +513,9 @@ export default function AgentScreen() {
         proposal.changes.map((change) => change.path),
     );
     if (!selectedChanges.length) return;
-    const snapshots = captureProposalSnapshots(files, selectedChanges);
+    // Sprint 46: Vor jeder Anwendung wird automatisch ein hash-gesicherter
+    // Snapshot erzeugt (geprüfte Sprint-36-Logik).
+    const snapshots = buildProposalSnapshots(files, selectedChanges, Date.now());
     setMessages((current) =>
       current.map((message) =>
         message.id === messageId ? { ...message, state: "applying" } : message,
@@ -570,13 +573,41 @@ export default function AgentScreen() {
     );
     setChatError("");
     try {
+      // Sprint 46: „Rückgängig machen" stellt ausschließlich verifizierte
+      // Inhalte wieder her; jeder Snapshot läuft durch die geprüfte
+      // Sprint-36-Logik mit Integritätsprüfung und Einmal-Schutz.
+      const currentContentsByPath: Record<string, string | null> = {};
+      for (const snapshot of snapshots) {
+        currentContentsByPath[snapshot.targetPath] =
+          files.find((file) => file.path === snapshot.targetPath)?.content ??
+          null;
+      }
+      const outcome = restoreProposalSnapshots(
+        snapshots,
+        currentContentsByPath,
+        Date.now(),
+      );
+      if (!outcome.restored.length) {
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === messageId
+              ? { ...message, state: "applied" }
+              : message,
+          ),
+        );
+        setChatError(
+          outcome.skipped[0]?.reason ??
+            "Die Wiederherstellung der vorherigen Datei-Inhalte ist fehlgeschlagen.",
+        );
+        return;
+      }
       await syncRemoteChanges(
-        snapshots.map(({ path, content }) => ({ path, content })),
+        outcome.restored.map(({ path, content }) => ({ path, content })),
       );
-      snapshots.forEach((snapshot) =>
-        updateFile(snapshot.id, snapshot.content),
+      outcome.restored.forEach((entry) =>
+        updateFile(entry.id, entry.content),
       );
-      markFilesSynced(snapshots.map((snapshot) => snapshot.id));
+      markFilesSynced(outcome.restored.map((entry) => entry.id));
       setAppliedSnapshots((current) => {
         const next = { ...current };
         delete next[messageId];
@@ -588,7 +619,7 @@ export default function AgentScreen() {
             ? {
                 ...message,
                 state: "reverted",
-                content: `${message.content}\n\nDie vorherigen Datei-Inhalte wurden aus dem lokalen Snapshot wiederhergestellt.`,
+                content: `${message.content}\n\n${outcome.summaryText}. Die vorherigen Datei-Inhalte wurden nach verifizierter Integritätsprüfung wiederhergestellt.`,
               }
             : message,
         ),
