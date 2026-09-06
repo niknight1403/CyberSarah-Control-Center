@@ -13,6 +13,9 @@ module.exports = {
       min_uptime: "10s",
       time: true,
       env: {
+        // PORT ist hier bewusst verankert, damit `pm2 restart --update-env`
+        // niemals auf den Node-Default 3000 zurückfällt (nginx erwartet 3001).
+        PORT: "3001",
         DOTENV_CONFIG_PATH: "/opt/cybersarah-control-center/.env",
       },
       error_file: "./logs/pm2-error.log",
