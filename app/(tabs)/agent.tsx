@@ -13,6 +13,7 @@ import {
   parseDevelopmentChatHistory,
   saveDevelopmentChatHistory,
   serializeDevelopmentChatHistory,
+  DEVELOPMENT_CHAT_HISTORY_LIMIT,
   type DevelopmentChatHistoryMessage,
 } from "@/lib/development-chat-history";
 import {
@@ -20,6 +21,11 @@ import {
   getSelectedProposalChanges,
   type ProposalFileSnapshot,
 } from "@/lib/proposal-application-logic";
+import {
+  buildProposalQueueView,
+  DEFAULT_PROPOSAL_QUEUE_TTL_MS,
+  type ProposalSource,
+} from "@/lib/proposal-queue-view-logic";
 import type { AgentProposal } from "@/lib/remote-workspace-client";
 import {
   getProviderLabel,
@@ -134,6 +140,51 @@ export default function AgentScreen() {
   const [selectedProposalPaths, setSelectedProposalPaths] = useState<
     Record<string, string[]>
   >({});
+  // Sprint 45: Vorschlagswarteschlange nach Sprint-35-Logik. Ordnung, Ablauf,
+  // Duplikat- und Überlaufbehandlung stammen unverändert aus der geprüften
+  // Zustandsmaschine; das Limit folgt der bestehenden Verlaufskonfiguration.
+  const proposalSources = useMemo<ProposalSource[]>(() => {
+    const nowMs = Date.now();
+    return messages
+      .map((message, index) => ({ message, index }))
+      .flatMap(({ message, index }) => (message.proposal ? [{ message, index }] : []))
+      .map(({ message, index }) => {
+        const proposal = message.proposal;
+        const state =
+          message.state === "applying" ||
+          message.state === "applied" ||
+          message.state === "reverting" ||
+          message.state === "reverted" ||
+          message.state === "error"
+            ? message.state
+            : "ready";
+        return {
+          messageId: message.id,
+          summary: proposal!.summary,
+          changes: proposal!.changes.map((change) => ({
+            path: change.path,
+            content: change.content,
+          })),
+          createdAtMs: nowMs - (messages.length - index) * 1000,
+          state,
+        };
+      });
+  }, [messages]);
+
+  const proposalQueueView = useMemo(() => {
+    if (!proposalSources.length) return null;
+    try {
+      return buildProposalQueueView(proposalSources, {
+        nowMs: Date.now(),
+        maxQueued: DEVELOPMENT_CHAT_HISTORY_LIMIT,
+        ttlMs: DEFAULT_PROPOSAL_QUEUE_TTL_MS,
+        defaultPriority: "normal",
+      });
+    } catch {
+      return null;
+    }
+  }, [proposalSources]);
+
   const [appliedSnapshots, setAppliedSnapshots] = useState<
     Record<string, ProposalFileSnapshot[]>
   >({});
@@ -839,6 +890,47 @@ export default function AgentScreen() {
                   label="Konversation"
                   title="Reviewbarer Projektkontext"
                 />
+                {proposalQueueView ? (
+                  <>
+                    <StudioSection
+                      label="VORSCHLAGSWARTESCHLANGE"
+                      title="Agenten-Vorschläge"
+                    />
+                    <View style={styles.proposalQueueCard}>
+                      <Text style={styles.proposalQueueMeta}>
+                        {proposalQueueView.summary.summaryText}
+                      </Text>
+                      {proposalQueueView.items.slice(0, 6).map((item) => (
+                        <View key={item.id} style={styles.proposalQueueRow}>
+                          <View style={styles.proposalQueueRowMain}>
+                            <Text
+                              numberOfLines={1}
+                              style={styles.proposalQueueTitle}
+                            >
+                              {item.title}
+                            </Text>
+                            <Text
+                              numberOfLines={1}
+                              style={styles.proposalQueueMetaSmall}
+                            >
+                              {item.pathLabel} · {item.priorityLabel} ·{" "}
+                              {item.expiryLabel}
+                            </Text>
+                          </View>
+                          <StatusBadge
+                            label={item.badgeLabel}
+                            tone={item.badgeTone}
+                          />
+                        </View>
+                      ))}
+                      {proposalQueueView.items.length > 6 ? (
+                        <Text style={styles.proposalQueueMore}>
+                          + {proposalQueueView.items.length - 6} weitere
+                        </Text>
+                      ) : null}
+                    </View>
+                  </>
+                ) : null}
               </>
             }
             ListFooterComponent={
@@ -1696,6 +1788,46 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 14,
     marginRight: 8,
+  },
+  proposalQueueCard: {
+    backgroundColor: "#101824",
+    borderColor: "#283A50",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 12,
+  },
+  proposalQueueMeta: {
+    color: "#98AABE",
+    fontSize: 10,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  proposalQueueRow: {
+    alignItems: "center",
+    borderTopColor: "#1B2D3D",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    paddingVertical: 7,
+  },
+  proposalQueueRowMain: { flex: 1 },
+  proposalQueueTitle: {
+    color: "#D3DFEC",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  proposalQueueMetaSmall: {
+    color: "#8496AA",
+    fontSize: 9,
+    lineHeight: 13,
+    marginTop: 2,
+  },
+  proposalQueueMore: {
+    color: "#8C9FB2",
+    fontSize: 10,
+    marginTop: 6,
   },
   clearHistoryButton: {
     alignItems: "center",
