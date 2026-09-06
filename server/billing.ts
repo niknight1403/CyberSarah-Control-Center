@@ -45,17 +45,119 @@ function getAppBaseUrl() {
   return baseUrl;
 }
 
-function getSubscriptionPriceId() {
-  const priceId = requiredEnvironment("STRIPE_PRICE_ID");
-  if (!priceId.startsWith("price_"))
-    throw new Error("STRIPE_PRICE_ID muss eine gültige Stripe-Preis-ID sein.");
-  return priceId;
+export type SubscriptionPriceLike = {
+  id: string;
+  active: boolean;
+  type: string;
+  recurring: { interval: string } | null;
+};
+
+export type StripePriceApi = {
+  prices: {
+    retrieve(id: string): Promise<unknown>;
+    list(params: {
+      product?: string;
+      active?: boolean;
+      limit?: number;
+    }): Promise<unknown>;
+  };
+};
+
+export function normalizeSubscriptionPrice(raw: unknown): SubscriptionPriceLike | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const candidate = raw as {
+    id?: unknown;
+    active?: unknown;
+    type?: unknown;
+    recurring?: unknown;
+  };
+  if (typeof candidate.id !== "string" || typeof candidate.active !== "boolean") return null;
+  if (candidate.type !== "recurring" && candidate.type !== "one_time") return null;
+  let recurring: { interval: string } | null = null;
+  if (typeof candidate.recurring === "object" && candidate.recurring !== null) {
+    const interval = (candidate.recurring as { interval?: unknown }).interval;
+    if (typeof interval === "string") recurring = { interval };
+  }
+  return { id: candidate.id, active: candidate.active, type: candidate.type, recurring };
+}
+
+let resolvedPriceIdCache: string | null = null;
+
+export function resetResolvedPriceIdCache() {
+  resolvedPriceIdCache = null;
+}
+
+export function pickSubscriptionPriceId(
+  prices: SubscriptionPriceLike[],
+): SubscriptionPriceLike | null {
+  const recurring = prices.filter((price) => price.active && price.type === "recurring");
+  const monthly = recurring.find((price) => price.recurring?.interval === "month");
+  return monthly ?? recurring[0] ?? null;
+}
+
+/**
+ * Löst die Abo-Preis-ID autonom auf:
+ * 1. Konfigurierter STRIPE_PRICE_ID, sofern Stripe ihn als aktiv und
+ *    wiederkehrend bestätigt (fängt Platzhalter/Tippfehler ab).
+ * 2. Sonst aktiver wiederkehrender Preis des Produkts aus
+ *    STRIPE_PRODUCT_MONATLICH (Monatspreis bevorzugt).
+ * Erfolgreiche Auflösungen werden prozessweit gecacht.
+ */
+export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
+  if (resolvedPriceIdCache) return resolvedPriceIdCache;
+
+  const configured = process.env.STRIPE_PRICE_ID?.trim() ?? "";
+  if (configured.startsWith("price_")) {
+    try {
+      const price = normalizeSubscriptionPrice(await stripe.prices.retrieve(configured));
+      if (price && price.active && price.type === "recurring") {
+        resolvedPriceIdCache = configured;
+        return configured;
+      }
+      console.warn(
+        `[Billing] STRIPE_PRICE_ID (${configured}) ist inaktiv oder nicht wiederkehrend – falle auf die Produkt-Auflösung zurück.`,
+      );
+    } catch (error) {
+      console.warn(
+        `[Billing] STRIPE_PRICE_ID (${configured}) wurde von Stripe abgelehnt (${
+          error instanceof Error ? error.message : "unbekannter Fehler"
+        }) – falle auf die Produkt-Auflösung zurück.`,
+      );
+    }
+  }
+
+  const productId = process.env.STRIPE_PRODUCT_MONATLICH?.trim() ?? "";
+  if (productId) {
+    const listed = await stripe.prices.list({
+      product: productId,
+      active: true,
+      limit: 100,
+    });
+    const data =
+      (listed as { data?: unknown }).data instanceof Array ? (listed as { data: unknown[] }).data : [];
+    const picked = pickSubscriptionPriceId(
+      data.map(normalizeSubscriptionPrice).filter((p): p is SubscriptionPriceLike => p !== null),
+    );
+    if (picked) {
+      resolvedPriceIdCache = picked.id;
+      console.info(
+        `[Billing] Abo-Preis automatisch über STRIPE_PRODUCT_MONATLICH aufgelöst: ${picked.id}`,
+      );
+      return picked.id;
+    }
+  }
+
+  throw new Error(
+    "STRIPE_PRICE_ID fehlt oder ist ungültig und konnte nicht über STRIPE_PRODUCT_MONATLICH aufgelöst werden. Bitte im Stripe-Dashboard einen aktiven wiederkehrenden Preis prüfen.",
+  );
 }
 
 export function assertLiveStripeConfiguration() {
   requiredEnvironment("STRIPE_WEBHOOK_SECRET");
   getAppBaseUrl();
-  getSubscriptionPriceId();
+  const configuredPrice = process.env.STRIPE_PRICE_ID?.trim() ?? "";
+  if (configuredPrice && !configuredPrice.startsWith("price_"))
+    throw new Error("STRIPE_PRICE_ID muss eine gültige Stripe-Preis-ID sein.");
   return getStripe();
 }
 
@@ -82,7 +184,7 @@ export async function createLiveCheckoutSession(user: {
     mode: "subscription",
     customer: customerId,
     client_reference_id: String(user.id),
-    line_items: [{ price: getSubscriptionPriceId(), quantity: 1 }],
+    line_items: [{ price: await resolveSubscriptionPriceId(stripe), quantity: 1 }],
     success_url: `${baseUrl}/account?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/account?checkout=cancelled`,
     allow_promotion_codes: false,

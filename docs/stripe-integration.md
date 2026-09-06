@@ -79,3 +79,13 @@ cd /opt/cybersarah-control-center
 ```
 
 In der Stripe-Dashboard-Konfiguration muss der Endpoint auf `https://app.cybersarah-ki.com/api/billing/stripe/webhook` zeigen und mindestens die oben genannten Subscription- und Checkout-Events abonnieren. Ein absichtlich ungültiger oder fehlender `stripe-signature`-Header muss mit HTTP 400 abgewiesen werden.
+
+## Autonome Preis-Aufloesung (2026-09-06)
+
+Der Server prueft den konfigurierten `STRIPE_PRICE_ID` gegen die Stripe-API, bevor er eine
+Checkout-Session erstellt. Lehnt Stripe den Preis ab (Platzhalter, Tippfehler, geloeschte
+Preise) oder ist der Preis inaktiv bzw. nicht wiederkehrend, faellt der Server automatisch
+auf die aktiven wiederkehrenden Preise des Produkts `STRIPE_PRODUCT_MONATLICH` zurueck und
+waehlt bevorzugt das Monats-Intervall. Die erfolgreiche Aufloesung wird prozessweit gecacht.
+Damit laeuft der Checkout auch dann, wenn `STRIPE_PRICE_ID` in der ENV noch nicht oder falsch
+gesetzt ist; die ENV-Validierung (validate-production.mjs) bleibt bewusst strenger.
