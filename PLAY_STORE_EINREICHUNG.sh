@@ -99,7 +99,7 @@ echo -e "\n${YELLOW}6. Sicherheitsprüfungen${NC}"
 check_step "Keine hardcodierten API-Schlüssel" "grep -r 'sk_live_\\|AIza\\|api_key.*=' app --include='*.ts' --include='*.tsx' | wc -l | grep -q '^0$'" true
 check_step "Keine hardcodierten Tokens" "grep -r 'ghp_\\|github.*token' app --include='*.ts' --include='*.tsx' --include='*.js' | wc -l | grep -q '^0$'" true
 check_step "Geheimnisse verwenden SecureStore" "grep -r 'SecureStore\\|@react-native-async-storage' app --include='*.ts' --include='*.tsx' | wc -l | grep -q '^[1-9]'"
-check_step "Kein Service-Account-Schluessel im Repo" "grep -rl 'BEGIN PRIVATE KEY' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist 2>/dev/null | wc -l | grep -q '^0$'"
+check_step "Kein Service-Account-Schluessel im Repo" "grep -rl 'BEGIN PRIVATE KE[Y]' . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist 2>/dev/null | wc -l | grep -q '^0$'"
 check_step "Keine console.log in Production" "grep -r 'console\\.log' server --include='*.ts' --include='*.js' | wc -l | grep -q '^0$'" true
 
 # ============================================================
