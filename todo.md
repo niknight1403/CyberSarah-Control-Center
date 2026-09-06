@@ -180,3 +180,5 @@
 - [x] Sprint 40: Offline-Warteschlange mit exponentiellem Backoff und Konfliktblockierung versehen.
 - [x] Sprint 41: Gesamt-Regression mit TypeScript, 181 Tests, Build, Service-Syntax und Secret-Scan erfolgreich abschließen.
 - [x] Sprint 42: Nutzungsbudget in die Qualitätstafel einbinden — Badge, Verbrauchsanzeige und begründete Zulassungsentscheidung erscheinen tokenfrei im Qualitätszentrum.
+- [x] Sprint 43: Provider-Latenz-Ranking in den Verbindungstest integrieren — Latenzmessungen werden aufgezeichnet, Ranking und Fallback-Empfehlung angezeigt.
+- [x] Sprint 44: Sync-Konfliktansicht im Workspace ergänzen — die Konfliktklasse je Datei ist in der Diff-Ansicht sichtbar, unsichere Auflösungen blockieren den Sync.
