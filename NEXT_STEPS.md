@@ -21,13 +21,44 @@ Diese Datei dokumentiert die geplante Weiterentwicklung nach Sprint 41. Die Spri
 
 ## Detailplanung Sprint 45 — Vorschlagswarteschlange im Agentenbereich
 
-Grundlage ist das in Sprint 35 verifizierte Modul `lib/proposal-queue-logic.ts` (9 deterministische Tests in `tests/proposal-queue-logic.test.ts`); die Oberflächenanbindung erfolgt in `app/(tabs)/agent.tsx`:
+Grundlage ist das in Sprint 35 verifizierte Modul `lib/proposal-queue-logic.ts` (9 deterministische Tests in `tests/proposal-queue-logic.test.ts`). Die folgende Detailplanung übernimmt Logik und Zustandsübergänge unverändert aus Sprint 35; die Oberflächenanbindung erfolgt in `app/(tabs)/agent.tsx`.
 
-1. **Datenmodell**: Jeder Agenten-Vorschlag aus dem Entwicklungschat wird als `AgentProposal` geführt — mit Ziel-Pfad, Inhalts-Hash, Priorität (`low`, `normal`, `high`, `critical`), Erstellungs- und Ablaufzeitstempel sowie Status (`pending`, `review`, `applied`, `rejected`, `expired`).
-2. **Queue-Bewertung**: `evaluateProposalQueue` übernimmt die Ordnung — abgelaufene Vorschläge werden deterministisch auf `expired` gesetzt, Duplikate (gleicher Ziel-Pfad und Inhalts-Hash) verworfen (der älteste Eintrag bleibt erhalten), Sortierung nach Priorität und dann Erstellungszeit, Überlauf verwirft die niedrigst priorisierten Einträge.
-3. **Zustandsübergänge**: Bedienung ausschließlich über `transitionProposal` aus demselben Modul; die geprüfte Zustandsmaschine erlaubt `pending → review|rejected|expired`, `review → applied|rejected|expired`; angewendete, abgelehnte und abgelaufene Vorschläge sind endgültig — keine Sprünge oder Rückholungen.
-4. **Anzeige im Agentenbereich**: Priorisierte Liste mit Status-Badge, Priorität, Ablaufdatum und Hinweisen auf verworfene Duplikate; abgelaufene Vorschläge bleiben sichtbar, sind aber nicht mehr anwendbar. Die Darstellung bleibt tokenfrei (keine Inhalte, Secrets oder Endpoints).
-5. **Speichergrenze**: Das Warteschlangenlimit (`maxQueued`) wird konfigurierbar aus der bestehenden Studio-Konfiguration bezogen; die Bewertung bleibt deterministisch und damit testbar.
+### Datenmodell (aus Sprint 35 übernommen)
+
+- `AgentProposal`: `id`, `targetPath`, `contentHash`, `priority` (`critical` → `high` → `normal` → `low`), `createdAtMs`, `expiresAtMs`, `status`.
+- `ProposalStatus`: `pending`, `review`, `applied`, `rejected`, `expired`.
+- `QueueConfig`: `nowMs` und `maxQueued` (muss mindestens 1 sein, sonst Fehler).
+
+### Queue-Bewertung — `evaluateProposalQueue` (Regeln wortgleich aus Sprint 35)
+
+1. Abgelaufene Vorschläge werden deterministisch auf `expired` gesetzt — ein Vorschlag gilt als abgelaufen, wenn `expiresAtMs <= nowMs` und sein Status weder `applied` noch `rejected` ist.
+2. Duplikate (gleiches Ziel und gleicher Inhalts-Hash, Schlüssel aus `targetPath` und `contentHash`) werden verworfen; der älteste Eintrag bleibt erhalten. Bewertet werden ausschließlich aktive Vorschläge (`pending` oder `review`).
+3. Die übrigen Vorschläge werden nach Priorität und dann nach Erstellung sortiert; bei Überlauf werden die niedrig priorisierten verworfen.
+
+Das Ergebnis (`QueueEvaluation`) liefert `order` (sortierte Liste), `expiredIds`, `duplicatesRemoved` und `droppedForOverflow` — die Oberfläche zeigt alle vier Aspekte.
+
+### Zustandsübergänge — `transitionProposal` (Zustandsmaschine wortgleich aus Sprint 35)
+
+| Aktueller Status | Erlaubte Folgestatus |
+|---|---|
+| `pending` | `review`, `rejected`, `expired` |
+| `review` | `applied`, `rejected`, `expired` |
+| `applied` | — (endgültig) |
+| `rejected` | — (endgültig) |
+| `expired` | — (endgültig) |
+
+Ein Übergang in den aktuellen Status ist nie erlaubt; jede Prüfung liefert `allowed`, `nextStatus` und eine begründete `reason`. Angewendete, abgelehnte und abgelaufene Vorschläge sind endgültig und können nicht erneut geöffnet werden. Die Oberfläche bedient Zustandswechsel ausschließlich über diese Funktion.
+
+### Anzeige im Agentenbereich
+
+Priorisierte Liste mit Status-Badge, Priorität und Ablaufdatum; abgelaufene Vorschläge bleiben sichtbar, sind aber nicht mehr anwendbar. Die Darstellung bleibt tokenfrei (keine Inhalte, Secrets oder Endpoints). Das Warteschlangenlimit (`maxQueued`) wird aus der bestehenden Studio-Konfiguration bezogen.
+
+### Umsetzungsschritte und Validierung
+
+1. **Einspeisung**: Vorschläge aus dem Entwicklungschat werden direkt als `AgentProposal` überführt (Ziel-Pfad und Inhalts-Hash aus der bestehenden Proposal-Antwort des Workspace-Service; Priorität und Ablaufzeit aus der Studio-Konfiguration).
+2. **Bewertung**: Bei jeder Aktualisierung läuft `evaluateProposalQueue`; die Oberfläche zeigt Ordnung, Ablauf, Duplikat- und Überlauf-Hinweise aus `QueueEvaluation`.
+3. **Bedienung**: Ansehen, Anwenden und Ablehnen ausschließlich über `transitionProposal`; abgelehnte Ergebnispräsentation enthält immer die begründete `reason`.
+4. **Validierung**: TypeScript (`npx tsc --noEmit`), volle Vitest-Suite, Server-Build und Secret-Scan müssen erfolgreich sein, bevor der Sprint committet und gepusht wird.
 
 Akzeptanzkriterium (unverändert): Agenten-Vorschläge erscheinen priorisiert mit Zustand, Ablaufdatum und Duplikatschutz; Zustandsübergänge folgen der geprüften Zustandsmaschine.
 
