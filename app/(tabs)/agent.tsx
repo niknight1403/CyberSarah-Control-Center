@@ -227,6 +227,10 @@ export default function AgentScreen() {
     Record<string, ChangeSnapshot[]>
   >({});
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [connectionTest, setConnectionTest] = useState<{
+    status: "idle" | "checking" | "ready" | "error";
+    message: string;
+  }>({ status: "idle", message: "" });
   const [loadingPreviewIds, setLoadingPreviewIds] = useState<
     Record<string, boolean>
   >({});
@@ -252,6 +256,8 @@ export default function AgentScreen() {
     pickVideos,
   } = useMediaPicker();
   const developmentChatMutation = trpc.developmentChat.send.useMutation();
+  const chatConnectionTestMutation =
+    trpc.developmentChat.testConnection.useMutation();
   const hasRepository = Boolean(settings.workspaceId);
   const chatWorkspaceId = settings.workspaceId;
   const providerLabel = getProviderLabel(settings.provider);
@@ -303,7 +309,7 @@ export default function AgentScreen() {
       changes: [],
       affectedFiles: [],
       providerUsed: result.providerUsed,
-      fallbackUsed: false,
+      fallbackUsed: result.fallbackUsed,
     };
   };
 
@@ -667,6 +673,37 @@ export default function AgentScreen() {
     setLoadingPreviewIds((current) => ({ ...current, [id]: loading }));
   };
 
+  const runChatConnectionTest = async () => {
+    setConnectionTest({ status: "checking", message: "" });
+    try {
+      const result = await chatConnectionTestMutation.mutateAsync({
+        provider: settings.provider,
+      });
+      if (result.ok) {
+        setProviderActivity("active");
+        setConnectionTest({
+          status: "ready",
+          message: `${getProviderLabel(result.provider)} antwortet in ${result.latencyMs} ms · Modell ${result.model ?? "unbekannt"}`,
+        });
+      } else {
+        setProviderActivity("error");
+        setConnectionTest({
+          status: "error",
+          message: result.error ?? "Der KI-Provider konnte nicht erreicht werden.",
+        });
+      }
+    } catch (error) {
+      setProviderActivity("error");
+      setConnectionTest({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Der KI-Verbindungstest ist fehlgeschlagen.",
+      });
+    }
+  };
+
   const testConnector = async (connector: ConnectorId) => {
     setConnectorTests((current) => ({
       ...current,
@@ -937,6 +974,38 @@ export default function AgentScreen() {
                     tone={readyForChat ? "accent" : "warning"}
                   />
                 </View>
+                <TouchableOpacity
+                  accessibilityLabel="KI-Verbindung testen"
+                  accessibilityRole="button"
+                  activeOpacity={0.75}
+                  disabled={connectionTest.status === "checking"}
+                  onPress={() => void runChatConnectionTest()}
+                  style={[
+                    styles.contextChip,
+                    connectionTest.status === "checking" &&
+                      styles.contextChipDisabled,
+                  ]}
+                >
+                  <IconSymbol name="bolt.fill" size={14} color="#52D8FF" />
+                  <Text numberOfLines={1} style={styles.contextText}>
+                    {connectionTest.status === "checking"
+                      ? "KI-Verbindung wird geprüft …"
+                      : "KI-Verbindung testen"}
+                  </Text>
+                </TouchableOpacity>
+                {connectionTest.message ? (
+                  <Text
+                    numberOfLines={3}
+                    style={[
+                      styles.connectionTestText,
+                      connectionTest.status === "ready"
+                        ? styles.connectionTestTextReady
+                        : styles.connectionTestTextError,
+                    ]}
+                  >
+                    {connectionTest.message}
+                  </Text>
+                ) : null}
                 <View style={styles.historyRow}>
                   <Text style={styles.historyText}>
                     {historyLoaded
@@ -1881,6 +1950,22 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "space-between",
     marginBottom: 25,
+  },
+  connectionTestText: {
+    color: "#AEB8CC",
+    flexShrink: 1,
+    fontFamily: "WixMadeforText",
+    fontSize: 12,
+    marginBottom: 18,
+  },
+  connectionTestTextError: {
+    color: "#FF7A85",
+  },
+  connectionTestTextReady: {
+    color: "#6FE3A5",
+  },
+  contextChipDisabled: {
+    opacity: 0.55,
   },
   contextChip: {
     alignItems: "center",

@@ -161,12 +161,23 @@ async function callAnthropic(messages: ChatMessage[], requestedModel?: string) {
 }
 
 async function callManaged(messages: ChatMessage[], requestedModel?: string) {
-  const result = await invokeLLM({
-    messages: toProviderMessages(messages) as Message[],
-    model: requestedModel,
-    maxTokens: 1_800,
-  });
-  return { content: extractContent(result), model: result.model };
+  try {
+    const result = await invokeLLM({
+      messages: toProviderMessages(messages) as Message[],
+      model: requestedModel,
+      maxTokens: 1_800,
+    });
+    return { content: extractContent(result), model: result.model };
+  } catch (error) {
+    if (error instanceof Error && /OPENAI_API_KEY/.test(error.message)) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message:
+          "Der On-Server-LLM ist nicht konfiguriert. Bitte OPENAI_API_KEY in der Serverumgebung setzen.",
+      });
+    }
+    throw error;
+  }
 }
 
 function isTransientChatError(error: unknown) {
@@ -214,26 +225,109 @@ export const developmentChatRouter = router({
       { id: "custom", label: "Eigener OpenAI-kompatibler Endpoint", type: "custom" },
     ] as const,
   })),
-  send: protectedProcedure.input(chatInputSchema).mutation(async ({ input }) => {
-    try {
-      const reply = await callProvider(input.provider, input.messages, input.model);
-      return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
-    } catch (error) {
-      if (error instanceof TRPCError) throw error;
-      if (isTransientChatError(error)) {
-        let lastFallbackError: unknown = error;
-        for (const fallbackProvider of getFallbackProviders(input.provider)) {
-          try {
-            const reply = await callProvider(fallbackProvider, input.messages, input.model);
-            return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
-          } catch (fallbackError) {
-            lastFallbackError = fallbackError;
-            if (!isTransientChatError(fallbackError)) break;
-          }
-        }
-        throw new TRPCError({ code: "BAD_GATEWAY", message: lastFallbackError instanceof Error ? lastFallbackError.message : "Die konfigurierten KI-Fallback-Provider konnten den Entwicklungsauftrag nicht verarbeiten." });
-      }
-      throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "Der KI-Provider konnte den Entwicklungsauftrag nicht verarbeiten." });
-    }
-  }),
+  send: protectedProcedure
+    .input(chatInputSchema)
+    .mutation(({ input }) => handleDevelopmentChat(input)),
+  testConnection: protectedProcedure
+    .input(
+      z.object({
+        provider: providerSchema.default("managed"),
+        model: z.string().trim().min(1).max(160).optional(),
+      }),
+    )
+    .mutation(({ input }) =>
+      testDevelopmentChatConnection(input.provider, input.model),
+    ),
 });
+
+export type DevelopmentChatResult = {
+  content: string;
+  model: string;
+  providerUsed: ProviderId;
+  fallbackUsed: boolean;
+  receivedAt: string;
+};
+
+/**
+ * Kern des Entwicklungschats: ruft den primären Provider auf und weicht bei
+ * transienten Fehlern auf die konfigurierten Fallback-Provider aus. Als
+ * eigenständige Funktion exportiert, damit die gesamte Kette (Provider-
+ * Auswahl, Fallback, Fehlersemantik) deterministisch getestet werden kann.
+ */
+export async function handleDevelopmentChat(input: {
+  provider: ProviderId;
+  messages: ChatMessage[];
+  model?: string;
+}): Promise<DevelopmentChatResult> {
+  try {
+    const reply = await callProvider(input.provider, input.messages, input.model);
+    return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    if (isTransientChatError(error)) {
+      let lastFallbackError: unknown = error;
+      for (const fallbackProvider of getFallbackProviders(input.provider)) {
+        try {
+          const reply = await callProvider(fallbackProvider, input.messages, input.model);
+          return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
+        } catch (fallbackError) {
+          lastFallbackError = fallbackError;
+          if (!isTransientChatError(fallbackError)) break;
+        }
+      }
+      throw new TRPCError({ code: "BAD_GATEWAY", message: lastFallbackError instanceof Error ? lastFallbackError.message : "Die konfigurierten KI-Fallback-Provider konnten den Entwicklungsauftrag nicht verarbeiten." });
+    }
+    throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "Der KI-Provider konnte den Entwicklungsauftrag nicht verarbeiten." });
+  }
+}
+
+export type DevelopmentChatConnectionTestResult = {
+  ok: boolean;
+  provider: ProviderId;
+  model?: string;
+  latencyMs: number;
+  error?: string;
+};
+
+/**
+ * Redigiert Fehlermeldungen für die Anzeige: URLs und potenziell sensible
+ * Fragmente werden entfernt, die Länge begrenzt.
+ */
+function sanitizeConnectionError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replace(/https?:\/\/\S+/g, "[redigiert]")
+    .replace(/(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{10,})/g, "[redigiert]")
+    .slice(0, 400);
+}
+
+/**
+ * Prüft die Chat-Anbindung Ende-zu-Ende über denselben Provider-Pfad wie der
+ * echte Entwicklungsauftrag und misst die Latenz. Fehler werden redigiert
+ * zurückgegeben, damit die Ursache sichtbar bleibt, ohne Endpoints oder
+ * Schlüsselfragmente preiszugeben.
+ */
+export async function testDevelopmentChatConnection(
+  provider: ProviderId,
+  requestedModel?: string,
+): Promise<DevelopmentChatConnectionTestResult> {
+  const startedAt = Date.now();
+  try {
+    const reply = await callProvider(provider, [
+      { role: "user", content: "Antworte ausschließlich mit dem Wort OK." },
+    ], requestedModel);
+    return {
+      ok: true,
+      provider,
+      model: reply.model,
+      latencyMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      provider,
+      latencyMs: Date.now() - startedAt,
+      error: sanitizeConnectionError(error),
+    };
+  }
+}
