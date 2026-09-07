@@ -1,5 +1,5 @@
 import "dotenv/config";
-import mysql from "mysql2/promise";
+import pg from "pg";
 
 const failures = [];
 const required = [
@@ -35,7 +35,7 @@ for (const [typo, correct] of knownEnvTypos) {
   if (process.env[typo]?.trim()) failures.push(`${typo} ist ein Tippfehler – der Server liest ausschließlich ${correct}`);
 }
 const databaseUrl = process.env.DATABASE_URL?.trim() ?? "";
-if (databaseUrl && !/^(mysql|mysql2|mariadb):\/\//i.test(databaseUrl)) failures.push("DATABASE_URL muss eine MySQL-Verbindung (mysql://…) sein – der Server nutzt drizzle-orm/mysql2");
+if (databaseUrl && !/^postgres(ql)?:\/\//i.test(databaseUrl)) failures.push("DATABASE_URL muss eine PostgreSQL-Verbindung (postgresql://…) sein – der Server nutzt drizzle-orm/node-postgres (Koyeb-Database-Service)");
 const chatProviderKeys = [
   "BUILT_IN_FORGE_API_KEY",
   "OPENAI_API_KEY",
@@ -74,10 +74,11 @@ try {
 }
 
 try {
-  const connection = await mysql.createConnection(process.env.DATABASE_URL);
-  await connection.query("SELECT 1 AS healthy");
-  await connection.end();
-  console.log("OK: MySQL-Datenbankverbindung und SELECT 1 erfolgreich");
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  await client.query("SELECT 1 AS healthy");
+  await client.end();
+  console.log("OK: PostgreSQL-Datenbankverbindung und SELECT 1 erfolgreich");
 } catch (error) {
   console.error(`FEHLER: Datenbankverbindung fehlgeschlagen (${error instanceof Error ? error.message : "unbekannt"})`);
   process.exitCode = 1;

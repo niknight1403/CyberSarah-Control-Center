@@ -28,13 +28,14 @@ ausführen — der Repository-Deploy-Pfad des VPS ist bewusst eingefroren.
 Der VPS läuft unangetastet weiter, bis der Cutover (Phase 5) abgeschlossen
 ist.
 
-## Phase 2 — PostgreSQL-Sprint (als Nächstes)
+## Phase 2 — PostgreSQL-Sprint (abgeschlossen)
 
 Koyeb-Datenbanken sind verwaltetes PostgreSQL; MySQL bietet Koyeb nicht.
-Der Server wird daher von `drizzle-orm/mysql2` auf PostgreSQL
-(`drizzle-orm/node-postgres`) umgestellt: Schema-Dialekt, Migrationen,
-`validate-production.mjs` (akzeptiert künftig `postgresql://…`) und
-deterministische Tests.
+Der Server wurde auf `drizzle-orm/node-postgres` umgestellt: Schema
+(`drizzle/schema.ts`, pg-core mit `user_role`-Enum), frische PG-Migration
+(`drizzle/0000_dapper_husk.sql`), Upserts via `onConflictDoUpdate`,
+`validate-production.mjs` akzeptiert nur noch `postgresql://…` und prüft
+die Verbindung mit `pg`. `mysql2` ist aus den Abhängigkeiten entfernt.
 
 ## Phase 3 — Datenmigration
 

@@ -47,4 +47,18 @@ describe("production deployment configuration", () => {
     expect(ops).not.toContain("/opt/cybersarah-control-center");
     expect(ops).toContain("koyeb");
   });
+
+  it("nutzt PostgreSQL als Datenbank-Treiber", () => {
+    const schema = readProjectFile("drizzle/schema.ts");
+    expect(schema).toContain("drizzle-orm/pg-core");
+    expect(schema).not.toContain("mysql-core");
+
+    const pkg = readProjectFile("package.json");
+    expect(pkg).toContain("\"pg\"");
+    expect(pkg).not.toContain("mysql2");
+
+    const validator = readProjectFile("scripts/validate-production.mjs");
+    expect(validator).toContain("node-postgres");
+    expect(validator).not.toContain("mysql2/promise");
+  });
 });

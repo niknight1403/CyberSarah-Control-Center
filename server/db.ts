@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { billingSubscriptions, InsertUser, users } from "../drizzle/schema";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
@@ -96,9 +96,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
+    await db
+      .insert(users)
+      .values(values)
+      .onConflictDoUpdate({ target: users.openId, set: updateSet });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -205,7 +206,8 @@ export async function upsertBillingSubscription(input: {
   await db
     .insert(billingSubscriptions)
     .values(input)
-    .onDuplicateKeyUpdate({
+    .onConflictDoUpdate({
+      target: billingSubscriptions.stripeSubscriptionId,
       set: {
         stripeCustomerId: input.stripeCustomerId,
         stripePriceId: input.stripePriceId ?? null,

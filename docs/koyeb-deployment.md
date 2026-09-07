@@ -62,12 +62,12 @@ Wichtige Hinweise zu den Variablen:
 ## Datenbank
 
 Der Container erreicht nur Datenbanken, die öffentlich (oder innerhalb
-Koyeb) erreichbar sind. Eine DATABASE_URL mit localhost funktioniert dort nicht. Koyeb erreicht nur
-öffentliche oder eigene Endpunkte. Der Hetzner-Exit ist vollzogen (siehe
-docs/HETZNER-EXIT.md): produktive Datenbank ist eine verwaltete MySQL-
-Instanz (z. B. Aiven, Clever Cloud oder Railway), deren Endpunkt als
-DATABASE_URL-Secret hinterlegt wird. Der komplette Datenumzug von der
-ehemaligen VPS-MariaDB ist im Exit-Runbook beschrieben.
+Koyeb) erreichbar sind. Eine DATABASE_URL mit localhost funktioniert dort nicht. Der Hetzner-Exit
+ist vollzogen (siehe docs/HETZNER-EXIT.md): Der Server nutzt PostgreSQL
+(drizzle-orm/node-postgres), produktive Datenbank ist ein Koyeb-Database-
+Service (verwaltetes PostgreSQL). Dessen Endpunkt wird als DATABASE_URL-
+Secret hinterlegt; der Datenumzug von der ehemaligen VPS-MariaDB ist im
+Exit-Runbook beschrieben.
 
 Vor dem ersten Start müssen die Drizzle-Migrationen (drizzle/*.sql) gegen
 die gewählte Koyeb-Datenbank eingespielt werden, da der Container selbst

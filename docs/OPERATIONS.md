@@ -38,7 +38,7 @@ Die Android-Konfiguration ist portrait-orientiert und verwendet das CyberSarah-C
 
 | Variable | Bedeutung | Hinweis |
 |---|---|---|
-| `DATABASE_URL` | Datenbank-Verbindung | Derzeit `mysql://…` (`drizzle-orm/mysql2`); wird im Hetzner-Exit auf Koyeb-PostgreSQL umgestellt (`postgresql://…`) |
+| `DATABASE_URL` | PostgreSQL-Verbindung (`postgresql://…`) | Der Server nutzt `drizzle-orm/node-postgres` gegen den Koyeb-Database-Service; MySQL-URLs werden abgewiesen |
 | `APP_ALLOWED_ORIGINS` | Erlaubte Web-Origins (kommagetrennt) | Ohne diese Variable blockiert der Server produktive Web-Requests mit HTTP 403; `ALLOWED_ORIGINS` ist ein bekannter Tippfehler |
 | `APP_BASE_URL` | HTTPS-Basis-URL | Muss mit `https://` beginnen |
 | `JWT_SECRET` | Sitzungs-Signatur | Mindestens 32 Zeichen |
