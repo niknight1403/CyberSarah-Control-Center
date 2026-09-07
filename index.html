@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sarah Klein entwickelt digitale Produkte, die komplexe Systeme klar und menschlich machen." />
+    <title>Sarah Klein | Product Designer & Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header" id="top">
+      <a class="brand" href="#top" aria-label="Sarah Klein Startseite">
+        <span class="brand-mark">SK</span>
+        <span>Sarah Klein</span>
+      </a>
+      <button class="menu-toggle" type="button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="main-navigation">
+        <span></span><span></span>
+      </button>
+      <nav id="main-navigation" class="main-nav" aria-label="Hauptnavigation">
+        <a href="#about">Über mich</a>
+        <a href="#projects">Projekte</a>
+        <a href="#contact" class="nav-cta">Lass uns sprechen <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero section-shell" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="status-dot"></span> Verfügbar für ausgewählte Projekte</p>
+          <h1 id="hero-title">Digitale Produkte mit <em>Haltung.</em></h1>
+          <p class="hero-lead">Ich bin Sarah, Product Designerin und Builderin aus Berlin. Ich übersetze komplexe Ideen in klare, mutige und nützliche digitale Erlebnisse.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#projects">Arbeiten ansehen <span aria-hidden="true">↓</span></a>
+            <a class="text-link" href="#contact">Projekt anfragen <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-label="Profilbild-Platzhalter">
+          <div class="portrait-frame">
+            <div class="portrait-glow"></div>
+            <div class="portrait-avatar">SK</div>
+            <span class="portrait-label">design / build / care</span>
+          </div>
+          <div class="orbit-note note-top">08:42<br /><span>deep work</span></div>
+          <div class="orbit-note note-bottom">Berlin<br /><span>52° 31' N</span></div>
+        </div>
+        <div class="scroll-hint" aria-hidden="true"><span></span> Scroll to explore</div>
+      </section>
+
+      <section class="about section-shell" id="about" aria-labelledby="about-title">
+        <div class="section-label">01 / Über mich</div>
+        <div class="about-grid">
+          <h2 id="about-title">Neugier ist mein <span>Kompass.</span></h2>
+          <div class="about-copy">
+            <p>Seit über 7 Jahren arbeite ich an der Schnittstelle von Strategie, Design und Technologie. Am liebsten dort, wo noch keine fertige Lösung existiert.</p>
+            <p>Ich glaube an weniger Lärm, bessere Fragen und Produkte, die sich selbstverständlich anfühlen. Von der ersten Skizze bis zum letzten Pixel bin ich dabei.</p>
+            <div class="skills" aria-label="Fähigkeiten">
+              <span>Product Strategy</span><span>UX / UI Design</span><span>Prototyping</span><span>Design Systems</span><span>Creative Coding</span><span>Facilitation</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="projects section-shell" id="projects" aria-labelledby="projects-title">
+        <div class="section-heading">
+          <div class="section-label">02 / Ausgewählte Arbeit</div>
+          <h2 id="projects-title">Ideen, die <span>Form annehmen.</span></h2>
+        </div>
+        <div class="project-grid">
+          <article class="project-card project-card-featured">
+            <div class="project-visual visual-orbit"><span class="visual-chip">01</span><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit-core">N</div></div>
+            <div class="project-info"><div><p class="project-type">Brand Platform · 2024</p><h3>Norden Studio</h3></div><a class="circle-link" href="https://example.com" target="_blank" rel="noreferrer" aria-label="Norden Studio Projekt öffnen">↗</a><p>Eine neue digitale Heimat für Menschen, die anders arbeiten und leben wollen.</p></div>
+          </article>
+          <article class="project-card">
+            <div class="project-visual visual-lime"><span class="visual-chip">02</span><div class="signal-bars"><i></i><i></i><i></i><i></i><i></i></div><span class="visual-word">clear</span></div>
+            <div class="project-info"><div><p class="project-type">SaaS · 2023</p><h3>Signal / Noise</h3></div><a class="circle-link" href="https://example.com" target="_blank" rel="noreferrer" aria-label="Signal Noise Projekt öffnen">↗</a><p>Komplexe Daten für Teams sichtbar, verständlich und handlungsfähig machen.</p></div>
+          </article>
+          <article class="project-card">
+            <div class="project-visual visual-coral"><span class="visual-chip">03</span><div class="coral-shape">✦</div><span class="visual-caption">made<br />with care</span></div>
+            <div class="project-info"><div><p class="project-type">Digital Product · 2022</p><h3>Common Ground</h3></div><a class="circle-link" href="https://example.com" target="_blank" rel="noreferrer" aria-label="Common Ground Projekt öffnen">↗</a><p>Ein ruhiger Ort für laute Fragen: Community und Wissen neu gedacht.</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="contact section-shell" id="contact" aria-labelledby="contact-title">
+        <div class="contact-intro"><div class="section-label">03 / Kontakt</div><h2 id="contact-title">Lass uns etwas <span>Gutes bauen.</span></h2><p>Du hast eine Idee, ein kniffliges Problem oder einfach Lust auf ein Gespräch? Schreib mir. Ich melde mich normalerweise innerhalb von 48 Stunden.</p><a class="mail-link" href="mailto:hallo@sarahklein.design">hallo@sarahklein.design <span>↗</span></a></div>
+        <form class="contact-form" id="contact-form" novalidate>
+          <label for="name">Dein Name<input id="name" name="name" type="text" autocomplete="name" placeholder="Wie darf ich dich nennen?" required /></label>
+          <label for="email">Deine E-Mail<input id="email" name="email" type="email" autocomplete="email" placeholder="du@beispiel.de" required /></label>
+          <label for="message">Deine Nachricht<textarea id="message" name="message" rows="4" placeholder="Erzähl mir ein bisschen von deinem Vorhaben ..." required></textarea></label>
+          <button class="button button-primary" type="submit">Nachricht senden <span aria-hidden="true">↗</span></button>
+          <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <footer class="site-footer section-shell">
+      <a class="brand" href="#top"><span class="brand-mark">SK</span><span>Sarah Klein</span></a>
+      <p>© <span id="current-year">2026</span> Sarah Klein. Mit Neugier gemacht.</p>
+      <div class="social-links"><a href="https://www.linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a><a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a><a href="https://www.instagram.com" target="_blank" rel="noreferrer">Instagram</a></div>
+    </footer>
+  </body>
+</html>
