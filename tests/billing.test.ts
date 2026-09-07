@@ -108,6 +108,17 @@ describe("subscription price resolution", () => {
     });
   });
 
+  it("loest einen stabilen Stripe-Lookup-Key autonom auf", async () => {
+    vi.stubEnv("STRIPE_PRICE_LOOKUP_KEY", "cybersarah-monthly");
+    const stripe = fakeStripe(rejects, [price({ id: "price_lookup" })]);
+    await expect(resolveSubscriptionPriceId(stripe)).resolves.toBe("price_lookup");
+    expect(stripe.prices.list).toHaveBeenCalledWith({
+      lookup_keys: ["cybersarah-monthly"],
+      active: true,
+      limit: 100,
+    });
+  });
+
   it("ignoriert inaktive oder einmalige Produktpreise", async () => {
     vi.stubEnv("STRIPE_PRODUCT_MONATLICH", "prod_monatlich");
     const stripe = fakeStripe(

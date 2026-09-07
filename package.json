@@ -4,14 +4,14 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "concurrently -k \"pnpm dev:server\" \"pnpm dev:metro\"",
+    "dev": "concurrently -k \"npm run dev:server\" \"npm run dev:metro\"",
     "dev:server": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
     "dev:metro": "cross-env EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo start --web --port ${EXPO_PORT:-8081}",
     "build": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=cjs --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
-    "start:pm2": "pnpm exec pm2 start ecosystem.config.cjs --only cybersarah-control-center --update-env",
-    "restart:pm2": "pnpm exec pm2 restart cybersarah-control-center --update-env",
-    "stop:pm2": "pnpm exec pm2 delete cybersarah-control-center",
+    "start:pm2": "npm exec -- pm2 start ecosystem.config.cjs --only cybersarah-control-center --update-env",
+    "restart:pm2": "npm exec -- pm2 restart cybersarah-control-center --update-env",
+    "stop:pm2": "npm exec -- pm2 delete cybersarah-control-center",
     "check": "tsc --noEmit",
     "lint": "expo lint",
     "format": "prettier --write .",
@@ -19,7 +19,7 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:seed-admin": "tsx scripts/seed-admin.ts",
     "android": "expo run:android",
-    "build:android": "pnpm dlx eas-cli@latest build --platform android --profile production",
+    "build:android": "npx eas-cli@latest build --platform android --profile production",
     "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs"
   },
@@ -103,5 +103,5 @@
     "typescript": "~5.9.3",
     "vitest": "^2.1.9"
   },
-  "packageManager": "pnpm@9.12.0"
+  "packageManager": "npm@11.9.0"
 }

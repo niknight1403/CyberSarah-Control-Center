@@ -57,6 +57,7 @@ export type StripePriceApi = {
     retrieve(id: string): Promise<unknown>;
     list(params: {
       product?: string;
+      lookup_keys?: string[];
       active?: boolean;
       limit?: number;
     }): Promise<unknown>;
@@ -99,7 +100,8 @@ export function pickSubscriptionPriceId(
  * Löst die Abo-Preis-ID autonom auf:
  * 1. Konfigurierter STRIPE_PRICE_ID, sofern Stripe ihn als aktiv und
  *    wiederkehrend bestätigt (fängt Platzhalter/Tippfehler ab).
- * 2. Sonst aktiver wiederkehrender Preis des Produkts aus
+ * 2. Sonst aktiver wiederkehrender Preis über STRIPE_PRICE_LOOKUP_KEY.
+ * 3. Sonst aktiver wiederkehrender Preis des Produkts aus
  *    STRIPE_PRODUCT_MONATLICH (Monatspreis bevorzugt).
  * Erfolgreiche Auflösungen werden prozessweit gecacht.
  */
@@ -126,6 +128,31 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
     }
   }
 
+  const lookupKey = process.env.STRIPE_PRICE_LOOKUP_KEY?.trim() ?? "";
+  if (lookupKey) {
+    const listed = await stripe.prices.list({
+      lookup_keys: [lookupKey],
+      active: true,
+      limit: 100,
+    });
+    const data =
+      (listed as { data?: unknown }).data instanceof Array
+        ? (listed as { data: unknown[] }).data
+        : [];
+    const picked = pickSubscriptionPriceId(
+      data
+        .map(normalizeSubscriptionPrice)
+        .filter((p): p is SubscriptionPriceLike => p !== null),
+    );
+    if (picked) {
+      resolvedPriceIdCache = picked.id;
+      console.info(
+        `[Billing] Abo-Preis automatisch über STRIPE_PRICE_LOOKUP_KEY aufgelöst: ${picked.id}`,
+      );
+      return picked.id;
+    }
+  }
+
   const productId = process.env.STRIPE_PRODUCT_MONATLICH?.trim() ?? "";
   if (productId) {
     const listed = await stripe.prices.list({
@@ -148,7 +175,7 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
   }
 
   throw new Error(
-    "STRIPE_PRICE_ID fehlt oder ist ungültig und konnte nicht über STRIPE_PRODUCT_MONATLICH aufgelöst werden. Bitte im Stripe-Dashboard einen aktiven wiederkehrenden Preis prüfen.",
+    "STRIPE_PRICE_ID fehlt oder ist ungültig und konnte nicht über STRIPE_PRICE_LOOKUP_KEY oder STRIPE_PRODUCT_MONATLICH aufgelöst werden. Bitte im Stripe-Dashboard einen aktiven wiederkehrenden Preis prüfen.",
   );
 }
 

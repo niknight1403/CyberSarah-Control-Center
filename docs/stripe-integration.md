@@ -7,7 +7,8 @@ Der Backend-Service erwartet folgende Variablen in seiner `.env`-Datei:
 ```dotenv
 STRIPE_MODE=live
 STRIPE_SECRET_KEY=sk_live_...
-STRIPE_PRICE_ID=price_...
+# Entweder feste ID oder bevorzugt ein stabiler Stripe-Lookup-Key:
+STRIPE_PRICE_LOOKUP_KEY=cybersarah-monthly
 STRIPE_WEBHOOK_SECRET=whsec_...
 APP_BASE_URL=https://app.cybersarah-ki.com
 ```
@@ -82,10 +83,9 @@ In der Stripe-Dashboard-Konfiguration muss der Endpoint auf `https://app.cybersa
 
 ## Autonome Preis-Aufloesung (2026-09-06)
 
-Der Server prueft den konfigurierten `STRIPE_PRICE_ID` gegen die Stripe-API, bevor er eine
-Checkout-Session erstellt. Lehnt Stripe den Preis ab (Platzhalter, Tippfehler, geloeschte
-Preise) oder ist der Preis inaktiv bzw. nicht wiederkehrend, faellt der Server automatisch
-auf die aktiven wiederkehrenden Preise des Produkts `STRIPE_PRODUCT_MONATLICH` zurueck und
-waehlt bevorzugt das Monats-Intervall. Die erfolgreiche Aufloesung wird prozessweit gecacht.
-Damit laeuft der Checkout auch dann, wenn `STRIPE_PRICE_ID` in der ENV noch nicht oder falsch
-gesetzt ist; die ENV-Validierung (validate-production.mjs) bleibt bewusst strenger.
+Der Server prueft `STRIPE_PRICE_ID` gegen Stripe. Wenn diese ID fehlt oder ungueltig ist,
+fragt er zuerst `STRIPE_PRICE_LOOKUP_KEY` ab und faellt danach auf
+`STRIPE_PRODUCT_MONATLICH` zurueck. Aktive wiederkehrende Preise werden bevorzugt; bei
+mehreren Treffern wird der Monats-Preis gewaehlt. Die erfolgreiche Aufloesung wird
+prozessweit gecacht. Dadurch kann die Price-ID im Stripe-Dashboard geaendert werden,
+ohne die Koyeb-Konfiguration oder den App-Build anzupassen.
