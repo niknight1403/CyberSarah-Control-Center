@@ -139,7 +139,11 @@ const config: ExpoConfig = {
       },
     ],
   ],
-  extra: { eas: { projectId: "57727d7f-e324-41e5-8faf-71b60e4a1fdd" } },
+  extra: {
+    eas: {
+      projectId: "4a3ea21d-feab-4c31-96c2-c1075123d58f"
+    },
+  },
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
