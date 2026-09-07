@@ -37,6 +37,7 @@ Empfohlene Koyeb-Variablen:
 NODE_ENV=production
 PORT=8000
 APP_BASE_URL=https://<öffentliche-app-domain>
+APP_ALLOWED_ORIGINS=https://<öffentliche-app-domain>,https://app.cybersarah-ki.com,https://www.cybersarah-ki.com
 DATABASE_URL=<Koyeb-Secret>
 JWT_SECRET=<Koyeb-Secret>
 STRIPE_MODE=live
@@ -44,6 +45,35 @@ STRIPE_SECRET_KEY=<Koyeb-Secret>
 STRIPE_PRICE_LOOKUP_KEY=cybersarah-monthly
 STRIPE_WEBHOOK_SECRET=<Koyeb-Secret>
 ```
+
+Wichtige Hinweise zu den Variablen:
+
+- **APP_ALLOWED_ORIGINS ist in Produktion Pflicht.** Ohne sie lehnt die
+  Sicherheits-Middleware jeden Browser-Request mit Origin-Header mit
+  HTTP 403 ab (bei NODE_ENV=production gibt es keinen Fallback). Es müssen
+  alle Domains eingetragen sein, von denen die Web-App den API-Dienst
+  aufruft – inklusive der Koyeb-URL.
+- **JWT_SECRET wird für die Session-Cookies benötigt.** Ohne ihn ist kein
+  Login möglich. Auch OAUTH_SERVER_URL und OWNER_OPEN_ID müssen wie auf
+  dem VPS übernommen werden, wenn Login/Owner-Funktionen genutzt werden.
+- **METRICS_TOKEN ist optional** und schützt `/api/metrics`; ohne ihn
+  bleibt der Endpoint gesperrt.
+
+## Datenbank
+
+Der Container erreicht nur Datenbanken, die öffentlich (oder innerhalb
+Koyeb) erreichbar sind. Die produktive MariaDB auf dem VPS lauscht auf
+127.0.0.1:3306 und ist von Koyeb aus NICHT erreichbar – eine
+DATABASE_URL mit localhost funktioniert dort nicht. Optionen:
+
+1. Von Koyeb bereitgestellte Datenbank (Service/Instance im selben Koyeb-
+   Workspace) und DATABASE_URL auf deren Endpunkt setzen.
+2. Die VPS-MariaDB NICHT öffentlich exponieren; sie bleibt der Produktions-
+   datenbestand für den nginx/PM2-Betrieb.
+
+Vor dem ersten Start müssen die Drizzle-Migrationen (drizzle/*.sql) gegen
+die gewählte Koyeb-Datenbank eingespielt werden, da der Container selbst
+keine Migrationen ausführt – identisch zum VPS-Workflow.
 
 ## Lokaler Smoke-Test
 
