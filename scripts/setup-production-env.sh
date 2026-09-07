@@ -3,12 +3,23 @@ set -euo pipefail
 
 REPO_DIR="/opt/cybersarah-control-center"
 ENV_FILE="$REPO_DIR/.env"
+SERVICE_USER="${CYBERSARAH_SERVICE_USER:-cybersarah}"
+SERVICE_GROUP="${CYBERSARAH_SERVICE_GROUP:-$SERVICE_USER}"
 umask 077
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Dieses Skript muss als root ausgeführt werden (sudo -i)." >&2
   exit 1
 fi
+
+id "$SERVICE_USER" >/dev/null 2>&1 || {
+  echo "Der Service-Benutzer '$SERVICE_USER' existiert nicht." >&2
+  exit 1
+}
+getent group "$SERVICE_GROUP" >/dev/null || {
+  echo "Die Service-Gruppe '$SERVICE_GROUP' existiert nicht." >&2
+  exit 1
+}
 
 mkdir -p "$REPO_DIR"
 if [[ -f "$ENV_FILE" ]]; then
@@ -80,12 +91,13 @@ BUILT_IN_FORGE_API_KEY=$forge_key
 EOF
 
 chmod 600 "$ENV_FILE"
-chown root:root "$ENV_FILE"
+chown "$SERVICE_USER:$SERVICE_GROUP" "$ENV_FILE"
 
 echo ".env wurde sicher geschrieben: $ENV_FILE"
+echo "Eigentümer: $SERVICE_USER:$SERVICE_GROUP, Modus: 600"
 echo "Secrets werden nicht ausgegeben. Als Nächstes ausführen:"
 echo "  cd $REPO_DIR"
 echo "  git pull --ff-only origin main"
 echo "  pnpm install --frozen-lockfile"
 echo "  pnpm run build"
-echo "  pm2 restart cybersarah-backend --update-env"
+echo "  systemctl restart cybersarah.service"
