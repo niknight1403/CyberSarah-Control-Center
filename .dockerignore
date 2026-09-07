@@ -1,0 +1,17 @@
+.git
+.github
+.expo
+.cache
+.webdev
+.vscode
+node_modules
+dist
+web-build
+ios
+android
+logs
+*.log
+.env
+.env.*
+secrets-backup.tar.gz.gpg
+workspace-service
