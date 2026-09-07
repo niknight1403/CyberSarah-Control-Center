@@ -81,3 +81,4 @@ workspace-service/.env
 workspace-service/.env
 .env
 workspace-service/.env
+web-dist/

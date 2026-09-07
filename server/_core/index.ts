@@ -1,5 +1,12 @@
 import "dotenv/config";
 import express from "express";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import {
+  isWebFallbackCandidate,
+  mapUrlPathToWebFile,
+  resolveWebDistDir,
+} from "../../lib/static-web-logic";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -115,6 +122,35 @@ async function startServer() {
       createContext,
     }),
   );
+
+  // Statischer Expo-Web-Export (Koyeb-Einzel-Dienst): Dateien aus
+  // web-dist ausliefern, unbekannte GET-Pfade auf index.html fallen.
+  const webDistDir = resolveWebDistDir(process.cwd());
+  if (webDistDir) {
+    // Catch-all NACH allen /api-Routen: Datei aus dem Web-Export liefern,
+    // sonst index.html (Static-Site-Export, client-seitiges Routing).
+    app.get("*", (req, res) => {
+      if (!isWebFallbackCandidate(req.method, req.path)) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      const relative = mapUrlPathToWebFile(req.path);
+      const filePath = relative ? path.join(webDistDir, relative) : null;
+      if (filePath && existsSync(filePath)) {
+        res.sendFile(filePath);
+        return;
+      }
+      // Fallback nur fuer pfadaehnliche Requests (keine Asset-Endungen).
+      const looksLikeAsset = /\.[a-zA-Z0-9]+$/.test(req.path.split("?")[0]);
+      const indexPath = path.join(webDistDir, "index.html");
+      if (!looksLikeAsset && existsSync(indexPath)) {
+        res.sendFile(indexPath);
+        return;
+      }
+      res.status(404).json({ error: "Not found" });
+    });
+    console.log(`[api] serving static web export from ${webDistDir}`);
+  }
 
   const port = parseInt(process.env.PORT || "3000", 10);
   server.listen(port, () => {
