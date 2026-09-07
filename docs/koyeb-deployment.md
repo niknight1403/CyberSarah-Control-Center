@@ -116,3 +116,27 @@ haben (Koyeb-Konsole → Integrations → GitHub installieren). Die
 Datenbank (Koyeb-Database-Service PostgreSQL) muss existieren und als
 DATABASE_URL erreichbar sein. Weitere ENVs (STRIPE_SECRET_KEY,
 STRIPE_WEBHOOK_SECRET) werden optional aus der Umgebung übernommen.
+
+## Secrets-Architektur (wo welche Werte leben)
+
+Damit nach dem Klonen des Repositories nichts manuell nachgetragen werden
+muss, leben die Secrets an drei klar getrennten Orten — niemals im
+Repository selbst (Schutz vor Leaks, GitHub-Scanning, Zugriffskontrolle):
+
+1. **GitHub Actions Secrets** (Repo → Settings → Secrets and variables →
+   Actions): Für alle CI-/Build- und Bootstrap-Läufe. Nach jedem Laden
+   des Repos sind sie in jedem Workflow-Run automatisch integriert
+   (Write-only: GitHub gibt sie nie wieder heraus, nur in Workflows
+   ein). Der Workflow `.github/workflows/koyeb-bootstrap.yml` zieht
+   KOYEB_TOKEN, DATABASE_URL, JWT_SECRET, METRICS_TOKEN und die
+   Stripe-Keys ausschließlich aus diesem Speicher.
+2. **Koyeb-ENV-Konfiguration** (Koyeb-Konsole → Service → Environment):
+   Für den Laufzeitbetrieb. Werden von `scripts/koyeb-deploy.mjs`
+   automatisch beim Anlegen des Dienstes gesetzt und beim Redeploy mit
+   der echten Domain gepatcht (APP_BASE_URL, APP_ALLOWED_ORIGINS).
+3. **Lokale Entwicklung**: `.env.example` dokumentiert alle Variablen,
+   die lokale `.env` bleibt gitignored und wird nie committet.
+
+Fehlende Werte werden nicht geraten: KOYEB_TOKEN muss als
+Actions-Secret existieren (Koyeb-Konsole → Account Settings → API), die
+Koyeb-PostgreSQL-DATABASE_URL entsteht bei Anlage der Datenbank.
