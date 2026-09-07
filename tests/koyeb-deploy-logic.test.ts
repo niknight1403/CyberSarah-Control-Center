@@ -78,6 +78,37 @@ describe("buildServiceEnv", () => {
     expect(list).toContain("FOO=bar");
   });
 
+  it("reicht OAuth-, Admin- und Stripe-Variablen nur bei Vorhandensein durch", () => {
+    const voll = buildServiceEnv({
+      ...base,
+      oauthServerUrl: "https://oauth.example.com",
+      ownerOpenId: "owner-open-id-123",
+      adminEmail: "admin@cybersarah-ki.com",
+      stripeMode: "live",
+      stripePriceLookupKey: "cybersarah-monthly",
+      stripeProductId: "price_123",
+      trustProxy: "1",
+    });
+    expect(voll).toContain("OAUTH_SERVER_URL=https://oauth.example.com");
+    expect(voll).toContain("OWNER_OPEN_ID=owner-open-id-123");
+    expect(voll).toContain("ADMIN_EMAIL=admin@cybersarah-ki.com");
+    expect(voll).toContain("STRIPE_MODE=live");
+    expect(voll).toContain("STRIPE_PRICE_LOOKUP_KEY=cybersarah-monthly");
+    expect(voll).toContain("STRIPE_PRICE_ID=price_123");
+    expect(voll).toContain("TRUST_PROXY=1");
+
+    const gefiltert = buildServiceEnv(base).filter(
+      (zeile) =>
+        zeile.startsWith("OAUTH_") ||
+        zeile.startsWith("OWNER_") ||
+        zeile.startsWith("ADMIN_") ||
+        zeile.startsWith("STRIPE_MODE") ||
+        zeile.startsWith("STRIPE_PRICE") ||
+        zeile.startsWith("TRUST_PROXY"),
+    );
+    expect(gefiltert).toEqual([]);
+  });
+
   it("lehnt Zeilenumbrueche in Werten ab", () => {
     expect(() =>
       buildServiceEnv({ ...base, extra: ["KEY=wert\ninjektion"] }),

@@ -19,9 +19,9 @@ Multi-Stage-`Dockerfile`; der Container bindet den von Koyeb gesetzten
    Stripe-Lookup-Key des Monats-Preises setzen, zum Beispiel
    `cybersarah-monthly`. `STRIPE_PRICE_ID` bleibt optional; falls sie fehlt,
    wird der aktive wiederkehrende Preis über den Lookup-Key gewählt.
-7. Für Mobile-Builds `EXPO_PUBLIC_API_BASE_URL` auf die öffentliche Koyeb-URL
-   setzen, zum Beispiel `https://cybersarah-control-center-<id>.koyeb.app`.
-   Die App verwendet diese URL anschließend für `/api/trpc` und OAuth.
+7. Mobile-Builds benötigen keine Build-zeit-API-URL: Die App bezieht ihre
+   Workspace-/API-Adresse aus den In-App-Einstellungen (Provider-/Workspace-
+   Konfiguration). Der Deploy-Skript-Weg setzt alle Runtime-ENVs automatisch.
 
 Der Container verwendet automatisch `PORT`, falls Koyeb einen abweichenden
 Port vorgibt. Für einen Datenbank-abhängigen Bereitschaftscheck steht zusätzlich
@@ -44,6 +44,9 @@ STRIPE_MODE=live
 STRIPE_SECRET_KEY=<Koyeb-Secret>
 STRIPE_PRICE_LOOKUP_KEY=cybersarah-monthly
 STRIPE_WEBHOOK_SECRET=<Koyeb-Secret>
+OAUTH_SERVER_URL=<aus GitHub-Actions-Secret>
+OWNER_OPEN_ID=<aus GitHub-Actions-Secret>
+TRUST_PROXY=1
 ```
 
 Wichtige Hinweise zu den Variablen:
@@ -58,6 +61,12 @@ Wichtige Hinweise zu den Variablen:
   dem VPS übernommen werden, wenn Login/Owner-Funktionen genutzt werden.
 - **METRICS_TOKEN ist optional** und schützt `/api/metrics`; ohne ihn
   bleibt der Endpoint gesperrt.
+- **OAUTH_SERVER_URL und OWNER_OPEN_ID** werden vom Deploy-Skript seit
+  Sprint 50 automatisch aus der Umgebung durchgereicht (Login-/Owner-
+  Funktionen laufen dann ohne manuelle Konsole-Nacharbeit).
+- **TRUST_PROXY=1** setzt das Deploy-Skript standardmäßig (Koyeb
+  terminiert TLS im Proxy; X-Forwarded-For/-Proto wird vertraut für
+  Rate-Limiting und Cookies).
 
 ## Datenbank
 
@@ -172,8 +181,8 @@ Dauer: ca. 10 Minuten.
    | `NODE_ENV` | `production` |
    | `PORT` | `8000` |
    | `DATABASE_URL` | Connection String aus Schritt 1 |
-   | `JWT_SECRET` | `f140dd08f1fe4ebbcadf9cf7accd0f12667410392dda64009bae05c04bfc5e8b` |
-   | `METRICS_TOKEN` | `51c031f5877e446de409accbce2143b9` |
+   | `JWT_SECRET` | Wert aus GitHub-Actions-Secret `JWT_SECRET` (nicht im Repository) |
+   | `METRICS_TOKEN` | Wert aus GitHub-Actions-Secret `METRICS_TOKEN` (seit Sprint 50 hinterlegt, nicht im Repository) |
    | `APP_BASE_URL` | erst leer lassen, nach Schritt 3 setzen |
 
 7. **Advanced Settings → Exposed Port**: `8000`, Protokoll HTTP

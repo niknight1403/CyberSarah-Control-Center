@@ -37,4 +37,8 @@ jobs:
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
+          OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
+          STRIPE_MODE: live
+          STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
         run: node scripts/koyeb-deploy.mjs --migrate

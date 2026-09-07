@@ -126,6 +126,13 @@ async function main() {
     metricsToken,
     stripeSecretKey: env("STRIPE_SECRET_KEY"),
     stripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET"),
+    oauthServerUrl: env("OAUTH_SERVER_URL"),
+    ownerOpenId: env("OWNER_OPEN_ID"),
+    adminEmail: env("ADMIN_EMAIL"),
+    stripeMode: env("STRIPE_MODE"),
+    stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
+    stripeProductId: env("STRIPE_PRICE_ID"),
+    trustProxy: env("TRUST_PROXY", "1"),
   });
 
   const requestBody = buildAppCreateRequest({
@@ -163,6 +170,13 @@ async function main() {
     metricsToken,
     stripeSecretKey: env("STRIPE_SECRET_KEY"),
     stripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET"),
+    oauthServerUrl: env("OAUTH_SERVER_URL"),
+    ownerOpenId: env("OWNER_OPEN_ID"),
+    adminEmail: env("ADMIN_EMAIL"),
+    stripeMode: env("STRIPE_MODE"),
+    stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
+    stripeProductId: env("STRIPE_PRICE_ID"),
+    trustProxy: env("TRUST_PROXY", "1"),
   });
   log("Patche ENV mit echter Domain …");
   await apiFetch(`/v1/services/${service.id}`, {
