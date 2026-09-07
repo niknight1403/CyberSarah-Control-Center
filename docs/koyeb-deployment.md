@@ -82,3 +82,37 @@ curl http://localhost:8000/api/health
 ```
 
 Erwartet wird eine JSON-Antwort mit `ok: true`.
+## Automatisiertes Deployment (scripts/koyeb-deploy.mjs)
+
+Das Deployment ist als Ein-Befehl-Skript automatisiert. Der Koyeb-API-Token
+wird ausschließlich aus der Umgebung (`KOYEB_TOKEN`) gelesen und niemals ins
+Repository committet.
+
+```bash
+# Dry-Run: Request-Body pruefen, ohne Ressourcen anzulegen
+KOYEB_TOKEN=<token> DATABASE_URL=<koyeb-postgres-uri> \
+  node scripts/koyeb-deploy.mjs --dry-run
+
+# Vollständiges Deployment inkl. Migrationen und Health-Verifikation
+KOYEB_TOKEN=<token> DATABASE_URL=<koyeb-postgres-uri> \
+  JWT_SECRET=<secret> METRICS_TOKEN=<secret> \
+  node scripts/koyeb-deploy.mjs --migrate
+```
+
+Ablauf des Skripts:
+
+1. Token-Format validieren (lib/koyeb-deploy-logic.mjs, 16 deterministische
+   Tests; Fließtext statt Token wird abgelehnt).
+2. Optional `--migrate`: Drizzle-Migrationen gegen die Koyeb-Datenbank.
+3. App mit API+Web-Kombidienst anlegen (POST /v1/apps, Docker-Builder,
+   Port 8000, Health-Check /api/health, Region fra).
+4. Auf Healthy warten und die öffentliche URL ermitteln.
+5. ENV mit der echten Domain patchen (APP_BASE_URL, APP_ALLOWED_ORIGINS)
+   und auf den Redeploy warten.
+6. `/api/health` öffentlich verifizieren.
+
+Voraussetzungen: Das Koyeb-GitHub-App muss Zugriff auf das Repository
+haben (Koyeb-Konsole → Integrations → GitHub installieren). Die
+Datenbank (Koyeb-Database-Service PostgreSQL) muss existieren und als
+DATABASE_URL erreichbar sein. Weitere ENVs (STRIPE_SECRET_KEY,
+STRIPE_WEBHOOK_SECRET) werden optional aus der Umgebung übernommen.
