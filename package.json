@@ -101,5 +101,5 @@
     "typescript": "~5.9.3",
     "vitest": "^2.1.9"
   },
-  "packageManager": "npm@11.9.0"
+  "packageManager": "pnpm@10.x.x"
 }
