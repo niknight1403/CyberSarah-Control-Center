@@ -2,9 +2,9 @@
 
 This service is the **execution boundary** for Custom AI Studio. It accepts requests from the mobile client, clones GitHub repositories into a Docker volume, offers selected file and Git operations, starts a Vite-compatible development command, proxies the resulting preview, and produces reviewable AI patch proposals. It deliberately does not expose a shell endpoint or persist user-supplied GitHub and provider credentials.
 
-## Deployment on a VPS
+## Deployment on a Docker host
 
-Copy the `workspace-service` directory to the server, create `.env` from `config.example`, set a long unique `SERVICE_ACCESS_TOKEN`, and set `PREVIEW_PUBLIC_BASE_URL` to the service's public **HTTPS** origin. Start the service with the following command.
+Copy the `workspace-service` directory to the host (PaaS with Docker support or your own server), create `.env` from `config.example`, set a long unique `SERVICE_ACCESS_TOKEN`, and set `PREVIEW_PUBLIC_BASE_URL` to the service's public **HTTPS** origin. Start the service with the following command.
 
 ```bash
 cp config.example .env

@@ -62,14 +62,12 @@ Wichtige Hinweise zu den Variablen:
 ## Datenbank
 
 Der Container erreicht nur Datenbanken, die öffentlich (oder innerhalb
-Koyeb) erreichbar sind. Die produktive MariaDB auf dem VPS lauscht auf
-127.0.0.1:3306 und ist von Koyeb aus NICHT erreichbar – eine
-DATABASE_URL mit localhost funktioniert dort nicht. Optionen:
-
-1. Von Koyeb bereitgestellte Datenbank (Service/Instance im selben Koyeb-
-   Workspace) und DATABASE_URL auf deren Endpunkt setzen.
-2. Die VPS-MariaDB NICHT öffentlich exponieren; sie bleibt der Produktions-
-   datenbestand für den nginx/PM2-Betrieb.
+Koyeb) erreichbar sind. Eine DATABASE_URL mit localhost funktioniert dort nicht. Koyeb erreicht nur
+öffentliche oder eigene Endpunkte. Der Hetzner-Exit ist vollzogen (siehe
+docs/HETZNER-EXIT.md): produktive Datenbank ist eine verwaltete MySQL-
+Instanz (z. B. Aiven, Clever Cloud oder Railway), deren Endpunkt als
+DATABASE_URL-Secret hinterlegt wird. Der komplette Datenumzug von der
+ehemaligen VPS-MariaDB ist im Exit-Runbook beschrieben.
 
 Vor dem ersten Start müssen die Drizzle-Migrationen (drizzle/*.sql) gegen
 die gewählte Koyeb-Datenbank eingespielt werden, da der Container selbst

@@ -3,23 +3,26 @@
 ## Lokale Entwicklung
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm dev
+npm ci
+npm run dev
 ```
 
-Der Produktions-Bundle wird mit `pnpm build` erzeugt und mit `pnpm start` gestartet. Secrets gehören ausschließlich in eine lokale `.env` oder in die Secret-Verwaltung des jeweiligen Hosts.
+Der Produktions-Bundle wird mit `npm run build` erzeugt und mit `npm start` gestartet. Secrets gehören ausschließlich in eine lokale `.env` oder in die Secret-Verwaltung des jeweiligen Hosts.
 
 ## Render
 
-Render verwendet `render.yaml`. Der Build lautet `corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build`, der Start erfolgt mit `pnpm start`. `OAUTH_SERVER_URL` und `EXPO_PUBLIC_OAUTH_SERVER_URL` werden ausschließlich als geschützte Render-Environment-Variablen hinterlegt.
+Render verwendet `render.yaml`. Der Build lautet `corepack enable && pnpm install --frozen-lockfile --prod=false && npm run build`, der Start erfolgt mit `npm start`. `OAUTH_SERVER_URL` und `EXPO_PUBLIC_OAUTH_SERVER_URL` werden ausschließlich als geschützte Render-Environment-Variablen hinterlegt.
 
-## Hetzner und systemd
+## Produktion: Koyeb (einziger Betriebspfad)
 
-Der Produktionsstand liegt unter `/opt/cybersarah-control-center`. Eine Service-Unit muss mit einem unprivilegierten, auf dem Host tatsächlich vorhandenen Benutzer betrieben werden. Status und Logs werden mit `systemctl status cybersarah.service --no-pager` und `journalctl -u cybersarah.service -f` geprüft.
-
-## Speicherüberwachung
-
-Das Skript `deploy/cybersarah-disk-check-ntfy.sh` prüft das Root-Dateisystem, verwendet konfigurierbare Warnschwellen und sendet nur bei Statuswechseln an ntfy. Die Topic-URL liegt in `/etc/cybersarah/disk-alert.env` mit Modus `0600`; sie wird weder in Git noch in Logs ausgegeben. Der zugehörige Timer sollte mit `systemctl list-timers cybersarah-disk-check-ntfy.timer --no-pager` geprüft werden.
+Die Produktion läuft vollständig auf Koyeb. Der API-Dienst wird aus dem
+Repository als Docker-Service gebaut (`Dockerfile`, siehe
+`docs/koyeb-deployment.md`); die Web-App und der Custom-AI-Studio-
+Workspace-Service laufen als eigene Koyeb-Dienste. Die Datenbank ist ein
+Koyeb-Database-Service (PostgreSQL) – der vollständige Umzugs- und
+Abschaltplan liegt in `docs/HETZNER-EXIT.md`. Secrets werden ausschließlich
+als Koyeb-Umgebungsvariablen hinterlegt; vor jedem Deploy prüft
+`scripts/validate-production.mjs` die ENV lokal.
 
 ## Backup und Wiederherstellung
 
@@ -35,7 +38,7 @@ Die Android-Konfiguration ist portrait-orientiert und verwendet das CyberSarah-C
 
 | Variable | Bedeutung | Hinweis |
 |---|---|---|
-| `DATABASE_URL` | MySQL-Verbindung (`mysql://…`) | Der Server nutzt `drizzle-orm/mysql2`; `postgressl://`- und `postgresql://`-URLs sowie der Tippfehler `DATARASE_URL` werden abgewiesen |
+| `DATABASE_URL` | Datenbank-Verbindung | Derzeit `mysql://…` (`drizzle-orm/mysql2`); wird im Hetzner-Exit auf Koyeb-PostgreSQL umgestellt (`postgresql://…`) |
 | `APP_ALLOWED_ORIGINS` | Erlaubte Web-Origins (kommagetrennt) | Ohne diese Variable blockiert der Server produktive Web-Requests mit HTTP 403; `ALLOWED_ORIGINS` ist ein bekannter Tippfehler |
 | `APP_BASE_URL` | HTTPS-Basis-URL | Muss mit `https://` beginnen |
 | `JWT_SECRET` | Sitzungs-Signatur | Mindestens 32 Zeichen |

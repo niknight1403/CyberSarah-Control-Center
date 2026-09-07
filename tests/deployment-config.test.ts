@@ -6,41 +6,45 @@ const readProjectFile = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), "utf8");
 
 describe("production deployment configuration", () => {
-  it("uses one repository path and service port for the systemd health check", () => {
-    const appService = readProjectFile("deploy/cybersarah.service");
-    const healthService = readProjectFile("deploy/cybersarah-health.service");
-    const monitor = readProjectFile("scripts/uptime-monitor.sh");
+  it("baut mit npm und einem gesperrten Lockfile", () => {
+    const pkg = readProjectFile("package.json");
+    expect(pkg).toContain('"packageManager": "npm@');
+    expect(pkg).not.toContain("start:pm2");
 
-    expect(appService).toContain(
-      "WorkingDirectory=/opt/cybersarah-control-center",
-    );
-    expect(appService).toContain("Environment=PORT=3000");
-    expect(healthService).toContain(
-      "WorkingDirectory=/opt/cybersarah-control-center",
-    );
-    expect(healthService).toContain(
-      "HEALTH_URL=http://127.0.0.1:3000/api/health",
-    );
-    expect(monitor).toContain(
-      'HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"',
-    );
+    const lock = JSON.parse(readProjectFile("package-lock.json"));
+    expect(lock.lockfileVersion).toBe(3);
   });
 
-  it("documents the same production path, user, and health endpoint as the units", () => {
-    const systemdGuide = readProjectFile("deploy/README-systemd.md");
-    const monitoringGuide = readProjectFile("deploy/UPTIME-MONITORING.md");
-    const setupScript = readProjectFile("scripts/setup-production-env.sh");
-    const easConfig = readProjectFile("eas.json");
+  it("stellt den API-Dienst als Docker-Container mit Runtime-Port bereit", () => {
+    const dockerfile = readProjectFile("Dockerfile");
+    expect(dockerfile).toContain("npm ci");
+    expect(dockerfile).toContain("npm run build");
+    expect(dockerfile).toContain("npm prune --omit=dev");
+    expect(dockerfile).toMatch(/^ENV PORT=\d+$/m);
+    expect(dockerfile).toContain('CMD ["node", "dist/index.js"]');
+  });
 
-    expect(systemdGuide).toContain("/opt/cybersarah-control-center");
-    expect(systemdGuide).toContain("cybersarah");
-    expect(systemdGuide).not.toContain("/opt/cybersarah/.env");
-    expect(monitoringGuide).toContain("http://127.0.0.1:3000/api/health");
-    expect(monitoringGuide).not.toContain("127.0.0.1:3001");
-    expect(setupScript).toContain('SERVICE_USER="${CYBERSARAH_SERVICE_USER:-cybersarah}"');
-    expect(setupScript).toContain('chown "$SERVICE_USER:$SERVICE_GROUP" "$ENV_FILE"');
-    expect(setupScript).not.toContain("chown root:root");
-    expect(easConfig).toContain('serviceAccountKeyPath": ".secrets/google-play-service-account.json"');
-    expect(easConfig).toContain('releaseStatus": "draft"');
+  it("haelt keine Secrets im Image", () => {
+    const ignore = readProjectFile(".dockerignore");
+    expect(ignore.split("\n")).toContain(".env");
+    expect(ignore.split("\n")).toContain(".env.*");
+    expect(ignore.split("\n")).toContain("node_modules");
+  });
+
+  it("dokumentiert APP_ALLOWED_ORIGINS als Produktions-Pflicht", () => {
+    const guide = readProjectFile("docs/koyeb-deployment.md");
+    expect(guide).toContain("APP_ALLOWED_ORIGINS");
+    expect(guide).toMatch(/Pflicht|403/);
+  });
+
+  it("enthaelt keine Hetzner- oder VPS-Betriebsspur mehr", () => {
+    const design = readProjectFile("design.md").toLowerCase();
+    expect(design).not.toContain("hetzner");
+
+    const ops = readProjectFile("docs/OPERATIONS.md").toLowerCase();
+    expect(ops).not.toContain("systemd");
+    expect(ops).not.toContain("ntfy");
+    expect(ops).not.toContain("/opt/cybersarah-control-center");
+    expect(ops).toContain("koyeb");
   });
 });

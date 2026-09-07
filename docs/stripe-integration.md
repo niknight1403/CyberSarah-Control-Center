@@ -68,11 +68,10 @@ Für eine realistische Abonnement-Synchronisierung sollte eine Test-Checkout-Ses
 Nach dem Setzen der Live-Variablen und einem Neustart des Dienstes:
 
 ```bash
-pm2 restart cybersarah-backend --update-env
-pm2 logs cybersarah-backend --lines 100
+# Dienst nach ENV-Aenderung neu starten (Koyeb: Redeploy des Services; eigener Host: Prozess-Neustart)
 ```
 
-Für die vollständige Prüfung von `.env`, Health-Endpoint, MySQL, PM2 und Nginx:
+Für die vollständige Prüfung der ENV, des Health-Endpoints und von MySQL:
 
 ```bash
 cd /opt/cybersarah-control-center

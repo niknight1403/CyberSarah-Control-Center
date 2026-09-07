@@ -31,7 +31,7 @@ Das Skript schreibt die Datei nach `.secrets/google-play-service-account.json`. 
 
 ## Laufzeit-Secrets der Anwendung
 
-Die Secrets für Datenbank, JWT, Stripe, Metrics, OAuth und serverseitige Provider gehören in `/opt/cybersarah-control-center/.env`. Sie werden mit `scripts/setup-production-env.sh` interaktiv eingetragen. Das Skript erstellt eine Sicherung vorhandener `.env`-Dateien, verwendet Modus `600` und setzt den Eigentümer standardmäßig auf den systemd-Benutzer `cybersarah`. Es schreibt keine Werte in GitHub.
+Die Secrets für Datenbank, JWT, Stripe, Metrics, OAuth und serverseitige Provider gehören ausschließlich in die Secret-Verwaltung des Produktionshosts (Koyeb: Environment-Variablen/Secrets) – nie in das Repository. Vor jedem Deploy prüft `scripts/validate-production.mjs` die Namen und Formate der Umgebung. Lokal liegen sie in einer `.env`, die niemals committet wird.
 
 Nach dem Setup werden Build und Neustart kontrolliert ausgeführt:
 

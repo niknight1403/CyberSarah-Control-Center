@@ -70,4 +70,4 @@ The type hierarchy pairs the platform system font for UI clarity with a monospac
 
 ## Service boundary
 
-The app defines a versioned remote-workspace contract for a server that the user can host on a Hetzner VPS. The service owns cloning, file-system access, Git commits/pushes, process execution, CORS, and provider API calls. The mobile client owns presentation, transient editor state, and securely stored device credentials. This separation prevents the mobile app from executing arbitrary repository commands locally and keeps provider secrets out of bundled application code.
+The app defines a versioned remote-workspace contract for a server that the user hosts on a PaaS platform (such as Koyeb) or their own host. The service owns cloning, file-system access, Git commits/pushes, process execution, CORS, and provider API calls. The mobile client owns presentation, transient editor state, and securely stored device credentials. This separation prevents the mobile app from executing arbitrary repository commands locally and keeps provider secrets out of bundled application code.
