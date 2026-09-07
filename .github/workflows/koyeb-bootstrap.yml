@@ -1,0 +1,40 @@
+name: Koyeb Bootstrap
+
+# Einmaliger Bootstrap des CyberSarah Control Center auf Koyeb.
+# Alle Werte kommen aus GitHub Actions Secrets — nach dem Laden des
+# Repos ist damit das Deployment automatisch integriert.
+# Ausloesen: GitHub UI → Actions → "Koyeb Bootstrap" → Run workflow.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci --include=dev
+
+      - name: TypeCheck und Tests
+        run: |
+          npm run check
+          npm test
+
+      - name: Auf Koyeb deployen (Migrationen + App + Health-Check)
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: node scripts/koyeb-deploy.mjs --migrate
