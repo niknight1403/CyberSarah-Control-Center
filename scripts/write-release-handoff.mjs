@@ -18,10 +18,10 @@ const handoff = {
   runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? "1",
   status,
   checks: {
-    install: "pnpm install --frozen-lockfile",
-    typecheck: "pnpm check",
-    tests: "pnpm test",
-    build: "pnpm build",
+    install: "npm ci",
+    typecheck: "npm run check",
+    tests: "npm test",
+    build: "npm run build",
   },
   secretsIncluded: false,
 };
