@@ -140,3 +140,70 @@ Repository selbst (Schutz vor Leaks, GitHub-Scanning, Zugriffskontrolle):
 Fehlende Werte werden nicht geraten: KOYEB_TOKEN muss als
 Actions-Secret existieren (Koyeb-Konsole → Account Settings → API), die
 Koyeb-PostgreSQL-DATABASE_URL entsteht bei Anlage der Datenbank.
+
+## Klick-für-Klick: Deployment über die Koyeb-Konsole (ohne API-Token)
+
+Für den manuellen Weg über die Weboberfläche sind keine API-Tokens nötig.
+Dauer: ca. 10 Minuten.
+
+### Schritt 1 — PostgreSQL-Datenbank anlegen
+
+1. [app.koyeb.com](https://app.koyeb.com) → links im Menü **Databases**
+2. **Create Database** → Typ **PostgreSQL**
+3. Name: `cybersarah-db` · Region: ` Frankfurt` (fra) · Plan: den
+   kostenlosen/hobby-Plan wählen
+4. **Create** → warten bis Status *Ready*
+5. Auf der Datenbank-Seite die **Connection String** kopieren (beginnt mit
+   `postgres://…`) → das ist später der Wert für `DATABASE_URL`
+
+### Schritt 2 — App aus GitHub anlegen
+
+1. **Overview** → **Create App** → **GitHub**
+2. Repository `niknight1403/CyberSarah-Control-Center` auswählen,
+   Branch `main`
+3. Builder: **Dockerfile** (wird automatisch erkannt)
+4. Service-Name: `cybersarah`
+5. Instance: kostenlose/Small-Instanz · Region Frankfurt
+6. **Advanced Settings → Environment Variables** — folgende Werte exakt
+   eintragen:
+
+   | Variable | Wert |
+   |---|---|
+   | `NODE_ENV` | `production` |
+   | `PORT` | `8000` |
+   | `DATABASE_URL` | Connection String aus Schritt 1 |
+   | `JWT_SECRET` | `f140dd08f1fe4ebbcadf9cf7accd0f12667410392dda64009bae05c04bfc5e8b` |
+   | `METRICS_TOKEN` | `51c031f5877e446de409accbce2143b9` |
+   | `APP_BASE_URL` | erst leer lassen, nach Schritt 3 setzen |
+
+7. **Advanced Settings → Exposed Port**: `8000`, Protokoll HTTP
+8. **Advanced Settings → Health Check**: HTTP-Pfad `/api/health`, Port `8000`
+9. **Deploy**
+
+### Schritt 3 — Nach dem ersten Deploy: echte Domain eintragen
+
+1. Auf der Service-Seite oben die URL kopieren
+   (Format `https://cybersarah-…-…koyeb.app`)
+2. **Settings → Environment Variables** (Konsole: Service → Settings):
+   - `APP_BASE_URL` = die kopierte URL
+   - `APP_ALLOWED_ORIGINS` = `https://<kopierte-url>,https://app.cybersarah-ki.com,https://www.cybersarah-ki.com`
+3. Speichern → das löst automatisch einen Redeploy aus
+4. Warten bis Status *Healthy*, dann `https://<url>/api/health` im Browser
+   prüfen → `{"status":"ok"…}`
+
+### Schritt 4 (später, Phase 5) — DNS-Cutover
+
+In der Koyeb-Konsole unter Settings → Domains die eigene Domain
+`app.cybersarah-ki.com` hinzufügen und beim DNS-Provider den CNAME
+umstellen (Details: docs/HETZNER-EXIT.md Phase 5).
+
+### Optional — Stripe aktivieren
+
+Zusätzlich in die ENV (Werte aus dem Stripe-Dashboard bzw. der alten
+Produktions-`.env`):
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+Ohne beide läuft Billing im deaktivierten Modus — die App startet trotzdem.
+
+Hinweis: Der Workspace-Service (Dockerfile.koyeb) wird als separater
+Koyeb-Service in einem Folgeschritt angelegt (gleicher Ablauf, Port
+8787); für den Produktivbetrieb von Web + API ist er nicht erforderlich.
