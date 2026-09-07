@@ -1,5 +1,6 @@
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
+import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
 import * as Auth from "@/lib/_core/auth";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -24,6 +25,7 @@ export default function AccountScreen() {
   }, []);
 
   const user = accountQuery.data ?? localUser;
+  useAdminAutoSetup(user?.role === "admin" ? user : null);
   const busy = registerMutation.isPending || loginMutation.isPending || logoutMutation.isPending;
 
   const persistAccount = async (result: { sessionToken: string; user: NonNullable<typeof user> }) => {
