@@ -151,8 +151,11 @@ export default function ChatScreen() {
       const score = scores.find((s) => s.providerId === connector);
       const rec = score ? " (" + score.recommendation + ", " + Math.round(sample.latencyMs) + "ms)" : "";
       setConnectorTests((c) => ({ ...c, [connector]: { status: "success", message: "Verbindung bestätigt" + rec } }));
-    } catch {
-      setConnectorTests((c) => ({ ...c, [connector]: { status: "error", message: "Verbindung fehlgeschlagen" } }));
+    } catch (error) {
+      // Sprint 73: Praezise Rueckmeldung statt generischem "fehlgeschlagen" —
+      // CORS-/API-Key-/Netzwerkfehler sind so im Frontend unterscheidbar.
+      const detail = error instanceof Error ? error.message : String(error);
+      setConnectorTests((c) => ({ ...c, [connector]: { status: "error", message: detail || "Verbindung fehlgeschlagen" } }));
     }
   };
 

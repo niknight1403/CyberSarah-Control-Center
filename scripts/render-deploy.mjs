@@ -169,6 +169,12 @@ async function deployApp() {
   const serviceName = env("RENDER_SERVICE_NAME", "cybersarah-control-center");
   const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
 
+  const workspaceServiceUrl = env("WORKSPACE_SERVICE_URL", "");
+  const workspaceServiceToken = env("WORKSPACE_SERVICE_TOKEN", "");
+  const workspaceExtra = [];
+  if (workspaceServiceUrl) workspaceExtra.push(`WORKSPACE_SERVICE_URL=${workspaceServiceUrl}`);
+  if (workspaceServiceToken) workspaceExtra.push(`WORKSPACE_SERVICE_TOKEN=${workspaceServiceToken}`);
+
   const buildEnv = (baseUrl) =>
     buildServiceEnv({
       databaseUrl: dbCheck.url,
@@ -186,6 +192,7 @@ async function deployApp() {
       stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
       stripeProductId: env("STRIPE_PRICE_ID"),
       trustProxy: env("TRUST_PROXY", "1"),
+      extra: workspaceExtra,
     });
 
   const { service, publicUrl } = await upsertService({
@@ -223,6 +230,12 @@ async function deployWorkspace() {
     process.exit(2);
   }
 
+  // Sprint 73: ALLOWED_ORIGIN muss die App-Domains enthalten — nicht die
+  // eigene Workspace-URL (fuehrte zu "Origin ist nicht erlaubt" / CORS-Blockade).
+  const appServiceName = env("RENDER_SERVICE_NAME", "cybersarah-control-center");
+  const defaultAllowedOrigins = `https://${appServiceName}.onrender.com,https://app.cybersarah-ki.com,https://www.cybersarah-ki.com`;
+  const allowedOrigin = env("WORKSPACE_ALLOWED_ORIGIN", defaultAllowedOrigins);
+
   const buildEnv = (allowedOrigin, previewUrl) =>
     buildWorkspaceEnv({ serviceAccessToken, allowedOrigin, previewPublicBaseUrl: previewUrl });
 
@@ -230,7 +243,7 @@ async function deployWorkspace() {
     serviceName,
     rootDir: "workspace-service",
     healthCheckPath: "/api/v1/health",
-    envLines: buildEnv(`https://${serviceName}.onrender.com`, ""),
+    envLines: buildEnv(allowedOrigin, ""),
   });
 
   if (!service) return; // Dry-Run

@@ -104,6 +104,8 @@ export const opsRouter = router({
   // kann die Service-Adresse selbst nicht kennen; der Server kennt sie aus ENV.
   workspaceServiceUrl: adminProcedure.query(() => ({
     url: process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "") ?? null,
+    // Sprint 73: Render-Proxy aktiv, sobald der Server die Service-Adresse kennt.
+    proxyUrl: process.env.WORKSPACE_SERVICE_URL?.trim() ? "/api/render" : null,
   })),
   backupManifest: adminProcedure.query(async () => {
     const tableCounts = await tableRowCounts();

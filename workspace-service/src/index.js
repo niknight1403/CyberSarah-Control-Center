@@ -472,7 +472,14 @@ app.use(express.json({ limit: "1mb" }));
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || !allowedOrigin || origin === allowedOrigin) return callback(null, true);
+      // Sprint 73: ALLOWED_ORIGIN unterstuetzt komma-separierte Origins
+      // (App-Domain + onrender-Preview) — vorher blockierte der Service jede
+      // Anfrage, wenn nur die eigene URL hinterlegt war.
+      const allowed = allowedOrigin
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      if (!origin || allowed.length === 0 || allowed.includes(origin)) return callback(null, true);
       return callback(new Error("Origin ist nicht erlaubt."));
     },
     allowedHeaders: ["Authorization", "Content-Type", "X-GitHub-Token", "X-AI-Provider", "X-AI-Provider-Key", "X-AI-Provider-Endpoint"],

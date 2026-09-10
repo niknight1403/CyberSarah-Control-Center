@@ -4,6 +4,8 @@ import { defaultLocalProviderEndpoints, getDefaultFreeProvider, normalizeLocalPr
 import { secureSessionStore } from "@/lib/secure-session-store";
 import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
 import { exportEncryptedSettingsBackup, restoreEncryptedSettingsBackup, type SettingsBackupExportResult, type SettingsBackupRestoreResult } from "@/lib/settings-backup";
+import { getApiBaseUrl } from "@/constants/oauth";
+import { trpc } from "@/lib/trpc";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const PREFERENCES_KEY = "custom-ai-studio.preferences.v1";
@@ -114,6 +116,32 @@ const StudioSettingsContext = createContext<StudioSettingsContextValue | undefin
 export function StudioSettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState(defaultSettings);
   const [loading, setLoading] = useState(true);
+  // Sprint 73: Server-seitiger Render-Proxy (/api/render/*) — wenn der Server
+  // die Workspace-Adresse kennt, laufen ALLE Service-Aufrufe gleichen Ursprungs
+  // ueber den Server und umgehen damit die CORS-Blockade des Browsers komplett.
+  const [proxyBaseUrl, setProxyBaseUrl] = useState<string | null>(null);
+  const trpcUtils = trpc.useUtils();
+
+  useEffect(() => {
+    let cancelled = false;
+    trpcUtils.ops.workspaceServiceUrl
+      .fetch()
+      .then((remote) => {
+        if (!cancelled && remote?.proxyUrl) setProxyBaseUrl(`${getApiBaseUrl()}${remote.proxyUrl}`);
+      })
+      .catch(() => {
+        // Kein Admin oder Server ohne Proxy — es gilt die direkte workspaceUrl.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trpcUtils]);
+
+  /** Bevorzugte Basis-URL: Proxy zuerst, sonst die hinterlegte Workspace-URL. */
+  const resolveWorkspaceBaseUrl = useCallback(
+    (directUrl: string) => proxyBaseUrl ?? directUrl,
+    [proxyBaseUrl],
+  );
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -186,7 +214,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       readProviderApiKey(storedSettings.provider),
     ]);
     const client = new RemoteWorkspaceClient({
-      baseUrl: storedSettings.workspaceUrl,
+      baseUrl: resolveWorkspaceBaseUrl(storedSettings.workspaceUrl),
       serviceAccessToken: input.serviceAccessToken?.trim() || storedServiceToken || undefined,
       githubToken: input.githubToken?.trim() || storedGitHubToken || undefined,
       provider: storedSettings.provider,
@@ -202,14 +230,14 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [saveSettings]);
 
   const readAttachedFile = useCallback(async (path: string) => {
-    if (!settings.workspaceUrl || !settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    if ((!settings.workspaceUrl && !proxyBaseUrl) || !settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
     const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
       readSecureValue(GITHUB_TOKEN_KEY),
       readProviderApiKey(settings.provider),
     ]);
     const client = new RemoteWorkspaceClient({
-      baseUrl: settings.workspaceUrl,
+      baseUrl: resolveWorkspaceBaseUrl(settings.workspaceUrl),
       serviceAccessToken: serviceAccessToken || undefined,
       githubToken: githubToken || undefined,
       provider: settings.provider,
@@ -217,24 +245,24 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       localProviderEndpoints: settings.localProviderEndpoints,
     });
     return client.getFile(settings.workspaceId, path);
-  }, [settings.localProviderEndpoints, settings.provider, settings.workspaceId, settings.workspaceUrl]);
+  }, [proxyBaseUrl, resolveWorkspaceBaseUrl, settings.localProviderEndpoints, settings.provider, settings.workspaceId, settings.workspaceUrl]);
 
   const createConnectedClient = useCallback(async () => {
-    if (!settings.workspaceUrl || !settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
+    if ((!settings.workspaceUrl && !proxyBaseUrl) || !settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
     const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
       readSecureValue(GITHUB_TOKEN_KEY),
       readProviderApiKey(settings.provider),
     ]);
     return new RemoteWorkspaceClient({
-      baseUrl: settings.workspaceUrl,
+      baseUrl: resolveWorkspaceBaseUrl(settings.workspaceUrl),
       serviceAccessToken: serviceAccessToken || undefined,
       githubToken: githubToken || undefined,
       provider: settings.provider,
       providerApiKey: providerApiKey || undefined,
       localProviderEndpoints: settings.localProviderEndpoints,
     });
-  }, [settings.localProviderEndpoints, settings.provider, settings.workspaceId, settings.workspaceUrl]);
+  }, [proxyBaseUrl, resolveWorkspaceBaseUrl, settings.localProviderEndpoints, settings.provider, settings.workspaceId, settings.workspaceUrl]);
 
   const loadRepositoryDetails = useCallback(async () => {
     if (!settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");
@@ -295,36 +323,36 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [createConnectedClient, settings.workspaceId]);
 
   const loadWorkspaceHealth = useCallback(async () => {
-    if (!settings.workspaceUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
+    if (!settings.workspaceUrl && !proxyBaseUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
     const [serviceAccessToken, githubToken, providerApiKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
       readSecureValue(GITHUB_TOKEN_KEY),
       readProviderApiKey(settings.provider),
     ]);
-    const client = new RemoteWorkspaceClient({ baseUrl: settings.workspaceUrl, serviceAccessToken: serviceAccessToken || undefined, githubToken: githubToken || undefined, provider: settings.provider, providerApiKey: providerApiKey || undefined, localProviderEndpoints: settings.localProviderEndpoints });
+    const client = new RemoteWorkspaceClient({ baseUrl: resolveWorkspaceBaseUrl(settings.workspaceUrl), serviceAccessToken: serviceAccessToken || undefined, githubToken: githubToken || undefined, provider: settings.provider, providerApiKey: providerApiKey || undefined, localProviderEndpoints: settings.localProviderEndpoints });
     return client.getHealth();
-  }, [settings.localProviderEndpoints, settings.provider, settings.workspaceUrl]);
+  }, [proxyBaseUrl, resolveWorkspaceBaseUrl, settings.localProviderEndpoints, settings.provider, settings.workspaceUrl]);
 
   const testLocalProviderEndpoint = useCallback(async (provider: "ollama" | "lmstudio", endpoint: string) => {
-    if (!settings.workspaceUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
+    if (!settings.workspaceUrl && !proxyBaseUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
     const [serviceAccessToken, providerApiKey] = await Promise.all([readSecureValue(SERVICE_ACCESS_TOKEN_KEY), readProviderApiKey(provider)]);
     const client = new RemoteWorkspaceClient({
-      baseUrl: settings.workspaceUrl,
+      baseUrl: resolveWorkspaceBaseUrl(settings.workspaceUrl),
       serviceAccessToken: serviceAccessToken || undefined,
       provider,
       providerApiKey: providerApiKey || undefined,
       localProviderEndpoints: { [provider]: endpoint },
     });
     return client.testLocalProviderEndpoint(provider);
-  }, [settings.workspaceUrl]);
+  }, [proxyBaseUrl, resolveWorkspaceBaseUrl, settings.workspaceUrl]);
 
   const testCloudProvider = useCallback(async (provider: CloudProviderId, apiKey?: string) => {
-    if (!settings.workspaceUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
+    if (!settings.workspaceUrl && !proxyBaseUrl) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
     const [serviceAccessToken, storedProviderKey] = await Promise.all([readSecureValue(SERVICE_ACCESS_TOKEN_KEY), readProviderApiKey(provider)]);
     if (!apiKey?.trim() && !storedProviderKey) throw new Error("Für diesen Cloud-Provider ist kein gespeicherter API-Key vorhanden.");
-    const client = new RemoteWorkspaceClient({ baseUrl: settings.workspaceUrl, serviceAccessToken: serviceAccessToken || undefined, provider, providerApiKey: apiKey?.trim() || storedProviderKey || undefined });
+    const client = new RemoteWorkspaceClient({ baseUrl: resolveWorkspaceBaseUrl(settings.workspaceUrl), serviceAccessToken: serviceAccessToken || undefined, provider, providerApiKey: apiKey?.trim() || storedProviderKey || undefined });
     return client.testCloudProvider(provider);
-  }, [settings.workspaceUrl]);
+  }, [proxyBaseUrl, resolveWorkspaceBaseUrl, settings.workspaceUrl]);
 
   const exportSettingsBackup = useCallback(async (passphrase: string) => {
     const providerEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed" && option.id !== "auto").map(async (option) => [option.id, await readSecureValue(providerKeyStorageKey(option.id))] as const));

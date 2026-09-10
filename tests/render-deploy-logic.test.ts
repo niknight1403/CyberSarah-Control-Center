@@ -190,3 +190,30 @@ describe("render-deploy-logic: renderApiError / maskSecrets", () => {
     expect(masked).toContain("https://x.onrender.com");
   });
 });
+
+describe("render-deploy-logic: Workspace-CORS & Render-Proxy (Sprint 73)", () => {
+  it("buildWorkspaceEnv uebernimmt komma-separierte ALLOWED_ORIGIN-Werte", () => {
+    const lines = buildWorkspaceEnv({
+      serviceAccessToken: "tok",
+      allowedOrigin: "https://app.cybersarah-ki.com,https://cybersarah-control-center.onrender.com",
+    });
+    expect(lines).toContain(
+      "ALLOWED_ORIGIN=https://app.cybersarah-ki.com,https://cybersarah-control-center.onrender.com",
+    );
+  });
+
+  it("buildServiceEnv nimmt WORKSPACE_*-Proxy-Variablen ueber extra auf", () => {
+    const lines = buildServiceEnv({
+      databaseUrl: "postgresql://u:p@db.neon.tech/db?sslmode=require",
+      appBaseUrl: "https://app.cybersarah-ki.com",
+      allowedOrigins: "https://app.cybersarah-ki.com",
+      jwtSecret: "secret",
+      extra: [
+        "WORKSPACE_SERVICE_URL=https://cybersarah-workspace.onrender.com",
+        "WORKSPACE_SERVICE_TOKEN=service-token",
+      ],
+    });
+    expect(lines).toContain("WORKSPACE_SERVICE_URL=https://cybersarah-workspace.onrender.com");
+    expect(lines).toContain("WORKSPACE_SERVICE_TOKEN=service-token");
+  });
+});

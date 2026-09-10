@@ -48,6 +48,10 @@ services:
         sync: false
       - key: TRUST_PROXY
         value: "1"
+      - key: WORKSPACE_SERVICE_URL
+        sync: false # Workspace-Service-Adresse — aktiviert den /api/render-Proxy
+      - key: WORKSPACE_SERVICE_TOKEN
+        sync: false # Service-Token serverseitig (statt in der App hinterlegt)
 
   # Workspace-Service (Custom-AI-Studio): token-geschützt, Port 8787.
   # WORKSPACES_DIR liegt auf Render Free auf ephemeraler Disk — bei

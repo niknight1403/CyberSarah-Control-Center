@@ -50,6 +50,8 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
           OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
+          WORKSPACE_SERVICE_URL: ${{ secrets.WORKSPACE_SERVICE_URL }}
+          WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN }}
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
         run: node scripts/render-deploy.mjs --migrate
@@ -59,4 +61,5 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ACCESS_TOKEN: ${{ secrets.SERVICE_ACCESS_TOKEN }}
+          WORKSPACE_ALLOWED_ORIGIN: ${{ secrets.WORKSPACE_ALLOWED_ORIGIN }}
         run: node scripts/render-deploy.mjs --workspace
