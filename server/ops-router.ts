@@ -7,6 +7,10 @@ import { checkDatabaseHealth, tableRowCounts } from "./db";
 import { adminProcedure, router } from "./_core/trpc";
 import { resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
 import { buildBackupManifest } from "../lib/db-backup-manifest-logic";
+import {
+  COLD_START_RETRY_DELAYS_MS,
+  classifyWorkspaceFailure,
+} from "../lib/workspace-coldstart-logic";
 
 const WORKSPACE_PROBE_TIMEOUT_MS = 3_000;
 
@@ -16,24 +20,45 @@ async function probeWorkspace(): Promise<OpsCheckInput> {
     return { kind: "workspace", state: "unknown" };
   }
   const started = Date.now();
-  try {
-    const response = await fetch(`${baseUrl}/api/v1/health`, {
-      signal: AbortSignal.timeout(WORKSPACE_PROBE_TIMEOUT_MS),
-    });
-    const state = response.ok ? "ok" : "degraded";
-    return {
-      kind: "workspace",
-      state,
-      ageMs: Date.now() - started,
-      detail: `HTTP ${response.status}`,
-    };
-  } catch (error) {
-    return {
-      kind: "workspace",
-      state: "down",
-      detail: error instanceof Error ? error.name : "Verbindungsfehler",
-    };
+  const classifyError = (error: unknown): { status?: number; code?: string } => {
+    if (error instanceof Error && "code" in error && typeof (error as { code?: string }).code === "string") {
+      return { code: (error as { code: string }).code };
+    }
+    if (error instanceof TypeError) return { code: "ECONNREFUSED" };
+    return {};
+  };
+  for (let attempt = 0; attempt <= COLD_START_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/health`, {
+        signal: AbortSignal.timeout(WORKSPACE_PROBE_TIMEOUT_MS),
+      });
+      const state = response.ok ? "ok" : "degraded";
+      return {
+        kind: "workspace",
+        state,
+        ageMs: Date.now() - started,
+        detail: `HTTP ${response.status}${attempt > 0 ? ` (nach Kaltstart-Retry ${attempt})` : ""}`,
+      };
+    } catch (error) {
+      const failure = classifyError(error);
+      if (attempt >= COLD_START_RETRY_DELAYS_MS.length) {
+        const kind = classifyWorkspaceFailure(failure);
+        return {
+          kind: "workspace",
+          state: kind === "coldStart" ? "unknown" : "down",
+          ageMs: Date.now() - started,
+          detail:
+            kind === "coldStart"
+              ? "Kaltstart vermutet, alle Retries erschoepft — Dienst weckt vermutlich gerade auf"
+              : error instanceof Error
+                ? error.name
+                : "Verbindungsfehler",
+        };
+      }
+      await new Promise((resolve) => setTimeout(resolve, COLD_START_RETRY_DELAYS_MS[attempt]));
+    }
   }
+  return { kind: "workspace", state: "down", detail: "unerreichbar" };
 }
 
 function probeChat(): OpsCheckInput {
