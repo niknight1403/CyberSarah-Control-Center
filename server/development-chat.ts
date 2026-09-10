@@ -7,6 +7,11 @@ import {
   evaluateChatQuota,
 } from "../lib/chat-quota-logic";
 import {
+  isFeatureEnabled,
+  parseFeatureFlagOverrides,
+  resolveFeatureFlags,
+} from "../lib/feature-flag-logic";
+import {
   buildChatExport,
   type ExportSession,
 } from "../lib/chat-export-logic";
@@ -45,6 +50,10 @@ const chatInputSchema = z.object({
 });
 
 type ProviderId = z.infer<typeof providerSchema>;
+
+/** Aktive Flags (ENV FEATURE_FLAGS ueberschreibt Registry-Defaults). */
+const currentFeatureFlags = () =>
+  resolveFeatureFlags(parseFeatureFlagOverrides(process.env.FEATURE_FLAGS ?? ""));
 type ChatMessage = z.infer<typeof messageSchema>;
 
 type ProviderConfig = {
@@ -246,23 +255,26 @@ export const developmentChatRouter = router({
     .mutation(async ({ input, ctx }) => {
       // Sprint 59: Fair-Use-Tagesquote aus der persistenten Historie
       // (Admins ausgenommen) — schuetzt vor unbegrenzter Chat-Nutzung.
-      try {
-        const recentMessages = await listChatMessages(ctx.user.openId, 500);
-        const usedToday = countMessagesToday(recentMessages, new Date());
-        const quota = evaluateChatQuota(
-          {
-            dailyLimit: Number(process.env.DAILY_CHAT_LIMIT) || DEFAULT_DAILY_CHAT_LIMIT,
-            role: ctx.user.role,
-          },
-          usedToday,
-          new Date(),
-        );
-        if (!quota.allowed) {
-          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: quota.reason ?? "Tageslimit erreicht." });
+      // Sprint 61: nur wirksam, solange das chatQuota-Flag aktiv ist.
+      if (isFeatureEnabled(currentFeatureFlags(), "chatQuota")) {
+        try {
+          const recentMessages = await listChatMessages(ctx.user.openId, 500);
+          const usedToday = countMessagesToday(recentMessages, new Date());
+          const quota = evaluateChatQuota(
+            {
+              dailyLimit: Number(process.env.DAILY_CHAT_LIMIT) || DEFAULT_DAILY_CHAT_LIMIT,
+              role: ctx.user.role,
+            },
+            usedToday,
+            new Date(),
+          );
+          if (!quota.allowed) {
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: quota.reason ?? "Tageslimit erreicht." });
+          }
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+          console.warn("[developmentChat] Quotenpruefung uebersprungen:", error);
         }
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.warn("[developmentChat] Quotenpruefung uebersprungen:", error);
       }
       const result = await handleDevelopmentChat(input);
       // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
@@ -317,6 +329,12 @@ export const developmentChatRouter = router({
       }),
     )
     .query(async ({ input, ctx }) => {
+      if (!isFeatureEnabled(currentFeatureFlags(), "chatExport")) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Der Chat-Export ist derzeit deaktiviert.",
+        });
+      }
       const overview = await listChatSessions(ctx.user.openId, input.limit);
       const wanted = input.sessionId
         ? overview.filter((session) => session.sessionId === sanitizeSessionId(input.sessionId))

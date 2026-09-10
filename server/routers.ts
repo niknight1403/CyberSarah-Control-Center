@@ -5,12 +5,14 @@ import { billingRouter } from "./billing-router";
 import { systemRouter } from "./_core/systemRouter";
 import { developmentChatRouter } from "./development-chat";
 import { opsRouter } from "./ops-router";
+import { featuresRouter } from "./features-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   ops: opsRouter,
+  features: featuresRouter,
   developmentChat: developmentChatRouter,
   account: accountRouter,
   billing: billingRouter,
