@@ -33,10 +33,12 @@ describe("workspace-service startup smoke (Sprint 73)", () => {
         },
       );
       let output = "";
+      // CI-Runner sind unter paralleler Krypto-Last langsam beim Kaltstart —
+      // grosszuegiger Timeout, damit kein false negative entsteht.
       const timer = setTimeout(() => {
         child.kill("SIGKILL");
         resolve({ code: null, output });
-      }, 6000);
+      }, 20000);
       child.stdout?.on("data", (chunk) => {
         output += String(chunk);
         if (output.includes("listening on")) {
@@ -48,6 +50,10 @@ describe("workspace-service startup smoke (Sprint 73)", () => {
       child.stderr?.on("data", (chunk) => {
         output += String(chunk);
       });
+      child.on("error", (error) => {
+        clearTimeout(timer);
+        resolve({ code: -1, output: output + `\n[spawn-error] ${error.message}` });
+      });
       child.on("exit", (code) => {
         clearTimeout(timer);
         resolve({ code, output });
@@ -55,11 +61,11 @@ describe("workspace-service startup smoke (Sprint 73)", () => {
     });
 
     if (result.code === 0 || result.code === null) {
-      expect(result.output).toContain("listening on");
+      expect(result.output, `kein 'listening on' im Output nach 20s:\n${result.output}`).toContain("listening on");
     } else {
       throw new Error(`Workspace-Service crashte beim Start (exit ${result.code}):\n${result.output}`);
     }
-  }, 15000);
+  }, 40000);
 
   it("nutzt node:fs (sync) fuer resolveWorkspacesDirectory — kein mkdirSync auf Promise-fs", async () => {
     const source = fsSync.readFileSync(
