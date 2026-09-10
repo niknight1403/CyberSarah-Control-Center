@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
@@ -20,12 +21,12 @@ function resolveWorkspacesDirectory() {
   const configured = process.env.WORKSPACES_DIR ?? "/data/workspaces";
   const primary = path.resolve(configured);
   try {
-    fs.mkdirSync(primary, { recursive: true });
-    fs.accessSync(primary, fs.constants.W_OK);
+    fsSync.mkdirSync(primary, { recursive: true });
+    fsSync.accessSync(primary, fsSync.constants.W_OK);
     return primary;
   } catch {
     const fallback = path.resolve(process.cwd(), "workspaces");
-    fs.mkdirSync(fallback, { recursive: true });
+    fsSync.mkdirSync(fallback, { recursive: true });
     console.warn(
       `[workspaces] WORKSPACES_DIR "${configured}" ist nicht beschreibbar — nutze ephemeralen Fallback ${fallback}. ` +
         "Workspaces ueberleben keinen Neustart/Re-Deploy (Render Free: Persistent Disk ist ein bezahlter Upgrade-Schritt).",
