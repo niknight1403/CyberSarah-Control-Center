@@ -33,6 +33,10 @@ jobs:
       - name: Abhaengigkeiten installieren
         run: npm ci --include=dev
 
+      - name: Workspace-Service-Abhaengigkeiten installieren
+        run: npm install --omit=dev --no-audit --no-fund
+        working-directory: workspace-service
+
       - name: TypeCheck und Tests
         run: |
           npm run check
