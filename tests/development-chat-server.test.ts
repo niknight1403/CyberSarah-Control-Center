@@ -10,6 +10,7 @@ vi.mock("../server/_core/llm", () => ({
 import { invokeLLM } from "../server/_core/llm";
 import {
   handleDevelopmentChat,
+  sanitizeChatError,
   testDevelopmentChatConnection,
 } from "../server/development-chat";
 
@@ -297,5 +298,17 @@ describe("development chat server chain", () => {
     expect(probe.error).not.toMatch(/sk-[A-Za-z0-9_-]{8,}/);
     expect(probe.latencyMs).toBeGreaterThanOrEqual(0);
     await server.close();
+  });
+});
+
+describe("Sprint 53 — sanitizeChatError", () => {
+  it("redigiert Keys und URLs in Chat-Fehlermeldungen", () => {
+    const raw = 'LLM invoke failed: 401 Unauthorized – Incorrect API key: sk-proj-ABCDEFG12345. See https://api.openai.com/account';
+    expect(sanitizeChatError(raw, "fallback")).not.toContain("sk-proj-ABCDEFG12345");
+    expect(sanitizeChatError(raw, "fallback")).not.toContain("https://api.openai.com");
+  });
+
+  it("behält harmlose Meldungen und greift auf den Fallback bei leerem Ergebnis zu", () => {
+    expect(sanitizeChatError("Der Provider antwortete nicht.", "fallback")).toBe("Der Provider antwortete nicht.");
   });
 });

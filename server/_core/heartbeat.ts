@@ -1,29 +1,19 @@
 import { TRPCError } from "@trpc/server";
 import { ENV } from "./env";
+import {
+  buildHeartbeatCreateBody,
+  buildHeartbeatUpdateBody,
+  mapHeartbeatStatus,
+  stringifyHeartbeatPayload,
+  validateHeartbeatCron,
+  validateHeartbeatPath,
+  type HeartbeatJob,
+  type HeartbeatJobUpdate,
+} from "../../lib/heartbeat-logic";
 
-export type HeartbeatJob = {
-  name: string;
-  /**
-   * 6-field cron with seconds (`sec min hour dom mon dow`), UTC, min interval 60s.
-   * Use `0` for the seconds field — e.g. `"0 0 9 * * *"` is daily 09:00 UTC.
-   * See /home/ubuntu/skills/webdev-periodic-updates/SKILL.md.
-   */
-  cron: string;
-  /** Callback path. MUST start with `/api/scheduled/`. */
-  path: string;
-  method?: "POST" | "PUT";
-  payload?: unknown;
-  description?: string;
-};
-
-/**
- * Update patch. All fields optional; unset = leave unchanged.
- * `enable`: true = resume, false = pause; omit = unchanged.
- * `name` is the (project, owner)-scope key and cannot be changed.
- */
-export type HeartbeatJobUpdate = Partial<Omit<HeartbeatJob, "name">> & {
-  enable?: boolean;
-};
+// Typen leben in lib/heartbeat-logic (pure, deterministisch getestet);
+// Re-Export fuer bestehende Importe.
+export type { HeartbeatJob, HeartbeatJobUpdate } from "../../lib/heartbeat-logic";
 
 export type HeartbeatJobInfo = {
   taskUid: string;
@@ -105,32 +95,10 @@ const mapForgeError = (
   rpc: string
 ): TRPCError => {
   const status = response.status;
-  let code: TRPCError["code"] = "INTERNAL_SERVER_ERROR";
-  if (status === 401) code = "UNAUTHORIZED";
-  else if (status === 403) code = "FORBIDDEN";
-  else if (status === 404) code = "NOT_FOUND";
-  else if (status === 400 || status === 422) code = "BAD_REQUEST";
-  else if (status === 409) code = "CONFLICT";
-  else if (status === 429) code = "TOO_MANY_REQUESTS";
   return new TRPCError({
-    code,
+    code: mapHeartbeatStatus(status),
     message: `Heartbeat ${rpc} failed (${status})${detail ? `: ${detail}` : ""}`,
   });
-};
-
-const stringifyPayload = (payload: unknown): string => {
-  if (payload === undefined || payload === null) return "{}";
-  if (typeof payload === "string") return payload;
-  return JSON.stringify(payload);
-};
-
-const validateCallbackPath = (path: string): void => {
-  if (!path || !path.startsWith("/api/scheduled/")) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "callback path must start with /api/scheduled/",
-    });
-  }
 };
 
 /**
@@ -141,17 +109,17 @@ export async function createHeartbeatJob(
   job: HeartbeatJob,
   userSession: string
 ): Promise<{ taskUid: string; nextExecutionAt?: string | null }> {
-  validateCallbackPath(job.path);
+  const pathCheck = validateHeartbeatPath(job.path);
+  if (!pathCheck.ok) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: pathCheck.reason });
+  }
+  const cronCheck = validateHeartbeatCron(job.cron);
+  if (!cronCheck.ok) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: cronCheck.reason });
+  }
   return callForge<{ taskUid: string; nextExecutionAt?: string | null }>(
     "CreateHeartbeatJob",
-    {
-      name: job.name,
-      cronExpression: job.cron,
-      callbackPath: job.path,
-      callbackMethod: job.method ?? "POST",
-      callbackPayload: stringifyPayload(job.payload),
-      description: job.description ?? "",
-    },
+    buildHeartbeatCreateBody(job),
     userSession
   );
 }
@@ -165,19 +133,21 @@ export async function updateHeartbeatJob(
   patch: HeartbeatJobUpdate,
   userSession: string
 ): Promise<{ nextExecutionAt?: string | null }> {
-  if (patch.path !== undefined) validateCallbackPath(patch.path);
-  const body: Record<string, unknown> = { taskUid };
-  if (patch.cron !== undefined) body.cronExpression = patch.cron;
-  if (patch.path !== undefined) body.callbackPath = patch.path;
-  if (patch.method !== undefined) body.callbackMethod = patch.method;
-  if (patch.payload !== undefined) {
-    body.callbackPayload = stringifyPayload(patch.payload);
+  if (patch.path !== undefined) {
+    const pathCheck = validateHeartbeatPath(patch.path);
+    if (!pathCheck.ok) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: pathCheck.reason });
+    }
   }
-  if (patch.description !== undefined) body.description = patch.description;
-  if (patch.enable !== undefined) body.enable = patch.enable;
+  if (patch.cron !== undefined) {
+    const cronCheck = validateHeartbeatCron(patch.cron);
+    if (!cronCheck.ok) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: cronCheck.reason });
+    }
+  }
   return callForge<{ nextExecutionAt?: string | null }>(
     "UpdateHeartbeatJob",
-    body,
+    buildHeartbeatUpdateBody(taskUid, patch),
     userSession
   );
 }

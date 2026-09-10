@@ -275,9 +275,19 @@ export async function handleDevelopmentChat(input: {
           if (!isTransientChatError(fallbackError)) break;
         }
       }
-      throw new TRPCError({ code: "BAD_GATEWAY", message: lastFallbackError instanceof Error ? lastFallbackError.message : "Die konfigurierten KI-Fallback-Provider konnten den Entwicklungsauftrag nicht verarbeiten." });
+      throw new TRPCError({
+        code: "BAD_GATEWAY",
+        message: lastFallbackError instanceof Error
+          ? sanitizeChatError(lastFallbackError.message, "Die konfigurierten KI-Fallback-Provider konnten den Entwicklungsauftrag nicht verarbeiten.")
+          : "Die konfigurierten KI-Fallback-Provider konnten den Entwicklungsauftrag nicht verarbeiten.",
+      });
     }
-    throw new TRPCError({ code: "BAD_GATEWAY", message: error instanceof Error ? error.message : "Der KI-Provider konnte den Entwicklungsauftrag nicht verarbeiten." });
+    throw new TRPCError({
+      code: "BAD_GATEWAY",
+      message: error instanceof Error
+        ? sanitizeChatError(error.message, "Der KI-Provider konnte den Entwicklungsauftrag nicht verarbeiten.")
+        : "Der KI-Provider konnte den Entwicklungsauftrag nicht verarbeiten.",
+    });
   }
 }
 
@@ -293,6 +303,15 @@ export type DevelopmentChatConnectionTestResult = {
  * Redigiert Fehlermeldungen für die Anzeige: URLs und potenziell sensible
  * Fragmente werden entfernt, die Länge begrenzt.
  */
+/**
+ * Sprint 53 — redigiert Backend-Fehlermeldungen (URLs, Keys) auf dem
+ * Chat-Sende-Pfad, bevor sie an den Client gehen.
+ */
+export function sanitizeChatError(message: string, fallback: string): string {
+  const sanitized = sanitizeConnectionError(message);
+  return sanitized.length > 0 ? sanitized : fallback;
+}
+
 function sanitizeConnectionError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   return raw

@@ -36,3 +36,33 @@ export function normalizeProjectPath(name: string) {
 export function createProjectContextFile(attachment: MediaAttachment, content: string, totalBytes: number): ProjectContextFile {
   return { name: normalizeProjectPath(attachment.name), content: content.slice(0, PROJECT_UPLOAD_LIMITS.maxContentChars - totalBytes), mimeType: attachment.mimeType, size: attachment.size };
 }
+
+/**
+ * Sprint 53 — Zero-Config-Anhaenge: Nicht-textuelle Dateien (PDF, Bilder,
+ * Videos) werden nicht mehr still verworfen, sondern als kompakter
+ * Metadaten-Eintrag in den Prompt-Kontext eingespeist. Das Modell weiss
+ * dann, dass ein Dokument existiert, und kann gezielt nachfragen.
+ */
+export type NonTextAttachmentInfo = Pick<MediaAttachment, "name" | "mimeType" | "size">;
+
+export function formatAttachmentBytes(size: number): string {
+  if (size >= 1_048_576) return `${(size / 1_048_576).toFixed(1)} MB`;
+  if (size >= 1_024) return `${(size / 1_024).toFixed(1)} KB`;
+  return `${size} B`;
+}
+
+export function describeNonTextAttachment(attachment: NonTextAttachmentInfo): string {
+  const parts = [attachment.name];
+  if (attachment.mimeType) parts.push(attachment.mimeType);
+  if (typeof attachment.size === "number") parts.push(formatAttachmentBytes(attachment.size));
+  return parts.join(", ");
+}
+
+export function createNonTextContextEntry(attachment: NonTextAttachmentInfo): ProjectContextFile {
+  return {
+    name: normalizeProjectPath(attachment.name),
+    content: `[Nicht-textueller Anhang: ${describeNonTextAttachment(attachment)}. Der Inhalt kann client-seitig nicht als Text gelesen werden — bei Bedarf gezielt nachfragen.]`,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+  };
+}

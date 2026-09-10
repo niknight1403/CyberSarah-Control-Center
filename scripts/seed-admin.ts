@@ -3,18 +3,27 @@ import "dotenv/config";
 import { ensureAdminAccount } from "../server/db";
 import { hashPassword } from "../server/local-auth";
 
-const email = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
-const password = process.env.ADMIN_PASSWORD ?? "";
+async function main() {
+  const email = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD ?? "";
 
-if (!email || !password) {
-  throw new Error("ADMIN_EMAIL und ADMIN_PASSWORD müssen für das Admin-Seeding gesetzt sein.");
+  if (!email || !password) {
+    throw new Error("ADMIN_EMAIL und ADMIN_PASSWORD müssen für das Admin-Seeding gesetzt sein.");
+  }
+
+  const passwordHash = await hashPassword(password);
+  const user = await ensureAdminAccount({
+    email,
+    name: "CyberSarah Administrator",
+    passwordHash,
+  });
+
+  console.log(`[Admin] Konto bereit: ${user.email ?? email} (role=${user.role})`);
 }
 
-const passwordHash = await hashPassword(password);
-const user = await ensureAdminAccount({
-  email,
-  name: "CyberSarah Administrator",
-  passwordHash,
+// Async-Main statt Top-Level-Await: tsx laedt das Skript als CJS,
+// wo Top-Level-Await nicht unterstuetzt wird.
+main().catch((error) => {
+  console.error(`[Admin] Seeding fehlgeschlagen: ${error.message}`);
+  process.exit(1);
 });
-
-console.log(`[Admin] Konto bereit: ${user.email ?? email} (role=${user.role})`);

@@ -1,5 +1,10 @@
 import { ENV } from "./env";
 
+import {
+  MANAGED_LLM_NO_KEY_MESSAGE,
+  resolveManagedLlmEndpoint,
+} from "../../lib/managed-llm-fallback-logic";
+
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
 export type TextContent = {
@@ -204,15 +209,22 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+/**
+ * Sprint 53 — Zero-Config: Ohne Forge-Key faellt der Managed-Aufruf
+ * automatisch auf den OpenAI-Endpoint zurueck (deterministisch getestet in
+ * tests/managed-llm-fallback-logic.test.ts).
+ */
+const resolveManagedEndpoint = () => {
+  const endpoint = resolveManagedLlmEndpoint({
+    forgeApiUrl: ENV.forgeApiUrl,
+    forgeApiKey: ENV.forgeApiKey,
+    openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
+    openaiApiKey: process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,
+  });
+  if (!endpoint) {
+    throw new Error(MANAGED_LLM_NO_KEY_MESSAGE);
   }
+  return endpoint;
 };
 
 const normalizeResponseFormat = ({
@@ -318,7 +330,7 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+  const endpoint = resolveManagedEndpoint();
 
   const {
     messages,
@@ -376,11 +388,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetchWithBackoff(resolveApiUrl(), {
+  const response = await fetchWithBackoff(endpoint.url, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${endpoint.apiKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -406,15 +418,13 @@ export type ModelsResponse = {
 };
 
 export async function listLLMModels(): Promise<ModelsResponse> {
-  assertApiKey();
-
-  const url =
-    ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-      ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-      : "https://forge.manus.im/v1/models";
+  const managed = resolveManagedEndpoint();
+  const url = managed.source === "forge"
+    ? `${ENV.forgeApiUrl!.replace(/\/$/, "")}/v1/models`
+    : `${managed.url.replace(/\/chat\/completions$/, "")}/models`;
 
   const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
+    headers: { authorization: `Bearer ${managed.apiKey}` },
   });
 
   if (!response.ok) {

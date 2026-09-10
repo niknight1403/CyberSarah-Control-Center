@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import type { MediaAttachment } from "@/lib/media-picker-logic";
-import { createProjectContextFile, isProjectTextFile, PROJECT_UPLOAD_LIMITS, type ProjectContextFile } from "@/lib/project-upload-logic";
+import { createNonTextContextEntry, createProjectContextFile, isProjectTextFile, PROJECT_UPLOAD_LIMITS, type ProjectContextFile } from "@/lib/project-upload-logic";
 
 export async function readProjectContext(attachments: MediaAttachment[]): Promise<{ files: ProjectContextFile[]; skipped: string[] }> {
   const files: ProjectContextFile[] = [];
@@ -9,7 +9,9 @@ export async function readProjectContext(attachments: MediaAttachment[]): Promis
 
   for (const attachment of attachments.slice(0, PROJECT_UPLOAD_LIMITS.maxFiles)) {
     if (attachment.kind !== "datei" || !isProjectTextFile(attachment)) {
-      skipped.push(attachment.name);
+      // Sprint 53: PDFs, Bilder und Videos wandern als Metadaten-Eintrag
+      // in den Kontext statt still verworfen zu werden.
+      files.push(createNonTextContextEntry(attachment));
       continue;
     }
     if (attachment.size && attachment.size > PROJECT_UPLOAD_LIMITS.maxFileBytes) {
