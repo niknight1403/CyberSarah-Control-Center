@@ -36,6 +36,11 @@ jobs:
       - name: TypeScript-Check
         run: npm run check
 
+      - name: CSS-Interop-Cache seeden (SHA-1-Fix fuer frische Installs)
+        run: |
+          mkdir -p node_modules/react-native-css-interop/.cache
+          touch node_modules/react-native-css-interop/.cache/web.css
+
       - name: Expo-Web-Export (web-dist)
         run: EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo export -p web --output-dir web-dist
 
