@@ -16,5 +16,6 @@ export function hasProviderKey(status: ProviderKeyStatus, provider: ProviderId) 
 
 export function getProviderKeyStatusLabel(provider: ProviderId, configured: boolean) {
   if (provider === "managed") return "Serverseitig verwaltet";
+  if (provider === "auto") return "Serverseitige Keys + lokale Endpoints werden automatisch genutzt";
   return configured ? "API-Key sicher hinterlegt" : "Kein API-Key hinterlegt";
 }

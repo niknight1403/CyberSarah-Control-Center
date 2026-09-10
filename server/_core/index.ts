@@ -21,6 +21,7 @@ import {
 import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
 import { checkDatabaseHealth } from "../db";
+import { restoreRouterState } from "../model-router";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -255,6 +256,7 @@ async function startServer() {
   });
 
   const port = parseInt(process.env.PORT || "3000", 10);
+  void restoreRouterState().catch(() => undefined);
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
   });

@@ -51,6 +51,7 @@ import { RepositoryConnectCard } from "@/components/studio/repository-connect-ca
 import { parseRepositoryChatIntent } from "@/lib/repository-intent-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
+import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
@@ -113,6 +114,8 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export default function AgentScreen() {
+  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  useAdminAutoRouter(accountQuery.data ?? null);
   const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } =
     useWorkspace();
   const {
@@ -308,7 +311,7 @@ export default function AgentScreen() {
       rationale: `Antwort von ${result.providerUsed} · Modell ${result.model}`,
       changes: [],
       affectedFiles: [],
-      providerUsed: result.providerUsed,
+      providerUsed: result.providerUsed === "auto" ? "managed" : result.providerUsed,
       fallbackUsed: result.fallbackUsed,
     };
   };
@@ -683,7 +686,7 @@ export default function AgentScreen() {
         setProviderActivity("active");
         setConnectionTest({
           status: "ready",
-          message: `${getProviderLabel(result.provider)} antwortet in ${result.latencyMs} ms · Modell ${result.model ?? "unbekannt"}`,
+          message: `${getProviderLabel(result.provider === "auto" ? "managed" : result.provider)} antwortet in ${result.latencyMs} ms · Modell ${result.model ?? "unbekannt"}`,
         });
       } else {
         setProviderActivity("error");

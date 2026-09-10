@@ -10,6 +10,7 @@ export type ProviderChannel = "local" | "cloud";
 
 const localProviders = new Set<ProviderId>(["ollama", "lmstudio"]);
 const labels: Record<ProviderId, string> = {
+  auto: "Autonomer Superagent",
   managed: "On-Server",
   openai: "OpenAI",
   gemini: "Google Gemini",
@@ -49,6 +50,7 @@ export function getProviderChannel(
   provider: ProviderId,
   endpoint?: string,
 ): ProviderChannel {
+  if (provider === "auto") return "cloud";
   if (provider === "custom")
     return isPrivateEndpoint(endpoint) ? "local" : "cloud";
   return localProviders.has(provider) ? "local" : "cloud";

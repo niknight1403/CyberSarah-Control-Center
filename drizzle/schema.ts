@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  jsonb,
   integer,
   pgEnum,
   pgTable,
@@ -16,6 +17,16 @@ import {
  * Columns use camelCase to match both database fields and generated types.
  */
 export const userRole = pgEnum("user_role", ["user", "admin"]);
+
+/** Sprint 71 — Persistente Modell-Router-Konfiguration (KV je Schluessel). */
+export const modelRouterSettings = pgTable("modelRouterSettings", {
+  key: varchar("key", { length: 128 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
 
 export const users = pgTable("users", {
   /**

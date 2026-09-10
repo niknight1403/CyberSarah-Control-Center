@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
+  modelRouterSettings,
   billingSubscriptions,
   chatMessages,
   InsertChatMessage,
@@ -234,6 +235,33 @@ export async function getBillingSubscriptionForUser(userId: number) {
     .where(eq(billingSubscriptions.userId, userId))
     .limit(1);
   return result[0];
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 71 — Modell-Router-Persistenz (bevorzugte Reihenfolge, Statuswerte)
+// ---------------------------------------------------------------------------
+
+export async function getModelRouterSetting<T>(key: string): Promise<T | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  const result = await db
+    .select()
+    .from(modelRouterSettings)
+    .where(eq(modelRouterSettings.key, key))
+    .limit(1);
+  return (result[0]?.value as T | undefined) ?? null;
+}
+
+export async function setModelRouterSetting(key: string, value: unknown): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  await db
+    .insert(modelRouterSettings)
+    .values({ key, value: value as never })
+    .onConflictDoUpdate({
+      target: modelRouterSettings.key,
+      set: { value: value as never },
+    });
 }
 
 export async function ensureAdminAccount(input: {

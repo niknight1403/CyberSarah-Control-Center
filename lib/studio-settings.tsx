@@ -12,6 +12,7 @@ const GITHUB_TOKEN_KEY = "custom-ai-studio.github-token.v1";
 const PROVIDER_KEY_KEY = "custom-ai-studio.provider-key.v1";
 
 export const providerOptions = [
+  { id: "auto", label: "Autonomer Superagent / Auto-Router", detail: "Analyiert jeden Auftrag und waehlt automatisch die optimale KI · Auto-Fallback bei Ausfall oder Rate-Limit · Administrator-Standard" },
   { id: "managed", label: "On-Server", detail: "Der Workspace-Service verwaltet den Provider." },
   { id: "openai", label: "OpenAI", detail: `API-Key lokal geschützt · ${providerDefaults.openai.model} · kein garantierter Gratiszugang` },
   { id: "gemini", label: "Google Gemini", detail: `API-Key lokal geschützt oder per Server-Key · ${providerDefaults.gemini.model} · Free-Tier abhängig von Konto/Region` },
@@ -124,7 +125,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
           hasSecureValue(GITHUB_TOKEN_KEY),
           hasSecureValue(PROVIDER_KEY_KEY),
         ]);
-        const providerKeyEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed").map(async (option) => [option.id, await hasSecureValue(providerKeyStorageKey(option.id))] as const));
+        const providerKeyEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed" && option.id !== "auto").map(async (option) => [option.id, await hasSecureValue(providerKeyStorageKey(option.id))] as const));
         const providerKeyStatus = Object.fromEntries(providerKeyEntries) as ProviderKeyStatus;
         if (hasProviderKey && parsed.provider && parsed.provider !== "managed") providerKeyStatus[parsed.provider] = true;
         setSettings({ ...defaultSettings, ...parsed, localProviderEndpoints: normalizeLocalProviderEndpoints(parsed.localProviderEndpoints), hasServiceAccessToken, hasGitHubToken, hasProviderKey: Boolean(providerKeyStatus[parsed.provider ?? defaultSettings.provider]), providerKeyStatus });
@@ -326,7 +327,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [settings.workspaceUrl]);
 
   const exportSettingsBackup = useCallback(async (passphrase: string) => {
-    const providerEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed").map(async (option) => [option.id, await readSecureValue(providerKeyStorageKey(option.id))] as const));
+    const providerEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed" && option.id !== "auto").map(async (option) => [option.id, await readSecureValue(providerKeyStorageKey(option.id))] as const));
     const providerKeys: Record<string, string> = {};
     for (const [providerId, key] of providerEntries) if (key) providerKeys[providerId] = key;
     const legacyKey = await readSecureValue(PROVIDER_KEY_KEY);

@@ -16,6 +16,7 @@ import { formatProjectContext, readProjectContext } from "@/lib/project-upload-r
 import { RepositoryConnectCard } from "@/components/studio/repository-connect-card";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
+import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";

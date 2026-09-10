@@ -1,7 +1,7 @@
-export type ProviderId = "managed" | "openai" | "gemini" | "openrouter" | "groq" | "together" | "anthropic" | "ollama" | "lmstudio" | "custom" | "huggingface";
+export type ProviderId = "auto" | "managed" | "openai" | "gemini" | "openrouter" | "groq" | "together" | "anthropic" | "ollama" | "lmstudio" | "custom" | "huggingface";
 
 export const freeProviderIds: readonly ProviderId[] = ["gemini", "openrouter", "groq", "ollama", "lmstudio", "huggingface"];
-export type CloudProviderId = Exclude<ProviderId, "managed" | "ollama" | "lmstudio" | "custom">;
+export type CloudProviderId = Exclude<ProviderId, "auto" | "managed" | "ollama" | "lmstudio" | "custom">;
 export const cloudProviderIds: readonly CloudProviderId[] = ["openai", "gemini", "openrouter", "groq", "together", "anthropic", "huggingface"];
 
 export function isFreeTierProvider(provider: ProviderId) {
@@ -13,6 +13,7 @@ export function getDefaultFreeProvider(): ProviderId {
 }
 
 export const providerDefaults: Record<ProviderId, { model: string; freeTierNote: string }> = {
+  auto: { model: "dynamisch", freeTierNote: "Autonomer Router waehlt die optimale KI je Auftrag und failover-t automatisch." },
   managed: { model: "gpt-4o-mini", freeTierNote: "On-Server-Konfiguration" },
   openai: { model: "gpt-4o-mini", freeTierNote: "Kosten und Limits hängen vom OpenAI-Konto ab." },
   gemini: { model: "gemini-3.6-flash", freeTierNote: "Kostenlose Nutzung hängt von Region, Konto und aktuellem Google-AI-Studio-Limit ab." },

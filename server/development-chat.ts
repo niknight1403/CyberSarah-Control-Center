@@ -22,9 +22,28 @@ import {
 } from "../lib/chat-history-logic";
 import { z } from "zod";
 import { invokeLLM, type Message } from "./_core/llm";
-import { protectedProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+
+import {
+  buildProviderOrder,
+  classifyPrompt,
+  type RouterProviderId,
+} from "../lib/model-router-logic";
+import { buildSuperagentBrief, shouldAttachSuperagentBrief } from "../lib/superagent-brief-logic";
+import { getRuntimeLogs } from "./runtime-logger";
+import { classifyRuntimeState } from "../lib/live-status-logic";
+import {
+  getPreferredProviderOrder,
+  getRouterHealth,
+  getRouterConfiguredProviders,
+  recordRouterOutcome,
+  getRouterSnapshot,
+  setPreferredProviderOrder,
+  probeLocalProviders,
+} from "./model-router";
 
 const providerSchema = z.enum([
+  "auto",
   "managed",
   "openai",
   "gemini",
@@ -70,8 +89,8 @@ function getEnv(name: string) {
   return process.env[name]?.trim() || undefined;
 }
 
-function getProviderConfig(provider: Exclude<ProviderId, "managed" | "anthropic">, requestedModel?: string): ProviderConfig {
-  const base: Record<Exclude<ProviderId, "managed" | "anthropic">, Omit<ProviderConfig, "model"> & { defaultModel: string }> = {
+function getProviderConfig(provider: Exclude<ProviderId, "managed" | "anthropic" | "auto">, requestedModel?: string): ProviderConfig {
+  const base: Record<Exclude<ProviderId, "managed" | "anthropic" | "auto">, Omit<ProviderConfig, "model"> & { defaultModel: string }> = {
     openai: {
       endpoint: getEnv("AI_OPENAI_BASE_URL") ?? "https://api.openai.com/v1/chat/completions",
       apiKey: getEnv("AI_OPENAI_API_KEY") ?? getEnv("OPENAI_API_KEY"),
@@ -151,7 +170,7 @@ function extractContent(payload: unknown): string {
   throw new Error("Der Provider hat keine Textantwort zurückgegeben.");
 }
 
-async function callOpenAICompatibleProvider(provider: Exclude<ProviderId, "managed" | "anthropic">, messages: ChatMessage[], requestedModel?: string) {
+async function callOpenAICompatibleProvider(provider: Exclude<ProviderId, "managed" | "anthropic" | "auto">, messages: ChatMessage[], requestedModel?: string) {
   const config = getProviderConfig(provider, requestedModel);
   const response = await fetch(config.endpoint, {
     method: "POST",
@@ -230,6 +249,7 @@ function getFallbackProviders(provider: ProviderId) {
 }
 
 async function callProvider(provider: ProviderId, messages: ChatMessage[], model?: string) {
+  if (provider === "auto") return callManaged(messages, model);
   if (provider === "managed") return callManaged(messages, model);
   if (provider === "anthropic") return callAnthropic(messages, model);
   return callOpenAICompatibleProvider(provider, messages, model);
@@ -238,6 +258,7 @@ async function callProvider(provider: ProviderId, messages: ChatMessage[], model
 export const developmentChatRouter = router({
   providers: protectedProcedure.query(() => ({
     providers: [
+      { id: "auto", label: "Autonomer Superagent / Auto-Router", type: "auto" },
       { id: "managed", label: "On-Server LLM", type: "managed" },
       { id: "ollama", label: "Ollama lokal", type: "local" },
       { id: "lmstudio", label: "LM Studio lokal", type: "local" },
@@ -251,6 +272,20 @@ export const developmentChatRouter = router({
       { id: "custom", label: "Eigener OpenAI-kompatibler Endpoint", type: "custom" },
     ] as const,
   })),
+  /** Sprint 71 — Aggregierter Router-Status fuer die Admin-UI. */
+  routerStatus: adminProcedure.query(async () => getRouterSnapshot()),
+
+  /** Sprint 71 — Bevorzugte Provider-Reihenfolge persistent speichern. */
+  setPreferredOrder: adminProcedure
+    .input(z.object({ order: z.array(z.string().trim().min(1).max(64)).max(11) }))
+    .mutation(async ({ input }) => {
+      const order = await setPreferredProviderOrder(input.order);
+      return { order };
+    }),
+
+  /** Sprint 71 — Lokale Endpoints (Ollama/LM Studio) aktiv anpingen. */
+  probeLocalProviders: adminProcedure.mutation(async () => probeLocalProviders()),
+
   send: protectedProcedure
     .input(chatInputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -277,7 +312,7 @@ export const developmentChatRouter = router({
           console.warn("[developmentChat] Quotenpruefung uebersprungen:", error);
         }
       }
-      const result = await handleDevelopmentChat(input);
+      const result = await handleDevelopmentChat({ ...input, role: ctx.user.role });
       // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
       // Persistenzfehler brechen die Chat-Antwort nicht ab).
       try {
@@ -422,6 +457,13 @@ export type DevelopmentChatResult = {
   providerUsed: ProviderId;
   fallbackUsed: boolean;
   receivedAt: string;
+  /** Sprint 71 — Entscheidung des autonomen Modell-Routers (nur bei "auto"). */
+  route?: {
+    taskType: "code" | "reasoning" | "ui" | "chat";
+    complexity: "light" | "medium" | "heavy";
+    attemptedProviders: RouterProviderId[];
+    reasons: string[];
+  };
 };
 
 /**
@@ -430,11 +472,135 @@ export type DevelopmentChatResult = {
  * eigenständige Funktion exportiert, damit die gesamte Kette (Provider-
  * Auswahl, Fallback, Fehlersemantik) deterministisch getestet werden kann.
  */
+type RoutedMessage = { role: "user" | "assistant" | "system"; content: string };
+
+/** Live-Systemdaten fuer den Superagent-Briefing-Kontext sammeln. */
+async function buildSuperagentContext() {
+  const now = Date.now();
+  const errors = getRuntimeLogs()
+    .filter((entry) => entry.level === "error" || entry.level === "warn")
+    .slice(-5)
+    .map((entry) => `${entry.level}: ${entry.message}`.slice(0, 300));
+  let workspaceConnected = false;
+  const workspaceUrl = process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "");
+  if (workspaceUrl) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2_000);
+      const response = await fetch(`${workspaceUrl}/api/v1/health`, { signal: controller.signal });
+      clearTimeout(timer);
+      workspaceConnected = response.ok;
+    } catch {
+      workspaceConnected = false;
+    }
+  }
+  return {
+    runtime: {
+      state: classifyRuntimeState({ processUp: true, nowMs: now }),
+      uptimeSeconds: Math.round(process.uptime()),
+      activeUrl: process.env.APP_BASE_URL?.trim() ?? null,
+    },
+    workspace: {
+      connected: workspaceConnected,
+      repositoryUrl: process.env.CYBERSARAH_REVENUE_REPOSITORY_URL?.trim() ?? null,
+      branch: "main",
+    },
+    recentErrors: errors,
+    availableSkills: ["agent", "quality", "diff"],
+  };
+}
+
+/**
+ * Sprint 71 — Autonomer Modell-Router: klassifiziert den Auftrag, waehlt die
+ * beste Provider-Reihenfolge und failover-t bei Fehlern/Timeouts/Rate-Limits
+ * unterbrechungsfrei auf die naechste Alternative. Admins erhalten zusaetzlich
+ * den Superagent-Briefing-Kontext (Live-Status, Logs, Workspace).
+ */
+async function handleAutoRoutedChat(
+  input: { messages: ChatMessage[]; model?: string; role?: string | null },
+): Promise<DevelopmentChatResult> {
+  const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const classification = classifyPrompt(lastUserMessage);
+  const preferredOrder = await getPreferredProviderOrder();
+  const now = Date.now();
+  const order = buildProviderOrder({
+    taskType: classification.taskType,
+    complexity: classification.complexity,
+    preferredOrder,
+    health: getRouterHealth(),
+    configuredProviders: getRouterConfiguredProviders(),
+    now,
+  });
+  const candidates = order
+    .filter((entry) => entry.available)
+    .slice(0, 4)
+    .map((entry) => entry.provider) as RouterProviderId[];
+
+  const isAdmin = input.role === "admin";
+  let messages: RoutedMessage[] = input.messages;
+  if (isAdmin && shouldAttachSuperagentBrief(lastUserMessage, input.role)) {
+    const context = await buildSuperagentContext();
+    const brief = buildSuperagentBrief({
+      ...context,
+      role: input.role,
+      now: new Date(),
+    });
+    messages = [{ role: "system", content: brief }, ...input.messages];
+  }
+
+  let lastError: unknown = new Error("Kein verfuegbarer KI-Provider fuer die automatische Route.");
+  for (const provider of candidates) {
+    const startedAt = Date.now();
+    try {
+      const reply = await callProvider(provider, messages as ChatMessage[], input.model);
+      recordRouterOutcome(provider, { kind: "success", latencyMs: Date.now() - startedAt }, Date.now());
+      return {
+        ...reply,
+        providerUsed: provider,
+        fallbackUsed: provider !== candidates[0],
+        receivedAt: new Date().toISOString(),
+        route: {
+          taskType: classification.taskType,
+          complexity: classification.complexity,
+          attemptedProviders: candidates,
+          reasons: classification.reasons,
+        },
+      };
+    } catch (error) {
+      lastError = error;
+      if (error instanceof TRPCError) {
+        recordRouterOutcome(provider, { kind: "failure", retryable: false, rateLimited: false }, Date.now());
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      const rateLimited = /\b429\b/.test(message);
+      recordRouterOutcome(
+        provider,
+        error instanceof Error && error.name === "AbortError"
+          ? { kind: "timeout" }
+          : { kind: "failure", retryable: isTransientChatError(error), rateLimited },
+        Date.now(),
+      );
+      if (!isTransientChatError(error)) break;
+    }
+  }
+  throw new TRPCError({
+    code: "BAD_GATEWAY",
+    message: lastError instanceof Error
+      ? sanitizeChatError(lastError.message, "Der autonome Modell-Router konnte keinen KI-Provider erreichen.")
+      : "Der autonome Modell-Router konnte keinen KI-Provider erreichen.",
+  });
+}
+
 export async function handleDevelopmentChat(input: {
   provider: ProviderId;
   messages: ChatMessage[];
   model?: string;
+  role?: string | null;
 }): Promise<DevelopmentChatResult> {
+  if (input.provider === "auto") {
+    return handleAutoRoutedChat({ messages: input.messages, model: input.model, role: input.role });
+  }
   try {
     const reply = await callProvider(input.provider, input.messages, input.model);
     return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };

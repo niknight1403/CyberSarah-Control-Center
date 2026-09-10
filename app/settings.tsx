@@ -3,6 +3,8 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { integrationFixture } from "@/constants/integration-fixture";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
+import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
+import { trpc } from "@/lib/trpc";
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
 import { type FieldValidation, validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
@@ -21,6 +23,9 @@ export default function SettingsScreen() {
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [branch, setBranch] = useState("main");
+  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  const isAdmin = accountQuery.data?.role === "admin";
+  useAdminAutoRouter(accountQuery.data ?? null);
   const [provider, setProvider] = useState<ProviderId>("managed");
   const [serviceAccessToken, setServiceAccessToken] = useState("");
   const [githubToken, setGithubToken] = useState("");
@@ -283,10 +288,20 @@ export default function SettingsScreen() {
         </View>
         <View style={styles.sectionSpacer}>
           <StudioSection label="KI-Agent" title="Provider-Profil" />
+          {isAdmin && provider === "auto" ? (
+            <View style={[styles.providerRow, styles.providerRowSelected]}>
+              <View style={[styles.radio, styles.radioSelected]}><View style={styles.radioDot} /></View>
+              <View style={styles.providerText}>
+                <Text style={styles.providerLabel}>Autonomes Routing aktiv</Text>
+                <Text style={styles.providerDetail}>Optimale KI wird automatisch zugewiesen — die manuelle Provider-Wahl ist für Administratoren deaktiviert.</Text>
+              </View>
+            </View>
+          ) : null}
           {providerOptions.map((option) => {
             const selected = option.id === provider;
+            const locked = isAdmin && option.id !== "auto";
             return (
-              <TouchableOpacity key={option.id} activeOpacity={0.75} onPress={() => { setProvider(option.id); setProviderApiKey(""); setCloudTestState("idle"); setCloudTestMessage(""); setSaveState("idle"); }} style={[styles.providerRow, selected && styles.providerRowSelected]}>
+              <TouchableOpacity key={option.id} activeOpacity={0.75} disabled={locked} onPress={() => { setProvider(option.id); setProviderApiKey(""); setCloudTestState("idle"); setCloudTestMessage(""); setSaveState("idle"); }} style={[styles.providerRow, selected && styles.providerRowSelected, locked && { opacity: 0.55 }]}>
                 <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioDot} /> : null}</View>
                 <View style={styles.providerText}>
                   <Text style={styles.providerLabel}>{option.label}</Text>
