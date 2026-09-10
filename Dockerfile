@@ -8,6 +8,9 @@ RUN npm ci
 COPY . .
 RUN npm run build
 # Statischer Expo-Web-Export fuer die kombinierte Web+API-Auslieferung.
+# CSS-Interop-Cache seeden (SHA-1-Fix fuer frische npm-ci-Installs, vgl. build-apk.yml)
+RUN mkdir -p node_modules/react-native-css-interop/.cache \
+ && touch node_modules/react-native-css-interop/.cache/web.css
 RUN npx expo export -p web --output-dir web-dist
 RUN npm prune --omit=dev
 
