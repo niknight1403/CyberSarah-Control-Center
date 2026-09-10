@@ -1,20 +1,19 @@
 import type { NextFunction, Request, Response } from "express";
 
+import { resolveAllowedOrigins } from "../../lib/allowed-origins-logic";
+
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX_REQUESTS = 120;
 
 type RateLimitEntry = { count: number; resetAt: number };
 
 function configuredOrigins() {
-  const configured = (process.env.APP_ALLOWED_ORIGINS ?? "")
-    .split(",")
-    .map((origin: string) => origin.trim())
-    .filter(Boolean);
-  if (configured.length > 0) return new Set(configured);
-  if (process.env.NODE_ENV !== "production") {
-    return new Set(["http://localhost:8081", "http://localhost:19006"]);
-  }
-  return new Set<string>();
+  // Sprint 69: Capacitor-Origins (APK) sind immer erlaubt, damit die App
+  // sich auch produktiv gegen die API authentifizieren kann ("Failed to fetch"-Fix).
+  return resolveAllowedOrigins({
+    configuredRaw: process.env.APP_ALLOWED_ORIGINS,
+    isProduction: process.env.NODE_ENV === "production",
+  });
 }
 
 export function createSecurityMiddleware() {

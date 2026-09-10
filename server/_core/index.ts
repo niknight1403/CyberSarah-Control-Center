@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
@@ -238,6 +238,21 @@ async function startServer() {
     });
     console.log(`[api] serving static web export from ${webDistDir}`);
   }
+
+  // Sprint 69: Globale JSON-Fehlerbehandlung — NIE HTML-Fehlerseiten an
+  // API-Clients ausliefern (Express-Default 404/500 liefert sonst HTML und
+  // loest client-seitige JSON-Parse-Exceptions aus).
+  app.use((req, res) => {
+    res.status(404).json({ error: "Not found", path: req.path, method: req.method });
+  });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
+    console.error("[api] unhandled error:", req.method, req.path, error);
+    const status = typeof (error as { status?: number })?.status === "number" ? (error as { status: number }).status : 500;
+    if (!res.headersSent) {
+      res.status(status).json({ error: "Internal server error", path: req.path, method: req.method });
+    }
+  });
 
   const port = parseInt(process.env.PORT || "3000", 10);
   server.listen(port, () => {

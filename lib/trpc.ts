@@ -4,6 +4,7 @@ import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
+import { assertJsonFetchResponse } from "@/lib/fetch-safety-logic";
 
 /**
  * tRPC React client for type-safe API calls.
@@ -31,10 +32,12 @@ export function createTRPCClient() {
         },
         // Custom fetch to include credentials for cookie-based auth
         fetch(url, options) {
+          // Sprint 69: HTML-Fehlerseiten (SPA-Fallback, Proxy-404) erzeugen
+          // sonst "Unexpected token '<'" — hier faengt ein sprechender Fehler.
           return fetch(url, {
             ...options,
             credentials: "include",
-          });
+          }).then(assertJsonFetchResponse);
         },
       }),
     ],

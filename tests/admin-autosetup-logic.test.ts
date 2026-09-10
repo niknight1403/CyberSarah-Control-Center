@@ -55,7 +55,9 @@ describe("planAdminAutoSetup", () => {
     const plan = planAdminAutoSetup({ role: "admin", storedSettings: { provider: "openai", branch: "main", protectChatContent: true }, hasProviderKey: true, connectorPreferences: { workspace: true, github: true, provider: true }, skillPreferences: { agent: true, diff: true, quality: true }, completedVersion: null });
     expect(plan.shouldRun).toBe(true);
     expect(plan.settings.provider).toBe("openai");
-    expect(plan.appliedSteps).toEqual(["Bestehende Konfiguration bestätigt — keine Änderungen nötig."]);
+    // Sprint 69 (v2): ohne gesetztes Repository wird das Revenue-Repo als Standard hinterlegt.
+    expect(plan.settings.repositoryUrl).toBe("https://github.com/niknight1403/cybersarah-revenue-os");
+    expect(plan.appliedSteps).toEqual(["Standard-Repository https://github.com/niknight1403/cybersarah-revenue-os (Branch main) hinterlegt."]);
   });
 
   it("bestätigt eine bereits vollständige Konfiguration ohne sie zu verändern", () => {

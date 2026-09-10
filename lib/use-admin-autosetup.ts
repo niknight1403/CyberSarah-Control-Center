@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { CONNECTOR_PREFERENCE_STORAGE_KEY } from "@/lib/connector-preferences-logic";
 import { SKILL_PREFERENCE_STORAGE_KEY } from "@/lib/skill-preferences-logic";
+import { trpc } from "@/lib/trpc";
 import { ADMIN_AUTOSETUP_VERSION, planAdminAutoSetup } from "@/lib/admin-autosetup-logic";
 
 export const ADMIN_AUTOSETUP_STORAGE_KEY = "cybersarah.admin-autosetup.version";
@@ -21,6 +22,7 @@ type AdminAutoSetupUser = { role?: string } | null | undefined;
  */
 export function useAdminAutoSetup(user: AdminAutoSetupUser) {
   const { settings, saveSettings } = useStudioSettings();
+  const utils = trpc.useUtils();
   const running = useRef(false);
 
   const run = useCallback(async () => {
@@ -48,8 +50,18 @@ export function useAdminAutoSetup(user: AdminAutoSetupUser) {
         completedVersion: completedRaw != null && Number.isFinite(Number(completedRaw)) ? Number(completedRaw) : null,
       });
       if (!plan.shouldRun) return;
+      // Sprint 69: Fehlende Workspace-URL vom Server beziehen (Zero-Config).
+      let workspaceUrl = plan.settings.workspaceUrl;
+      if (!workspaceUrl) {
+        try {
+          const remote = await utils.ops.workspaceServiceUrl.fetch();
+          workspaceUrl = remote.url ?? "";
+        } catch {
+          workspaceUrl = "";
+        }
+      }
       await saveSettings({
-        workspaceUrl: plan.settings.workspaceUrl,
+        workspaceUrl,
         repositoryUrl: plan.settings.repositoryUrl,
         branch: plan.settings.branch,
         provider: plan.settings.provider,
@@ -64,7 +76,7 @@ export function useAdminAutoSetup(user: AdminAutoSetupUser) {
     } finally {
       running.current = false;
     }
-  }, [saveSettings, settings]);
+  }, [saveSettings, settings, utils]);
 
   useEffect(() => {
     if (user?.role === "admin") void run();

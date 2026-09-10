@@ -1,4 +1,5 @@
 import { toPersistedStudioSettings, type PersistedStudioSettings } from "./studio-settings-logic";
+import { CYBERSARAH_REVENUE_DEFAULT_BRANCH, CYBERSARAH_REVENUE_REPOSITORY_URL } from "./repository-intent-logic";
 import { DEFAULT_CONNECTOR_PREFERENCES, normalizeConnectorPreferences, type ConnectorPreferences } from "./connector-preferences-logic";
 import { DEFAULT_SKILL_PREFERENCES, normalizeSkillPreferences, type SkillPreferences } from "./skill-preferences-logic";
 
@@ -10,7 +11,7 @@ import { DEFAULT_SKILL_PREFERENCES, normalizeSkillPreferences, type SkillPrefere
  * ohne Nebenwirkungen; alle Speicher-Vorgänge führt der Aufrufer aus.
  */
 
-export const ADMIN_AUTOSETUP_VERSION = 1;
+export const ADMIN_AUTOSETUP_VERSION = 2;
 
 export type AdminAutoSetupSnapshot = {
   role: string;
@@ -46,8 +47,10 @@ export function planAdminAutoSetup(snapshot: AdminAutoSetupSnapshot): AdminAutoS
   const stored = snapshot.storedSettings ?? {};
   const current = toPersistedStudioSettings({
     workspaceUrl: stored.workspaceUrl ?? "",
-    repositoryUrl: stored.repositoryUrl ?? "",
-    branch: stored.branch ?? "main",
+    // Sprint 69 (v2): Standard-Repository CyberSarah-revenue-os/main, damit
+    // nach dem App-Start keine manuelle Verknuepfung mehr noetig ist.
+    repositoryUrl: stored.repositoryUrl?.trim() || CYBERSARAH_REVENUE_REPOSITORY_URL,
+    branch: stored.branch?.trim() || CYBERSARAH_REVENUE_DEFAULT_BRANCH,
     provider: stored.provider ?? "managed",
     localProviderEndpoints: stored.localProviderEndpoints,
     protectChatContent: stored.protectChatContent ?? true,
@@ -81,8 +84,8 @@ export function planAdminAutoSetup(snapshot: AdminAutoSetupSnapshot): AdminAutoS
     settings = { ...settings, provider: "managed" };
     appliedSteps.push("KI-Provider auf On-Server-Modus gestellt (managed) — Chat ohne eigenen API-Key nutzbar.");
   }
-  if (!stored.branch) {
-    appliedSteps.push("Standard-Branch main hinterlegt.");
+  if (!stored.repositoryUrl?.trim()) {
+    appliedSteps.push(`Standard-Repository ${CYBERSARAH_REVENUE_REPOSITORY_URL} (Branch ${CYBERSARAH_REVENUE_DEFAULT_BRANCH}) hinterlegt.`);
   }
   if (stored.protectChatContent == null) {
     appliedSteps.push("Chat-Inhaltsschutz standardmäßig aktiviert.");

@@ -100,6 +100,11 @@ export const opsRouter = router({
 
     return buildOpsOverview(inputs);
   }),
+  // Sprint 69: Workspace-Service-URL fuer das Admin-Autosetup — der Client
+  // kann die Service-Adresse selbst nicht kennen; der Server kennt sie aus ENV.
+  workspaceServiceUrl: adminProcedure.query(() => ({
+    url: process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "") ?? null,
+  })),
   backupManifest: adminProcedure.query(async () => {
     const tableCounts = await tableRowCounts();
     return buildBackupManifest({

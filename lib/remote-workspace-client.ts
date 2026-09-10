@@ -4,6 +4,8 @@ import {
   type ProviderId,
 } from "@/lib/studio-settings-logic";
 
+import { parseJsonResponse } from "./fetch-safety-logic";
+
 export type RemoteWorkspaceConfig = {
   baseUrl: string;
   serviceAccessToken?: string;
@@ -165,7 +167,7 @@ export class RemoteWorkspaceClient {
             : `Workspace-Service antwortet mit ${response.status}.`;
         throw new WorkspaceRequestError(response.status, message);
       }
-      return (await response.json()) as T;
+      return parseJsonResponse<T>(response);
     } catch (error) {
       if (controller.signal.aborted) {
         throw new Error(
