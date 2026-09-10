@@ -2,6 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { insertChatTurn, listChatMessages, listChatSessions } from "./db";
 import { sanitizeSessionId } from "../lib/chat-session-logic";
 import {
+  buildChatExport,
+  type ExportSession,
+} from "../lib/chat-export-logic";
+import {
   buildPersistableTurn,
   toDisplayHistory,
 } from "../lib/chat-history-logic";
@@ -279,6 +283,51 @@ export const developmentChatRouter = router({
     .query(async ({ input, ctx }) =>
       listChatSessions(ctx.user.openId, input.limit),
     ),
+  export: protectedProcedure
+    .input(
+      z.object({
+        format: z.enum(["markdown", "json"]).default("markdown"),
+        sessionId: z.string().trim().max(64).optional(),
+        limit: z.number().int().min(1).max(500).default(500),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const overview = await listChatSessions(ctx.user.openId, input.limit);
+      const wanted = input.sessionId
+        ? overview.filter((session) => session.sessionId === sanitizeSessionId(input.sessionId))
+        : overview;
+      const sessions: ExportSession[] = [];
+      for (const session of wanted) {
+        const messages = await listChatMessages(
+          ctx.user.openId,
+          input.limit,
+          session.sessionId,
+        );
+        sessions.push({
+          sessionId: session.sessionId,
+          title: session.title,
+          messages: [...messages]
+            .reverse()
+            .map((message) => ({
+              role: message.role,
+              content: message.content,
+              createdAt: message.createdAt,
+              provider: message.provider,
+            })),
+        });
+      }
+      if (sessions.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Keine Chat-Historie zum Export gefunden.",
+        });
+      }
+      return buildChatExport({
+        sessions,
+        format: input.format,
+        userLabel: ctx.user.email ?? undefined,
+      });
+    }),
   testConnection: protectedProcedure
     .input(
       z.object({
