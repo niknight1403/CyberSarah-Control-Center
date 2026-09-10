@@ -5,6 +5,7 @@ import {
   koyebApiError,
   maskSecrets,
   publicUrlFromApp,
+  validateDatabaseUrl,
   validateKoyebToken,
 } from "../lib/koyeb-deploy-logic.mjs";
 
@@ -167,5 +168,33 @@ describe("maskSecrets", () => {
     expect(maskSecrets("postgresql://u:geheim@db/cs")).toBe(
       "postgresql://u:***@db/cs",
     );
+  });
+});
+
+describe("validateDatabaseUrl", () => {
+  it("akzeptiert gueltige postgres- und postgresql-Connection-Strings", () => {
+    expect(
+      validateDatabaseUrl("postgresql://koyeb-adm:geheim@db-abc.example.com:5432/koyebdb"),
+    ).toEqual({
+      ok: true,
+      url: "postgresql://koyeb-adm:geheim@db-abc.example.com:5432/koyebdb",
+    });
+    expect(validateDatabaseUrl("postgres://u:p@host.example.com/db").ok).toBe(true);
+  });
+
+  it("streicht Leerzeichen und Fliesstext ab", () => {
+    expect(validateDatabaseUrl("Hier steht der Connection String.").ok).toBe(false);
+    expect(validateDatabaseUrl("  postgresql://u:p@host/db  ").ok).toBe(true);
+  });
+
+  it("lehnt falsche Schemata, leere Werte und fehlenden Host ab", () => {
+    expect(validateDatabaseUrl("mysql://u:p@host/db").ok).toBe(false);
+    expect(validateDatabaseUrl("").ok).toBe(false);
+    expect(validateDatabaseUrl("postgresql://:5432/db").ok).toBe(false);
+  });
+
+  it("lehnt localhost fuer Koyeb-Einsatz ab", () => {
+    expect(validateDatabaseUrl("postgresql://u:p@localhost:5432/cybersarah").ok).toBe(false);
+    expect(validateDatabaseUrl("postgres://u:p@127.0.0.1/cybersarah").ok).toBe(false);
   });
 });

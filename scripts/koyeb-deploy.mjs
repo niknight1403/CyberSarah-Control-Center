@@ -24,6 +24,7 @@ import {
   maskSecrets,
   publicUrlFromApp,
   validateKoyebToken,
+  validateDatabaseUrl,
 } from "../lib/koyeb-deploy-logic.mjs";
 
 const API = "https://app.koyeb.com";
@@ -96,6 +97,12 @@ async function main() {
     );
     process.exit(2);
   }
+  const dbCheck = validateDatabaseUrl(databaseUrl);
+  if (!dbCheck.ok) {
+    console.error(`[koyeb-deploy] DATABASE_URL ungueltig: ${dbCheck.reason}`);
+    process.exit(2);
+  }
+  log("DATABASE_URL-Format gueltig (Fail-Fast-Check).");
 
   const appName = env("KOYEB_APP_NAME", "cybersarah-control-center");
   const region = env("KOYEB_REGION", "fra");

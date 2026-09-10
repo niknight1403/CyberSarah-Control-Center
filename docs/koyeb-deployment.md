@@ -155,15 +155,22 @@ Koyeb-PostgreSQL-DATABASE_URL entsteht bei Anlage der Datenbank.
 Für den manuellen Weg über die Weboberfläche sind keine API-Tokens nötig.
 Dauer: ca. 10 Minuten.
 
-### Schritt 1 — PostgreSQL-Datenbank anlegen
+### Schritt 1 — PostgreSQL-Database-Service anlegen
 
-1. [app.koyeb.com](https://app.koyeb.com) → links im Menü **Databases**
-2. **Create Database** → Typ **PostgreSQL**
-3. Name: `cybersarah-db` · Region: ` Frankfurt` (fra) · Plan: den
-   kostenlosen/hobby-Plan wählen
-4. **Create** → warten bis Status *Ready*
-5. Auf der Datenbank-Seite die **Connection String** kopieren (beginnt mit
-   `postgres://…`) → das ist später der Wert für `DATABASE_URL`
+1. [app.koyeb.com](https://app.koyeb.com) → oben im Menü **Databases**
+2. **Create Database Service**
+3. Name: `cybersarah-db` · Region: **Frankfurt** (fra) · Engine: **PostgreSQL 16/17**
+4. Default-Role: `koyeb-adm` (Standard lassen) · Instance: **free**
+5. **Create Database Service** → warten bis Status *Ready*
+6. Auf der Detailseite die **Connection-URI** kopieren (beginnt mit
+   `postgresql://koyeb-adm:…@…/koyebdb`) → das ist der Wert für
+   `DATABASE_URL`
+
+**Free-Tier-Limits der kostenlosen DB-Instanz:** 5 Stunden Compute pro
+Monat, maximal 1 GB Daten. Für dauerhaften Produktivbetrieb ist die
+Instanz **small** (~29,76 $/Monat) nötig — Entscheidung des Owners.
+Das Deploy-Skript validiert die `DATABASE_URL` seit Sprint 51 vorab
+(Fail-Fast: Scheme, Host, localhost-Erkennung).
 
 ### Schritt 2 — App aus GitHub anlegen
 
