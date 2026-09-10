@@ -90,6 +90,27 @@ async function listServices() {
 }
 
 /**
+ * Verfolgt einen konkreten Deploy bis live/failed (fuer explizit
+ * angestossene Deploys mit bekannter ID).
+ */
+async function watchDeployToLive(serviceId, deploy) {
+  const deadline = Date.now() + 25 * 60 * 1000;
+  let latest = deploy;
+  while (Date.now() - deadline < 0) {
+    const status = latest?.status ?? "unbekannt";
+    log(`Deploy-Status: ${status}`);
+    if (status === "live") return latest;
+    if (status === "build_failed" || status === "update_failed" || status === "pre_deploy_failed") {
+      throw new Error("Build/Update fehlgeschlagen — Render-Logs pruefen.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20000));
+    const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=1`);
+    latest = Array.isArray(deploys) ? deploys[0]?.deploy ?? deploys[0] : latest;
+  }
+  throw new Error("Timeout beim Warten auf den Live-Deploy (25 Minuten).");
+}
+
+/**
  * Sprint 73 (Stale-Read-Fix): Direkt nach einem ENV-PUT ist der "letzte"
  * Deploy in der Render-API noch der ALTE, ggf. fehlgeschlagene Deploy —
  * waitForLive brach dann sofort mit update_failed ab, obwohl der neue
@@ -113,8 +134,19 @@ async function waitForLive(serviceId, beforeDeployId = null, timeoutMs = 25 * 60
       if (!fresh) {
         noNewDeployPolls += 1;
         if (noNewDeployPolls >= 6) {
-          log("Kein neuer Deploy angestossen (ENV vermutlich identisch) — pruefe laufenden Service per Health-Check.");
-          return null;
+          // ENV-identischer PUT loest keinen Deploy aus. Der aktuelle Commit
+          // muss aber trotzdem gebaut werden — deshalb expliziter Trigger.
+          log("Kein neuer Deploy durch ENV-Update — stoesse Deploy des aktuellen Commits explizit an.");
+          const triggered = await apiFetch(`/services/${serviceId}/deploys`, { method: "POST" });
+          const triggeredDeploy = triggered?.deploy ?? triggered;
+          const triggeredId = triggeredDeploy?.id ?? null;
+          log(`Deploy angestossen: ${triggeredId ?? "unbekannte ID"}`);
+          await new Promise((resolve) => setTimeout(resolve, 20000));
+          const after = await apiFetch(`/services/${serviceId}/deploys?limit=1`);
+          const afterLatest = Array.isArray(after) ? after[0]?.deploy ?? after[0] : null;
+          const watchId = afterLatest?.id ?? triggeredId;
+          const watch = watchId === triggeredId ? triggeredDeploy : afterLatest;
+          return watchDeployToLive(serviceId, watch);
         }
         log("Warte auf neuen Deploy nach ENV-Update …");
         await new Promise((resolve) => setTimeout(resolve, 20000));
