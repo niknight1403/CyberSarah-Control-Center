@@ -70,9 +70,15 @@ describe("chat-search-logic", () => {
     expect(result.hits).toHaveLength(5);
     expect(result.totalMatches).toBe(30);
     expect(result.truncated).toBe(true);
-    expect(searchChatMessages(many, "neon", 5).hits[0]).toEqual(
-      searchChatMessages(many, "neon", 5).hits[0],
-    );
+    // Stabilitaet des Top-Treffers ueber zwei Aufrufe; der recency-Score
+    // haengt von Date.now() ab, daher Score nur mit Toleranz vergleichen.
+    const first = searchChatMessages(many, "neon", 5).hits[0];
+    const second = searchChatMessages(many, "neon", 5).hits[0];
+    const { score: firstScore, ...firstRest } = first;
+    const { score: secondScore, ...secondRest } = second;
+    expect(firstRest).toEqual(secondRest);
+    expect(firstScore).toBeCloseTo(secondScore, 6);
+    expect(result.truncated).toBe(true);
   });
 
   it("liefert bei leerer Anfrage strukturierte Leermenge", () => {
