@@ -11,6 +11,7 @@ import {
   parseFeatureFlagOverrides,
   resolveFeatureFlags,
 } from "../lib/feature-flag-logic";
+import { searchChatMessages, validateSearchQuery } from "../lib/chat-search-logic";
 import {
   buildChatExport,
   type ExportSession,
@@ -370,6 +371,38 @@ export const developmentChatRouter = router({
         format: input.format,
         userLabel: ctx.user.email ?? undefined,
       });
+    }),
+  search: protectedProcedure
+    .input(
+      z.object({
+        q: z.string().trim().min(1).max(200),
+        sessionId: z.string().trim().max(64).optional(),
+        limit: z.number().int().min(1).max(50).default(20),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const validation = validateSearchQuery(input.q);
+      if (!validation.valid) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: validation.reason });
+      }
+      const sessions = await listChatSessions(ctx.user.openId, 500);
+      const wanted = input.sessionId
+        ? sessions.filter((session) => session.sessionId === sanitizeSessionId(input.sessionId))
+        : sessions;
+      const candidates = [];
+      for (const session of wanted) {
+        const messages = await listChatMessages(ctx.user.openId, 500, session.sessionId);
+        for (const message of messages) {
+          candidates.push({
+            role: message.role,
+            content: message.content,
+            sessionId: session.sessionId,
+            title: session.title,
+            createdAt: message.createdAt,
+          });
+        }
+      }
+      return searchChatMessages(candidates, input.q, input.limit);
     }),
   testConnection: protectedProcedure
     .input(
