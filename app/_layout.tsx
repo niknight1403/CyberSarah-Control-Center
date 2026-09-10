@@ -93,10 +93,15 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StudioSettingsProvider>
-        <WorkspaceProvider>
-          <trpc.Provider client={trpcClient} queryClient={queryClient}>
-            <QueryClientProvider client={queryClient}>
+      {/* Sprint 73 FIX: trpc.Provider/QueryClientProvider muessen den Baum
+          umschliessen, BEVOR StudioSettingsProvider gerendert wird - dieser
+          ruft trpc.useUtils() auf. War die Reihenfolge vertauscht, wirft
+          React beim Mount "Unable to find tRPC Context" -> Absturz vor dem
+          ersten Paint -> dauerhaft weisser WebView-Screen. */}
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <StudioSettingsProvider>
+            <WorkspaceProvider>
             {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
             {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
             {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
@@ -105,10 +110,10 @@ export default function RootLayout() {
               <Stack.Screen name="oauth/callback" />
             </Stack>
             <StatusBar style="auto" />
-            </QueryClientProvider>
-          </trpc.Provider>
-        </WorkspaceProvider>
-      </StudioSettingsProvider>
+            </WorkspaceProvider>
+          </StudioSettingsProvider>
+        </QueryClientProvider>
+      </trpc.Provider>
     </GestureHandlerRootView>
   );
 
