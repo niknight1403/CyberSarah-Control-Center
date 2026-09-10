@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * Core user table backing auth flow (PostgreSQL / Koyeb Database Service).
+ * Core user table backing auth flow (PostgreSQL / Neon).
  * Extend this file with additional tables as your product grows.
  * Columns use camelCase to match both database fields and generated types.
  */
@@ -56,6 +56,23 @@ export const billingSubscriptions = pgTable("billingSubscriptions", {
     .notNull(),
 });
 
+/**
+ * Sprint 54 — persistierte Entwicklungsauftrags-Chat-Historie.
+ * Nutzer-Bezug ueber openId (Sessions tragen openId, kein Join noetig);
+ * role und content werden fuer den Prompt-Wiedereinsatz unverändert
+ * gespeichert, provider zur Nachvollziehbarkeit.
+ */
+export const chatMessages = pgTable("chatMessages", {
+  id: serial("id").primaryKey(),
+  userOpenId: varchar("userOpenId", { length: 64 }).notNull(),
+  role: varchar("role", { length: 16 }).notNull(),
+  content: text("content").notNull(),
+  provider: varchar("provider", { length: 32 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;

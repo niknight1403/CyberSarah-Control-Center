@@ -32,9 +32,31 @@ describe("production deployment configuration", () => {
   });
 
   it("dokumentiert APP_ALLOWED_ORIGINS als Produktions-Pflicht", () => {
-    const guide = readProjectFile("docs/koyeb-deployment.md");
+    const guide = readProjectFile("docs/render-deployment.md");
     expect(guide).toContain("APP_ALLOWED_ORIGINS");
     expect(guide).toMatch(/Pflicht|403/);
+  });
+
+  it("definiert Render als Zielplattform mit Free-Plan-Blueprint", () => {
+    const blueprint = readProjectFile("render.yaml");
+    expect(blueprint).toContain("plan: free");
+    expect(blueprint).toContain("cybersarah-control-center");
+    expect(blueprint).toContain("cybersarah-workspace");
+    expect(blueprint).toContain("rootDir: workspace-service");
+
+    const workflow = readProjectFile(".github/workflows/render-deploy.yml");
+    expect(workflow).toContain("RENDER_API_KEY");
+    expect(workflow).toContain("render-deploy.mjs");
+  });
+
+  it("haelt das Repository frei von Koyeb-Resten und Klartext-Secrets", () => {
+    const deployLogic = readProjectFile("lib/render-deploy-logic.mjs");
+    expect(deployLogic).toContain("rnd_");
+    expect(deployLogic).toContain("maskSecrets");
+
+    const guide = readProjectFile("docs/render-deployment.md");
+    expect(guide).toContain("Neon");
+    expect(guide).toContain("ephemeral");
   });
 
   it("enthaelt keine Hetzner- oder VPS-Betriebsspur mehr", () => {
@@ -45,7 +67,8 @@ describe("production deployment configuration", () => {
     expect(ops).not.toContain("systemd");
     expect(ops).not.toContain("ntfy");
     expect(ops).not.toContain("/opt/cybersarah-control-center");
-    expect(ops).toContain("koyeb");
+    expect(ops).toContain("render");
+    expect(ops).toContain("neon");
   });
 
   it("nutzt PostgreSQL als Datenbank-Treiber", () => {

@@ -68,7 +68,7 @@ Für eine realistische Abonnement-Synchronisierung sollte eine Test-Checkout-Ses
 Nach dem Setzen der Live-Variablen und einem Neustart des Dienstes:
 
 ```bash
-# Dienst nach ENV-Aenderung neu starten (Koyeb: Redeploy des Services; eigener Host: Prozess-Neustart)
+# Dienst nach ENV-Aenderung neu starten (Render: Re-Deploy des Services; eigener Host: Prozess-Neustart)
 ```
 
 Für die vollständige Prüfung der ENV, des Health-Endpoints und von MySQL:
@@ -87,4 +87,4 @@ fragt er zuerst `STRIPE_PRICE_LOOKUP_KEY` ab und faellt danach auf
 `STRIPE_PRODUCT_MONATLICH` zurueck. Aktive wiederkehrende Preise werden bevorzugt; bei
 mehreren Treffern wird der Monats-Preis gewaehlt. Die erfolgreiche Aufloesung wird
 prozessweit gecacht. Dadurch kann die Price-ID im Stripe-Dashboard geaendert werden,
-ohne die Koyeb-Konfiguration oder den App-Build anzupassen.
+ohne die Render-Konfiguration oder den App-Build anzupassen.

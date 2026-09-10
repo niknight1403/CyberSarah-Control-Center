@@ -1,6 +1,12 @@
-import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { billingSubscriptions, InsertUser, users } from "../drizzle/schema";
+import { desc, eq, sql } from "drizzle-orm";
+import {
+  billingSubscriptions,
+  chatMessages,
+  InsertChatMessage,
+  InsertUser,
+  users,
+} from "../drizzle/schema";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
   .trim()
@@ -265,6 +271,56 @@ export async function ensureAdminAccount(input: {
   if (!saved)
     throw new Error("Das Admin-Konto konnte nicht verifiziert werden.");
   return saved;
+}
+
+
+/**
+ * Sprint 54 — persistierte Entwicklungsauftrags-Chat-Historie.
+ * Alle inhaltlichen Regeln (Rollen, Kappung) liegen in
+ * lib/chat-history-logic.ts; hier nur der Datenbankzugriff.
+ */
+export async function insertChatMessage(input: InsertChatMessage) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Chat-Historie nicht speicherbar.");
+  const [saved] = await db.insert(chatMessages).values(input).returning();
+  return saved;
+}
+
+/** Speichert einen kompletten Turn (User-Frage + Antwort) atomar. */
+export async function insertChatTurn({
+  userOpenId,
+  userContent,
+  assistantContent,
+  provider,
+}: {
+  userOpenId: string;
+  userContent: string;
+  assistantContent: string;
+  provider: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Chat-Historie nicht speicherbar.");
+  const [savedUser, savedAssistant] = await db
+    .insert(chatMessages)
+    .values([
+      { userOpenId, role: "user", content: userContent, provider },
+      { userOpenId, role: "assistant", content: assistantContent, provider },
+    ])
+    .returning();
+  return { userMessage: savedUser, assistantMessage: savedAssistant };
+}
+
+/** Neueste Nachrichten eines Nutzers (DESC — Anzeige/Prompt drehen selbst). */
+export async function listChatMessages(userOpenId: string, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(chatMessages)
+    .where(eq(chatMessages.userOpenId, userOpenId))
+    .orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
+    .limit(Math.max(1, Math.min(500, limit)));
+  return rows;
 }
 
 export { ADMIN_EMAIL, isAdministratorEmail };

@@ -3,7 +3,7 @@ import path from "node:path";
 
 /**
  * Deterministische Logik für die Auslieferung des statischen
- * Expo-Web-Exports durch den API-Server (Koyeb-Einzel-Dienst-Betrieb).
+ * Expo-Web-Exports durch den API-Server (PaaS-Einzel-Dienst-Betrieb, Render).
  *
  * Der Web-Build liegt im Container unter WEB_DIST_DIR (Standard:
  * "web-dist" relativ zum Arbeitsverzeichnis). Der Server serviert die

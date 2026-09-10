@@ -11,7 +11,29 @@ import { z } from "zod";
 
 const execFileAsync = promisify(execFile);
 const port = Number(process.env.PORT ?? 8787);
-const workspacesDirectory = path.resolve(process.env.WORKSPACES_DIR ?? "/data/workspaces");
+// WORKSPACES_DIR mit Ephemeral-Fallback (Render Free hat keine persistenten
+// Disks): Ist der konfigurierte Pfad nicht beschreibbar, faellt der Service
+// auf ein beschreibbares lokales Verzeichnis zurueck und warnt beim Start.
+// Repositorys werden pro Anfrage aus Remote-Quellen geclont — der Fallback
+// ist funktional, Workspaces ueberleben aber keinen Re-Deploy.
+function resolveWorkspacesDirectory() {
+  const configured = process.env.WORKSPACES_DIR ?? "/data/workspaces";
+  const primary = path.resolve(configured);
+  try {
+    fs.mkdirSync(primary, { recursive: true });
+    fs.accessSync(primary, fs.constants.W_OK);
+    return primary;
+  } catch {
+    const fallback = path.resolve(process.cwd(), "workspaces");
+    fs.mkdirSync(fallback, { recursive: true });
+    console.warn(
+      `[workspaces] WORKSPACES_DIR "${configured}" ist nicht beschreibbar — nutze ephemeralen Fallback ${fallback}. ` +
+        "Workspaces ueberleben keinen Neustart/Re-Deploy (Render Free: Persistent Disk ist ein bezahlter Upgrade-Schritt).",
+    );
+    return fallback;
+  }
+}
+const workspacesDirectory = resolveWorkspacesDirectory();
 const publicBaseUrl = (process.env.PREVIEW_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
 const serviceAccessToken = process.env.SERVICE_ACCESS_TOKEN ?? "";
 const allowedOrigin = process.env.ALLOWED_ORIGIN ?? "";

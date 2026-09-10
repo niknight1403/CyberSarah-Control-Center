@@ -1,4 +1,9 @@
 import { TRPCError } from "@trpc/server";
+import { insertChatTurn, listChatMessages } from "./db";
+import {
+  buildPersistableTurn,
+  toDisplayHistory,
+} from "../lib/chat-history-logic";
 import { z } from "zod";
 import { invokeLLM, type Message } from "./_core/llm";
 import { protectedProcedure, router } from "./_core/trpc";
@@ -227,7 +232,38 @@ export const developmentChatRouter = router({
   })),
   send: protectedProcedure
     .input(chatInputSchema)
-    .mutation(({ input }) => handleDevelopmentChat(input)),
+    .mutation(async ({ input, ctx }) => {
+      const result = await handleDevelopmentChat(input);
+      // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
+      // Persistenzfehler brechen die Chat-Antwort nicht ab).
+      try {
+        const turn = buildPersistableTurn({
+          userContent: input.messages.at(-1)?.content ?? "",
+          assistantContent: result.content,
+          provider: result.providerUsed,
+        });
+        if (turn) {
+          await insertChatTurn({
+            userOpenId: ctx.user.openId,
+            userContent: turn.userMessage.content,
+            assistantContent: turn.assistantMessage.content,
+            provider: turn.provider,
+          });
+        }
+      } catch (error) {
+        console.warn("[developmentChat] Turn nicht persistiert:", error);
+      }
+      return result;
+    }),
+  history: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(500).default(100),
+      }),
+    )
+    .query(async ({ input, ctx }) =>
+      toDisplayHistory(await listChatMessages(ctx.user.openId, input.limit)),
+    ),
   testConnection: protectedProcedure
     .input(
       z.object({

@@ -54,3 +54,7 @@
 
 - **Issue #3:** Koyeb-Deployment wartet auf einen gültigen `KOYEB_TOKEN` (GitHub-Actions-Secret) — danach läuft der Bootstrap-Workflow vollautomatisch.
 - `SERVICE_ACCESS_TOKEN` als Actions-Secret für den Workspace-Service; Volume-Anhängung für `WORKSPACES_DIR` in der Koyeb-Konsole (Owner-Schritte).
+
+## Nachtrag (Sprint 54, 2026-09-10): Koyeb-Abhängigkeit entfernt
+
+Der offene Punkt „Koyeb-Deployment wartet auf KOYEB_TOKEN" (Issue #3) wurde durch eine Plattform-Entscheidung obsolet: Koyeb wurde vollständig aus dem Repository entfernt und durch **Render (Free) + Neon (Free PostgreSQL)** ersetzt — der E2E-Hinweis dieses Berichts zur Koyeb-Produktionsumgebung ist damit historisch. Details: `docs/render-deployment.md`, `render.yaml`, Workflow „Render Deploy". Der Managed-LLM-Fallback aus diesem Sprint bleibt unverändert wirksam; `OPENAI_API_KEY` wird jetzt automatisch als Laufzeit-ENV an den Render-Dienst durchgereicht.

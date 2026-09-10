@@ -1,17 +1,73 @@
+# Render Blueprint (Infrastruktur als Code) — CyberSarah Control Center
+#
+# Primärer Deploy-Pfad ist der GitHub-Actions-Workflow
+# .github/workflows/render-deploy.yml (API-getrieben, Secrets aus GitHub).
+# Diese Datei ist die deklarative Referenz — alternativ kann der Owner
+# sie einmalig über das Render-Dashboard anwenden (New → Blueprint),
+# wobei die `sync: false`-Werte dort abgefragt werden.
+#
+# 100 % kostenfrei: Render Free Plan (750 Instanz-Stunden/Monat, Schlaf
+# nach 15 Min. Inaktivität) + Neon Free PostgreSQL (DATABASE_URL).
+# Beide Dienste teilen sich die 750 Stunden — kein Dauerbetrieb-Dauerlauf.
+
 services:
+  # Kombidienst: API (tRPC/Express) + statischer Expo-Web-Export, Port 8000.
   - type: web
     name: cybersarah-control-center
-    runtime: node
+    runtime: docker
     plan: free
     region: frankfurt
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
-    healthCheckPath: /api/health
+    branch: main
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: false # Neon-Connection-String (postgresql://…neon.tech/…)
+      - key: APP_BASE_URL
+        sync: false # https://cybersarah-control-center.onrender.com
+      - key: APP_ALLOWED_ORIGINS
+        sync: false # onrender-Domain + app.cybersarah-ki.com
+      - key: JWT_SECRET
+        sync: false
+      - key: METRICS_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false # Managed-LLM-Fallback (Sprint 53)
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_MODE
+        value: live
+      - key: STRIPE_PRICE_LOOKUP_KEY
+        value: cybersarah-monthly
       - key: OAUTH_SERVER_URL
         sync: false
-      - key: EXPO_PUBLIC_OAUTH_SERVER_URL
+      - key: OWNER_OPEN_ID
+        sync: false
+      - key: TRUST_PROXY
+        value: "1"
+
+  # Workspace-Service (Custom-AI-Studio): token-geschützt, Port 8787.
+  # WORKSPACES_DIR liegt auf Render Free auf ephemeraler Disk — bei
+  # Bedarf Persistent Disk hinzufügen (bezahlter Owner-Schritt).
+  - type: web
+    name: cybersarah-workspace
+    runtime: docker
+    rootDir: workspace-service
+    plan: free
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8787"
+      - key: SERVICE_ACCESS_TOKEN
+        sync: false
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: PREVIEW_PUBLIC_BASE_URL
         sync: false

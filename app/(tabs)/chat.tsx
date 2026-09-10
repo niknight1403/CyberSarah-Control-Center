@@ -7,6 +7,7 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { loadDevelopmentChatHistory, parseDevelopmentChatHistory, saveDevelopmentChatHistory, serializeDevelopmentChatHistory, type DevelopmentChatHistoryMessage } from "@/lib/development-chat-history";
 import { formatChatDay, shouldShowDayDivider, shouldShowTimestamp } from "@/lib/chat-presentation-logic";
+import { serverHistoryToChatRows } from "@/lib/chat-history-logic";
 import type { AgentProposal } from "@/lib/remote-workspace-client";
 import { getProviderLabel } from "@/lib/provider-status-logic";
 import { useMediaPicker } from "@/hooks/use-media-picker";
@@ -98,6 +99,21 @@ export default function ChatScreen() {
     }).catch(() => undefined);
     return () => { active = false; };
   }, [chatWorkspaceId, settings.protectChatContent]);
+
+  // Sprint 54: Serverseitig persistierte Historie (PostgreSQL) laden —
+  // nur als Hydration, wenn lokal keine Konversation existiert.
+  const serverHistoryQuery = trpc.developmentChat.history.useQuery(
+    { limit: 100 },
+    { retry: false },
+  );
+  useEffect(() => {
+    const rows = serverHistoryQuery.data;
+    if (!rows?.length) return;
+    setMessages((current) => {
+      if (current.some((message) => message.role === "user")) return current;
+      return [...initialMessages, ...serverHistoryToChatRows(rows)];
+    });
+  }, [serverHistoryQuery.data]);
 
   const updateConnectorPreference = (connector: ConnectorId) => {
     setConnectorPreferences((current) => {

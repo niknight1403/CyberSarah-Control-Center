@@ -123,7 +123,7 @@ async function startServer() {
     }),
   );
 
-  // Statischer Expo-Web-Export (Koyeb-Einzel-Dienst): Dateien aus
+  // Statischer Expo-Web-Export (Render-Einzel-Dienst): Dateien aus
   // web-dist ausliefern, unbekannte GET-Pfade auf index.html fallen.
   const webDistDir = resolveWebDistDir(process.cwd());
   if (webDistDir) {

@@ -9,19 +9,18 @@ npm run dev
 
 Der Produktions-Bundle wird mit `npm run build` erzeugt und mit `npm start` gestartet. Secrets gehören ausschließlich in eine lokale `.env` oder in die Secret-Verwaltung des jeweiligen Hosts.
 
-## Render
+## Produktion: Render + Neon (einziger Betriebspfad)
 
-Render verwendet `render.yaml`. Der Build lautet `corepack enable && pnpm install --frozen-lockfile --prod=false && npm run build`, der Start erfolgt mit `npm start`. `OAUTH_SERVER_URL` und `EXPO_PUBLIC_OAUTH_SERVER_URL` werden ausschließlich als geschützte Render-Environment-Variablen hinterlegt.
-
-## Produktion: Koyeb (einziger Betriebspfad)
-
-Die Produktion läuft vollständig auf Koyeb. Der API-Dienst wird aus dem
-Repository als Docker-Service gebaut (`Dockerfile`, siehe
-`docs/koyeb-deployment.md`); die Web-App und der Custom-AI-Studio-
-Workspace-Service laufen als eigene Koyeb-Dienste. Die Datenbank ist ein
-Koyeb-Database-Service (PostgreSQL) – der vollständige Umzugs- und
-Abschaltplan liegt in `docs/HETZNER-EXIT.md`. Secrets werden ausschließlich
-als Koyeb-Umgebungsvariablen hinterlegt; vor jedem Deploy prüft
+Die Produktion läuft vollständig auf Render (Free Plan) mit Neon-PostgreSQL
+als Datenbank. Der API-Dienst (inklusive statischem Web-Export) und der
+Custom-AI-Studio-Workspace-Service laufen als eigene Render-Dienste aus
+dem Repository (`Dockerfile` bzw. `workspace-service/Dockerfile` mit
+`rootDir`, siehe `docs/render-deployment.md` und `render.yaml`). Die
+PostgreSQL-Datenbank ist ein Neon-Free-Project — Render Free Postgres
+wird nach 30 Tagen gelöscht und ist deshalb bewusst nicht im Einsatz.
+Der vollständige Umzugs- und Abschaltplan liegt in `docs/HETZNER-EXIT.md`.
+Deploy und Laufzeit-ENV übernimmt der GitHub-Actions-Workflow „Render
+Deploy" vollautomatisch aus den Actions-Secrets; vor jedem Deploy prüft
 `scripts/validate-production.mjs` die ENV lokal.
 
 ## Backup und Wiederherstellung
@@ -38,7 +37,7 @@ Die Android-Konfiguration ist portrait-orientiert und verwendet das CyberSarah-C
 
 | Variable | Bedeutung | Hinweis |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL-Verbindung (`postgresql://…`) | Der Server nutzt `drizzle-orm/node-postgres` gegen den Koyeb-Database-Service; MySQL-URLs werden abgewiesen |
+| `DATABASE_URL` | PostgreSQL-Verbindung (`postgresql://…`) | Der Server nutzt `drizzle-orm/node-postgres` gegen Neon-PostgreSQL; MySQL-URLs werden abgewiesen |
 | `APP_ALLOWED_ORIGINS` | Erlaubte Web-Origins (kommagetrennt) | Ohne diese Variable blockiert der Server produktive Web-Requests mit HTTP 403; `ALLOWED_ORIGINS` ist ein bekannter Tippfehler |
 | `APP_BASE_URL` | HTTPS-Basis-URL | Muss mit `https://` beginnen |
 | `JWT_SECRET` | Sitzungs-Signatur | Mindestens 32 Zeichen |
@@ -47,7 +46,7 @@ Die Android-Konfiguration ist portrait-orientiert und verwendet das CyberSarah-C
 
 ## Monitoring-Endpunkte
 
-`GET /api/health` prüft die Prozess-Erreichbarkeit. `GET /api/ready` führt zusätzlich einen echten MySQL-Readiness-Check mit `SELECT 1` aus und antwortet bei nicht erreichbarer Datenbank mit HTTP 503. Prometheus-kompatible Prozessmetriken sind unter `GET /api/metrics` verfügbar; in Produktion ist dafür `Authorization: Bearer $METRICS_TOKEN` erforderlich.
+`GET /api/health` prüft die Prozess-Erreichbarkeit. `GET /api/ready` führt zusätzlich einen echten PostgreSQL-Readiness-Check mit `SELECT 1` aus und antwortet bei nicht erreichbarer Datenbank mit HTTP 503. Prometheus-kompatible Prozessmetriken sind unter `GET /api/metrics` verfügbar; in Produktion ist dafür `Authorization: Bearer $METRICS_TOKEN` erforderlich.
 
 ## Sicherheitsregeln
 

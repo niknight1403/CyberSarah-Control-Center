@@ -35,7 +35,7 @@ for (const [typo, correct] of knownEnvTypos) {
   if (process.env[typo]?.trim()) failures.push(`${typo} ist ein Tippfehler – der Server liest ausschließlich ${correct}`);
 }
 const databaseUrl = process.env.DATABASE_URL?.trim() ?? "";
-if (databaseUrl && !/^postgres(ql)?:\/\//i.test(databaseUrl)) failures.push("DATABASE_URL muss eine PostgreSQL-Verbindung (postgresql://…) sein – der Server nutzt drizzle-orm/node-postgres (Koyeb-Database-Service)");
+if (databaseUrl && !/^postgres(ql)?:\/\//i.test(databaseUrl)) failures.push("DATABASE_URL muss eine PostgreSQL-Verbindung (postgresql://…) sein – der Server nutzt drizzle-orm/node-postgres (Neon-PostgreSQL)");
 const chatProviderKeys = [
   "BUILT_IN_FORGE_API_KEY",
   "OPENAI_API_KEY",

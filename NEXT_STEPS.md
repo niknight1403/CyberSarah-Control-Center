@@ -71,5 +71,5 @@ Akzeptanzkriterium (unverändert): Agenten-Vorschläge erscheinen priorisiert mi
 ## Mittel- und langfristige Richtung (nach Sprint 51)
 
 - Betriebserfahrung aus dem Realgerät-Test in die Provider-Routing-Logik zurückfließen lassen (Messwerte, Timeouts, Fallback-Schwellen).
-- Strukturierte Healthchecks der PaaS-Betriebspfade (Koyeb/Render) konsolidieren und Warnstufen in einer zentralen Betriebsansicht zusammenführen.
+- Strukturierte Healthchecks der PaaS-Betriebspfade (Render/Neon) konsolidieren und Warnstufen in einer zentralen Betriebsansicht zusammenführen.
 - Verschlüsselte Support- und Settings-Backups um die neuen Zustände (Budget, Latenz-Ranking, Snapshots) erweitern, sobald diese persistiert werden.

@@ -1,9 +1,10 @@
-name: Koyeb Bootstrap
+name: Render Deploy
 
-# Einmaliger Bootstrap des CyberSarah Control Center auf Koyeb.
-# Alle Werte kommen aus GitHub Actions Secrets — nach dem Laden des
-# Repos ist damit das Deployment automatisch integriert.
-# Ausloesen: GitHub UI → Actions → "Koyeb Bootstrap" → Run workflow.
+# Bootstrap und Updates des CyberSarah Control Center auf Render
+# (Koyeb-Ersatz, 100 % kostenfrei: Render Free + Neon Free).
+# Alle Werte kommen aus GitHub Actions Secrets — das Deployment ist
+# damit vollstaendig automatisiert, keine manuelle ENV-Nacharbeit.
+# Ausloesen: GitHub UI → Actions → "Render Deploy" → Run workflow.
 
 on:
   workflow_dispatch:
@@ -37,24 +38,25 @@ jobs:
           npm run check
           npm test
 
-      - name: Auf Koyeb deployen (App, Migrationen + Health-Check)
+      - name: Auf Render deployen (App, Migrationen + Health-Check)
         if: inputs.target == 'app'
         env:
-          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
           OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
-        run: node scripts/koyeb-deploy.mjs --migrate
+        run: node scripts/render-deploy.mjs --migrate
 
-      - name: Workspace-Service auf Koyeb deployen (Port 8787)
+      - name: Workspace-Service auf Render deployen (Port 8787)
         if: inputs.target == 'workspace'
         env:
-          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ACCESS_TOKEN: ${{ secrets.SERVICE_ACCESS_TOKEN }}
-        run: node scripts/koyeb-deploy.mjs --workspace
+        run: node scripts/render-deploy.mjs --workspace
