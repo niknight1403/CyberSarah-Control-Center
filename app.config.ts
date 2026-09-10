@@ -81,7 +81,15 @@ const config: ExpoConfig = {
   },
   web: {
     bundler: "metro",
-    output: "static",
+    // Sprint 73 FIX: "single" statt "static". Die App laeuft ausschliesslich
+    // in einer Capacitor-WebView (kein echter SSR/Static-Hosting-Kontext,
+    // kein SEO-Nutzen). "static" prae-rendert HTML pro Route und der Client
+    // versucht per hydrateRoot() zu "hydrieren" - jede Abweichung (Platform-
+    // Checks, Locale, AsyncStorage-Werte) fuehrt zu React-Fehler #418
+    // (Hydration Mismatch) und liess die App direkt nach dem tRPC-Fix wieder
+    // mit weissem/rotem Screen abstuerzen. "single" rendert rein
+    // client-seitig ohne Hydration-Risiko.
+    output: "single",
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
