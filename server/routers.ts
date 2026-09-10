@@ -6,6 +6,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { developmentChatRouter } from "./development-chat";
 import { opsRouter } from "./ops-router";
 import { featuresRouter } from "./features-router";
+import { appStatusRouter } from "./app-status-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -13,6 +14,7 @@ export const appRouter = router({
   system: systemRouter,
   ops: opsRouter,
   features: featuresRouter,
+  appStatus: appStatusRouter,
   developmentChat: developmentChatRouter,
   account: accountRouter,
   billing: billingRouter,

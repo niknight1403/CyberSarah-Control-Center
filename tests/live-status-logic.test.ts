@@ -56,7 +56,7 @@ describe("live-status-logic", () => {
 
   it("normalisiert Logzeilen tolerante (Ebenen, Kaetzung, Ids)", () => {
     const entry = normalizeRuntimeLogEntry(
-      { level: "quatsch", source: "  ", message: "Hallo   ", atMs: NOW },
+      { level: "quatsch" as unknown as "info", source: "  ", message: "Hallo   ", atMs: NOW },
       "fallback-id",
     );
     expect(entry.level).toBe("info");
