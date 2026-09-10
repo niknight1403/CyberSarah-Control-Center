@@ -1,0 +1,2 @@
+ALTER TABLE "chatMessages" ADD COLUMN "sessionId" varchar(64) DEFAULT 'default' NOT NULL;--> statement-breakpoint
+CREATE INDEX "chatMessages_session_idx" ON "chatMessages" USING btree ("userOpenId","sessionId");

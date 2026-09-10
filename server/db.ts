@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   billingSubscriptions,
   chatMessages,
@@ -21,6 +21,7 @@ function isAdministratorEmail(email: string | null | undefined) {
 }
 
 import { ENV } from "./_core/env";
+import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -292,35 +293,57 @@ export async function insertChatTurn({
   userContent,
   assistantContent,
   provider,
+  sessionId,
 }: {
   userOpenId: string;
   userContent: string;
   assistantContent: string;
   provider: string | null;
+  sessionId?: string | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Datenbank nicht verfuegbar — Chat-Historie nicht speicherbar.");
+  const resolvedSessionId = sanitizeSessionId(sessionId);
   const [savedUser, savedAssistant] = await db
     .insert(chatMessages)
     .values([
-      { userOpenId, role: "user", content: userContent, provider },
-      { userOpenId, role: "assistant", content: assistantContent, provider },
+      { userOpenId, sessionId: resolvedSessionId, role: "user", content: userContent, provider },
+      { userOpenId, sessionId: resolvedSessionId, role: "assistant", content: assistantContent, provider },
     ])
     .returning();
   return { userMessage: savedUser, assistantMessage: savedAssistant };
 }
 
 /** Neueste Nachrichten eines Nutzers (DESC — Anzeige/Prompt drehen selbst). */
-export async function listChatMessages(userOpenId: string, limit = 100) {
+export async function listChatMessages(
+  userOpenId: string,
+  limit = 100,
+  sessionId?: string | null,
+) {
   const db = await getDb();
   if (!db) return [];
+  const resolvedSessionId = sessionId === undefined ? undefined : sanitizeSessionId(sessionId);
   const rows = await db
     .select()
     .from(chatMessages)
-    .where(eq(chatMessages.userOpenId, userOpenId))
+    .where(
+      resolvedSessionId === undefined
+        ? eq(chatMessages.userOpenId, userOpenId)
+        : and(
+            eq(chatMessages.userOpenId, userOpenId),
+            eq(chatMessages.sessionId, resolvedSessionId),
+          ),
+    )
     .orderBy(desc(chatMessages.createdAt), desc(chatMessages.id))
     .limit(Math.max(1, Math.min(500, limit)));
   return rows;
+}
+
+/** Sitzungsuebersicht eines Nutzers (Sprint 57) — Logik in lib/chat-session-logic.ts. */
+export async function listChatSessions(userOpenId: string, limit = 500) {
+  const messages = await listChatMessages(userOpenId, limit);
+  const ascending = [...messages].reverse();
+  return buildSessionOverview(ascending);
 }
 
 export { ADMIN_EMAIL, isAdministratorEmail };

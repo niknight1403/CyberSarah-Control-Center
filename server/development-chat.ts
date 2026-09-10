@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { insertChatTurn, listChatMessages } from "./db";
+import { insertChatTurn, listChatMessages, listChatSessions } from "./db";
+import { sanitizeSessionId } from "../lib/chat-session-logic";
 import {
   buildPersistableTurn,
   toDisplayHistory,
@@ -31,6 +32,7 @@ const chatInputSchema = z.object({
   messages: z.array(messageSchema).min(1).max(24),
   provider: providerSchema.default("managed"),
   model: z.string().trim().min(1).max(160).optional(),
+  sessionId: z.string().trim().max(64).optional(),
 });
 
 type ProviderId = z.infer<typeof providerSchema>;
@@ -248,6 +250,7 @@ export const developmentChatRouter = router({
             userContent: turn.userMessage.content,
             assistantContent: turn.assistantMessage.content,
             provider: turn.provider,
+            sessionId: input.sessionId,
           });
         }
       } catch (error) {
@@ -259,10 +262,22 @@ export const developmentChatRouter = router({
     .input(
       z.object({
         limit: z.number().int().min(1).max(500).default(100),
+        sessionId: z.string().trim().max(64).optional(),
       }),
     )
     .query(async ({ input, ctx }) =>
-      toDisplayHistory(await listChatMessages(ctx.user.openId, input.limit)),
+      toDisplayHistory(
+        await listChatMessages(ctx.user.openId, input.limit, input.sessionId),
+      ),
+    ),
+  sessions: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(500).default(500),
+      }),
+    )
+    .query(async ({ input, ctx }) =>
+      listChatSessions(ctx.user.openId, input.limit),
     ),
   testConnection: protectedProcedure
     .input(

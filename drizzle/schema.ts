@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -65,11 +66,14 @@ export const billingSubscriptions = pgTable("billingSubscriptions", {
 export const chatMessages = pgTable("chatMessages", {
   id: serial("id").primaryKey(),
   userOpenId: varchar("userOpenId", { length: 64 }).notNull(),
+  sessionId: varchar("sessionId", { length: 64 }).notNull().default("default"),
   role: varchar("role", { length: 16 }).notNull(),
   content: text("content").notNull(),
   provider: varchar("provider", { length: 32 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => [
+  index("chatMessages_session_idx").on(table.userOpenId, table.sessionId),
+]);
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = typeof chatMessages.$inferInsert;

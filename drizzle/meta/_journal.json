@@ -15,6 +15,13 @@
       "when": 1789046381378,
       "tag": "0001_tidy_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789050234631,
+      "tag": "0002_tidy_ted_forrester",
+      "breakpoints": true
     }
   ]
 }
