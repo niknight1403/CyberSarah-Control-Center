@@ -82,8 +82,13 @@ describe.skipIf(process.env.CI)("workspace-service startup smoke (Sprint 73)", (
       path.resolve(__dirname, "..", "workspace-service", "src", "index.js"),
       "utf8",
     );
-    expect(source).toMatch(/import fsSync from "node:fs"/);
     expect(source).not.toMatch(/fs\.mkdirSync/);
     expect(source).not.toMatch(/fs\.accessSync/);
+    // Sprint 73: asynchrone Aufloesung mit Timeout-Race, damit blockierende
+    // Mounts (GH-Runner-/proc, read-only Container-Layer) den Start nie
+    // einfrieren koennen.
+    expect(source).toMatch(/raceTimeout/);
+    expect(source).toMatch(/await resolveWorkspacesDirectory\(\)/);
+    expect(source).toMatch(/tmpdir-Fallback/);
   });
 });

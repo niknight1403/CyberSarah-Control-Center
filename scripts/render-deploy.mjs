@@ -89,11 +89,41 @@ async function listServices() {
   return Array.isArray(data) ? data.map((entry) => entry.service ?? entry) : [];
 }
 
-async function waitForLive(serviceId, timeoutMs = 25 * 60 * 1000) {
+/**
+ * Sprint 73 (Stale-Read-Fix): Direkt nach einem ENV-PUT ist der "letzte"
+ * Deploy in der Render-API noch der ALTE, ggf. fehlgeschlagene Deploy —
+ * waitForLive brach dann sofort mit update_failed ab, obwohl der neue
+ * Deploy noch gar nicht existierte. Deshalb: Es wird explizit auf einen
+ * Deploy mit NEUER ID gewartet (beforeDeployId) und nur deren Status
+ * bewertet. Stoert der ENV-Patch keinen neuen Deploy an (ENV identisch),
+ * wird nach 2 Minuten ohne neuen Deploy fortgefahren — der nachgelagerte
+ * Health-Check ist der verbindliche Nachweis.
+ */
+async function waitForLive(serviceId, beforeDeployId = null, timeoutMs = 25 * 60 * 1000) {
   const started = Date.now();
+  let newDeploySeen = beforeDeployId === null;
+  let noNewDeployPolls = 0;
   while (Date.now() - started < timeoutMs) {
-    const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=1`);
-    const latest = Array.isArray(deploys) ? deploys[0]?.deploy ?? deploys[0] : null;
+    const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=5`);
+    const list = Array.isArray(deploys)
+      ? deploys.map((entry) => entry?.deploy ?? entry)
+      : [];
+    if (!newDeploySeen) {
+      const fresh = list.find((deploy) => deploy?.id && deploy.id !== beforeDeployId);
+      if (!fresh) {
+        noNewDeployPolls += 1;
+        if (noNewDeployPolls >= 6) {
+          log("Kein neuer Deploy angestossen (ENV vermutlich identisch) — pruefe laufenden Service per Health-Check.");
+          return null;
+        }
+        log("Warte auf neuen Deploy nach ENV-Update …");
+        await new Promise((resolve) => setTimeout(resolve, 20000));
+        continue;
+      }
+      newDeploySeen = true;
+      log(`Neuer Deploy erkannt: ${fresh.id}`);
+    }
+    const latest = list[0] ?? null;
     const status = latest?.status ?? "unbekannt";
     log(`Deploy-Status: ${status}`);
     if (status === "live") return latest;
@@ -109,6 +139,13 @@ async function verifyPublic(url, healthPath = "/api/health") {
   const health = await fetch(`${url}${healthPath}`);
   if (!health.ok) throw new Error(`${healthPath} antwortet ${health.status}`);
   log(`${healthPath}: ${health.status} OK`);
+}
+
+/** Liefert die ID des aktuell letzten Deploys (fuer den Stale-Read-Guard). */
+async function latestDeployId(serviceId) {
+  const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=1`);
+  if (!Array.isArray(deploys) || deploys.length === 0) return null;
+  return deploys[0]?.deploy?.id ?? deploys[0]?.id ?? null;
 }
 
 /**
@@ -138,11 +175,21 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
 
   if (existing) {
     log(`Service "${serviceName}" existiert (${existing.id}) — setze ENV vollstaendig …`);
+    const priorDeploys = await apiFetch(`/services/${existing.id}/deploys?limit=1`);
+    const priorDeployId = Array.isArray(priorDeploys)
+      ? priorDeploys[0]?.deploy?.id ?? priorDeploys[0]?.id ?? null
+      : null;
     await apiFetch(`/services/${existing.id}/env-vars`, {
       method: "PUT",
       body: JSON.stringify(requestBody.envVars),
     });
-  } else {
+    const liveDeploy = await waitForLive(existing.id, priorDeployId);
+    if (liveDeploy) log(`Deploy ${liveDeploy.id ?? ""} live.`);
+    let publicUrl = publicServiceUrl((await apiFetch(`/services/${existing.id}`)).service ?? {}) ?? assumedUrl;
+    log(`Oeffentliche URL: ${publicUrl}`);
+    return { service: existing, publicUrl };
+  }
+  {
     log(`Lege Service "${serviceName}" an …`);
     const created = await apiFetch("/services", {
       method: "POST",
@@ -227,13 +274,14 @@ async function deployApp() {
   // falls Render den Standard-Subdomain-Namen veraendert hat.
   if (publicUrl !== `https://${serviceName}.onrender.com`) {
     log("Patche ENV mit der echten onrender-Domain …");
+    const patchBeforeDeployId = await latestDeployId(service.id);
     await apiFetch(`/services/${service.id}/env-vars`, {
       method: "PUT",
       body: JSON.stringify(
         buildServiceCreateRequest({ serviceName, envLines: buildEnv(publicUrl) }).envVars,
       ),
     });
-    await waitForLive(service.id);
+    await waitForLive(service.id, patchBeforeDeployId);
   }
 
   await verifyPublic(publicUrl, "/api/health");
@@ -271,6 +319,7 @@ async function deployWorkspace() {
 
   if (publicUrl !== `https://${serviceName}.onrender.com`) {
     log("Patche Workspace-ENV mit der echten onrender-Domain …");
+    const wsPatchBeforeDeployId = await latestDeployId(service.id);
     await apiFetch(`/services/${service.id}/env-vars`, {
       method: "PUT",
       body: JSON.stringify(
@@ -282,7 +331,7 @@ async function deployWorkspace() {
         }).envVars,
       ),
     });
-    await waitForLive(service.id);
+    await waitForLive(service.id, wsPatchBeforeDeployId);
   }
 
   await verifyPublic(publicUrl, "/api/v1/health");

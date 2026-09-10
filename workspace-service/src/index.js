@@ -12,29 +12,63 @@ import { z } from "zod";
 
 const execFileAsync = promisify(execFile);
 const port = Number(process.env.PORT ?? 8787);
-// WORKSPACES_DIR mit Ephemeral-Fallback (Render Free hat keine persistenten
+// WORKSPACES_DIR mit Ephemeralfallback (Render Free hat keine persistenten
 // Disks): Ist der konfigurierte Pfad nicht beschreibbar, faellt der Service
 // auf ein beschreibbares lokales Verzeichnis zurueck und warnt beim Start.
 // Repositorys werden pro Anfrage aus Remote-Quellen geclont — der Fallback
 // ist funktional, Workspaces ueberleben aber keinen Re-Deploy.
-function resolveWorkspacesDirectory() {
-  const configured = process.env.WORKSPACES_DIR ?? "/data/workspaces";
-  const primary = path.resolve(configured);
+//
+// Sprint 73: Die Pruefung ist absichtlich ASYNCHRON mit Timeout-Race.
+// Synchrone FS-Calls (mkdirSync/accessSync) koennen auf unbeschreibbaren
+// Mounts (GH-Runner-/proc, read-only Container-Layer) UNBEGRENZT blockieren
+// statt sofort zu werfen — der Service hing dann beim Start fest ohne
+// jeglichen Output. Async + Race laesst den Start in jeder Umgebung
+// deterministisch durchlaufen (max. ~2s pro Kandidat).
+import os from "node:os";
+import { setTimeout as sleep } from "node:timers/promises";
+
+async function ensureDirectoryUsable(candidate) {
   try {
-    fsSync.mkdirSync(primary, { recursive: true });
-    fsSync.accessSync(primary, fsSync.constants.W_OK);
-    return primary;
+    await fs.mkdir(candidate, { recursive: true });
+    await fs.access(candidate, fsSync.constants.W_OK);
+    return true;
   } catch {
-    const fallback = path.resolve(process.cwd(), "workspaces");
-    fsSync.mkdirSync(fallback, { recursive: true });
-    console.warn(
-      `[workspaces] WORKSPACES_DIR "${configured}" ist nicht beschreibbar — nutze ephemeralen Fallback ${fallback}. ` +
-        "Workspaces ueberleben keinen Neustart/Re-Deploy (Render Free: Persistent Disk ist ein bezahlter Upgrade-Schritt).",
-    );
-    return fallback;
+    return false;
   }
 }
-const workspacesDirectory = resolveWorkspacesDirectory();
+
+function raceTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    sleep(ms).then(() => {
+      throw new Error("timeout");
+    }),
+  ]);
+}
+
+async function resolveWorkspacesDirectory() {
+  const configured = process.env.WORKSPACES_DIR?.trim() || "/data/workspaces";
+  const candidates = [
+    { label: `WORKSPACES_DIR "${configured}"`, dir: path.resolve(configured) },
+    { label: "cwd-Fallback", dir: path.resolve(process.cwd(), "workspaces") },
+    { label: "tmpdir-Fallback", dir: path.join(os.tmpdir(), "cybersarah-workspaces") },
+  ];
+  for (const candidate of candidates) {
+    const usable = await raceTimeout(ensureDirectoryUsable(candidate.dir), 2000).catch(() => false);
+    if (usable) return candidate.dir;
+    console.warn(
+      `[workspaces] ${candidate.label} (${candidate.dir}) ist nicht beschreibbar/erreichbar — naechster Kandidat.`,
+    );
+  }
+  // Kein Kandidat nutzbar: Service startet trotzdem (Health bleibt erreichbar,
+  // Workspace-Operationen schlagen pro Anfrage fehl und loggen den Pfad).
+  const lastResort = candidates[candidates.length - 1].dir;
+  console.warn(
+    `[workspaces] WARNUNG: kein beschreibbares Workspace-Verzeichnis gefunden — nutze ${lastResort} als letzten Ausweg.`,
+  );
+  return lastResort;
+}
+const workspacesDirectory = await resolveWorkspacesDirectory();
 const publicBaseUrl = (process.env.PREVIEW_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
 const serviceAccessToken = process.env.SERVICE_ACCESS_TOKEN ?? "";
 const allowedOrigin = process.env.ALLOWED_ORIGIN ?? "";
