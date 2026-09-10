@@ -370,3 +370,23 @@ export async function listChatSessions(userOpenId: string, limit = 500) {
 }
 
 export { ADMIN_EMAIL, isAdministratorEmail };
+
+export async function getUserIdForStripeCustomerId(stripeCustomerId: string): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  const result = await db
+    .select({ userId: billingSubscriptions.userId })
+    .from(billingSubscriptions)
+    .where(eq(billingSubscriptions.stripeCustomerId, stripeCustomerId))
+    .limit(1);
+  return result[0]?.userId ?? null;
+}
+
+export async function setBillingSubscriptionStatus(stripeSubscriptionId: string, status: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  await db
+    .update(billingSubscriptions)
+    .set({ status })
+    .where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId));
+}

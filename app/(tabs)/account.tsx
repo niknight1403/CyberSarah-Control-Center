@@ -17,8 +17,10 @@ export default function AccountScreen() {
   const loginMutation = trpc.account.login.useMutation();
   const logoutMutation = trpc.auth.logout.useMutation();
   const billingQuery = trpc.billing.status.useQuery(undefined, { enabled: Boolean(localUser) || Boolean(accountQuery.data), retry: false });
-  const checkoutMutation = trpc.billing.checkout.useMutation();
+  const checkoutMutation = trpc.billing.checkoutTier.useMutation();
   const portalMutation = trpc.billing.portal.useMutation();
+  const cancelMutation = trpc.billing.cancel.useMutation();
+  const invoicesQuery = trpc.billing.invoices.useQuery(undefined, { enabled: Boolean(localUser) || Boolean(accountQuery.data), retry: false });
 
   useEffect(() => {
     void Auth.getUserInfo().then(setLocalUser);
@@ -50,10 +52,10 @@ export default function AccountScreen() {
     }
   };
 
-  const openCheckout = async () => {
+  const openCheckout = async (tier: "lite" | "pro" | "expert") => {
     setMessage("");
     try {
-      const result = await checkoutMutation.mutateAsync();
+      const result = await checkoutMutation.mutateAsync({ tier });
       await Linking.openURL(result.url);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Der Live-Checkout konnte nicht geöffnet werden.");
@@ -91,7 +93,49 @@ export default function AccountScreen() {
           <Text style={styles.email}>{user.email || "Keine E-Mail-Adresse hinterlegt"}</Text>
           <View style={[styles.roleBadge, user.role === "admin" && styles.roleBadgeAdmin]}><Text style={styles.roleText}>{user.role === "admin" ? "ADMINISTRATOR · VOLLER ZUGRIFF" : "STANDARDZUGANG"}</Text></View>
           {user.role === "admin" ? <Text style={styles.adminCopy}>Alle Skills, Steuerungselemente und Administrationsfunktionen sind für dieses Konto freigeschaltet.</Text> : null}
-          <View style={styles.billingCard}><Text style={styles.billingTitle}>LIVE-ABRECHNUNG</Text><Text style={styles.billingCopy}>{billingQuery.data?.subscription ? `Status: ${billingQuery.data.subscription.status}${billingQuery.data.subscription.cancelAtPeriodEnd ? " · Kündigung vorgemerkt" : ""}` : "Noch kein aktives Abonnement"}</Text>{billingQuery.data?.subscription ? <TouchableOpacity disabled={portalMutation.isPending} onPress={() => void openPortal()} style={styles.billingButton}><Text style={styles.billingButtonText}>{portalMutation.isPending ? "Portal wird geöffnet …" : "Abonnement verwalten"}</Text></TouchableOpacity> : <TouchableOpacity disabled={checkoutMutation.isPending} onPress={() => void openCheckout()} style={styles.billingButton}><Text style={styles.billingButtonText}>{checkoutMutation.isPending ? "Checkout wird geöffnet …" : "Live-Abonnement starten"}</Text></TouchableOpacity>}</View>
+          <View style={styles.billingCard}>
+            <Text style={styles.billingTitle}>LIVE-ABRECHNUNG</Text>
+            <Text style={styles.billingCopy}>{billingQuery.data?.subscription ? `Stufe: ${billingQuery.data?.tierLabel ?? "Lite"} · Status: ${billingQuery.data.subscription.status}${billingQuery.data.subscription.cancelAtPeriodEnd ? " · Kündigung vorgemerkt" : ""}` : "Noch kein aktives Abonnement — Stufe wählen:"}</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+              {(["lite", "pro", "expert"] as const).map((tier) => (
+                <TouchableOpacity key={tier} disabled={checkoutMutation.isPending} onPress={() => void openCheckout(tier)} style={[styles.billingButton, { flex: 1, backgroundColor: billingQuery.data?.tier === tier ? "#4b5563" : undefined }]}>
+                  <Text style={styles.billingButtonText}>{checkoutMutation.isPending && checkoutMutation.variables?.tier === tier ? "…" : tier === "expert" ? "Expert" : tier === "pro" ? "Pro" : "Lite"}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {billingQuery.data?.subscription ? (
+              <>
+                <TouchableOpacity disabled={portalMutation.isPending || cancelMutation.isPending} onPress={() => void openPortal()} style={[styles.billingButton, { marginTop: 8 }]}>
+                  <Text style={styles.billingButtonText}>{portalMutation.isPending ? "Portal wird geöffnet …" : "Abonnement verwalten"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  disabled={cancelMutation.isPending || billingQuery.data.subscription.cancelAtPeriodEnd}
+                  onPress={async () => {
+                    try {
+                      await cancelMutation.mutateAsync();
+                      setMessage("Abonnement wird zum Periodenende gekündigt — im Portal widerrufbar.");
+                      await billingQuery.refetch();
+                    } catch (error) {
+                      setMessage(error instanceof Error ? error.message : "Die Kündigung ist fehlgeschlagen.");
+                    }
+                  }}
+                  style={[styles.billingButton, { marginTop: 8, opacity: billingQuery.data.subscription.cancelAtPeriodEnd ? 0.5 : 1 }]}
+                >
+                  <Text style={styles.billingButtonText}>{billingQuery.data.subscription.cancelAtPeriodEnd ? "Kündigung vorgemerkt" : "Zum Periodenende kündigen"}</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+            {(invoicesQuery.data?.invoices?.length ?? 0) > 0 ? (
+              <View style={{ marginTop: 10 }}>
+                <Text style={styles.billingCopy}>Rechnungen:</Text>
+                {invoicesQuery.data!.invoices.slice(0, 5).map((invoice) => (
+                  <TouchableOpacity key={invoice.id} disabled={!invoice.hostedInvoiceUrl} onPress={() => (invoice.hostedInvoiceUrl ? Linking.openURL(invoice.hostedInvoiceUrl) : undefined)} style={{ paddingVertical: 6 }}>
+                    <Text style={[styles.billingCopy, { color: "#9ca3af" }]}>{invoice.created ? new Date(invoice.created).toLocaleDateString("de-DE") : "—"} · {(invoice.amountTotal / 100).toFixed(2)} € · {invoice.status === "paid" ? "bezahlt" : invoice.status === "open" ? "offen" : "storniert"}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+          </View>
           <TouchableOpacity disabled={busy} onPress={() => void logout()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{busy ? "Abmeldung läuft …" : "Abmelden"}</Text></TouchableOpacity>
         </View> : <View style={styles.card}>
           <View style={styles.switchRow}><TouchableOpacity onPress={() => setMode("login")} style={[styles.switchButton, mode === "login" && styles.switchButtonActive]}><Text style={styles.switchText}>Login</Text></TouchableOpacity><TouchableOpacity onPress={() => setMode("register")} style={[styles.switchButton, mode === "register" && styles.switchButtonActive]}><Text style={styles.switchText}>Registrieren</Text></TouchableOpacity></View>
