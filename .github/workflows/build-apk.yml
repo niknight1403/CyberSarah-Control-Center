@@ -66,6 +66,33 @@ jobs:
           test -s "$APK" || { echo "APK fehlt: $APK"; exit 1; }
           ls -lh "$APK"
 
+      - name: Release-Signing-Keystore aus Secrets dekodieren
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cybersarah-release.keystore"
+          ls -l "$RUNNER_TEMP/cybersarah-release.keystore"
+
+      - name: Signierte Release-APK bauen (Gradle)
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -PcybersarahKeystorePath="$RUNNER_TEMP/cybersarah-release.keystore"
+
+      - name: Release-APK verifizieren (Signatur-Check mit apksigner)
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK" || { echo "Release-APK fehlt: $APK"; exit 1; }
+          ls -lh "$APK"
+          SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort | tail -1)"
+          "$APKSIGNER" verify --print-certs "$APK" | head -3
+          rm -f "$RUNNER_TEMP/cybersarah-release.keystore"
+
       - name: Release-AAB bauen (Google Play, R8-obfuskiert)
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon --stacktrace
@@ -84,15 +111,18 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk \
             "CyberSarah-ControlCenter-v${VERSION}-debug.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk \
+            "CyberSarah-ControlCenter-v${VERSION}-release.apk"
           TAG="v${VERSION}-apk"
           NOTES="Automatisierter Capacitor-Build aus Commit ${GITHUB_SHA::7}.
           Web-Export der CyberSarah-App als Android-Wrapper (com.cybersarah.controlcenter).
           Installation: Unbekannte Quellen erlauben und die APK oeffnen.
           Play-Store-AAB (R8-obfuskiert, unsigniert — Signierung ist Owner-Handoff) liegt als Workflow-Artefakt bereit."
+          APK_FILES="CyberSarah-ControlCenter-v${VERSION}-debug.apk CyberSarah-ControlCenter-v${VERSION}-release.apk"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "CyberSarah-ControlCenter-v${VERSION}-debug.apk" --clobber
+            gh release upload "$TAG" $APK_FILES --clobber
           else
-            gh release create "$TAG" "CyberSarah-ControlCenter-v${VERSION}-debug.apk" \
+            gh release create "$TAG" $APK_FILES \
               --title "CyberSarah Control Center v${VERSION} (Android APK)" \
               --notes "$NOTES"
           fi

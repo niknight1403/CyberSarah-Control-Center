@@ -16,12 +16,30 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Sprint 73: Release-Signierung. Keystore liegt NIE im Repo, sondern wird
+    // im CI-Runner aus GitHub-Secrets dekodiert (ANDROID_KEYSTORE_PATH etc.).
+    // Ohne diese ENV-Variablen (z. B. lokaler Build) bleibt der Release-Typ
+    // unsigniert — dann greift der bisherige Owner-Handoff.
+    signingConfigs {
+        release {
+            if (rootProject.hasProperty('cybersarahKeystorePath')) {
+                storeFile file(cybersarahKeystorePath)
+                storeType 'PKCS12'
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             // Sprint 72: R8-Obfuskierung aktiv (Google-Pay-Compliance).
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (rootProject.hasProperty('cybersarahKeystorePath')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
