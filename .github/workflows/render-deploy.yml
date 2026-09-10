@@ -51,7 +51,8 @@ jobs:
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
           OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
           WORKSPACE_SERVICE_URL: ${{ secrets.WORKSPACE_SERVICE_URL }}
-          WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN }}
+          # Fallback: gleiches Token wie der Workspace-Service selbst (SERVICE_ACCESS_TOKEN)
+          WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
         run: node scripts/render-deploy.mjs --migrate
