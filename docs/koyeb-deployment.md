@@ -220,6 +220,25 @@ Produktions-`.env`):
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
 Ohne beide läuft Billing im deaktivierten Modus — die App startet trotzdem.
 
-Hinweis: Der Workspace-Service (Dockerfile.koyeb) wird als separater
-Koyeb-Service in einem Folgeschritt angelegt (gleicher Ablauf, Port
-8787); für den Produktivbetrieb von Web + API ist er nicht erforderlich.
+## Workspace-Service separat deployen (--workspace)
+
+Der Workspace-Service (Git-/Preview-/Agent-Runtime, Port 8787) wird als
+eigene Koyeb-App deployt — für Web + API ist er nicht erforderlich:
+
+```bash
+KOYEB_TOKEN=<token> SERVICE_ACCESS_TOKEN=<secret> \
+  node scripts/koyeb-deploy.mjs --workspace --dry-run   # Request pruefen
+KOYEB_TOKEN=<token> SERVICE_ACCESS_TOKEN=<secret> \
+  node scripts/koyeb-deploy.mjs --workspace             # anlegen + patchen
+```
+
+- App-Name: `cybersarah-workspace` (überschreibbar via `KOYEB_WORKSPACE_APP_NAME`)
+- Health-Check: `GET /api/v1/health` — seit Sprint 52 bewusst **öffentlich**
+  (Antwort enthält keine Secrets; Koyeb-Health-Checks senden keinen
+  Bearer-Token — vorher hätte der Dienst nie Healthy erreicht)
+- Alle anderen Routes bleiben token-geschützt; ohne `SERVICE_ACCESS_TOKEN`
+  verweigert der Dienst in Produktion den Start (Fail-Fast im Skript)
+- Der Bootstrap-Workflow bietet `target: app | workspace` (workflow_dispatch)
+- **Persistentes Volume:** `WORKSPACES_DIR` liegt ohne Koyeb-Volume auf
+  ephemeraler Disk (Workspaces wären nach Redeploy weg) — Volume in der
+  Konsole anhängen (Owner-Schritt, siehe Koyeb-Doku „Volumes")

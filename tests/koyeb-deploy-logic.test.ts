@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAppCreateRequest,
   buildServiceEnv,
+  buildWorkspaceEnv,
   koyebApiError,
   maskSecrets,
   publicUrlFromApp,
@@ -196,5 +197,81 @@ describe("validateDatabaseUrl", () => {
   it("lehnt localhost fuer Koyeb-Einsatz ab", () => {
     expect(validateDatabaseUrl("postgresql://u:p@localhost:5432/cybersarah").ok).toBe(false);
     expect(validateDatabaseUrl("postgres://u:p@127.0.0.1/cybersarah").ok).toBe(false);
+  });
+});
+
+describe("buildWorkspaceEnv", () => {
+  const base = {
+    serviceAccessToken: "service-token-abc123",
+  };
+
+  it("verlangt SERVICE_ACCESS_TOKEN (Produktion startet sonst nicht)", () => {
+    expect(() => buildWorkspaceEnv({})).toThrow("SERVICE_ACCESS_TOKEN");
+    expect(() =>
+      buildWorkspaceEnv({ serviceAccessToken: "   " }),
+    ).toThrow("SERVICE_ACCESS_TOKEN");
+  });
+
+  it("baut ENV mit Pflicht-Token, Port 8787 und Optionals", () => {
+    const list = buildWorkspaceEnv({
+      ...base,
+      allowedOrigin: "https://app.cybersarah-ki.com",
+      previewPublicBaseUrl: "https://ws.example.com/preview",
+    });
+    expect(list).toContain("SERVICE_ACCESS_TOKEN=service-token-abc123");
+    expect(list).toContain("ALLOWED_ORIGIN=https://app.cybersarah-ki.com");
+    expect(list).toContain("PREVIEW_PUBLIC_BASE_URL=https://ws.example.com/preview");
+    expect(list).toContain("NODE_ENV=production");
+    expect(list).toContain("PORT=8787");
+  });
+
+  it("ohne Optionals nur Pflicht-ENV, mit Zeilenumbruch-Schutz", () => {
+    const list = buildWorkspaceEnv(base);
+    expect(list.some((zeile) => zeile.startsWith("ALLOWED_ORIGIN"))).toBe(false);
+    expect(() =>
+      buildWorkspaceEnv({ ...base, extra: ["KEY=wert\ninjektion"] }),
+    ).toThrow("Zeilenumbrueche");
+  });
+});
+
+describe("buildAppCreateRequest healthCheckPath", () => {
+  it("nutzt /api/health als Default", () => {
+    const body = buildAppCreateRequest({ appName: "cybersarah", envList: [] });
+    expect(body.services[0].definition.health_checks).toEqual([
+      { type: "http", port: 8000, path: "/api/health" },
+    ]);
+  });
+
+  it("erlaubt Workspace-Health-Check auf /api/v1/health mit Port 8787", () => {
+    const body = buildAppCreateRequest({
+      appName: "cybersarah-workspace",
+      serviceName: "workspace",
+      port: 8787,
+      healthCheckPath: "/api/v1/health",
+      envList: ["NODE_ENV=production"],
+    });
+    const service = body.services[0];
+    expect(service.name).toBe("workspace");
+    expect(service.definition.ports).toEqual([{ port: 8787, protocol: "http" }]);
+    expect(service.definition.health_checks).toEqual([
+      { type: "http", port: 8787, path: "/api/v1/health" },
+    ]);
+  });
+});
+
+describe("maskSecrets (Workspace-Env)", () => {
+  it("maskiert SERVICE_ACCESS_TOKEN und andere Token-ENVs", () => {
+    const text = JSON.stringify([
+      "SERVICE_ACCESS_TOKEN=super-geheim-123",
+      "METRICS_TOKEN=abc",
+      "JWT_SECRET=def",
+      "NODE_ENV=production",
+    ]);
+    const masked = maskSecrets(text);
+    expect(masked).toContain("SERVICE_ACCESS_TOKEN=***");
+    expect(masked).toContain("METRICS_TOKEN=***");
+    expect(masked).toContain("JWT_SECRET=***");
+    expect(masked).toContain("NODE_ENV=production");
+    expect(masked).not.toContain("super-geheim-123");
   });
 });

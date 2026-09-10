@@ -7,6 +7,14 @@ name: Koyeb Bootstrap
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Was soll deployt werden?'
+        type: choice
+        options:
+          - app
+          - workspace
+        default: app
 
 jobs:
   deploy:
@@ -29,7 +37,8 @@ jobs:
           npm run check
           npm test
 
-      - name: Auf Koyeb deployen (Migrationen + App + Health-Check)
+      - name: Auf Koyeb deployen (App, Migrationen + Health-Check)
+        if: inputs.target == 'app'
         env:
           KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -42,3 +51,10 @@ jobs:
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
         run: node scripts/koyeb-deploy.mjs --migrate
+
+      - name: Workspace-Service auf Koyeb deployen (Port 8787)
+        if: inputs.target == 'workspace'
+        env:
+          KOYEB_TOKEN: ${{ secrets.KOYEB_TOKEN }}
+          SERVICE_ACCESS_TOKEN: ${{ secrets.SERVICE_ACCESS_TOKEN }}
+        run: node scripts/koyeb-deploy.mjs --workspace

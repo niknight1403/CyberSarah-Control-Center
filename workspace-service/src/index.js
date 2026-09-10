@@ -457,7 +457,9 @@ app.use(
   }),
 );
 
-app.get("/api/v1/health", requireServiceAuthorization, (_request, response) => {
+// Health-Check bewusst oeffentlich (keine Secrets in der Antwort):
+// Platform-Health-Checks (z. B. Koyeb) senden keinen Bearer-Token.
+app.get("/api/v1/health", (_request, response) => {
   response.json({ status: "ready", version: "1.0.0", previewUrl: publicBaseUrl || undefined });
 });
 

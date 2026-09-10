@@ -20,6 +20,7 @@ import { spawnSync } from "node:child_process";
 import {
   buildAppCreateRequest,
   buildServiceEnv,
+  buildWorkspaceEnv,
   koyebApiError,
   maskSecrets,
   publicUrlFromApp,
@@ -31,6 +32,7 @@ const API = "https://app.koyeb.com";
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 const migrate = args.has("--migrate");
+const workspace = args.has("--workspace");
 
 function env(name, fallback) {
   const value = process.env[name];
@@ -76,10 +78,82 @@ async function waitForHealthy(appId, timeoutMs = 15 * 60 * 1000) {
   throw new Error("Timeout beim Warten auf Healthy (15 Minuten).");
 }
 
-async function verifyPublic(url) {
-  const health = await fetch(`${url}/api/health`);
-  if (!health.ok) throw new Error(`/api/health antwortet ${health.status}`);
-  log(`/api/health: ${health.status} OK`);
+async function verifyPublic(url, healthPath = "/api/health") {
+  const health = await fetch(`${url}${healthPath}`);
+  if (!health.ok) throw new Error(`${healthPath} antwortet ${health.status}`);
+  log(`${healthPath}: ${health.status} OK`);
+}
+
+async function deployWorkspace() {
+  const appName = env("KOYEB_WORKSPACE_APP_NAME", "cybersarah-workspace");
+  const region = env("KOYEB_REGION", "fra");
+  const instanceType = env("KOYEB_INSTANCE_TYPE", "free");
+  const serviceAccessToken = env("SERVICE_ACCESS_TOKEN", "");
+  if (!serviceAccessToken) {
+    console.error(
+      "[koyeb-deploy] SERVICE_ACCESS_TOKEN fehlt — der Workspace-Service verweigert in Produktion ohne Token den Start.",
+    );
+    process.exit(2);
+  }
+
+  const buildEnv = (allowedOrigin, previewUrl) =>
+    buildWorkspaceEnv({
+      serviceAccessToken,
+      allowedOrigin,
+      previewPublicBaseUrl: previewUrl,
+    });
+
+  const requestBody = buildAppCreateRequest({
+    appName,
+    serviceName: "workspace",
+    port: 8787,
+    healthCheckPath: "/api/v1/health",
+    region,
+    instanceType,
+    envList: buildEnv(
+      env("KOYEB_ALLOWED_ORIGINS", `https://${appName}.koyeb.app`),
+      "",
+    ),
+  });
+
+  if (dryRun) {
+    console.log(maskSecrets(JSON.stringify(requestBody, null, 2)));
+    log("Dry-Run: keine Ressourcen angelegt, Secrets maskiert.");
+    return;
+  }
+
+  log(`Lege Workspace-App "${appName}" an …`);
+  const created = await apiFetch("/v1/apps", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+  log(`App angelegt: ${created.id}`);
+
+  const app = await waitForHealthy(created.id);
+  const publicUrl = publicUrlFromApp(app);
+  if (!publicUrl) throw new Error("Keine oeffentliche Domain gefunden.");
+  log(`Oeffentliche Workspace-URL: ${publicUrl}`);
+
+  const service = app.services?.[0];
+  log("Patche ENV mit echter Domain …");
+  await apiFetch(`/v1/services/${service.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      definition: {
+        ...service.definition,
+        env: buildEnv(
+          `${publicUrl},https://app.cybersarah-ki.com`,
+          `${publicUrl}/preview`,
+        ),
+      },
+    }),
+  });
+  await waitForHealthy(created.id);
+  await verifyPublic(publicUrl, "/api/v1/health");
+  log(`Workspace-Deployment abgeschlossen: ${publicUrl}`);
+  log(
+    "Hinweis: WORKSPACES_DIR liegt ohne Koyeb-Volume auf ephemeraler Disk — Volume in der Konsole anhaengen (Owner-Schritt).",
+  );
 }
 
 async function main() {
@@ -89,6 +163,8 @@ async function main() {
     process.exit(2);
   }
   log("Token-Format gueltig.");
+
+  if (workspace) return deployWorkspace();
 
   const databaseUrl = env("DATABASE_URL");
   if (!databaseUrl) {
