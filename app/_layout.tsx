@@ -43,6 +43,14 @@ export default function RootLayout() {
     initManusRuntime();
   }, []);
 
+  // Sprint 73 DIAGNOSE-Build: Signal an das Diagnose-Overlay im +html.tsx,
+  // dass React erfolgreich gemountet hat (WebView-Diagnose weisser Screen).
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      (window as unknown as { __csMounted?: boolean }).__csMounted = true;
+    }
+  }, []);
+
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
     setFrame(metrics.frame);
