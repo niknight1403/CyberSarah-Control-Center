@@ -37,6 +37,17 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
+    // Kotlin >= 1.8 hat die jdk7/jdk8-Klassen in kotlin-stdlib integriert;
+    // alte 1.6.21-Transitives erzeugen "Duplicate class"-Fehler beim
+    // checkDebugDuplicateClasses-Task (Capacitor-v7-Standardfix).
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22") {
+            because("kotlin-stdlib 1.8.22 enthaelt die jdk7-Klassen")
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22") {
+            because("kotlin-stdlib 1.8.22 enthaelt die jdk8-Klassen")
+        }
+    }
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
