@@ -3,9 +3,10 @@
  * ueber lib/ops-overview-logic.ts. Admin-geschuetzt, tokenfreie Meldungen.
  */
 import { buildOpsOverview, type OpsCheckInput } from "../lib/ops-overview-logic";
-import { checkDatabaseHealth } from "./db";
+import { checkDatabaseHealth, tableRowCounts } from "./db";
 import { adminProcedure, router } from "./_core/trpc";
 import { resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
+import { buildBackupManifest } from "../lib/db-backup-manifest-logic";
 
 const WORKSPACE_PROBE_TIMEOUT_MS = 3_000;
 
@@ -73,5 +74,13 @@ export const opsRouter = router({
     ];
 
     return buildOpsOverview(inputs);
+  }),
+  backupManifest: adminProcedure.query(async () => {
+    const tableCounts = await tableRowCounts();
+    return buildBackupManifest({
+      label: process.env.DB_LABEL || "production",
+      tableCounts,
+      generatedAt: new Date(),
+    });
   }),
 });

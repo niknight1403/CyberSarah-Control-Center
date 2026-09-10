@@ -339,6 +339,29 @@ export async function listChatMessages(
   return rows;
 }
 
+/** Exakte Zeilenzahlen aller Projekttabellen (Sprint 60) — Basis fuer das
+ * Backup-Manifest. Bewusst count(*) je Tabelle statt pg_stat-Approximationen:
+ * Ein Manifest muss ohne ANALYZE korrekt sein. Tabellennamen stammen aus
+ * information_schema (kein Identifier-Injection-Risiko durch Nutzereingaben). */
+export async function tableRowCounts(): Promise<Record<string, number>> {
+  const db = await getDb();
+  if (!db) return {};
+  const rows = await db.execute(sql`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+    ORDER BY table_name
+  `);
+  const result: Record<string, number> = {};
+  for (const row of rows.rows ?? []) {
+    const tableName = String(row.table_name);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tableName)) continue;
+    const counted = await db.execute(sql.raw(`SELECT count(*)::int AS n FROM "${tableName}"`));
+    result[tableName] = Number(counted.rows?.[0]?.n) || 0;
+  }
+  return result;
+}
+
 /** Sitzungsuebersicht eines Nutzers (Sprint 57) — Logik in lib/chat-session-logic.ts. */
 export async function listChatSessions(userOpenId: string, limit = 500) {
   const messages = await listChatMessages(userOpenId, limit);
