@@ -47,11 +47,11 @@ jobs:
       - name: Capacitor-Sync (Web-Assets → Android)
         run: npx cap sync android
 
-      - name: JDK 17 einrichten
+      - name: JDK 21 einrichten
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Gradle-Berechtigungen korrigieren
         run: chmod +x android/gradlew
