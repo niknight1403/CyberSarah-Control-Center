@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
+import { describeNetworkFailure, parseSuccessfulResponse } from "../api-response-logic";
 
 type ApiResponse<T> = {
   data?: T;
@@ -55,14 +56,18 @@ export async function apiCall<T>(
     }
 
     const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      const data = await response.json();
-      return data as T;
+    const bodyText = await response.text();
+    // Sprint 72: Nie blind JSON.parse — HTML-Fallbacks (Proxy/SPA) und
+    // Netzwerkfehler werden als klare Meldung statt SyntaxError ausgeliefert.
+    const parsed = parseSuccessfulResponse<T>(response.status, contentType, bodyText);
+    if (!parsed.ok) {
+      throw new Error(parsed.error);
     }
-
-    const text = await response.text();
-    return (text ? JSON.parse(text) : {}) as T;
+    return parsed.data;
   } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(describeNetworkFailure(error, url));
+    }
     if (error instanceof Error) {
       throw error;
     }

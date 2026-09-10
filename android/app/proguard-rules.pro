@@ -1,21 +1,20 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# CyberSarah Control Center — R8/ProGuard-Regeln (Sprint 72)
+# Capacitor-Wrapper um einen Expo-Web-Export (WebView-App).
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Stack-Trace-Analyse: Zeilennummern behalten, Quellnamen kürzen.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# AndroidX/WebView: JS-Bridge und generierte Klassen nicht wegoptimieren.
+-keep class * extends android.webkit.WebViewClient { *; }
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Capacitor: Plugin-Registry per Reflexion — Klassen und Konstruktoren behalten.
+-keep class com.getcapacitor.** { *; }
+-dontwarn com.getcapacitor.**
+
+# Kotlin-Metadaten (Capacitor nutzt Kotlin-Plugins) nicht entfernen.
+-keepattributes KotlinMetadata, RuntimeVisibleAnnotations,AnnotationDefault
+-dontwarn org.jetbrains.annotations.**

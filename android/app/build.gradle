@@ -18,7 +18,9 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            // Sprint 72: R8-Obfuskierung aktiv (Google-Pay-Compliance).
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

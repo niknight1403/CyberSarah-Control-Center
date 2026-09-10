@@ -66,6 +66,17 @@ jobs:
           test -s "$APK" || { echo "APK fehlt: $APK"; exit 1; }
           ls -lh "$APK"
 
+      - name: Release-AAB bauen (Google Play, R8-obfuskiert)
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: AAB verifizieren und als Workflow-Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: CyberSarah-ControlCenter-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
       - name: APK umbenennen und Release veroeffentlichen
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,7 +87,8 @@ jobs:
           TAG="v${VERSION}-apk"
           NOTES="Automatisierter Capacitor-Build aus Commit ${GITHUB_SHA::7}.
           Web-Export der CyberSarah-App als Android-Wrapper (com.cybersarah.controlcenter).
-          Installation: Unbekannte Quellen erlauben und die APK oeffnen."
+          Installation: Unbekannte Quellen erlauben und die APK oeffnen.
+          Play-Store-AAB (R8-obfuskiert, unsigniert — Signierung ist Owner-Handoff) liegt als Workflow-Artefakt bereit."
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "CyberSarah-ControlCenter-v${VERSION}-debug.apk" --clobber
           else
