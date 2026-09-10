@@ -33,9 +33,17 @@ android {
     }
     buildTypes {
         release {
-            // Sprint 72: R8-Obfuskierung aktiv (Google-Pay-Compliance).
-            minifyEnabled true
-            shrinkResources true
+            // Sprint 73 HOTFIX: R8 vorlaeufig deaktiviert. Ursache fuer den
+            // weissen Screen bei Erstinstallation der signierten Release-APK:
+            // sehr wahrscheinlich eine von R8 wegoptimierte, per Reflexion
+            // von Capacitor benoetigte Klasse (kein Cordova-Plugin im Projekt,
+            // Kandidat: AndroidX-WebView-Kompat-Klassen). Bisher lief NIE ein
+            // R8-minifizierter Build auf einem echten Geraet (nur Debug-APK
+            // und AAB, letzteres nie direkt installiert). Nach Bestaetigung,
+            // dass die App ohne R8 startet, folgt ein gezielter Re-Enable mit
+            // ausfuehrlicheren -keep-Regeln plus Geraetetest vor Rollout.
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (rootProject.hasProperty('cybersarahKeystorePath')) {
                 signingConfig signingConfigs.release
