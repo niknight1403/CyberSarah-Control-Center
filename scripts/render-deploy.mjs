@@ -63,6 +63,27 @@ function log(message) {
   console.log(`[render-deploy] ${maskSecrets(message)}`);
 }
 
+let cachedOwnerId = null;
+
+/** Liefert die Render-Workspace-ID (ownerId) fuer POST /v1/services. */
+async function resolveOwnerId() {
+  if (cachedOwnerId) return cachedOwnerId;
+  const envOwner = env("RENDER_OWNER_ID", "");
+  const owners = await apiFetch("/owners?limit=20");
+  const list = Array.isArray(owners) ? owners.map((entry) => entry.owner ?? entry) : [];
+  const match =
+    (envOwner && list.find((owner) => owner?.id === envOwner)) ||
+    list.find((owner) => owner?.type === "individual" || owner?.type === "personal") ||
+    list[0];
+  if (!match?.id) {
+    console.error("[render-deploy] Kein Render-Owner gefunden — RENDER_API_KEY pruefen.");
+    process.exit(2);
+  }
+  cachedOwnerId = match.id;
+  log(`Render-Owner: ${match.id} (${match.name ?? match.type ?? "unbekannt"})`);
+  return cachedOwnerId;
+}
+
 async function listServices() {
   const data = await apiFetch("/services?limit=100&type=web_service");
   return Array.isArray(data) ? data.map((entry) => entry.service ?? entry) : [];
@@ -125,7 +146,7 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
     log(`Lege Service "${serviceName}" an …`);
     const created = await apiFetch("/services", {
       method: "POST",
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({ ...requestBody, ownerId: await resolveOwnerId() }),
     });
     service = created.service ?? created;
     log(`Service angelegt: ${service.id}`);

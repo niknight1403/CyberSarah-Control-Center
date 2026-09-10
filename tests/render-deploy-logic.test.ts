@@ -217,3 +217,20 @@ describe("render-deploy-logic: Workspace-CORS & Render-Proxy (Sprint 73)", () =>
     expect(lines).toContain("WORKSPACE_SERVICE_TOKEN=service-token");
   });
 });
+
+describe("render-deploy-logic: ownerId im Create-Request (Sprint 73)", () => {
+  it("uebernimmt ownerId in den Service-Create-Body", () => {
+    const body = buildServiceCreateRequest({
+      serviceName: "cybersarah-workspace",
+      ownerId: "usr-abc123",
+      rootDir: "workspace-service",
+      healthCheckPath: "/api/v1/health",
+    });
+    expect(body.ownerId).toBe("usr-abc123");
+  });
+
+  it("laesst ownerId weg, wenn nicht gesetzt (Abwaertskompatibilitaet)", () => {
+    const body = buildServiceCreateRequest({ serviceName: "cybersarah-workspace" });
+    expect(body.ownerId).toBeUndefined();
+  });
+});
