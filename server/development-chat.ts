@@ -2,6 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { insertChatTurn, listChatMessages, listChatSessions } from "./db";
 import { sanitizeSessionId } from "../lib/chat-session-logic";
 import {
+  DEFAULT_DAILY_CHAT_LIMIT,
+  countMessagesToday,
+  evaluateChatQuota,
+} from "../lib/chat-quota-logic";
+import {
   buildChatExport,
   type ExportSession,
 } from "../lib/chat-export-logic";
@@ -239,6 +244,26 @@ export const developmentChatRouter = router({
   send: protectedProcedure
     .input(chatInputSchema)
     .mutation(async ({ input, ctx }) => {
+      // Sprint 59: Fair-Use-Tagesquote aus der persistenten Historie
+      // (Admins ausgenommen) — schuetzt vor unbegrenzter Chat-Nutzung.
+      try {
+        const recentMessages = await listChatMessages(ctx.user.openId, 500);
+        const usedToday = countMessagesToday(recentMessages, new Date());
+        const quota = evaluateChatQuota(
+          {
+            dailyLimit: Number(process.env.DAILY_CHAT_LIMIT) || DEFAULT_DAILY_CHAT_LIMIT,
+            role: ctx.user.role,
+          },
+          usedToday,
+          new Date(),
+        );
+        if (!quota.allowed) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: quota.reason ?? "Tageslimit erreicht." });
+        }
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.warn("[developmentChat] Quotenpruefung uebersprungen:", error);
+      }
       const result = await handleDevelopmentChat(input);
       // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
       // Persistenzfehler brechen die Chat-Antwort nicht ab).
