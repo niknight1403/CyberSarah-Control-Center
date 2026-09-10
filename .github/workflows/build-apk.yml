@@ -43,6 +43,11 @@ jobs:
 
       - name: Expo-Web-Export (web-dist)
         run: EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo export -p web --output-dir web-dist
+        env:
+          # Sprint 73: API-Basis-URL explizit zur Build-Zzeit einbrennen.
+          # Zuvor leer -> Code fiel auf DEFAULT_API_BASE_URL zurueck; explizit
+          # gesetzt schliesst Tippfehler/Fallback-Probleme kuenftig aus.
+          EXPO_PUBLIC_API_BASE_URL: https://app.cybersarah-ki.com
 
       - name: Capacitor-Sync (Web-Assets → Android)
         run: npx cap sync android
