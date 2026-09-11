@@ -76,9 +76,8 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 ### Sprint 75 — Responsive Layout (Modul 1, Teil 2) — ERLEDIGT (11.09.2026)
 - Umgesetzt: Breakpoints in `lib/viewport-logic.ts` (Tablet 768px, Desktop 1200px), `AppSidebar` (Design-Theme-aware, Rail-Modus ab 1100px) ersetzt auf breiten Web-Viewports die Bottom-Tabs; aktives Item per Pfad-Präfix aufgelöst. 4 Tests.
 
-### Sprint 76 — Loop Engineering & Selbstheilung (Modul 2)
-- Ist-Basis: `retry-backoff-logic.ts` (dynamischer Backoff), `managed-llm-fallback-logic.ts`, `provider-error-logic.ts`.
-- Ziel: Endlos-Schleifen-Erkennung mit Rekursions-/Iterationstiefen-Cap je Agent-Ziel, Konvergenz-Messung (Ziel-Nähe je Schritt), Fehler-Selbstheilungskette mit Eskalationsstufen; Metriken in der Ops-Ansicht.
+### Sprint 76 — Loop Engineering & Selbstheilung (Modul 2) — ERLEDIGT (11.09.2026)
+- Umgesetzt: `lib/loop-engineering-logic.ts` — Iterations-Cap (Standard 40), Signatur-basierte Schleifen-Erkennung, Konvergenz-Auswertung über Fortschrittsfenster (Ziel 0.95, Mindestdelta 0.02) und Selbstheilungs-Eskalationsleiter (retry mit deterministischem Backoff → Strategiewechsel → Eskalation → harte Abbruchkante). 8 Tests.
 
 ### Sprint 77 — Ziel-Zerlegung & Ausführungsgraphen (Modul 2)
 - Ziel-Dekomposition in Ausfuehrungsgraphen (DAG) mit Schrittstatus, Abhaengigkeiten, Wiederanlauf; Chat-Entwicklungsfenster: Streaming-Ausgabe mit Syntax-Highlighting, Diff-Viewer, Terminal-Vorschau mit Freigabe-Ausloesung (bestehende Diff-/Proposal-Logik aufnehmen: `file-diff-logic.ts`, `proposal-queue-logic.ts`).
