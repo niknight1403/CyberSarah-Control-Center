@@ -469,12 +469,17 @@ export async function listUserInvoices(user: BillingUser) {
 export async function getBillingOverview(user: BillingUser) {
   const subscription = await db.getBillingSubscriptionForUser(user.id);
   const env = process.env as Record<string, string | undefined>;
-  const tier = subscription?.stripePriceId
-    ? tierFromPriceId(subscription.stripePriceId, env)
-    : "lite";
+  const adminGranted = user.role === "admin";
+  const tier = adminGranted
+    ? "expert"
+    : subscription?.stripePriceId
+      ? tierFromPriceId(subscription.stripePriceId, env)
+      : "lite";
+
   return {
     subscription: subscription ?? null,
     customerConfigured: Boolean(user.stripeCustomerId),
+    adminGranted,
     tier,
     tierLabel: tier === "expert" ? "Expert" : tier === "pro" ? "Pro" : "Lite",
     entitlements: entitlementsForRole(user.role, tier),

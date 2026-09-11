@@ -32,6 +32,12 @@ export const billingRouter = router({
   checkoutTier: protectedProcedure
     .input(z.object({ tier: z.enum(SUBSCRIPTION_TIERS) }))
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role === "admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Der Expert-Zugang ist für Administratoren bereits dauerhaft aktiv.",
+        });
+      }
       try {
         return await createTierCheckoutSession(
           {
@@ -50,6 +56,12 @@ export const billingRouter = router({
 
   /** Sprint 70 — Kuendung zum Periodenende (widerrufbar bis Periodenende). */
   cancel: protectedProcedure.mutation(async ({ ctx }) => {
+    if (ctx.user.role === "admin") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Administratorzugänge benötigen keine Kündigung.",
+      });
+    }
     try {
       return await cancelUserSubscription({
         id: ctx.user.id,
@@ -65,6 +77,9 @@ export const billingRouter = router({
 
   /** Sprint 70 — Rechnungshistorie (Stripe-Invoices als Nachweis). */
   invoices: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role === "admin") {
+      return { invoices: [] };
+    }
     try {
       return await listUserInvoices({
         id: ctx.user.id,
@@ -84,6 +99,12 @@ export const billingRouter = router({
     .query(({ input }) => evaluateRequestedTierChange(input.current, input.requested)),
 
   portal: protectedProcedure.mutation(async ({ ctx }) => {
+    if (ctx.user.role === "admin") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Administratorzugänge benötigen kein Stripe-Kundenportal.",
+      });
+    }
     try {
       return await createLiveBillingPortalSession({ stripeCustomerId: ctx.user.stripeCustomerId });
     } catch (error) {
