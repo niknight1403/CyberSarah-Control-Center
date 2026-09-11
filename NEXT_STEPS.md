@@ -73,9 +73,8 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 - Theme-Switcher in den Einstellungen ("Darstellung") und im Dev-Theme-Lab; Persistenz via AsyncStorage; Palette UND Effekt-Tokens (Glow, Glas-Blur, Gradient) schalten global.
 - Reine Logik in `lib/design-theme-logic.ts` + `lib/_core/design-theme-palettes.ts` (ohne react-native-Kette, vitest-tauglich), 7 neue Tests.
 
-### Sprint 75 — Responsive Layout (Modul 1, Teil 2)
-- Ist: Mobile Tab-Navigation unten. Ziel: Auf breiten Viewports (Tablet/Desktop) eine Sidebar-/Drawer-Navigation; Breakpoints via CSS-Media-Queries, ohne Navigation-Rewrite (expo-router Tabs bleiben).
-- Vorbereitung: Theme-Lab/Navigation-Werkzeuge pruefen, ScreenContainer-Breakpoint-Variante.
+### Sprint 75 — Responsive Layout (Modul 1, Teil 2) — ERLEDIGT (11.09.2026)
+- Umgesetzt: Breakpoints in `lib/viewport-logic.ts` (Tablet 768px, Desktop 1200px), `AppSidebar` (Design-Theme-aware, Rail-Modus ab 1100px) ersetzt auf breiten Web-Viewports die Bottom-Tabs; aktives Item per Pfad-Präfix aufgelöst. 4 Tests.
 
 ### Sprint 76 — Loop Engineering & Selbstheilung (Modul 2)
 - Ist-Basis: `retry-backoff-logic.ts` (dynamischer Backoff), `managed-llm-fallback-logic.ts`, `provider-error-logic.ts`.

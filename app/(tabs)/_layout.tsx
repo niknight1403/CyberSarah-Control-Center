@@ -2,23 +2,30 @@ import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HapticTab } from "@/components/haptic-tab";
+import { AppSidebar } from "@/components/responsive/app-sidebar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Platform } from "react-native";
+import { Platform, View, useWindowDimensions } from "react-native";
 import { useColors } from "@/hooks/use-colors";
+import { isWideViewport } from "@/lib/viewport-logic";
 
 export default function TabLayout() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const wide = Platform.OS === "web" && isWideViewport(width);
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
   return (
-    <Tabs
+    <View style={{ flex: 1, flexDirection: wide ? "row" : "column" }}>
+      {wide ? <AppSidebar /> : null}
+      <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.tint,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
+          display: wide ? "none" : "flex",
           paddingTop: 8,
           paddingBottom: bottomPadding,
           height: tabBarHeight,
@@ -70,6 +77,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => <IconSymbol size={25} name="person.crop.circle" color={color} />,
           }}
         />
-    </Tabs>
+      </Tabs>
+    </View>
   );
 }
