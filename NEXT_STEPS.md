@@ -94,9 +94,9 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 - Ist-Basis: GitHub-PAT-Verbindung (Settings, Repository-Sync), `stripe-webhook-logic.ts` mit `customer.subscription.updated`/`checkout.session.completed`, `subscription-tiers-logic.ts`, `usage-budget-logic.ts` (Token-Metering).
 - Umgesetzt: `lib/github-integration-logic.ts` — OAuth-URL-Bau mit CSRF-State-Schutz und Callback-Validierung, PAT-Plausibilitaetspruefung und Maskierung, Branch-Namen-Ableitung (kebab-case) und -Validierung, PR-Payload-Bau mit Datei-Uebersicht, Webhook-Reducer (push/PR opened/PR merged, robust gegen ungueltige Payloads). `lib/stripe-metering-logic.ts` — checkout.session.completed/expired-Abbildung auf Subscription-Aktivierung (Tier-Validierung gegen SUBSCRIPTION_TIERS), nutzungsbasiertes Token-Metering (Buchungs-Ledger, Zeitfenster-Aggregation je Modell, Kosten in Cent), Checkout-Session-Request-Bau mit Price-ID/HTTPS/E-Mail-Validierung. 9 Tests.
 
-### Sprint 81 — RBAC-Tiers & Elite/Admin-Override (Modul 5)
+### Sprint 81 — RBAC-Tiers & Elite/Admin-Override (Modul 5) — ERLEDIGT (11.09.2026)
 - Ist-Basis: `subscription-tiers-logic.ts` (Free/Pro-Struktur), `feature-flag-logic.ts`, Admin-Role (`account.me.role === "admin"`).
-- Ziel: Tier-Modell Free/Pro/Developer Max/Elite; Override-Mechanismus (Caps, Rate-Limits, Feature-Gates umgehen) NUR serverseitig pruefen; Admin-Dashboard: Subscription-Verwaltung, Token-Quote-Overrides, globale Key-Pool-Konfiguration.
+- Umgesetzt: `lib/access-control-logic.ts` — Rollen-Tiers free/pro/developer-max/elite (Abbildung vom Abo-Tier lite/pro/expert; Owner/Admin → elite), monotone Feature-Gates, Quota-Caps und Rate-Limits je Tier, Admin-Quota-Override (nur Anhebung, nie Senkung), `enforceServerAccess` als Server-Enforcementpunkt fuer tRPC-Router. Admin-Dashboard `app/admin.tsx` (Guard ueber admin.dashboard-Gate): Subscription-Verwaltung, Cap-Uebersicht, Quota-Override-Formulare. 7 Tests.
 
 ### Sprint 82 — Programm-Abschluss
 - Gesamtregression (tsc, Vitest, Build, Service-Syntax, Secret-Scan), Redaktion des Changelogs, Release-Handoff und Abschlussbericht in `docs/`.
