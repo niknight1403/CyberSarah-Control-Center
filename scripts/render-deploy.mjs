@@ -329,8 +329,10 @@ const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
     await waitForLive(service.id, patchBeforeDeployId);
   }
 
-  await verifyPublic(publicUrl, "/api/health");
-  log(`Deployment abgeschlossen: ${publicUrl} (Web + API)`);
+  const verifiedPublicUrl = configuredPublicUrl || publicUrl;
+
+  await verifyPublic(verifiedPublicUrl, "/api/health");
+  log(`Deployment abgeschlossen: ${verifiedPublicUrl} (Web + API)`);
   log("Naechste Schritte: Custom Domain app.cybersarah-ki.com (Phase 5).");
 }
 
