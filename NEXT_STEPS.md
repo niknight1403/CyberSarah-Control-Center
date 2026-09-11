@@ -79,8 +79,8 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 ### Sprint 76 — Loop Engineering & Selbstheilung (Modul 2) — ERLEDIGT (11.09.2026)
 - Umgesetzt: `lib/loop-engineering-logic.ts` — Iterations-Cap (Standard 40), Signatur-basierte Schleifen-Erkennung, Konvergenz-Auswertung über Fortschrittsfenster (Ziel 0.95, Mindestdelta 0.02) und Selbstheilungs-Eskalationsleiter (retry mit deterministischem Backoff → Strategiewechsel → Eskalation → harte Abbruchkante). 8 Tests.
 
-### Sprint 77 — Ziel-Zerlegung & Ausführungsgraphen (Modul 2)
-- Ziel-Dekomposition in Ausfuehrungsgraphen (DAG) mit Schrittstatus, Abhaengigkeiten, Wiederanlauf; Chat-Entwicklungsfenster: Streaming-Ausgabe mit Syntax-Highlighting, Diff-Viewer, Terminal-Vorschau mit Freigabe-Ausloesung (bestehende Diff-/Proposal-Logik aufnehmen: `file-diff-logic.ts`, `proposal-queue-logic.ts`).
+### Sprint 77 — Ziel-Zerlegung & Ausführungsgraphen (Modul 2) — ERLEDIGT (11.09.2026)
+- Umgesetzt: `lib/goal-graph-logic.ts` (DAG-Zerlegung, Kahn-Topologie mit Zykluserkennung, Schritt-Zustandsmaschine mit Abhaengigkeits-Validierung, Fortschritts-/Blockiert-Erkennung, wiederanlaufbar) und `lib/syntax-highlight-logic.ts` + `lib/prompt-optimization-logic.ts`. Komponenten: DiffViewer (syntax-highlighted, auf file-diff-logic aufbauend), StreamingOutput (Chunk-Akkumulation, Cursor), TerminalPreview (Human-in-the-Loop-Ausloesung, Status-Lebenzyklus), SystemContextInspector. 14 Tests.
 
 ### Sprint 78 — API-Key-Rotation & Failover (Modul 3)
 - Ist-Basis: `provider-key-logic.ts`, `provider-latency-logic.ts`, `provider-status-logic.ts`, `audit-rotation-logic.ts`, `model-router-logic.ts`.
