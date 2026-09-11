@@ -1,5 +1,7 @@
 # CyberSarah Control Center — Nächste geplante Schritte
 
+Stand: 2026-09-11 — **Sprints 42–51 sind abgeschlossen.** Abschluss und Regression: `docs/SPRINT_42_51_ABSCHLUSSBERICHT.md`. Offen bleibt die Owner-Entscheidung zum Prebuild-Konflikt (`android/` vs. `app.config.ts`).
+
 Stand: 2026-09-06 (nach Abschluss der Sprints 32–41, Commit `bba1724`)
 
 Diese Datei dokumentiert die geplante Weiterentwicklung nach Sprint 41. Die Sprints 42–51 schließen an die etablierte Arbeitsweise an: Jeder Sprint wird separat umgesetzt, getestet und committet. Im Vordergrund steht jetzt die Anbindung der in Sprint 32–40 entstandenen Logic-Module (`usage-budget`, `chat-compression`, `conflict-resolution`, `proposal-queue`, `change-snapshot`, `audit-rotation`, `provider-latency`, `changelog`, `retry-backoff`) an die bestehende Oberfläche und Infrastruktur.
