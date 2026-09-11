@@ -16,10 +16,8 @@ import {
   buildChatExport,
   type ExportSession,
 } from "../lib/chat-export-logic";
-import {
-  buildPersistableTurn,
-  toDisplayHistory,
-} from "../lib/chat-history-logic";
+import { buildPersistableTurn } from "../lib/chat-history-logic";
+import { compressPersistedChatHistory } from "../lib/chat-compression-logic";
 import { z } from "zod";
 import { invokeLLM, type Message } from "./_core/llm";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -255,6 +253,16 @@ async function callProvider(provider: ProviderId, messages: ChatMessage[], model
   return callOpenAICompatibleProvider(provider, messages, model);
 }
 
+/**
+ * Sprint 50 — konfigurierbare Obergrenze der Chat-Verlaufskompression
+ * (CHAT_COMPRESSION_MAX_MESSAGES). Ungueltige Werte fallen deterministisch
+ * auf den Standard von 60 Nachrichten zurueck.
+ */
+function getChatCompressionLimit(): number {
+  const parsed = Number(process.env.CHAT_COMPRESSION_MAX_MESSAGES);
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 60;
+}
+
 export const developmentChatRouter = router({
   providers: protectedProcedure.query(() => ({
     providers: [
@@ -343,8 +351,12 @@ export const developmentChatRouter = router({
       }),
     )
     .query(async ({ input, ctx }) =>
-      toDisplayHistory(
+      // Sprint 50: Gespeicherte Entwicklungschats werden beim Überschreiten
+      // konfigurierbarer Grenzen deterministisch komprimiert; der stabile
+      // Verdauungseintrag (Anzahl + FNV-1a-Hash) wird mitgeliefert.
+      compressPersistedChatHistory(
         await listChatMessages(ctx.user.openId, input.limit, input.sessionId),
+        { maxMessages: getChatCompressionLimit() },
       ),
     ),
   sessions: protectedProcedure

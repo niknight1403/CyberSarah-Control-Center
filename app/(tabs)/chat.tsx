@@ -108,7 +108,7 @@ export default function ChatScreen() {
     { retry: false },
   );
   useEffect(() => {
-    const rows = serverHistoryQuery.data;
+    const rows = serverHistoryQuery.data?.messages;
     if (!rows?.length) return;
     setMessages((current) => {
       if (current.some((message) => message.role === "user")) return current;

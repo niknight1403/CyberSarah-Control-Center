@@ -71,3 +71,86 @@ export function fnv1aHash(input: string): string {
   }
   return hash.toString(16).padStart(8, "0");
 }
+
+// --- Sprint 50: Kompression der gespeicherten Verlaufspersistenz ---
+
+export type PersistedChatRow = {
+  id: number;
+  role: string;
+  content: string;
+  provider?: string | null;
+  createdAt: string | Date;
+};
+
+export type CompressedDisplayMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  provider: string | null;
+  createdAt: string;
+};
+
+export type CompressedDisplayHistory = {
+  messages: CompressedDisplayMessage[];
+  digest: NonNullable<CompressedChatHistory["digest"]> | null;
+};
+
+/**
+ * Komprimiert die gespeicherten Entwicklungschats deterministisch: Die
+ * Zeilen werden nach ID aufsteigend sortiert (die Datenbank liefert DESC),
+ * auf Chat-Nachrichten abgebildet und mit der konfigurierten Grenze
+ * komprimiert. Der Verdauungseintrag (Anzahl, stabiler FNV-1a-Hash,
+ * Zusammenfassung) bleibt dabei fuer identische Inhalte reproduzierbar —
+ * unabhaengig von der Reihenfolge der Eingabezeilen. Ungueltige Zeilen
+ * (unbekannte Rolle, leerer Inhalt) werden verworfen.
+ */
+export function compressPersistedChatHistory(rows: unknown, config: CompressionConfig): CompressedDisplayHistory {
+  if (!Array.isArray(rows)) {
+    throw new Error("Persistierte Zeilen muessen ein Array sein.");
+  }
+  const ascending: PersistedChatRow[] = (rows as PersistedChatRow[])
+    .filter(
+      (row) =>
+        row !== null &&
+        typeof row === "object" &&
+        Number.isFinite(row.id) &&
+        (row.role === "user" || row.role === "assistant") &&
+        typeof row.content === "string" &&
+        row.content.trim() !== "",
+    )
+    .sort((a, b) => a.id - b.id);
+
+  const mapped = new Map<string, PersistedChatRow>();
+  const messages: ChatMessage[] = ascending.map((row) => {
+    const key = `chat-${row.id}`;
+    const timestampMs =
+      row.createdAt instanceof Date
+        ? row.createdAt.getTime()
+        : Number.isFinite(Date.parse(String(row.createdAt)))
+          ? Date.parse(String(row.createdAt))
+          : 0;
+    mapped.set(key, row);
+    return { id: key, role: row.role as "user" | "assistant", content: row.content, timestampMs };
+  });
+
+  const { kept, digest } = compressChatHistory(messages, config);
+  return {
+    messages: kept.flatMap((message) => {
+      const row = mapped.get(message.id);
+      if (!row) return [];
+      return [
+        {
+          id: row.id,
+          role: message.role as "user" | "assistant",
+          content: message.content,
+          provider: typeof row.provider === "string" ? row.provider : null,
+          createdAt:
+            row.createdAt instanceof Date
+              ? row.createdAt.toISOString()
+              : String(row.createdAt),
+        },
+      ];
+    }),
+    digest,
+  };
+}
