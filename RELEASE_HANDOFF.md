@@ -2,34 +2,44 @@
 
 ## Status
 
-Der Release-Kandidat ist für den Android-Publish vorbereitet. Die App ist portrait-orientiert konfiguriert, verwendet das Branding **CyberSarah Control Center** und enthält die Void-Dark-Oberfläche, SecureStore-Key-Verwaltung, lokale Provider-Endpoints, Cloud-Key-Verbindungstests, Agenten-Fallback, Repository-Workflows und tokenfreies Audit-Logging.
+Release **1.3.0** ist gebaut und veröffentlicht. Die App ist portrait-orientiert konfiguriert, verwendet das Branding **CyberSarah Control Center** und enthält die Void-Dark-Oberfläche, SecureStore-Key-Verwaltung, lokale Provider-Endpoints, Cloud-Key-Verbindungstests, Agenten-Fallback, Repository-Workflows und tokenfreies Audit-Logging. Play-Store-Vorbereitung (Listing, Data-Safety, Screenshot-Gerüst) liegt aus Sprint 83 vor (siehe `PLAY_STORE_BEREITSCHAFT.md`).
 
-## Validierung
+## APK-Erzeugung (aktuell)
 
-| Prüfung | Ergebnis |
+Der Android-Build läuft **nicht mehr über EAS**, sondern vollständig auf GitHub Actions über den Workflow `build-apk.yml` (Expo-Web-Export → Capacitor → Gradle). Er wird manuell per `workflow_dispatch` angestoßen:
+
+- **Start:** GitHub → Repo → *Actions* → **Build Android APK** → *Run workflow* → Branch `main`, optional `version_name` (Standard aus `app.config.ts`, aktuell 1.3.0).
+- **Letzter erfolgreicher Lauf:** Run #26 (ID 34612205152) auf `main`, Commit `3eacddb`, 11.09.2026 — per `workflow_dispatch`, Status `success`.
+- **Ergebnis:** GitHub-Release [`v1.3.0-apk`](https://github.com/niknight1403/CyberSarah-Control-Center/releases/tag/v1.3.0-apk) mit `CyberSarah-ControlCenter-v1.3.0-release.apk` (signiert, 5.8 MB) und `CyberSarah-ControlCenter-v1.3.0-debug.apk` (7.0 MB); das Play-Store-AAB (`CyberSarah-ControlCenter-aab`, 5.5 MB, R8-obfuskiert, unsigniert — Signierung ist Owner-Handoff) liegt als Workflow-Artefakt bereit.
+- **Kein EAS-Kontingent mehr nötig:** Da der Build nicht über EAS läuft, blockiert das ausgeschöpfte EAS-Free-Tier-Kontingent die APK-Erzeugung nicht mehr.
+
+## Manuelle Voraussetzungen (transparent)
+
+| Voraussetzung | Status / Handlung |
 |---|---|
-| TypeScript `pnpm check` | Erfolgreich |
-| Vitest `pnpm test` | 65 bestanden, 1 Auth-Test übersprungen |
-| Workspace-Service-Syntax | Erfolgreich mit `node --check` |
-| Server-Build `pnpm build` | Erfolgreich |
-| Expo-Konfiguration | SDK 54, Portrait, Android-Paket und Branding aufgelöst |
-| GitHub-CI | Letzter geprüfter Lauf erfolgreich auf `next-development` |
-| Mobile UI | Settings- und Workspace-Flows auf Portrait-Viewport geprüft |
-
-## APK-Erzeugung
-
-Der Android-Build wird ausschließlich über die **Publish-Schaltfläche** der Management-Oberfläche gestartet. Der aktuelle Projektstand muss zuerst als Checkpoint vorliegen. Danach in der Management-Oberfläche **Publish** wählen, den Android-Build anstoßen und das erzeugte APK-Artefakt über den dort angezeigten Download-Link abrufen. Ein manueller APK-Build im Sandbox-Terminal wird nicht ausgeführt, damit der verwaltete Build-Prozess und seine Ressourcenlimits eingehalten werden.
+| EXPO_TOKEN / EAS-Build | **Nicht mehr erforderlich** — seit der Capacitor-Gradle-Pipeline (`build-apk.yml`) läuft der Build auf GitHub Actions ohne EAS. |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | Muss als GitHub-Repo-Secrets vorhanden sein (für die signierte Release-APK). Sind gesetzt — der erfolgreiche Release-APK-Build inkl. `apksigner`-Signaturprüfung bestätigt das. |
+| Workflow-Start | `workflow_dispatch` auf `build-apk.yml`, Branch `main`. Kein weiterer Token nötig (`GH_TOKEN` ist in GitHub Actions eingebaut). |
+| Echter Android-Gerätetest | **Offener Owner-Schritt** — siehe unten. |
+| Play-Store-Einreichung | Service-Account außerhalb des Repos (siehe unten), `PLAY_STORE_EINREICHUNG.sh` vorbereitet. |
 
 ## Google-Play-Service-Account
 
-Die Play-Store-Einreichung verwendet den Service-Account `play-uploader@cybersarah-revenue-os.iam.gserviceaccount.com` (Projekt `cybersarah-revenue-os`). Der zugehörige Projektschlüssel (JSON mit privatem Schlüssel) ist ein Geheimnis und darf **niemals** im Repository abgelegt werden — `.gitignore` blockt die gängigen Dateinamen und `PLAY_STORE_EINREICHUNG.sh` prüft vor jeder Einreichung, dass kein privater Schlüssel im Repo liegt.
+Die Play-Store-Einreichung verwendet den Service-Account `play-uploader@cybersarah-revenue-os.iam.gserviceaccount.com` (Projekt `cybersarah-revenue-os`). Der zugehörige Projektschlüssel (JSON mit privatem Schlüssel) ist ein Geheimnis und darf **niemals** im Repository abgelegt werden — `.gitignore` blockt die gängigen Dateinamen und `PLAY_STORE_EINREICHUNG.sh` prüft vor jeder Einreichung, dass kein privater Schlüssel im Repo liegt. Für die Einreichung wird der Schlüssel ausschließlich lokal außerhalb des Repos bereitgestellt.
 
-Für den manuellen EAS-Submit wird der Schlüssel ausschließlich außerhalb des Repos bereitgestellt: als lokale Schlüsseldatei, die über den `serviceAccountKeyPath` der Submit-Konfiguration bzw. die zugehörige EAS-Option referenziert wird, oder als EAS-Geheimnis. `eas.json` reicht die Produktionseinreichung bereits in den internen Test-Track (`submit.production.android.track: "internal"`).
+## Realgerät-Test (offener Owner-Handoff)
 
-## Realgerät-Test
+Installation der signierten `CyberSarah-ControlCenter-v1.3.0-release.apk`:
 
-Nach dem APK-Download die App auf einem Android-Gerät installieren und nacheinander den Workspace-Service, einen Cloud-Key sowie einen LAN- oder VPN-Endpoint für Ollama beziehungsweise LM Studio testen. Für lokale Provider darf nicht automatisch `127.0.0.1` verwendet werden, wenn der Modellserver auf einem anderen Rechner läuft. In diesem Fall ist die erreichbare LAN-, VPN- oder Tailscale-Adresse einzutragen.
+1. APK vom Release `v1.3.0-apk` herunterladen (nicht die Debug-Variante).
+2. Auf dem Android-Gerät *Einstellungen → Apps → Spezialzugriff → Unbekannte Quellen* (bzw. *Apps aus unbekannten Quellen installieren*) für den Browser/Dateimanager erlauben.
+3. APK öffnen und installieren; bei Play-Protect-Warnung *Trotzdem installieren* wählen (Erstsignierung ist nicht Play-verifiziert).
+4. Beim ersten Start nacheinander testen:
+   - Workspace-Service-Verbindung (Health/Ready-Status in den Einstellungen).
+   - Einen Cloud-Key (OpenAI, Gemini oder OpenRouter) hinterlegen und den Verbindungstest ausführen.
+   - Einen LAN-, VPN- oder Tailscale-Endpoint für Ollama beziehungsweise LM Studio. Für lokale Provider darf nicht automatisch `127.0.0.1` verwendet werden, wenn der Modellserver auf einem anderen Rechner läuft — dann die erreichbare LAN-, VPN- oder Tailscale-Adresse eintragen.
+5. Ergebnis in der todo.md abhaken (letzter offener Punkt).
 
 ## GitHub
 
-Der Zielstand wird zum Repository `niknight1403/CyberSarah-Control-Center` gepusht. Sensible SecureStore-Werte und API-Keys werden nicht in Git committed. Die GitHub-Actions sollen nach dem Push erneut den CI-Lauf und die tokenfreien Audit-Ereignisse prüfen.
+Der Zielstand wird zum Repository `niknight1403/CyberSarah-Control-Center` (`main`) gepusht. Sensible SecureStore-Werte und API-Keys werden nicht in Git committed. Nach jedem Push den CI-Lauf und die tokenfreien Audit-Ereignisse prüfen; APK-Builds nur nach grüner CI anstoßen.

@@ -74,9 +74,9 @@
 - [x] Verbindungstests ohne Token-Leaks deterministisch validieren.
 - [x] Nächsten CyberSarah-Control-Center-Release vollständig validieren.
 - [x] Release-Checkpoint für die Veröffentlichung erstellen.
-- [ ] Veröffentlichung und Android-APK über die Publish-Oberfläche anstoßen.
+- [x] Veröffentlichung und Android-APK anstoßen — Build-APK-Workflow (Expo-Web-Export → Capacitor → Gradle) per workflow_dispatch erfolgreich, GitHub-Release v1.3.0-apk mit signierter Release-APK (5.8 MB) und Debug-APK (7.0 MB) veröffentlicht (Run #26, Commit 3eacddb, 11.09.2026).
 - [x] Verbundenes Ziel-Repository prüfen und für den Release-Workflow vorbereiten.
-- [ ] Android-Release für einen echten Geräte-Test vorbereiten und Publish-Handoff dokumentieren.
+- [x] Android-Release für den Geräte-Test vorbereiten und Publish-Handoff in RELEASE_HANDOFF.md dokumentieren — v1.3.0-Release-APK bereit, Installations- und Testschritte dokumentiert; der echte Geräte-Test selbst ist Owner-Handoff (siehe offener Punkt unten).
 - [x] Release-Benachrichtigungen für relevante Statusänderungen ergänzen.
 - [x] GitHub-Ziel `Niknight1403/CyberSarah Control Center` verifizieren und auf einen gültigen Repository-Namen abbilden.
 - [x] Aktuellen Release-Stand in das verifizierte Zielrepository pushen.
@@ -88,7 +88,7 @@
 - [x] Neuen Entwicklungsbranch aus `main` erstellen, zum Remote pushen und verifizieren.
 - [x] Aufgaben- und Issue-Übersicht für `next-development` aus GitHub und dem lokalen Projektregister erstellen.
 - [x] todo.md mit dem tatsächlichen Projektstand abgleichen und veraltete offene Punkte korrigieren.
-- [ ] Android-APK-Erstellung über die Publish-Oberfläche anstoßen und den Build-Handoff abschließen.
+- [x] Android-APK-Erstellung anstoßen und Build-Handoff abschließen — durch denselben erfolgreichen Build-APK-Lauf abgedeckt (Run #26).
 - [x] Media-Picker-, SecureStore- und Push-Benachrichtigungsabstraktionen mit deterministischen Tests absichern.
 - [x] CI/CD-Release-Benachrichtigungen, strukturiertes Logging und Audit-Protokollierung ergänzen.
 - [x] Release-Stand für den Publish-Handoff final validieren.
@@ -104,7 +104,7 @@
 - [x] Finalen Release-Commit erstellen und einen Publish-bereiten Checkpoint speichern.
 - [x] Visuelle Anzeige für lokale KI, Cloud-Provider und aktiven Fallback in der Benutzeroberfläche ergänzen.
 - [x] Neueste CyberSarah-Control-Center-Änderungen zum verbundenen GitHub-Repository pushen und Remote-Stand verifizieren.
-- [ ] Android-APK-Erstellung für CyberSarah Control Center über Publish anstoßen und den Installations-Handoff übergeben.
+- [x] Android-APK-Erstellung anstoßen und Installations-Handoff übergeben — Installations-Handoff in RELEASE_HANDOFF.md dokumentiert (APK-Auswahl, Unbekannte-Quellen-Freigabe, Test-Checkliste).
 - [x] Publish-Hinweis „nicht gepackte Änderungen“ diagnostizieren, Release-Stand checkpointen und APK-Handoff verifizieren.
 - [x] Einstellungsseite zur sicheren Verwaltung maskierter KI-Provider-API-Keys ergänzen.
 - [x] Provider-Keys je KI-Anbieter in den Einstellungen unabhängig anzeigen, speichern, maskieren und löschen
@@ -162,10 +162,10 @@
 - [x] Sprint 31: Gesamt-Regression, Preflight, Secret-Scan, Build und Git-Status in sauberer Umgebung ausführen.
 - [x] Veralteten Flutter-APK-Workflow nicht als Expo-APK-Workflow verwenden; tatsächlichen EAS-Workflow prüfen und korrigieren, falls erforderlich.
 - [x] GitHub-Push, Release und APK-Action nur nach grüner Validierung und ohne unzulässige Secrets ausführen.
-- [ ] Manuelle Voraussetzungen wie EXPO_TOKEN, EAS-Build, echter Android-Gerätetest und Publish-Oberfläche transparent dokumentieren.
+- [x] Manuelle Voraussetzungen transparent dokumentieren — in RELEASE_HANDOFF.md festgehalten: EAS/EXPO_TOKEN werden seit der Capacitor-Gradle-Pipeline nicht mehr benötigt; erforderlich sind nur die Android-Keystore-Secrets im Repo, der GitHub-Actions-Lauf selbst sowie der echte Geräte-Test als Owner-Schritt.
 - [x] Quellengebundener Abschlussbericht mit Commit-, Run- und Release-Status erstellen.
 - [x] EAS-APK-Action nach belegtem Free-Tier-Buildkontingent auf manuelle workflow_dispatch-Ausführung umstellen und die Einschränkung im Release-Handoff berücksichtigen.
-- [ ] APK-Erstellungsprozess über den Expo/EAS-Workflow per workflow_dispatch starten und Build-Status sowie APK-Artefakt verifizieren.
+- [x] APK-Erstellungsprozess per workflow_dispatch starten und Build-Status sowie Artefakte verifizieren — Run #26 (34612205152) auf main erfolgreich; Release-Assets v1.3.0-apk und AAB-Artefakt (5.5 MB, nicht abgelaufen) am 12.09.2026 verifiziert.
 - [x] workflow_dispatch-Lauf `33980785566` auf `main` gestartet und Ergebnis geprüft; EAS blockiert den Android-Build wegen ausgeschöpftem Free-Tier-Kontingent.
 - [x] Vollständige Projektübergabe beziehungsweise Eigentumsbestätigung für den GitHub-Benutzer Niknight1403 prüfen und dokumentieren.
 
@@ -225,3 +225,5 @@
 - [x] Sprint 70 (Stripe-Tier-System): Dreistufiges Abonnement (Lite/Pro/Expert) voll integriert — lib/subscription-tiers-logic (Stufen, Preis-IDs, Entitlements, Upgrade-/Downgrade-Entscheidung, Admin-Superadmin) + lib/stripe-webhook-logic (Event->Effekt-Abbildung, Status-Normalisierung, Preis-Extraktion) mit 15 deterministischen Tests. Server: createTierCheckoutSession je Stufe, cancelUserSubscription (Periodenende, widerrufbar), listUserInvoices, getBillingOverview (Tier aus stripePriceId, Entitlements Server+Client identisch). Webhook-Handler auf Pure-Logik umgestellt (duplizierte Route entfernt, bestehende RAW-Body-Route mit Signaturpruefung bleibt die eine Quelle). tRPC: checkoutTier/cancel/invoices/evaluateTierChange/portal/status. Account-UI: Stufen-Auswahl, Kündigung, Rechnungshistorie. 431/431 Tests gruen, tsc & build clean.
 - [x] Sprint 71 (Autonomer Modell-Router & Superagent-Briefing): lib/model-router-logic.ts — reine Router-Logik: Provider-Universum (11 Router-Provider, ohne "auto"), Auftrags-Klassifikation (TaskType code/reasoning/ui/chat + Komplexitaet light/medium/heavy), Qualitaets-Scores je Provider, autonome Cooldowns bei Fehlern/Timeouts/Rate-Limits mit failover-sicherer Reihenfolge (16 deterministische Tests). server/model-router.ts: Health-Tracking ueber alle Endpoints, persistente Router-Konfiguration in neuer modelRouterSettings-Tabelle (Migration 0003_wonderful_black_bolt.sql, jsonb-KV, Boot-Restore via restoreRouterState in _core/index.ts), getRouterSnapshot und probeLocalProviders (aktiver Ollama/LM-Studio-Ping). server/development-chat.ts: handleAutoRoutedChat — bei provider "auto" (nur Admin, Rolle wird aus ctx.user.role gereicht) entscheidet der RouterAuftrag + health, mit Fallback-Kette; Superagent-Briefing kontextualisiert komplexe Auftraege mit echten Systemdaten (classifyRuntimeState, Laufzeit-Logs, Workspace-/Repository-/Preview-Zustand; lib/superagent-brief-logic.ts, 6 Tests); Result.route dokumentiert Entscheidung (TaskType, Komplexitaet, versuchte Provider, Gruende). tRPC: routerStatus/setPreferredOrder/probeLocalProviders admin-geschuetzt, providers-Liste mit "Autonomer Superagent / Auto-Router" an oberster Stelle. UI: lib/use-admin-auto-router.ts aktiviert "auto" idempotent fuer Admins in Settings/Agent/Chat; Provider-Profil zeigt Status-Indikator "Autonomes Routing aktiv", manuelle Provider-Wahl ist fuer Admins gesperrt; "auto" in providerDefaults/Labels/Key-Status integriert (provider-key-logic, provider-status-logic, studio-settings-logic). 451/451 Tests gruen (20 neue), tsc sauber.
 - [x] Sprint 72 (API-Fehlerbehebung & Play-Store-Build): lib/api-response-logic.ts — behebt die beiden gemeldeten Fehlerklassen clientseitig und deterministisch: (1) "Unexpected token '<', <!DOCTYPE…" — apiCall in lib/_core/api.ts nutzt jetzt parseSuccessfulResponse statt blindem JSON.parse; HTML-/Proxy-Antworten auf 2xx ergeben eine klare Meldung ("Server-URL prüfen"), (2) "Failed to fetch" — TypeErrors werden via describeNetworkFailure in eine handlungsleitende Meldung mit Ziel-URL uebersetzt (6 deterministische Tests). Server-Routing war bereits Sprint-69-gehaertet und wurde runtime-verifiziert: Boot ohne DB, GET/POST auf unbekannten /api-Pfaden liefern JSON 404 mit Content-Type application/json (nie HTML), /api/health gruen. Android Play-Store-Build: android/app/build.gradle release buildType auf minifyEnabled true + shrinkResources true (R8-Obfuskierung), android/app/proguard-rules.pro mit WebView/JS-Bridge-, Capacitor-Reflexion- und Kotlin-Metadaten-Keep-Regeln, .github/workflows/build-apk.yml um bundleRelease erweitert — das unsignierte Play-AAB (Signierung bleibt Owner-Handoff) wird als Workflow-Artefakt CyberSarah-ControlCenter-aab hochgeladen und im Release vermerkt. Bestands-Verifikation (Master-Prompt-Punkte bereits gruen): Ollama/LM-Studio-Endpoints vordefiniert (studio-settings-logic), Workspace-Autosetup mit Standard-Repo CyberSarah-revenue-os/main (Sprint 69 v2), Session-Restore ueber SecureStore (Auth.getSessionToken/getUserInfo, account.tsx restore + apiCall Bearer-Header), ADMIN_EMAIL-Default niko.oeben@gmail.com erhaelt automatisch Rolle admin bei Register/Login (server/db.ts), Stripe-Tiers (Sprint 70), Auto-Router (Sprint 71), Branch-Konsolidierung auf nur main (gleicher Tag). Offline-Fallback existiert (lib/offline-action-logic), Kauf-Wiederherstellung entspricht der Stripe-Architektur dem billing.status-Refetch beim Login. 457/457 Tests gruen (6 neue), tsc sauber, Laufzeit-Checks gruen.
+
+- [ ] Echten Android-Gerätetest mit der signierten CyberSarah-ControlCenter-v1.3.0-release.apk durchführen (Owner-Handoff — Installations- und Testschritte in RELEASE_HANDOFF.md).
