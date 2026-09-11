@@ -82,9 +82,9 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 ### Sprint 77 — Ziel-Zerlegung & Ausführungsgraphen (Modul 2) — ERLEDIGT (11.09.2026)
 - Umgesetzt: `lib/goal-graph-logic.ts` (DAG-Zerlegung, Kahn-Topologie mit Zykluserkennung, Schritt-Zustandsmaschine mit Abhaengigkeits-Validierung, Fortschritts-/Blockiert-Erkennung, wiederanlaufbar) und `lib/syntax-highlight-logic.ts` + `lib/prompt-optimization-logic.ts`. Komponenten: DiffViewer (syntax-highlighted, auf file-diff-logic aufbauend), StreamingOutput (Chunk-Akkumulation, Cursor), TerminalPreview (Human-in-the-Loop-Ausloesung, Status-Lebenzyklus), SystemContextInspector. 14 Tests.
 
-### Sprint 78 — API-Key-Rotation & Failover (Modul 3)
+### Sprint 78 — API-Key-Rotation & Failover (Modul 3) — ERLEDIGT (11.09.2026)
 - Ist-Basis: `provider-key-logic.ts`, `provider-latency-logic.ts`, `provider-status-logic.ts`, `audit-rotation-logic.ts`, `model-router-logic.ts`.
-- Ziel: Quota-/429-Tracking je Key, Kontext-erhaltender Failover auf den naechsten gesunden Key, Kostengewichtete Modell-Tier-Auswahl im Router; Tests mit simulierten 429/Latenz-Szenarien.
+- Umgesetzt: `lib/key-rotation-logic.ts` — Key-Pool mit Health-Score (Latenz, Restguthaben), 429-Cooldown mit automatischer Freigabe, 402/403/Leerguthaben → exhausted, deterministischer Failover (Provider-Filter, Hoechst-Score, stabiler Tie-Break), `rotateOnFailure` traegt den Ausfuehrungskontext mit (Rotation-Report). Kostengewichtetes Modell-Tier-Routing (mini/standard/flagship) je Task-Klasse aus model-router-logic. 7 Tests mit simulierten 429/Latenz-Szenarien.
 
 ### Sprint 79 — MCP-Client & Connector-Registry (Modul 4, Teil 1)
 - Ist-Basis: `connector-preferences-logic.ts`, `skill-preferences-logic.ts`.
