@@ -31,9 +31,11 @@ export const API_BASE_URL = env.apiBaseUrl || DEFAULT_API_BASE_URL;
  * live backend and never falls back to localhost or a test IP.
  */
 export function getApiBaseUrl(): string {
-  // If API_BASE_URL is set, use it
-  if (API_BASE_URL) {
-    return API_BASE_URL.replace(/\/$/, "");
+  // Eine explizite Build-Konfiguration hat Vorrang.
+  // Im gehosteten Web leitet die App ohne Override dagegen von der
+  // aktuellen Browser-Domain auf ihre eigene API ab.
+  if (env.apiBaseUrl) {
+    return env.apiBaseUrl.replace(/\/$/, "");
   }
 
   // On web, derive from the current preview host when no explicit API URL is configured.
