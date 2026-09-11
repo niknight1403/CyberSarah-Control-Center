@@ -39,9 +39,9 @@ Error: Failed to get the SHA-1 for: node_modules/react-native-css-interop/.cache
 | `expo-doctor` | ✅ 20/21 (1 bewusst akzeptierter CNG-Befund, siehe Abschnitt 1) |
 | Expo-Web-Export | ✅ `web-dist`, 7,3 MB, inkl. `index.html`, `favicon.ico`, `metadata.json` |
 | `cap sync android` (CLI v8, Node 22) | ✅ copy + update ohne Fehler |
-| Gradle-Release-APK | ⏭ in der CI (`build-apk.yml`, workflow_dispatch) — lokale Sandbox hat kein Android-SDK; Pipeline ist identisch vorbereitet |
+| Gradle-Release-APK | ✅ in der CI verifiziert (Run 34603375200 auf `0e06f3d`, 4,5 min): Web-Export, Capacitor-Sync und Gradle-Build auf SDK 57 erfolgreich; Artefakt `CyberSarah-ControlCenter-aab` (5,8 MB, Release-AAB). Erster Lauf schlug mit TS2882 fehl — Ursache war das gitignore'de `expo-env.d.ts` (TypeScript 6 verlangt die Typdeklaration; die Datei referenziert `expo/types`, das die CSS-Modul-Deklarationen liefert). Fix: `expo-env.d.ts` wird committet statt ignoriert (`0e06f3d`) |
 
 ## 5. Offene Punkte
 
-- Der naechste `build-apk.yml`-Lauf (manuell getriggert) validiert die signierte Release-APK auf SDK 57 inkl. Gradle — Ergebnis dort pruefen.
+- ~~Der naechste `build-apk.yml`-Lauf~~ Erledigt: Der Release-AAB-Build auf SDK 57 ist verifiziert (11.09.2026).
 - NativeWind v4.2.6 ist die letzte v4-Stable (v5 nur Preview); falls Expo kuenftige SDKs Metro erneut aendern, ist ein Umstieg auf NativeWind v5 zu planen.
