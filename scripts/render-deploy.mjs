@@ -291,7 +291,7 @@ const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
     buildServiceEnv({
       databaseUrl: dbCheck.url,
       appBaseUrl: baseUrl,
-      allowedOrigins: `${baseUrl},https://app.cybersarah-ki.com,https://www.cybersarah-ki.com`,
+      allowedOrigins: `${baseUrl},https://app.cybersarah-ki.com,https://www.cybersarah-ki.com,https://localhost,http://localhost,capacitor://localhost`,
       jwtSecret,
       metricsToken: env("METRICS_TOKEN"),
       openAiApiKey: env("OPENAI_API_KEY"),
