@@ -39,11 +39,40 @@ die Verbindung mit `pg`. `mysql2` ist aus den Abhängigkeiten entfernt.
 
 ## Phase 3 — Datenmigration
 
-1. `mysqldump` der Produktiv-DB `cybersarah` (users, billingSubscriptions)
-   auf dem VPS (manuelles Handoff-Kommando).
-2. Konvertierung nach PostgreSQL und Import in die Neon-Datenbank
-   (Agent übernimmt Konvertierung und Import-SQL gegen den Neon-Endpoint).
-3. Gegenprüfung: Datensatzzahlen pro Tabelle identisch.
+1. `mysqldump` der Produktiv-DB `cybersarah` (users, billingSubscriptions,
+   chatMessages, modelRouterSettings) auf dem VPS (manuelles Handoff-Kommando,
+   unten). Die Dump-Datei wird dem Agenten über den Chat übergeben (nie in
+   das öffentliche Repo committen).
+2. Konvertierung nach PostgreSQL und Import in die Neon-Datenbank über
+   `scripts/import-mysql-dump.mjs` (Agent führt aus). Das Skript läuft über
+   SQL-over-HTTPS (`@neondatabase/serverless`) und funktioniert damit auch aus
+   HTTPS-only-Umgebungen. Idempotent (`ON CONFLICT DO NOTHING`), mappt
+   snake_case/camelCase-Spalten, setzt Defaults für NOT-NULL-Spalten, die in
+   älteren MySQL-Schemata fehlen, und prüft abschließend die Zeilenzahlen.
+3. Gegenprüfung: Datensatzzahlen pro Tabelle identisch (im Skript eingebaut).
+
+Handoff-Kommando auf dem VPS (liest die Zugangsdaten aus der App-.env):
+
+```bash
+cd /opt/cybersarah-control-center && python3 -c "
+import re, subprocess, sys
+url = [l for l in open('.env') if l.startswith('DATABASE_URL=')][0].split('=',1)[1].strip()
+m = re.match(r'mysql://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(\w+)', url)
+u, p, h, port, db = m.groups()
+cmd = ['mysqldump', '-u'+u, '-p'+p, '-h'+h] + (['-P'+port] if port else []) + \
+      ['--no-create-info', '--skip-extended-insert', '--hex-blob', '--skip-comments', db]
+r = subprocess.run(cmd, capture_output=True, text=True)
+open('/tmp/cybersarah-data.sql','w').write(r.stdout)
+print('Dump:', len(r.stdout), 'Bytes ->', '/tmp/cybersarah-data.sql', file=sys.stderr)
+print(r.stderr, file=sys.stderr)
+"
+```
+
+Import auf Agenten-Seite (Dump im Chat erhalten):
+
+```bash
+DATABASE_URL="$NEON_DATABASE_URL" node scripts/import-mysql-dump.mjs <dump-datei>.sql
+```
 
 ## Phase 4 — Render-Dienste
 
