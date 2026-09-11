@@ -10,3 +10,14 @@ export {
   type ColorScheme,
   type ThemeColorPalette,
 } from "@/lib/_core/theme";
+
+export {
+  DesignPalette,
+  type DesignThemeDefinition,
+  type DesignThemeEffects,
+  resolveDesignEffects,
+  resolveDesignPalette,
+  resolveDesignRuntimePalette,
+  effectCssVariables,
+} from "@/lib/_core/design-theme-palettes";
+export { type DesignTheme } from "@/lib/design-theme-logic";

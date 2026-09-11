@@ -64,6 +64,47 @@ Priorisierte Liste mit Status-Badge, Priorität und Ablaufdatum; abgelaufene Vor
 
 Akzeptanzkriterium (unverändert): Agenten-Vorschläge erscheinen priorisiert mit Zustand, Ablaufdatum und Duplikatschutz; Zustandsübergänge folgen der geprüften Zustandsmaschine.
 
+## Autonomie- und Erweiterungsprogramm (Modul 1–5, ab Sprint 74)
+
+Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aenderungen separat). Bestehende Logik wird erweitert, nicht neu gebaut — die Roadmap vermerkt den Ist-Zustand je Modul.
+
+### Sprint 74 — Design-System & Multi-Theme-Engine (Modul 1) — ERLEDIGT (11.09.2026)
+- Drei vollwertige Design-Themes: "Cyber Neon" (Obsidian-Dark, Cyan-/Magenta-Glow), "Enterprise Slate" (helles Profi-Layout), "Glas-Modern" (transluzente Flaechen, Blur, Gradients).
+- Theme-Switcher in den Einstellungen ("Darstellung") und im Dev-Theme-Lab; Persistenz via AsyncStorage; Palette UND Effekt-Tokens (Glow, Glas-Blur, Gradient) schalten global.
+- Reine Logik in `lib/design-theme-logic.ts` + `lib/_core/design-theme-palettes.ts` (ohne react-native-Kette, vitest-tauglich), 7 neue Tests.
+
+### Sprint 75 — Responsive Layout (Modul 1, Teil 2)
+- Ist: Mobile Tab-Navigation unten. Ziel: Auf breiten Viewports (Tablet/Desktop) eine Sidebar-/Drawer-Navigation; Breakpoints via CSS-Media-Queries, ohne Navigation-Rewrite (expo-router Tabs bleiben).
+- Vorbereitung: Theme-Lab/Navigation-Werkzeuge pruefen, ScreenContainer-Breakpoint-Variante.
+
+### Sprint 76 — Loop Engineering & Selbstheilung (Modul 2)
+- Ist-Basis: `retry-backoff-logic.ts` (dynamischer Backoff), `managed-llm-fallback-logic.ts`, `provider-error-logic.ts`.
+- Ziel: Endlos-Schleifen-Erkennung mit Rekursions-/Iterationstiefen-Cap je Agent-Ziel, Konvergenz-Messung (Ziel-Nähe je Schritt), Fehler-Selbstheilungskette mit Eskalationsstufen; Metriken in der Ops-Ansicht.
+
+### Sprint 77 — Ziel-Zerlegung & Ausführungsgraphen (Modul 2)
+- Ziel-Dekomposition in Ausfuehrungsgraphen (DAG) mit Schrittstatus, Abhaengigkeiten, Wiederanlauf; Chat-Entwicklungsfenster: Streaming-Ausgabe mit Syntax-Highlighting, Diff-Viewer, Terminal-Vorschau mit Freigabe-Ausloesung (bestehende Diff-/Proposal-Logik aufnehmen: `file-diff-logic.ts`, `proposal-queue-logic.ts`).
+
+### Sprint 78 — API-Key-Rotation & Failover (Modul 3)
+- Ist-Basis: `provider-key-logic.ts`, `provider-latency-logic.ts`, `provider-status-logic.ts`, `audit-rotation-logic.ts`, `model-router-logic.ts`.
+- Ziel: Quota-/429-Tracking je Key, Kontext-erhaltender Failover auf den naechsten gesunden Key, Kostengewichtete Modell-Tier-Auswahl im Router; Tests mit simulierten 429/Latenz-Szenarien.
+
+### Sprint 79 — MCP-Client & Connector-Registry (Modul 4, Teil 1)
+- Ist-Basis: `connector-preferences-logic.ts`, `skill-preferences-logic.ts`.
+- Ziel: MCP-Client (dynamische Tool-Discovery, Skill-Loading) plus erweiterbare Connector-Registry (Websuche, Ausfuehrungsumgebungen, Filesystem-Bridges, Custom-APIs) mit Berechtigungsprofilen.
+
+### Sprint 80 — GitHub- & Stripe-Integration vertiefen (Modul 4, Teil 2)
+- Ist-Basis: GitHub-PAT-Verbindung (Settings, Repository-Sync), `stripe-webhook-logic.ts` mit `customer.subscription.updated`/`checkout.session.completed`, `subscription-tiers-logic.ts`, `usage-budget-logic.ts` (Token-Metering).
+- Ziel: OAuth-Flow ergaenzen, PR-Erstellung/Branch-Management/Webhook-Verarbeitung ausbauen; Checkout-/Subscription-Verwaltung im Studio-UI konsolidieren.
+
+### Sprint 81 — RBAC-Tiers & Elite/Admin-Override (Modul 5)
+- Ist-Basis: `subscription-tiers-logic.ts` (Free/Pro-Struktur), `feature-flag-logic.ts`, Admin-Role (`account.me.role === "admin"`).
+- Ziel: Tier-Modell Free/Pro/Developer Max/Elite; Override-Mechanismus (Caps, Rate-Limits, Feature-Gates umgehen) NUR serverseitig pruefen; Admin-Dashboard: Subscription-Verwaltung, Token-Quote-Overrides, globale Key-Pool-Konfiguration.
+
+### Sprint 82 — Programm-Abschluss
+- Gesamtregression (tsc, Vitest, Build, Service-Syntax, Secret-Scan), Redaktion des Changelogs, Release-Handoff und Abschlussbericht in `docs/`.
+
+Akzeptanzkriterium je Sprint: TypeScript sauber, volle Vitest-Suite gruen (Ausnahme: bekannter Sandbox-Smoke-Test), Server-Build erfolgreich, keine Secrets im Code, Commit per GitHub-Token auf main gepusht.
+
 ## Manuelle Handoff-Punkte (bleiben Nutzeraktionen)
 
 - Android-Publish und APK-Erzeugung über die Publish-Oberfläche anstoßen; das EAS-Buildkontingent ist extern verwaltet und kann aus der Sandbox nicht verbraucht werden.

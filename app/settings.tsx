@@ -8,6 +8,8 @@ import { trpc } from "@/lib/trpc";
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
 import { type FieldValidation, validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
+import { useThemeContext } from "@/lib/theme-provider";
+import { DESIGN_THEMES, designThemeDescription, designThemeIcon, designThemeLabel } from "@/lib/design-theme-logic";
 import { getSettingsBackupRestoreConfirmation, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, pickEncryptedSettingsBackup, previewEncryptedSettingsBackup, type SettingsBackupImportCandidate, type SettingsBackupPreview } from "@/lib/settings-backup";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
@@ -20,6 +22,7 @@ type EndpointTestState = "idle" | "checking" | "ready" | "error";
 export default function SettingsScreen() {
   const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, exportSettingsBackup, loading, restoreSettingsBackup, saveSettings, setProtectedChatContent, settings, testCloudProvider, testLocalProviderEndpoint } = useStudioSettings();
   const { loadRemoteFiles } = useWorkspace();
+  const { designTheme, setDesignTheme, palette } = useThemeContext();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [branch, setBranch] = useState("main");
@@ -247,6 +250,32 @@ export default function SettingsScreen() {
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <StudioHeader eyebrow="Steuerzentrale" title="Verbindung" actionIcon="chevron.left" actionLabel="Zurück" onAction={() => router.back()} />
+        <View style={styles.sectionSpacer}>
+          <StudioSection label="Darstellung" title="Erscheinungsbild" />
+          <Text style={styles.fieldHint}>Das Design wirkt auf die gesamte App — Palette, Glow- und Glas-Effekte wechseln mit.</Text>
+          <View style={styles.designOptionStack}>
+            {DESIGN_THEMES.map((theme) => {
+              const active = designTheme === theme;
+              return (
+                <TouchableOpacity
+                  accessibilityLabel={`Design ${designThemeLabel(theme)} aktivieren`}
+                  accessibilityRole="button"
+                  activeOpacity={0.75}
+                  key={theme}
+                  onPress={() => setDesignTheme(theme)}
+                  style={[styles.designOption, active ? { borderColor: palette.primary } : null]}
+                >
+                  <IconSymbol name={designThemeIcon(theme)} size={17} color={palette.primary} />
+                  <View style={styles.designOptionTextArea}>
+                    <Text style={styles.designOptionTitle}>{designThemeLabel(theme)}</Text>
+                    <Text style={styles.designOptionDescription}>{designThemeDescription(theme)}</Text>
+                  </View>
+                  {active ? <IconSymbol name="checkmark.circle.fill" size={19} color={palette.success} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
         <EmptySurface
           description="Ein eigener Workspace-Service führt Repository-, Git- und Build-Operationen auf deiner Infrastruktur aus. Dieser Client bleibt der sichere Kontrollpunkt."
           icon="bolt.fill"
@@ -550,4 +579,10 @@ const styles = StyleSheet.create({
   savedLabel: { color: "#70E4AA", fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: "center" },
   notice: { alignItems: "flex-start", flexDirection: "row", gap: 9, marginTop: 20, paddingHorizontal: 5 },
   noticeText: { color: "#8B9AAE", flex: 1, fontSize: 12, lineHeight: 18 },
+  designOptionStack: { gap: 8 },
+  designOption: { alignItems: "center", borderColor: "#29384A", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, minHeight: 56, paddingHorizontal: 14, paddingVertical: 10 },
+  designOptionTextArea: { flex: 1, gap: 2 },
+  designOptionTitle: { color: "#F2F6FC", fontSize: 14, fontWeight: "700" },
+  designOptionDescription: { color: "#99A7B8", fontSize: 11, fontWeight: "500" },
+
 });

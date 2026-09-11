@@ -4,7 +4,8 @@ import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 
 import { ScreenContainer } from "@/components/screen-container";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { SchemeColors, type ColorScheme } from "@/constants/theme";
+import { type ColorScheme, resolveDesignPalette, SchemeColors } from "@/constants/theme";
+import { DESIGN_THEMES, designThemeDescription, designThemeIcon, designThemeLabel, type DesignTheme } from "@/lib/design-theme-logic";
 import { useColors } from "@/hooks/use-colors";
 import { useThemeContext } from "@/lib/theme-provider";
 
@@ -19,7 +20,9 @@ function ColorSwatch({ name, value }: { name: PaletteName; value: string }) {
         <View className="h-6 w-6 rounded-full border border-border" style={{ backgroundColor: value }} />
         <Text className="text-sm font-semibold text-foreground">{name}</Text>
       </View>
-      <Text className="text-xs font-mono text-muted">{value}</Text>
+      <Text className="text-xs text-muted" style={{ fontFamily: "monospace" }}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -27,37 +30,75 @@ function ColorSwatch({ name, value }: { name: PaletteName; value: string }) {
 export default function ThemeLabScreen() {
   const [pressCount, setPressCount] = useState(0);
   const [lastAction, setLastAction] = useState<string>("None yet");
-  const { colorScheme, setColorScheme } = useThemeContext();
+  const { colorScheme, setColorScheme, designTheme, setDesignTheme, palette } = useThemeContext();
   const colors = useColors();
 
   const swatches = useMemo(
     () =>
       paletteNames.map((name) => ({
         name,
-        value: SchemeColors[colorScheme][name],
+        value: resolveDesignPalette(designTheme, colorScheme)[name],
       })),
-    [colorScheme],
+    [designTheme, colorScheme],
   );
 
   const tileStyles = useMemo(() => {
-    const build = (scheme: ColorScheme) => ({
-      background: SchemeColors[scheme].background,
-      border: SchemeColors[scheme].border,
-      text: SchemeColors[scheme].foreground,
-      subText: SchemeColors[scheme].muted,
-      activeBackground: SchemeColors[scheme].primary,
-      activeText: SchemeColors[scheme].background,
-    });
+    const build = (scheme: ColorScheme) => {
+      const resolved = resolveDesignPalette(designTheme, scheme);
+      return {
+        background: resolved.background,
+        border: resolved.border,
+        text: resolved.foreground,
+        subText: resolved.muted,
+        activeBackground: resolved.primary,
+        activeText: resolved.background,
+      };
+    };
     return {
       light: build("light"),
       dark: build("dark"),
     };
-  }, []);
+  }, [designTheme]);
 
   return (
     <ScreenContainer className="p-5">
       <ScrollView className="flex-1">
         <View className="gap-4 pb-8">
+          <ThemedView className="rounded-2xl border border-border p-4">
+            <Text className="text-lg font-bold text-foreground">Design</Text>
+            <Text className="mt-1 text-sm text-muted">
+              Drei optische Gesamtdesigns — Palette und Effekte (Glow, Glas, Gradient) wechseln global.
+            </Text>
+            <View className="mt-3 gap-2">
+              {DESIGN_THEMES.map((theme) => {
+                const active = designTheme === theme;
+                return (
+                  <Pressable
+                    key={theme}
+                    accessibilityLabel={`Design ${designThemeLabel(theme)} aktivieren`}
+                    className={`rounded-2xl border px-4 py-3 ${active ? "border-primary" : "border-border"}`}
+                    style={active ? { borderColor: palette.primary } : undefined}
+                    onPress={() => {
+                      setDesignTheme(theme);
+                      setLastAction(`Design ${designThemeLabel(theme)} angewendet`);
+                    }}
+                  >
+                    <View className="flex-row items-center justify-between gap-3">
+                      <View className="flex-row items-center gap-3">
+                        <IconSymbol name={designThemeIcon(theme)} size={18} color={palette.primary} />
+                        <View className="gap-0.5">
+                          <Text className="text-base font-semibold text-foreground">{designThemeLabel(theme)}</Text>
+                          <Text className="text-xs text-muted">{designThemeDescription(theme)}</Text>
+                        </View>
+                      </View>
+                      {active ? <IconSymbol name="checkmark.circle.fill" size={20} color={palette.success} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ThemedView>
+
           <View className="flex-row gap-2">
             {(["light", "dark"] as ColorScheme[]).map((scheme) => (
               <Pressable
@@ -120,30 +161,30 @@ export default function ThemeLabScreen() {
 
             <View className="mt-4 flex-row flex-wrap gap-2">
               <TouchableOpacity
-                className="rounded-full px-4 py-2"
-                style={{ backgroundColor: SchemeColors[colorScheme].primary }}
+                className="effect-glow rounded-full px-4 py-2"
+                style={{ backgroundColor: palette.primary }}
                 onPress={() => {
                   setPressCount((count) => count + 1);
-                  setLastAction("Pressed Primary token");
+                  setLastAction("Pressed Primary token (Glow-Effekt)");
                 }}
               >
-                <Text className="text-sm font-semibold text-background">Primary</Text>
+                <Text className="text-sm font-semibold text-background">Primary + Glow</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className="rounded-full px-4 py-2 border border-border"
-                style={{ backgroundColor: SchemeColors[colorScheme].surface }}
+                className="effect-glass rounded-full border px-4 py-2"
+                style={{ backgroundColor: palette.surface, borderColor: palette.border }}
                 onPress={() => {
                   setPressCount((count) => count + 1);
-                  setLastAction("Pressed Surface token");
+                  setLastAction("Pressed Surface token (Glas-Effekt)");
                 }}
               >
                 <Text className="text-sm font-semibold text-foreground">
-                  Surface
+                  Surface + Glas
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 className="rounded-full px-4 py-2"
-                style={{ backgroundColor: SchemeColors[colorScheme].success }}
+                style={{ backgroundColor: palette.success }}
                 onPress={() => {
                   setPressCount((count) => count + 1);
                   setLastAction("Pressed Success token");
@@ -155,7 +196,7 @@ export default function ThemeLabScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 className="rounded-full px-4 py-2"
-                style={{ backgroundColor: SchemeColors[colorScheme].warning }}
+                style={{ backgroundColor: palette.warning }}
                 onPress={() => {
                   setPressCount((count) => count + 1);
                   setLastAction("Pressed Warning token");
@@ -167,7 +208,7 @@ export default function ThemeLabScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 className="rounded-full px-4 py-2"
-                style={{ backgroundColor: SchemeColors[colorScheme].error }}
+                style={{ backgroundColor: palette.error }}
                 onPress={() => {
                   setPressCount((count) => count + 1);
                   setLastAction("Pressed Error token");
@@ -177,6 +218,18 @@ export default function ThemeLabScreen() {
                   Error
                 </Text>
               </TouchableOpacity>
+            </View>
+
+            <View className="effect-glass effect-gradient mt-4 rounded-xl border border-border p-4">
+              <Text className="text-base font-semibold text-foreground">
+                Design-Vorschau
+              </Text>
+              <Text className="mt-1 text-sm text-muted">
+                Diese Fläche zeigt Gradient und Blur des aktiven Designs.
+              </Text>
+              <Text className="mt-1 text-xs text-muted">
+                useColors(): {colors.background} • Tint: {colors.tint}
+              </Text>
             </View>
 
             <View className="mt-4 rounded-xl bg-background p-4 border border-border">
@@ -208,7 +261,7 @@ export default function ThemeLabScreen() {
               Palette values
             </Text>
             <Text className="mt-1 text-sm text-muted">
-              Live values for the selected scheme
+              Live values for {designThemeLabel(designTheme)} · {colorScheme}
             </Text>
             <View className="mt-3 gap-2">
               {swatches.map((item) => (
