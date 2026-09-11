@@ -64,7 +64,9 @@ jobs:
         if: always()
         env:
           CI_STATUS: ${{ job.status == 'success' && 'passed' || 'failed' }}
-        run: node scripts/write-release-handoff.mjs
+          RELEASE_APP_NAME: CyberSarah Control Center
+          RELEASE_ANDROID_PACKAGE: com.app.customaistudiomobile
+        run: npx tsx scripts/write-release-handoff.ts
 
       - name: Upload release handoff artifact
         if: always()
