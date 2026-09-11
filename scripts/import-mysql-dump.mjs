@@ -42,8 +42,12 @@ if (!/^postgresql:\/\//.test(databaseUrl)) {
 // -- Zielschema (Spalten je Tabelle, mit Typinfo fuer die Konvertierung) ----
 const TARGET = {
   users: {
-    cols: ["id", "openId", "name", "email", "loginMethod", "passwordHash",
-           "stripeCustomerId", "role", "createdAt", "updatedAt", "lastSignedIn"],
+    // Reihenfolge = tatsaechliche MySQL-Tabellenspalten der VPS-DB
+    // (abgelesen am Produktivdump 2026-09-11). Bei Dumps mit expliziter
+    // Spaltenliste ueberschreibt diese der Parser ohnehin.
+    cols: ["id", "openId", "name", "email", "loginMethod", "role",
+           "createdAt", "updatedAt", "lastSignedIn", "passwordHash",
+           "stripeCustomerId"],
     bools: [],
   },
   billingSubscriptions: {

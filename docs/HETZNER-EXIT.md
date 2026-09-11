@@ -37,7 +37,15 @@ Der Server wurde auf `drizzle-orm/node-postgres` umgestellt: Schema
 `validate-production.mjs` akzeptiert nur noch `postgresql://…` und prüft
 die Verbindung mit `pg`. `mysql2` ist aus den Abhängigkeiten entfernt.
 
-## Phase 3 — Datenmigration
+## Phase 3 — Datenmigration (abgeschlossen 2026-09-11)
+
+Produktivdaten der VPS-MySQL-DB (`cybersarah`) sind in Neon importiert und
+verifiziert: genau 1 Benutzer (Admin-Konto, `local_c114449d-…`, role=admin,
+inkl. intaktem scrypt-Passwort-Hash). Die Tabellen `billingSubscriptions`,
+`chatMessages` und `modelRouterSettings` existierten auf dem VPS nicht —
+es gab keinerlei Abrechnungs-, Chat- oder Router-Daten zu migrieren.
+Gegenpruefung Zeilenzahl pro Tabelle: bestanden (siehe
+`scripts/import-mysql-dump.mjs`).
 
 1. `mysqldump` der Produktiv-DB `cybersarah` (users, billingSubscriptions,
    chatMessages, modelRouterSettings) auf dem VPS (manuelles Handoff-Kommando,
