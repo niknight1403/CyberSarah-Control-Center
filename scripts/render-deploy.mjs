@@ -267,7 +267,19 @@ async function deployApp() {
   }
 
   const serviceName = env("RENDER_SERVICE_NAME", "cybersarah-control-center");
-  const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
+  const configuredPublicUrl = env("RENDER_PUBLIC_URL", "").replace(/\/$/, "");
+
+  if (configuredPublicUrl && !/^https:\/\/[^/\s]+$/i.test(configuredPublicUrl)) {
+    console.error(
+      "[render-deploy] RENDER_PUBLIC_URL muss eine HTTPS-Basis-URL ohne Pfad sein.",
+    );
+    process.exit(2);
+  }
+
+  const initialPublicUrl =
+    configuredPublicUrl || `https://${serviceName}.onrender.com`;
+
+const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
 
   const workspaceServiceUrl = env("WORKSPACE_SERVICE_URL", "");
   const workspaceServiceToken = env("WORKSPACE_SERVICE_TOKEN", "");
@@ -297,15 +309,16 @@ async function deployApp() {
 
   const { service, publicUrl } = await upsertService({
     serviceName,
-    envLines: buildEnv(`https://${serviceName}.onrender.com`),
+    envLines: buildEnv(initialPublicUrl),
+
   });
 
   if (!service) return; // Dry-Run
 
   // Phase 2: APP_BASE_URL/APP_ALLOWED_ORIGINS mit der echten Domain patchen,
   // falls Render den Standard-Subdomain-Namen veraendert hat.
-  if (publicUrl !== `https://${serviceName}.onrender.com`) {
-    log("Patche ENV mit der echten onrender-Domain …");
+  if (!configuredPublicUrl && publicUrl !== `https://${serviceName}.onrender.com`) {
+  log("Patche ENV mit der echten onrender-Domain …");
     const patchBeforeDeployId = await latestDeployId(service.id);
     await apiFetch(`/services/${service.id}/env-vars`, {
       method: "PUT",

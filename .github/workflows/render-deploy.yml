@@ -74,6 +74,7 @@ jobs:
           WORKSPACE_SERVICE_URL: ${{ secrets.WORKSPACE_SERVICE_URL }}
           # Fallback: gleiches Token wie der Workspace-Service selbst (SERVICE_ACCESS_TOKEN)
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
+          RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
         run: node scripts/render-deploy.mjs --migrate
