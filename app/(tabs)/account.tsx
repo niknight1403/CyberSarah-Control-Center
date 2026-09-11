@@ -93,6 +93,15 @@ export default function AccountScreen() {
           <Text style={styles.email}>{user.email || "Keine E-Mail-Adresse hinterlegt"}</Text>
           <View style={[styles.roleBadge, user.role === "admin" && styles.roleBadgeAdmin]}><Text style={styles.roleText}>{user.role === "admin" ? "ADMINISTRATOR · VOLLER ZUGRIFF" : "STANDARDZUGANG"}</Text></View>
           {user.role === "admin" ? <Text style={styles.adminCopy}>Alle Skills, Steuerungselemente und Administrationsfunktionen sind für dieses Konto freigeschaltet.</Text> : null}
+          {user.role === "admin" ? (
+            <View style={styles.billingCard}>
+              <Text style={styles.billingTitle}>EXPERT-ZUGANG AKTIV</Text>
+              <Text style={styles.billingCopy}>
+                Dein Administratorzugang umfasst dauerhaft alle Expert-Funktionen.
+                Ein Abonnement oder Stripe-Checkout ist nicht erforderlich.
+              </Text>
+            </View>
+          ) : (
           <View style={styles.billingCard}>
             <Text style={styles.billingTitle}>LIVE-ABRECHNUNG</Text>
             <Text style={styles.billingCopy}>{billingQuery.data?.subscription ? `Stufe: ${billingQuery.data?.tierLabel ?? "Lite"} · Status: ${billingQuery.data.subscription.status}${billingQuery.data.subscription.cancelAtPeriodEnd ? " · Kündigung vorgemerkt" : ""}` : "Noch kein aktives Abonnement — Stufe wählen:"}</Text>
@@ -136,6 +145,7 @@ export default function AccountScreen() {
               </View>
             ) : null}
           </View>
+          )}
           <TouchableOpacity disabled={busy} onPress={() => void logout()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{busy ? "Abmeldung läuft …" : "Abmelden"}</Text></TouchableOpacity>
         </View> : <View style={styles.card}>
           <View style={styles.switchRow}><TouchableOpacity onPress={() => setMode("login")} style={[styles.switchButton, mode === "login" && styles.switchButtonActive]}><Text style={styles.switchText}>Login</Text></TouchableOpacity><TouchableOpacity onPress={() => setMode("register")} style={[styles.switchButton, mode === "register" && styles.switchButtonActive]}><Text style={styles.switchText}>Registrieren</Text></TouchableOpacity></View>
