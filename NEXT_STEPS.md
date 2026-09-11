@@ -98,8 +98,8 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 - Ist-Basis: `subscription-tiers-logic.ts` (Free/Pro-Struktur), `feature-flag-logic.ts`, Admin-Role (`account.me.role === "admin"`).
 - Umgesetzt: `lib/access-control-logic.ts` — Rollen-Tiers free/pro/developer-max/elite (Abbildung vom Abo-Tier lite/pro/expert; Owner/Admin → elite), monotone Feature-Gates, Quota-Caps und Rate-Limits je Tier, Admin-Quota-Override (nur Anhebung, nie Senkung), `enforceServerAccess` als Server-Enforcementpunkt fuer tRPC-Router. Admin-Dashboard `app/admin.tsx` (Guard ueber admin.dashboard-Gate): Subscription-Verwaltung, Cap-Uebersicht, Quota-Override-Formulare. 7 Tests.
 
-### Sprint 82 — Programm-Abschluss
-- Gesamtregression (tsc, Vitest, Build, Service-Syntax, Secret-Scan), Redaktion des Changelogs, Release-Handoff und Abschlussbericht in `docs/`.
+### Sprint 82 — Programm-Abschluss — ERLEDIGT (11.09.2026)
+- Umgesetzt: Gesamtregression gruen (tsc, Vitest 544/545 mit bekanntem Sandbox-Smoke-Test, Server-Build, Web-Export, Secret-Scan), Abschlussbericht in `docs/SPRINT_74-82_AUTONOMIE_PROGRAMM_ABSCHLUSSBERICHT.md`, Release-Handoff mit Version 1.3.0 und Tag v1.3.0 (AAB/APK-Pipeline baut aus android/).
 
 Akzeptanzkriterium je Sprint: TypeScript sauber, volle Vitest-Suite gruen (Ausnahme: bekannter Sandbox-Smoke-Test), Server-Build erfolgreich, keine Secrets im Code, Commit per GitHub-Token auf main gepusht.
 
