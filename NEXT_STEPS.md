@@ -86,9 +86,9 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 - Ist-Basis: `provider-key-logic.ts`, `provider-latency-logic.ts`, `provider-status-logic.ts`, `audit-rotation-logic.ts`, `model-router-logic.ts`.
 - Umgesetzt: `lib/key-rotation-logic.ts` — Key-Pool mit Health-Score (Latenz, Restguthaben), 429-Cooldown mit automatischer Freigabe, 402/403/Leerguthaben → exhausted, deterministischer Failover (Provider-Filter, Hoechst-Score, stabiler Tie-Break), `rotateOnFailure` traegt den Ausfuehrungskontext mit (Rotation-Report). Kostengewichtetes Modell-Tier-Routing (mini/standard/flagship) je Task-Klasse aus model-router-logic. 7 Tests mit simulierten 429/Latenz-Szenarien.
 
-### Sprint 79 — MCP-Client & Connector-Registry (Modul 4, Teil 1)
+### Sprint 79 — MCP-Client & Connector-Registry (Modul 4, Teil 1) — ERLEDIGT (11.09.2026)
 - Ist-Basis: `connector-preferences-logic.ts`, `skill-preferences-logic.ts`.
-- Ziel: MCP-Client (dynamische Tool-Discovery, Skill-Loading) plus erweiterbare Connector-Registry (Websuche, Ausfuehrungsumgebungen, Filesystem-Bridges, Custom-APIs) mit Berechtigungsprofilen.
+- Umgesetzt: `lib/mcp-registry-logic.ts` — Tool-Discovery-Merge ueber Server (Dedupe per voller ID, Konflikt-Report), Endpoint-Validierung (nur HTTPS, keine privaten Adressen), Faehigkeits-Matching (Permissions + Relevanz, Ausschluss-Flags), Berechtigungs-Gate fuer Tool-Ausfuehrung und unvergaengliche Connector-Registry (web-search/execution/filesystem/custom-api) mit Duplicate- und URL-Validierung. Transportschicht (SSE/HTTP) dockt an die Typen an. 6 Tests.
 
 ### Sprint 80 — GitHub- & Stripe-Integration vertiefen (Modul 4, Teil 2)
 - Ist-Basis: GitHub-PAT-Verbindung (Settings, Repository-Sync), `stripe-webhook-logic.ts` mit `customer.subscription.updated`/`checkout.session.completed`, `subscription-tiers-logic.ts`, `usage-budget-logic.ts` (Token-Metering).
