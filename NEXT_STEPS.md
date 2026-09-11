@@ -90,9 +90,9 @@ Struktur: Jedes Modul wird als eigener Sprint umgesetzt (Konvention: Major-Aende
 - Ist-Basis: `connector-preferences-logic.ts`, `skill-preferences-logic.ts`.
 - Umgesetzt: `lib/mcp-registry-logic.ts` — Tool-Discovery-Merge ueber Server (Dedupe per voller ID, Konflikt-Report), Endpoint-Validierung (nur HTTPS, keine privaten Adressen), Faehigkeits-Matching (Permissions + Relevanz, Ausschluss-Flags), Berechtigungs-Gate fuer Tool-Ausfuehrung und unvergaengliche Connector-Registry (web-search/execution/filesystem/custom-api) mit Duplicate- und URL-Validierung. Transportschicht (SSE/HTTP) dockt an die Typen an. 6 Tests.
 
-### Sprint 80 — GitHub- & Stripe-Integration vertiefen (Modul 4, Teil 2)
+### Sprint 80 — GitHub- & Stripe-Integration vertiefen (Modul 4, Teil 2) — ERLEDIGT (11.09.2026)
 - Ist-Basis: GitHub-PAT-Verbindung (Settings, Repository-Sync), `stripe-webhook-logic.ts` mit `customer.subscription.updated`/`checkout.session.completed`, `subscription-tiers-logic.ts`, `usage-budget-logic.ts` (Token-Metering).
-- Ziel: OAuth-Flow ergaenzen, PR-Erstellung/Branch-Management/Webhook-Verarbeitung ausbauen; Checkout-/Subscription-Verwaltung im Studio-UI konsolidieren.
+- Umgesetzt: `lib/github-integration-logic.ts` — OAuth-URL-Bau mit CSRF-State-Schutz und Callback-Validierung, PAT-Plausibilitaetspruefung und Maskierung, Branch-Namen-Ableitung (kebab-case) und -Validierung, PR-Payload-Bau mit Datei-Uebersicht, Webhook-Reducer (push/PR opened/PR merged, robust gegen ungueltige Payloads). `lib/stripe-metering-logic.ts` — checkout.session.completed/expired-Abbildung auf Subscription-Aktivierung (Tier-Validierung gegen SUBSCRIPTION_TIERS), nutzungsbasiertes Token-Metering (Buchungs-Ledger, Zeitfenster-Aggregation je Modell, Kosten in Cent), Checkout-Session-Request-Bau mit Price-ID/HTTPS/E-Mail-Validierung. 9 Tests.
 
 ### Sprint 81 — RBAC-Tiers & Elite/Admin-Override (Modul 5)
 - Ist-Basis: `subscription-tiers-logic.ts` (Free/Pro-Struktur), `feature-flag-logic.ts`, Admin-Role (`account.me.role === "admin"`).
