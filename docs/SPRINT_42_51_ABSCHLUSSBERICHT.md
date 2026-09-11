@@ -41,7 +41,7 @@ Ergänzend in der Serie abgeschlossen: SDK-57-Sicherheitssprint (`4085581`, High
 
 ## Offene Entscheidungen (ausdrücklich dem Owner vorbehalten)
 
-1. **Prebuild-Konflikt `android/` vs. `app.config.ts`:** Bislang unentschieden, ob der native Android-Ordner eingecheckt wird (passt besser zum Docker-Release-Flow) oder CNG (Continuous Native Generation) über `app.config.ts` geführt wird. Empfehlung liegt beim Owner; eine Umstellung ist ein eigener Sprint.
+1. **Prebuild-Konflikt `android/` vs. `app.config.ts` — ENTSCHIEDEN (11.09.2026):** Der Owner hat entschieden, `android/` eingecheckt zu lassen. Der Ordner ist die Quelle der Wahrheit für native Builds: Die APK-Pipeline (`build-apk.yml`) baut per Capacitor direkt daraus, und der Sprint-73-Fix (R8 deaktiviert) liegt als native Anpassung darin. `app.config.ts` steuert ausschließlich die Expo-/Web-Seite. Kein Umbau auf CNG; native Anpassungen werden weiterhin direkt im Ordner gepflegt.
 2. **SDK 57 als Zielsprint:** Das Sicherheits-Upgrade ist erfolgt (`4085581`); das vollständige SDK-57-Major-Upgrade (App-Build, native Module, Play-Store-Pipeline) bleibt gemäß Owner-Anweisung ein separater Sprint.
 
 ## Mittel- und langfristige Richtung (aus NEXT_STEPS.md übernommen)

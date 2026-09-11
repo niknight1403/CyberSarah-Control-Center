@@ -1,6 +1,6 @@
 # CyberSarah Control Center — Nächste geplante Schritte
 
-Stand: 2026-09-11 — **Sprints 42–51 sind abgeschlossen.** Abschluss und Regression: `docs/SPRINT_42_51_ABSCHLUSSBERICHT.md`. Offen bleibt die Owner-Entscheidung zum Prebuild-Konflikt (`android/` vs. `app.config.ts`).
+Stand: 2026-09-11 — **Sprints 42–51 sind abgeschlossen.** Abschluss und Regression: `docs/SPRINT_42_51_ABSCHLUSSBERICHT.md`. Der Prebuild-Konflikt ist am 11.09.2026 vom Owner entschieden: `android/` bleibt eingecheckt und ist die Quelle der Wahrheit fuer native Builds (Capacitor-APK-Pipeline inkl. Sprint-73-Fixes); `app.config.ts` steuert die Expo-/Web-Seite.
 
 Stand: 2026-09-06 (nach Abschluss der Sprints 32–41, Commit `bba1724`)
 
