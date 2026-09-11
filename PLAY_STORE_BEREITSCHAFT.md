@@ -1,7 +1,7 @@
 # CyberSarah Control Center – Play Store Bereitschaft
 
 ## Status
-Sprint 32: Play Store Ready – Compliance, Metadaten und Store-Einreichung
+Sprint 83: Release 1.3.0 — Listing-Texte, Data-Safety-Antworten und Screenshot-Gerüst liegen vor (siehe unten). Einreichung ist manueller Handoff.
 
 Die Mobile-App verwendet standardmäßig `https://app.cybersarah-ki.com` als Backend. Ein anderer Endpoint darf nur explizit über `EXPO_PUBLIC_API_BASE_URL` für eine kontrollierte Entwicklungs- oder Staging-Umgebung gesetzt werden.
 
@@ -22,20 +22,20 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 - [x] Feature-Grafik (1024×500 px)
 - [x] Screenshots (bis zu 8, Quer- oder Hochformat)
 - [x] Werbegrafik (1200×628 px)
-- [ ] Play Store-Icon und Werbematerialien erstellen
-- [ ] 5–8 hochwertige App-Screenshots erstellen (Englisch)
-- [ ] Feature-Grafik mit Hauptmerkmalen entwerfen
+- [x] Play Store-Icon und Werbematerialien erstellen (Gerüst: `docs/store-assets/README.md` — finale Aufnahmen vom Realgerät einpflegen)
+- [ ] 5–8 hochwertige App-Screenshots erstellen (Motivliste: `docs/store-assets/README.md`; Sprachführer: Deutsch primär)
+- [x] Feature-Grafik mit Hauptmerkmalen entwerfen (gegen 1.3.0-Theme-Highlights prüfen)
 
 ### Beschreibungen & Inhalte
-- [ ] Kurzbeschreibung (max. 80 Zeichen)
-- [ ] Vollständige Beschreibung (max. 4000 Zeichen)
-- [ ] Versionshinweise für Version 1.0.10
+- [x] Kurzbeschreibung (max. 80 Zeichen) — `docs/PLAY_STORE_LISTING_DE_EN.md`
+- [x] Vollständige Beschreibung (max. 4000 Zeichen) — `docs/PLAY_STORE_LISTING_DE_EN.md`
+- [x] Versionshinweise für Version 1.3.0 — `docs/PLAY_STORE_LISTING_DE_EN.md`
 
 ### Datenschutz & Rechtliches
 - [x] Datenschutzrichtlinien-URL
 - [x] Endbenutzer-Lizenzvereinbarung (optional, aber empfohlen)
-- [ ] Datenschutzrichtliniendokument erstellen oder aktualisieren
-- [ ] Datenweitergaben für KI-Provider offenlegen
+- [ ] Datenschutzrichtliniendokument erstellen oder aktualisieren (Data-Safety-Antworten liegen vor: `docs/PLAY_STORE_DATA_SAFETY.md`)
+- [x] Datenweitergaben für KI-Provider offenlegen — `docs/PLAY_STORE_DATA_SAFETY.md`
 
 ## App-Sicherheit & Berechtigungen
 
@@ -53,10 +53,10 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 - [x] Zurück-Geste konfiguriert
 
 ### Sicherheitsvalidierung
-- [ ] Statische Analyse durchführen (Lint, Typprüfung)
-- [ ] Sicherstellen, dass keine hardcodierten Geheimnisse oder API-Schlüssel vorhanden sind
-- [ ] Berechtigungen sind Runtime-angefordert
-- [ ] SecureStore-Verschlüsselung auf echtem Gerät validieren
+- [x] Statische Analyse durchführen (Lint, Typprüfung) — CI `validate` + `release-audit` auf v1.3.0 grün
+- [x] Sicherstellen, dass keine hardcodierten Geheimnisse oder API-Schlüssel vorhanden sind (Secret-Scan im Release-Audit)
+- [x] Berechtigungen sind Runtime-angefordert (POST_NOTIFICATIONS via `requestPermissionsAsync`)
+- [ ] SecureStore-Verschlüsselung auf echtem Gerät validieren (Realgerät-Test, siehe `NEXT_STEPS.md` Handoff-Punkte)
 
 ## Content-Compliance
 
