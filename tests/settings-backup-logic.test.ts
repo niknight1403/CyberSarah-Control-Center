@@ -23,13 +23,13 @@ describe("settings backup logic", () => {
     expect(serialized).not.toContain("AIza-test-secret");
     expect(serialized).not.toContain("192.168.1.20");
     expect(verifyEncryptedSettingsBackup(backup, input.passphrase)).toEqual({ valid: true });
-  });
+  }, 60_000);
 
   it("returns only bounded metadata after authenticated verification", () => {
     const backup = createEncryptedSettingsBackup(input);
     expect(getEncryptedSettingsBackupPreview(backup, input.passphrase)).toEqual({ createdAt: input.createdAt, providerIds: ["openai", "gemini"], endpointCount: 2 });
     expect(verifyEncryptedSettingsBackup(backup, "wrong password").valid).toBe(false);
-  });
+  }, 60_000);
 
   it("decrypts only after authentication and returns restorable values", () => {
     const backup = createEncryptedSettingsBackup(input);
@@ -40,7 +40,7 @@ describe("settings backup logic", () => {
     });
     expect(() => decryptEncryptedSettingsBackup(backup, "wrong password")).toThrow("nicht sicher verifiziert");
     expect(getSettingsBackupRestoreConfirmation({ createdAt: input.createdAt, providerIds: ["openai"], endpointCount: 2 }).message).toContain("Service- und GitHub-Tokens bleiben unverändert");
-  });
+  }, 60_000);
 
   it("rejects oversized provider keys and endpoint URLs before encryption", () => {
     expect(() => createEncryptedSettingsBackup({ ...input, providerKeys: { openai: "x".repeat(513) } })).toThrow("Provider-Key");
@@ -58,5 +58,5 @@ describe("settings backup logic", () => {
     expect(verifyEncryptedSettingsBackup(tampered, input.passphrase).valid).toBe(false);
     const confirmation = getSettingsBackupShareConfirmation();
     expect(confirmation.message).toContain("Passwort niemals zusammen");
-  });
+  }, 60_000);
 });

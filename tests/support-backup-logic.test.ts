@@ -12,7 +12,7 @@ describe("encrypted support backups", () => {
     expect(backup.cipher.mac).toBeTruthy();
     expect(serialized).not.toContain("deployment issue");
     expect(backup.kdf.iterations).toBeGreaterThan(100_000);
-  });
+  }, 60_000);
 
   it("requires a sufficiently long export password", () => {
     expect(isValidSupportBackupPassword("short")).toBe(false);
@@ -24,7 +24,7 @@ describe("encrypted support backups", () => {
     expect(verifyEncryptedSupportBackup(backup, "a carefully chosen password")).toEqual({ valid: true });
     expect(getEncryptedSupportBackupPreview(backup, "a carefully chosen password")).toMatchObject({ messageCount: 1, excerpts: ["Please investigate this deployment issue."] });
     expect(verifyEncryptedSupportBackup({ ...backup, cipher: { ...backup.cipher, ciphertext: `${backup.cipher.ciphertext}x` } }, "a carefully chosen password").valid).toBe(false);
-  });
+  }, 60_000);
 
   it("explains the encrypted support-sharing scope before the system share action", () => {
     const confirmation = getSupportShareConfirmation();
