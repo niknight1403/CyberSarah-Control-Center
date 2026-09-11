@@ -24,10 +24,10 @@ jobs:
       - name: Repository auschecken
         uses: actions/checkout@v5
 
-      - name: Node.js 20 einrichten
+      - name: Node.js 22 einrichten
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Abhaengigkeiten installieren (inkl. devDependencies)
