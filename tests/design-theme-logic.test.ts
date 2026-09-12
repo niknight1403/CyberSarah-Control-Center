@@ -12,22 +12,25 @@ import {
 
 describe("design theme logic", () => {
   it("normalizes only supported design themes", () => {
+    expect(normalizeDesignTheme("aurora")).toBe("aurora");
     expect(normalizeDesignTheme("neon")).toBe("neon");
     expect(normalizeDesignTheme("slate")).toBe("slate");
     expect(normalizeDesignTheme("glass")).toBe("glass");
-    expect(normalizeDesignTheme("unexpected")).toBe("neon");
-    expect(normalizeDesignTheme(undefined)).toBe("neon");
+    expect(normalizeDesignTheme("unexpected")).toBe("aurora");
+    expect(normalizeDesignTheme(undefined)).toBe("aurora");
   });
 
-  it("exposes exactly the three directive themes with stable key and German labels", () => {
-    expect(DESIGN_THEMES).toEqual(["neon", "slate", "glass"]);
-    expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v1");
+  it("exposes exactly the four design themes with stable key and German labels", () => {
+    expect(DESIGN_THEMES).toEqual(["aurora", "neon", "slate", "glass"]);
+    expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v2");
     expect(designThemeLabel("neon")).toBe("Cyber Neon");
     expect(designThemeLabel("slate")).toBe("Enterprise Slate");
     expect(designThemeLabel("glass")).toBe("Glas-Modern");
+    expect(designThemeLabel("aurora")).toBe("Aurora Glass");
     expect(designThemeIcon("neon")).toBe("bolt.fill");
     expect(designThemeIcon("slate")).toBe("chart.bar.fill");
     expect(designThemeIcon("glass")).toBe("sparkles");
+    expect(designThemeIcon("aurora")).toBe("wand.and.stars");
     for (const theme of DESIGN_THEMES) {
       expect(designThemeDescription(theme).length).toBeGreaterThan(10);
     }
@@ -59,6 +62,11 @@ describe("design theme logic", () => {
     const glass = resolveDesignPalette("glass", "dark");
     expect(glass.surface).toContain("rgba");
     expect(glass.border).toContain("rgba");
+
+    const aurora = resolveDesignPalette("aurora", "dark");
+    expect(aurora.background).not.toBe(baseSchemePalettes.dark.background);
+    expect(aurora.primary).toBe("#9D8CFF");
+    expect(aurora.surface).toContain("rgba");
   });
 
   it("keeps Enterprise Slate light and the neon/glass variants dark", () => {
@@ -71,6 +79,8 @@ describe("design theme logic", () => {
     expect(brightness(resolveDesignPalette("slate", "dark").background)).toBeLessThan(50);
     expect(brightness(resolveDesignPalette("neon", "dark").background)).toBeLessThan(20);
     expect(brightness(resolveDesignPalette("glass", "dark").background)).toBeLessThan(30);
+    expect(brightness(resolveDesignPalette("aurora", "dark").background)).toBeLessThan(30);
+    expect(brightness(resolveDesignPalette("aurora", "light").background)).toBeGreaterThan(200);
   });
 
   it("maps distinct effects per design theme", () => {
@@ -85,6 +95,12 @@ describe("design theme logic", () => {
     const glass = resolveDesignEffects("glass", "dark");
     expect(glass.blur).not.toBe("0px");
     expect(glass.gradientFrom).not.toBe(glass.gradientTo);
+
+    const aurora = resolveDesignEffects("aurora", "dark");
+    expect(aurora.glowPrimary).toContain("rgba");
+    expect(aurora.glowSoft).toContain("rgba");
+    expect(aurora.blur).not.toBe("0px");
+    expect(aurora.gradientFrom).not.toBe(aurora.gradientTo);
   });
 
   it("builds the runtime palette in the Colors shape", () => {

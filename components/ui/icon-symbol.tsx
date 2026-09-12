@@ -20,6 +20,7 @@ const MAPPING = {
   "chevron.left": "chevron-left",
   "folder.fill": "folder",
   "sparkles": "auto-awesome",
+  "wand.and.stars": "auto-fix-high",
   "play.rectangle.fill": "play-circle-filled",
   "gearshape.fill": "settings",
   "arrow.clockwise": "refresh",

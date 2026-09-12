@@ -166,6 +166,47 @@ export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> 
       },
     },
   },
+  /** Theme D — Aurora Glass (Standard seit v1.3.1) */
+  aurora: {
+    light: {
+      background: "#F3F4FC",
+      surface: "rgba(255, 255, 255, 0.66)",
+      border: "rgba(56, 45, 122, 0.14)",
+      foreground: "#241E3F",
+      primary: "#7C5CFF",
+      muted: "#6B7092",
+      success: "#0FA47A",
+      warning: "#C77A15",
+      error: "#C2404F",
+    },
+    dark: {
+      background: "#0A0E1F",
+      surface: "rgba(255, 255, 255, 0.07)",
+      border: "rgba(255, 255, 255, 0.14)",
+      foreground: "#EEF1FB",
+      primary: "#9D8CFF",
+      muted: "#9AA3C7",
+      success: "#4ADE96",
+      warning: "#FBBE6C",
+      error: "#FF7B8A",
+    },
+    effects: {
+      light: {
+        glowPrimary: "0 0 18px rgba(124, 92, 255, 0.22)",
+        glowSoft: "0 0 12px rgba(45, 212, 191, 0.16)",
+        blur: "14px",
+        gradientFrom: "#E3E6FA",
+        gradientTo: "#F3F0FB",
+      },
+      dark: {
+        glowPrimary: "0 0 22px rgba(157, 140, 255, 0.34)",
+        glowSoft: "0 0 14px rgba(45, 212, 191, 0.22)",
+        blur: "18px",
+        gradientFrom: "#150F36",
+        gradientTo: "#072031",
+      },
+    },
+  },
 };
 
 /** Basis-Palette des Schemas mit den Design-Overrides verschmelzen. */

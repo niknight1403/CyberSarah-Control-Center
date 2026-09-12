@@ -5,6 +5,7 @@ import { colorScheme as nativewindColorScheme, vars } from "nativewind";
 
 import { type ColorScheme, type ThemeColorPalette } from "@/constants/theme";
 import {
+  DEFAULT_DESIGN_THEME,
   DESIGN_THEME_STORAGE_KEY,
   normalizeDesignTheme,
   type DesignTheme,
@@ -34,7 +35,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const rawSystemScheme = useSystemColorScheme();
   const systemScheme: ColorScheme = rawSystemScheme === "dark" ? "dark" : "light";
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>("system");
-  const [designTheme, setDesignThemeState] = useState<DesignTheme>("neon");
+  const [designTheme, setDesignThemeState] = useState<DesignTheme>(DEFAULT_DESIGN_THEME);
   const colorScheme = resolveThemePreference(themePreference, systemScheme);
   const palette = useMemo(() => resolveDesignRuntimePalette(designTheme, colorScheme), [designTheme, colorScheme]);
 
