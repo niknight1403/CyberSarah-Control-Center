@@ -15,6 +15,7 @@ on:
         options:
           - app
           - workspace
+          - domain
         default: app
 
 jobs:
@@ -93,3 +94,21 @@ jobs:
           # bestehende DATABASE_URL-Secret — kein neuer Account, keine Kosten.
           WORKSPACE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: node scripts/render-deploy.mjs --workspace
+
+      - name: Custom Domain abschliessen (Phase 5, Sprint 84)
+        if: inputs.target == 'domain'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
+          OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
+          WORKSPACE_SERVICE_URL: ${{ secrets.WORKSPACE_SERVICE_URL }}
+          WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
+          CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN || 'app.cybersarah-ki.com' }}
+          CUSTOM_DOMAIN_WAIT_MINUTES: '15'
+        run: node scripts/render-deploy.mjs --domain

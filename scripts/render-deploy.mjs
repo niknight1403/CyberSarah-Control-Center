@@ -36,6 +36,7 @@ const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 const migrate = args.has("--migrate");
 const workspace = args.has("--workspace");
+const domain = args.has("--domain");
 
 function env(name, fallback) {
   const value = process.env[name];
@@ -255,6 +256,41 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
   return { service, publicUrl };
 }
 
+/**
+ * Sprint 84 (Phase 5 — Custom Domain): App-ENV-Builder, gemeinsam genutzt von
+ * deployApp() und deployCustomDomain(). APP_ALLOWED_ORIGINS umfasst immer
+ * Basis-URL, Custom Domain, www, localhost-Varianten und Capacitor.
+ */
+function makeAppEnvBuilder(databaseUrl) {
+  const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
+
+  const workspaceServiceUrl = env("WORKSPACE_SERVICE_URL", "");
+  const workspaceServiceToken = env("WORKSPACE_SERVICE_TOKEN", "");
+  const workspaceExtra = [];
+  if (workspaceServiceUrl) workspaceExtra.push(`WORKSPACE_SERVICE_URL=${workspaceServiceUrl}`);
+  if (workspaceServiceToken) workspaceExtra.push(`WORKSPACE_SERVICE_TOKEN=${workspaceServiceToken}`);
+
+  return (baseUrl) =>
+    buildServiceEnv({
+      databaseUrl,
+      appBaseUrl: baseUrl,
+      allowedOrigins: `${baseUrl},https://app.cybersarah-ki.com,https://www.cybersarah-ki.com,https://localhost,http://localhost,capacitor://localhost`,
+      jwtSecret,
+      metricsToken: env("METRICS_TOKEN"),
+      openAiApiKey: env("OPENAI_API_KEY"),
+      stripeSecretKey: env("STRIPE_SECRET_KEY"),
+      stripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET"),
+      oauthServerUrl: env("OAUTH_SERVER_URL"),
+      ownerOpenId: env("OWNER_OPEN_ID"),
+      adminEmail: env("ADMIN_EMAIL"),
+      stripeMode: env("STRIPE_MODE"),
+      stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
+      stripeProductId: env("STRIPE_PRICE_ID"),
+      trustProxy: env("TRUST_PROXY", "1"),
+      extra: workspaceExtra,
+    });
+}
+
 async function deployApp() {
   const databaseUrl = env("DATABASE_URL");
   if (!databaseUrl) {
@@ -293,33 +329,7 @@ async function deployApp() {
   const initialPublicUrl =
     configuredPublicUrl || `https://${serviceName}.onrender.com`;
 
-const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
-
-  const workspaceServiceUrl = env("WORKSPACE_SERVICE_URL", "");
-  const workspaceServiceToken = env("WORKSPACE_SERVICE_TOKEN", "");
-  const workspaceExtra = [];
-  if (workspaceServiceUrl) workspaceExtra.push(`WORKSPACE_SERVICE_URL=${workspaceServiceUrl}`);
-  if (workspaceServiceToken) workspaceExtra.push(`WORKSPACE_SERVICE_TOKEN=${workspaceServiceToken}`);
-
-  const buildEnv = (baseUrl) =>
-    buildServiceEnv({
-      databaseUrl: dbCheck.url,
-      appBaseUrl: baseUrl,
-      allowedOrigins: `${baseUrl},https://app.cybersarah-ki.com,https://www.cybersarah-ki.com,https://localhost,http://localhost,capacitor://localhost`,
-      jwtSecret,
-      metricsToken: env("METRICS_TOKEN"),
-      openAiApiKey: env("OPENAI_API_KEY"),
-      stripeSecretKey: env("STRIPE_SECRET_KEY"),
-      stripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET"),
-      oauthServerUrl: env("OAUTH_SERVER_URL"),
-      ownerOpenId: env("OWNER_OPEN_ID"),
-      adminEmail: env("ADMIN_EMAIL"),
-      stripeMode: env("STRIPE_MODE"),
-      stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
-      stripeProductId: env("STRIPE_PRICE_ID"),
-      trustProxy: env("TRUST_PROXY", "1"),
-      extra: workspaceExtra,
-    });
+  const buildEnv = makeAppEnvBuilder(dbCheck.url);
 
   const { service, publicUrl } = await upsertService({
     serviceName,
@@ -348,6 +358,118 @@ const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
   await verifyPublic(verifiedPublicUrl, "/api/health");
   log(`Deployment abgeschlossen: ${verifiedPublicUrl} (Web + API)`);
   log("Naechste Schritte: Custom Domain app.cybersarah-ki.com (Phase 5).");
+}
+
+/**
+ * Sprint 84 (Render-Phase 5): Custom Domain abschliessen.
+ *
+ * Ablauf:
+ *  1. App-Service ermitteln und Custom Domain per Render-API anlegen
+ *     (falls noch nicht vorhanden).
+ *  2. Verifikationsstatus + benoetigte DNS-Records loggen; auf die
+ *     automatische DNS-Verifikation warten (Render prueft selbst).
+ *  3. Nach Verifikation: APP_BASE_URL auf die Custom-Domain patchen
+ *     (onrender-Domain bleibt als Origin erlaubt) und Re-Deploy abwarten.
+ *  4. Verifizieren: HTTPS-Health gegen die Custom-Domain, HTTP->HTTPS-
+ *     Redirect-Verhalten und Workspace-CORS fuer die neue Origin.
+ */
+async function deployCustomDomain() {
+  const serviceName = env("RENDER_SERVICE_NAME", "cybersarah-control-center");
+  const domainName = env("CUSTOM_DOMAIN", "app.cybersarah-ki.com").trim().toLowerCase();
+  const waitMinutes = Math.max(1, Number(env("CUSTOM_DOMAIN_WAIT_MINUTES", "15")) || 15);
+  const databaseUrl = env("DATABASE_URL", "");
+  const dbCheck = validateDatabaseUrl(databaseUrl);
+  if (!dbCheck.ok) {
+    throw new Error(`DATABASE_URL ungueltig: ${dbCheck.reason}`);
+  }
+
+  const service = findServiceByName(await listServices(), serviceName);
+  if (!service) throw new Error(`Service "${serviceName}" nicht gefunden.`);
+
+  // 1) Bestehende Domains listen
+  const existingRaw = await apiFetch(`/services/${service.id}/domains?limit=20`);
+  const existing = (Array.isArray(existingRaw) ? existingRaw : []).map((e) => e?.domain ?? e);
+  let domain = existing.find((d) => d?.name?.toLowerCase() === domainName) ?? null;
+  if (!domain) {
+    log(`Lege Custom Domain ${domainName} fuer "${serviceName}" an …`);
+    const created = await apiFetch(`/services/${service.id}/domains`, {
+      method: "POST",
+      body: JSON.stringify({ name: domainName }),
+    });
+    domain = created?.domain ?? created;
+    log(`Domain angelegt: ${domain?.id ?? "unbekannte ID"}`);
+  } else {
+    log(`Custom Domain ${domainName} existiert bereits (ID ${domain.id}).`);
+  }
+
+  // 2) Verifikationsstatus + DNS-Anleitung
+  const printDomain = (d) => {
+    const verification = d?.verificationData ?? {};
+    log(`Domain ${d?.name}: Status=${d?.verificationStatus ?? "unbekannt"}`);
+    if (verification?.dnsName || verification?.dnsValue) {
+      log(`  DNS-Record: ${verification.dnsType ?? "CNAME"} ${verification.dnsName ?? domainName} -> ${verification.dnsValue ?? "?"}`);
+    }
+  };
+  printDomain(domain);
+
+  const deadline = Date.now() + waitMinutes * 60_000;
+  while ((domain?.verificationStatus ?? "pending") !== "verified" && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 30_000));
+    const fetched = await apiFetch(`/services/${service.id}/domains/${domain.id}`);
+    domain = fetched?.domain ?? fetched;
+    log(`Verifikations-Status: ${domain?.verificationStatus ?? "unbekannt"}`);
+  }
+  if (domain?.verificationStatus !== "verified") {
+    throw new Error(
+      `Domain ${domainName} nach ${waitMinutes} Minuten nicht verifiziert — DNS-Records beim Provider setzen (siehe oben) und den Workflow erneut ausloesen.`,
+    );
+  }
+  log(`Domain verifiziert: https://${domainName}`);
+
+  // 3) APP_BASE_URL auf die Custom-Domain patchen (Produktiv-URL), onrender bleibt Origin
+  const customUrl = `https://${domainName}`;
+  const buildEnv = makeAppEnvBuilder(dbCheck.url);
+  const patchedOrigins = `${customUrl},https://${serviceName}.onrender.com,https://app.cybersarah-ki.com,https://www.cybersarah-ki.com,https://localhost,http://localhost,capacitor://localhost`;
+  const patchedEnvLines = buildEnv(customUrl).map((line) =>
+    line.startsWith("APP_ALLOWED_ORIGINS=") ? `APP_ALLOWED_ORIGINS=${patchedOrigins}` : line,
+  );
+  const patchBeforeDeployIds = await deployIdsSnapshot(service.id);
+  await apiFetch(`/services/${service.id}/env-vars`, {
+    method: "PUT",
+    body: JSON.stringify(
+      buildServiceCreateRequest({
+        serviceName,
+        envLines: patchedEnvLines,
+      }).envVars,
+    ),
+  });
+  await waitForLive(service.id, patchBeforeDeployIds);
+
+  // 4) Verifikation gegen die produktive URL
+  await verifyPublic(customUrl, "/api/health");
+
+  // HTTP -> HTTPS Redirect pruefen (Render leitet automatisch um)
+  const httpProbe = await fetch(`http://${domainName}/api/health`, {
+    redirect: "manual",
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+  const redirectCode = httpProbe?.status ?? "unreachable";
+  const redirectTarget = httpProbe?.headers?.get("location") ?? "—";
+  log(`HTTP→HTTPS: ${redirectCode} → ${redirectTarget}`);
+
+  // Workspace-CORS: Health mit Origin-Header der Custom-Domain abfragen
+  const workspaceUrl = env("WORKSPACE_SERVICE_URL", `https://${env("RENDER_WORKSPACE_SERVICE_NAME", "cybersarah-workspace")}.onrender.com`).replace(/\/$/, "");
+  const corsProbe = await fetch(`${workspaceUrl}/api/v1/health`, {
+    headers: { Origin: customUrl, accept: "application/json" },
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+  const allowOrigin = corsProbe?.headers?.get("access-control-allow-origin") ?? "nicht gesetzt";
+  log(`Workspace-CORS fuer ${customUrl}: ${allowOrigin}`);
+  if (corsProbe?.ok && allowOrigin === "nicht gesetzt") {
+    log("Hinweis: Access-Control-Allow-Origin fehlt auf /api/v1/health (CORS ggf. nur auf authentifizierten Routen aktiv).");
+  }
+
+  log("Sprint 84 abgeschlossen: Custom Domain live, produktive URL verifiziert.");
 }
 
 async function deployWorkspace() {
@@ -448,6 +570,7 @@ async function main() {
   }
   log("API-Key-Format gueltig.");
 
+  if (domain) return deployCustomDomain();
   if (workspace) return deployWorkspace();
   return deployApp();
 }
