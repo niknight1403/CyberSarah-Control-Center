@@ -97,7 +97,7 @@ function getProviderConfig(provider: Exclude<ProviderId, "managed" | "anthropic"
     gemini: {
       endpoint: getEnv("AI_GEMINI_BASE_URL") ?? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       apiKey: getEnv("AI_GEMINI_API_KEY") ?? getEnv("GEMINI_API_KEY"),
-      defaultModel: getEnv("AI_GEMINI_MODEL") ?? "gemini-2.5-flash",
+      defaultModel: getEnv("AI_GEMINI_MODEL") ?? "gemini-flash-latest",
     },
     openrouter: {
       endpoint: getEnv("AI_OPENROUTER_BASE_URL") ?? "https://openrouter.ai/api/v1/chat/completions",

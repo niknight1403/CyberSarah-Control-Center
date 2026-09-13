@@ -9,7 +9,7 @@ describe("resolveManagedModel (Sprint 85)", () => {
   });
 
   it("nutzt fuer Gemini-Endpoints ein Gemini-Default-Modell", () => {
-    expect(resolveManagedModel(undefined, "gemini", {})).toBe("gemini-2.5-flash");
+    expect(resolveManagedModel(undefined, "gemini", {})).toBe("gemini-flash-latest");
     expect(resolveManagedModel(undefined, "gemini", { AI_GEMINI_MODEL: "gemini-2.5-pro" })).toBe("gemini-2.5-pro");
   });
 

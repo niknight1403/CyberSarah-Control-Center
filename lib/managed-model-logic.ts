@@ -19,7 +19,7 @@ export function resolveManagedModel(
   if (requested) return requested;
 
   if (source === "gemini") {
-    return env.AI_GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+    return env.AI_GEMINI_MODEL?.trim() || "gemini-flash-latest";
   }
 
   const candidates = [
