@@ -387,26 +387,31 @@ async function deployCustomDomain() {
   const service = findServiceByName(await listServices(), serviceName);
   if (!service) throw new Error(`Service "${serviceName}" nicht gefunden.`);
 
-  // 1) Bestehende Domains listen
-  const existingRaw = await apiFetch(`/services/${service.id}/domains?limit=20`);
-  const existing = (Array.isArray(existingRaw) ? existingRaw : []).map((e) => e?.domain ?? e);
+  // 1) Bestehende Custom Domains listen (Render-API: /custom-domains)
+  const existingRaw = await apiFetch(`/services/${service.id}/custom-domains?limit=100`);
+  const existing = (Array.isArray(existingRaw) ? existingRaw : []).map(
+    (e) => e?.customDomain ?? e?.domain ?? e,
+  );
   let domain = existing.find((d) => d?.name?.toLowerCase() === domainName) ?? null;
   if (!domain) {
     log(`Lege Custom Domain ${domainName} fuer "${serviceName}" an …`);
-    const created = await apiFetch(`/services/${service.id}/domains`, {
+    const created = await apiFetch(`/services/${service.id}/custom-domains`, {
       method: "POST",
       body: JSON.stringify({ name: domainName }),
     });
-    domain = created?.domain ?? created;
+    domain = created?.customDomain ?? created?.domain ?? created;
     log(`Domain angelegt: ${domain?.id ?? "unbekannte ID"}`);
   } else {
-    log(`Custom Domain ${domainName} existiert bereits (ID ${domain.id}).`);
+    log(`Custom Domain ${domainName} existiert bereits (ID ${domain?.id ?? "?"}).`);
   }
 
-  // 2) Verifikationsstatus + DNS-Anleitung
+  // 2) Verifikationsstatus + DNS-Anleitung (Status: verified | unverified)
   const printDomain = (d) => {
     const verification = d?.verificationData ?? {};
-    log(`Domain ${d?.name}: Status=${d?.verificationStatus ?? "unbekannt"}`);
+    log(
+      `Domain ${d?.name}: Status=${d?.verificationStatus ?? "unverified"} | Typ=${d?.domainType ?? "?"}` +
+        (d?.redirectForName ? ` | redirectForName=${d.redirectForName}` : ""),
+    );
     if (verification?.dnsName || verification?.dnsValue) {
       log(`  DNS-Record: ${verification.dnsType ?? "CNAME"} ${verification.dnsName ?? domainName} -> ${verification.dnsValue ?? "?"}`);
     }
@@ -414,11 +419,13 @@ async function deployCustomDomain() {
   printDomain(domain);
 
   const deadline = Date.now() + waitMinutes * 60_000;
-  while ((domain?.verificationStatus ?? "pending") !== "verified" && Date.now() < deadline) {
+  while ((domain?.verificationStatus ?? "unverified") !== "verified" && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 30_000));
-    const fetched = await apiFetch(`/services/${service.id}/domains/${domain.id}`);
-    domain = fetched?.domain ?? fetched;
-    log(`Verifikations-Status: ${domain?.verificationStatus ?? "unbekannt"}`);
+    // Abruf per Name oder ID (customDomainNameOrID-Pfadparameter)
+    const idOrName = encodeURIComponent(domain?.id ?? domainName);
+    const fetched = await apiFetch(`/services/${service.id}/custom-domains/${idOrName}`);
+    domain = fetched?.customDomain ?? fetched?.domain ?? fetched;
+    log(`Verifikations-Status: ${domain?.verificationStatus ?? "unverified"}`);
   }
   if (domain?.verificationStatus !== "verified") {
     throw new Error(
