@@ -65,6 +65,11 @@ describe("render-deploy-logic: buildServiceEnv", () => {
     expect(lines.find((l) => l.startsWith("PORT="))).toBeUndefined();
   });
 
+  it("setzt VITE_APP_ID stabil (Session-Tokens tragen appId im Payload)", () => {
+    const lines = buildServiceEnv(base);
+    expect(lines).toContain("VITE_APP_ID=cybersarah-control-center");
+  });
+
   it("nimmt optionale ENVs nur bei vorhandenen Werten auf", () => {
     const withOptional = buildServiceEnv({ ...base, metricsToken: "mt", openAiApiKey: "sk-test-123456" });
     expect(withOptional.find((l) => l.startsWith("METRICS_TOKEN="))).toBeTruthy();
