@@ -3,6 +3,7 @@ import {
   buildServiceCreateRequest,
   buildServiceEnv,
   buildWorkspaceEnv,
+  pickFreshDeploy,
   envVarsFromLines,
   findServiceByName,
   maskSecrets,
@@ -232,5 +233,32 @@ describe("render-deploy-logic: ownerId im Create-Request (Sprint 73)", () => {
   it("laesst ownerId weg, wenn nicht gesetzt (Abwaertskompatibilitaet)", () => {
     const body = buildServiceCreateRequest({ serviceName: "cybersarah-workspace" });
     expect(body.ownerId).toBeUndefined();
+  });
+});
+
+describe("pickFreshDeploy (Sprint-85-Follow-up: False-Green-Fix)", () => {
+  const list = [
+    { id: "dep-old-live", status: "live" },
+    { id: "dep-new", status: "created" },
+    { id: "dep-older", status: "live" },
+  ];
+
+  it("liefert den neuesten Deploy AUSSERHALB des ID-Snapshots — nicht irgendeinen anderen", () => {
+    const fresh = pickFreshDeploy(list, new Set(["dep-old-live"]));
+    expect(fresh?.id).toBe("dep-new");
+  });
+
+  it("liefert null, wenn alle Listeneintraege im Snapshot bekannt sind (kein neuer Deploy)", () => {
+    expect(pickFreshDeploy(list, new Set(["dep-old-live", "dep-new", "dep-older"]))).toBeNull();
+    expect(pickFreshDeploy([], new Set())).toBeNull();
+  });
+
+  it("akzeptiert Arrays als Snapshot und entpackt ggf. { deploy: … }-Eintraege", () => {
+    const wrapped = [{ deploy: { id: "dep-x", status: "live" } }, { deploy: { id: "dep-y", status: "created" } }];
+    expect(pickFreshDeploy(wrapped, ["dep-x"])?.id).toBe("dep-y");
+  });
+
+  it("filtert Eintraege ohne ID defensiv heraus", () => {
+    expect(pickFreshDeploy([{ status: "live" }, { id: "dep-z", status: "created" }], new Set(["dep-known"]))?.id).toBe("dep-z");
   });
 });

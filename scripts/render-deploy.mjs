@@ -24,6 +24,7 @@ import {
   buildWorkspaceEnv,
   findServiceByName,
   maskSecrets,
+  pickFreshDeploy,
   publicServiceUrl,
   renderApiError,
   validateDatabaseUrl,
@@ -104,65 +105,88 @@ async function watchDeployToLive(serviceId, deploy) {
       throw new Error("Build/Update fehlgeschlagen — Render-Logs pruefen.");
     }
     await new Promise((resolve) => setTimeout(resolve, 20000));
-    const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=1`);
-    latest = Array.isArray(deploys) ? deploys[0]?.deploy ?? deploys[0] : latest;
+    // Sprint-85-Follow-up: gezielt DEN Deploy per ID nachladen (kein list[0]).
+    if (latest?.id) {
+      const fetched = await apiFetch(`/services/${serviceId}/deploys/${latest.id}`);
+      latest = fetched?.deploy ?? fetched ?? latest;
+    }
   }
   throw new Error("Timeout beim Warten auf den Live-Deploy (25 Minuten).");
 }
 
 /**
- * Sprint 73 (Stale-Read-Fix): Direkt nach einem ENV-PUT ist der "letzte"
- * Deploy in der Render-API noch der ALTE, ggf. fehlgeschlagene Deploy —
- * waitForLive brach dann sofort mit update_failed ab, obwohl der neue
- * Deploy noch gar nicht existierte. Deshalb: Es wird explizit auf einen
- * Deploy mit NEUER ID gewartet (beforeDeployId) und nur deren Status
- * bewertet. Stoert der ENV-Patch keinen neuen Deploy an (ENV identisch),
- * wird nach 2 Minuten ohne neuen Deploy fortgefahren — der nachgelagerte
- * Health-Check ist der verbindliche Nachweis.
+ * Sprint 73 (Stale-Read-Fix) + Sprint-85-Follow-up (False-Green-Fix):
+ * Gewartet wird auf einen ECHTEN neuen Deploy. Frueher genuegte "ein Deploy
+ * mit anderer ID als der letzte" — das konnte ein BELIEBIGER aelterer aus
+ * den letzten 5 sein, waehrend list[0] (der alte, live Deploy) sofort als
+ * Erfolg galt. Der Health-Check lief dann gegen die ALTE Instanz → false
+ * gruen. Jetzt: Vor dem ENV-PUT wird deployIdsSnapshot() gezogen; "frisch"
+ * ist der neueste Listeneintrag ausserhalb des Snapshots (pickFreshDeploy),
+ * und danach wird GEZIELT dieser konkrete Deploy per ID beobachtet, bis er
+ * live ist oder fehlschlaegt. Erscheint kein neuer Deploy (ENV-identischer
+ * PUT), wird nach 2 Minuten explizit ein Deploy angestossen.
  */
-async function waitForLive(serviceId, beforeDeployId = null, timeoutMs = 25 * 60 * 1000) {
+async function deployIdsSnapshot(serviceId) {
+  const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=5`);
+  if (!Array.isArray(deploys)) return new Set();
+  return new Set(deploys.map((entry) => (entry?.deploy ?? entry)?.id).filter(Boolean));
+}
+
+async function waitForLive(serviceId, beforeDeployIds = null, timeoutMs = 25 * 60 * 1000) {
   const started = Date.now();
-  let newDeploySeen = beforeDeployId === null;
+  const hasSnapshot = beforeDeployIds instanceof Set && beforeDeployIds.size > 0;
+  let watchDeployId = null;
   let noNewDeployPolls = 0;
   while (Date.now() - started < timeoutMs) {
+    // Sobald der neue Deploy identifiziert ist: gezielt SEINEN Status abfragen
+    // (GET /deploys/{id}) — nie mehr list[0] vertrauen.
+    if (watchDeployId) {
+      const deploy = await apiFetch(`/services/${serviceId}/deploys/${watchDeployId}`);
+      const current = deploy?.deploy ?? deploy;
+      const status = current?.status ?? "unbekannt";
+      log(`Deploy-Status (${watchDeployId}): ${status}`);
+      if (status === "live") return current;
+      if (status === "build_failed" || status === "update_failed" || status === "pre_deploy_failed") {
+        throw new Error("Build/Update fehlgeschlagen — Render-Logs pruefen (APP_ALLOWED_ORIGINS, DATABASE_URL, WORKSPACE_DATABASE_URL).");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20000));
+      continue;
+    }
+
     const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=5`);
     const list = Array.isArray(deploys)
       ? deploys.map((entry) => entry?.deploy ?? entry)
       : [];
-    if (!newDeploySeen) {
-      const fresh = list.find((deploy) => deploy?.id && deploy.id !== beforeDeployId);
-      if (!fresh) {
-        noNewDeployPolls += 1;
-        if (noNewDeployPolls >= 6) {
-          // ENV-identischer PUT loest keinen Deploy aus. Der aktuelle Commit
-          // muss aber trotzdem gebaut werden — deshalb expliziter Trigger.
-          log("Kein neuer Deploy durch ENV-Update — stoesse Deploy des aktuellen Commits explizit an.");
-          const triggered = await apiFetch(`/services/${serviceId}/deploys`, { method: "POST" });
-          const triggeredDeploy = triggered?.deploy ?? triggered;
-          const triggeredId = triggeredDeploy?.id ?? null;
-          log(`Deploy angestossen: ${triggeredId ?? "unbekannte ID"}`);
-          await new Promise((resolve) => setTimeout(resolve, 20000));
-          const after = await apiFetch(`/services/${serviceId}/deploys?limit=1`);
-          const afterLatest = Array.isArray(after) ? after[0]?.deploy ?? after[0] : null;
-          const watchId = afterLatest?.id ?? triggeredId;
-          const watch = watchId === triggeredId ? triggeredDeploy : afterLatest;
-          return watchDeployToLive(serviceId, watch);
-        }
-        log("Warte auf neuen Deploy nach ENV-Update …");
+    // Neuer Service (ohne Snapshot): der neueste Deploy ist der gesuchte.
+    const fresh = hasSnapshot ? pickFreshDeploy(list, beforeDeployIds) : (list[0] ?? null);
+    if (!fresh) {
+      if (!hasSnapshot) {
+        log("Warte auf den ersten Deploy des neuen Services …");
         await new Promise((resolve) => setTimeout(resolve, 20000));
         continue;
       }
-      newDeploySeen = true;
-      log(`Neuer Deploy erkannt: ${fresh.id}`);
+      noNewDeployPolls += 1;
+      if (noNewDeployPolls >= 6) {
+        // ENV-identischer PUT loest keinen Deploy aus. Der aktuelle Commit
+        // muss aber trotzdem gebaut werden — deshalb expliziter Trigger.
+        log("Kein neuer Deploy durch ENV-Update — stoesse Deploy des aktuellen Commits explizit an.");
+        const triggered = await apiFetch(`/services/${serviceId}/deploys`, { method: "POST" });
+        const triggeredDeploy = triggered?.deploy ?? triggered;
+        watchDeployId = triggeredDeploy?.id ?? null;
+        if (watchDeployId) {
+          log(`Deploy angestossen: ${watchDeployId}`);
+          continue;
+        }
+        // POST lieferte keine ID: ueber naechste Liste identifizieren.
+        await new Promise((resolve) => setTimeout(resolve, 20000));
+        continue;
+      }
+      log("Warte auf neuen Deploy nach ENV-Update …");
+      await new Promise((resolve) => setTimeout(resolve, 20000));
+      continue;
     }
-    const latest = list[0] ?? null;
-    const status = latest?.status ?? "unbekannt";
-    log(`Deploy-Status: ${status}`);
-    if (status === "live") return latest;
-    if (status === "build_failed" || status === "update_failed" || status === "pre_deploy_failed") {
-      throw new Error("Build/Update fehlgeschlagen — Render-Logs pruefen (APP_ALLOWED_ORIGINS, DATABASE_URL).");
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20000));
+    log(`Neuer Deploy erkannt: ${fresh.id}`);
+    watchDeployId = fresh.id;
   }
   throw new Error("Timeout beim Warten auf den Live-Deploy (25 Minuten).");
 }
@@ -171,13 +195,6 @@ async function verifyPublic(url, healthPath = "/api/health") {
   const health = await fetch(`${url}${healthPath}`);
   if (!health.ok) throw new Error(`${healthPath} antwortet ${health.status}`);
   log(`${healthPath}: ${health.status} OK`);
-}
-
-/** Liefert die ID des aktuell letzten Deploys (fuer den Stale-Read-Guard). */
-async function latestDeployId(serviceId) {
-  const deploys = await apiFetch(`/services/${serviceId}/deploys?limit=1`);
-  if (!Array.isArray(deploys) || deploys.length === 0) return null;
-  return deploys[0]?.deploy?.id ?? deploys[0]?.id ?? null;
 }
 
 /**
@@ -207,15 +224,12 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
 
   if (existing) {
     log(`Service "${serviceName}" existiert (${existing.id}) — setze ENV vollstaendig …`);
-    const priorDeploys = await apiFetch(`/services/${existing.id}/deploys?limit=1`);
-    const priorDeployId = Array.isArray(priorDeploys)
-      ? priorDeploys[0]?.deploy?.id ?? priorDeploys[0]?.id ?? null
-      : null;
+    const priorDeployIds = await deployIdsSnapshot(existing.id);
     await apiFetch(`/services/${existing.id}/env-vars`, {
       method: "PUT",
       body: JSON.stringify(requestBody.envVars),
     });
-    const liveDeploy = await waitForLive(existing.id, priorDeployId);
+    const liveDeploy = await waitForLive(existing.id, priorDeployIds);
     if (liveDeploy) log(`Deploy ${liveDeploy.id ?? ""} live.`);
     let publicUrl = publicServiceUrl((await apiFetch(`/services/${existing.id}`)).service ?? {}) ?? assumedUrl;
     log(`Oeffentliche URL: ${publicUrl}`);
@@ -319,14 +333,14 @@ const jwtSecret = env("JWT_SECRET", randomUUID().replace(/-/g, ""));
   // falls Render den Standard-Subdomain-Namen veraendert hat.
   if (!configuredPublicUrl && publicUrl !== `https://${serviceName}.onrender.com`) {
   log("Patche ENV mit der echten onrender-Domain …");
-    const patchBeforeDeployId = await latestDeployId(service.id);
+    const patchBeforeDeployIds = await deployIdsSnapshot(service.id);
     await apiFetch(`/services/${service.id}/env-vars`, {
       method: "PUT",
       body: JSON.stringify(
         buildServiceCreateRequest({ serviceName, envLines: buildEnv(publicUrl) }).envVars,
       ),
     });
-    await waitForLive(service.id, patchBeforeDeployId);
+    await waitForLive(service.id, patchBeforeDeployIds);
   }
 
   const verifiedPublicUrl = configuredPublicUrl || publicUrl;
@@ -384,7 +398,7 @@ async function deployWorkspace() {
 
   if (publicUrl !== `https://${serviceName}.onrender.com`) {
     log("Patche Workspace-ENV mit der echten onrender-Domain …");
-    const wsPatchBeforeDeployId = await latestDeployId(service.id);
+    const wsPatchBeforeDeployIds = await deployIdsSnapshot(service.id);
     await apiFetch(`/services/${service.id}/env-vars`, {
       method: "PUT",
       body: JSON.stringify(
@@ -396,10 +410,29 @@ async function deployWorkspace() {
         }).envVars,
       ),
     });
-    await waitForLive(service.id, wsPatchBeforeDeployId);
+    await waitForLive(service.id, wsPatchBeforeDeployIds);
   }
 
   await verifyPublic(publicUrl, "/api/v1/health");
+  // Sprint-85-Follow-up: Der Health-Check allein prueft nur HTTP 200 — die
+  // ALTE Instanz erfuellt das auch. Dieses Gate verifiziert den INHALT:
+  // Bei gesetzter WORKSPACE_DATABASE_URL muss der neue Build den Postgres-
+  // Persistenz-Modus melden, sonst schlaegt der Deploy sichtbar fehl.
+  const expectPostgres = Boolean(workspaceDatabaseUrl);
+  const healthResponse = await fetch(`${publicUrl}/api/v1/health`, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!healthResponse.ok) throw new Error(`Health-Antwort ${healthResponse.status} — Deploy unvollstaendig.`);
+  const health = await healthResponse.json().catch(() => null);
+  const storage = health?.storage ?? null;
+  if (expectPostgres && (storage?.mode !== "postgres" || storage?.persistent !== true)) {
+    throw new Error(
+      `Health meldet NICHT den Postgres-Persistenz-Modus (bekam: ${JSON.stringify(storage)}). ` +
+        "Erwartet: mode=postgres, persistent=true — Render-Logs und Neon-Erreichbarkeit pruefen.",
+    );
+  }
+  log(`Speicher-Modus verifiziert: ${JSON.stringify(storage)}`);
   log(`Workspace-Deployment abgeschlossen: ${publicUrl}`);
   log(
     `Hinweis: WORKSPACE_STORAGE_PERSISTENT=${storagePersistent}, WORKSPACE_DATABASE_URL ${workspaceDatabaseUrl ? "gesetzt (Neon-Persistenz)" : "NICHT gesetzt (ephemeral)"}. ` +

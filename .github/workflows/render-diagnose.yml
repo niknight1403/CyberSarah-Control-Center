@@ -1,0 +1,53 @@
+name: Render Diagnose
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service-Name (leer = alle)"
+        required: false
+        default: ""
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Render-Services und Deploy-Historie abfragen (Render-API)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE: ${{ inputs.service }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          key = os.environ["RENDER_API_KEY"]
+          wanted = os.environ.get("SERVICE", "").strip()
+
+          def api(path):
+              req = urllib.request.Request(
+                  "https://api.render.com/v1" + path,
+                  headers={"Authorization": "Bearer " + key},
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          services = api("/services?limit=20")
+          print("--- Services ---")
+          targets = []
+          for entry in services:
+              service = entry.get("service", entry)
+              print(f"{service.get('name')} | {service.get('id')} | {service.get('type')} | suspended={service.get('suspended')}")
+              if not wanted or service.get("name") == wanted:
+                  targets.append((service.get("name"), service.get("id")))
+
+          print()
+          print("--- Deploy-Historie (neueste zuerst) ---")
+          for name, sid in targets:
+              print(f"== {name} ({sid}) ==")
+              for entry in api(f"/services/{sid}/deploys?limit=8"):
+                  deploy = entry.get("deploy", entry)
+                  commit = deploy.get("commit")
+                  cid = commit.get("id", "?")[:7] if isinstance(commit, dict) else str(commit)
+                  print(f"  {deploy.get('id')} | {deploy.get('status')} | commit={cid} | erstellt={deploy.get('createdAt')} | beendet={deploy.get('finishedAt')}")
+          PY
