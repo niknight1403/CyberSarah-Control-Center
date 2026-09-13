@@ -17,7 +17,6 @@ import {
   type ExportSession,
 } from "../lib/chat-export-logic";
 import { buildPersistableTurn } from "../lib/chat-history-logic";
-import { resolveManagedModel } from "../lib/managed-model-logic";
 import { compressPersistedChatHistory } from "../lib/chat-compression-logic";
 import { z } from "zod";
 import { invokeLLM, type Message } from "./_core/llm";
@@ -208,8 +207,7 @@ async function callManaged(messages: ChatMessage[], requestedModel?: string) {
   try {
     const result = await invokeLLM({
       messages: toProviderMessages(messages) as Message[],
-      // Sprint 85: Ohne explizites Modell lehnte OpenAI mit 400 ab.
-      model: resolveManagedModel(requestedModel),
+      model: requestedModel,
       maxTokens: 1_800,
     });
     return { content: extractContent(result), model: result.model };

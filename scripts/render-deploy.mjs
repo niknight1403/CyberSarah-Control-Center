@@ -279,6 +279,7 @@ function makeAppEnvBuilder(databaseUrl) {
       jwtSecret,
       metricsToken: env("METRICS_TOKEN"),
       openAiApiKey: env("OPENAI_API_KEY"),
+      geminiApiKey: env("GEMINI_API_KEY"),
       stripeSecretKey: env("STRIPE_SECRET_KEY"),
       stripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET"),
       oauthServerUrl: env("OAUTH_SERVER_URL"),

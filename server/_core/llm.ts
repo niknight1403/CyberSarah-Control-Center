@@ -4,6 +4,7 @@ import {
   MANAGED_LLM_NO_KEY_MESSAGE,
   resolveManagedLlmEndpoint,
 } from "../../lib/managed-llm-fallback-logic";
+import { resolveManagedModel } from "../../lib/managed-model-logic";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -219,6 +220,7 @@ const resolveManagedEndpoint = () => {
     forgeApiUrl: ENV.forgeApiUrl,
     forgeApiKey: ENV.forgeApiKey,
     openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
+    geminiApiKey: process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || undefined,
     openaiApiKey: process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,
   });
   if (!endpoint) {
@@ -348,13 +350,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     max_tokens,
   } = params;
 
+  // Sprint 85: Der model-Parameter ist Pflicht — ohne explizites Modell
+  // greift ein endpoint-bewusstes Default (siehe managed-model-logic).
+  const resolvedModel = model ?? resolveManagedModel(undefined, endpoint.source);
+
   const payload: Record<string, unknown> = {
     messages: messages.map(normalizeMessage),
+    model: resolvedModel,
   };
-
-  if (model) {
-    payload.model = model;
-  }
 
   if (tools && tools.length > 0) {
     payload.tools = tools;

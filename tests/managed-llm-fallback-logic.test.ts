@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  GEMINI_OPENAI_COMPAT_URL,
   MANAGED_LLM_NO_KEY_MESSAGE,
   resolveManagedLlmEndpoint,
   type ManagedLlmEnv,
@@ -38,6 +39,36 @@ describe("resolveManagedLlmEndpoint", () => {
       url: "https://openai-proxy.example.com/v1",
       apiKey: "proxy-key",
       source: "openai",
+    });
+  });
+
+  it("Sprint 85: bevorzugt Gemini vor dem OpenAI-Endpoint", () => {
+    const env: ManagedLlmEnv = {
+      forgeApiKey: undefined,
+      geminiApiKey: "gem-key",
+      openaiApiKey: "sk-openai-key",
+    };
+    expect(resolveManagedLlmEndpoint(env)).toEqual({
+      url: GEMINI_OPENAI_COMPAT_URL,
+      apiKey: "gem-key",
+      source: "gemini",
+    });
+  });
+
+  it("Sprint 85: faellt ohne Forge- und Gemini-Key auf OpenAI zurueck", () => {
+    const env: ManagedLlmEnv = { forgeApiKey: "", geminiApiKey: "  ", openaiApiKey: "sk-openai-key" };
+    expect(resolveManagedLlmEndpoint(env)).toEqual({
+      url: "https://api.openai.com/v1/chat/completions",
+      apiKey: "sk-openai-key",
+      source: "openai",
+    });
+  });
+
+  it("Sprint 85: ohne OpenAI-Key reicht ein Gemini-Key allein", () => {
+    expect(resolveManagedLlmEndpoint({ geminiApiKey: "gem-key" })).toEqual({
+      url: GEMINI_OPENAI_COMPAT_URL,
+      apiKey: "gem-key",
+      source: "gemini",
     });
   });
 
