@@ -75,11 +75,11 @@ services:
         sync: false
       - key: PREVIEW_PUBLIC_BASE_URL
         sync: false
-      # Sprint 85 (Persistent Disk): Erst NACH dem Bucken der Disk im
-      # Render-Dashboard aktivieren. Ablauf siehe
-      # docs/SPRINT_85_PERSISTENT_DISK.md (bezahlter Owner-Schritt).
-      # - key: WORKSPACE_STORAGE_PERSISTENT
-      #   value: "true"
+      # Sprint 85 (Persistent Disk): Die Disk selbst wird im Render-Dashboard
+      # gebucht (Disks-Seite, Mount /data). Das Flag WORKSPACE_STORAGE_PERSISTENT
+      # wird NICHT hier gesetzt, sondern via GitHub-Secret im Render-Deploy-
+      # Workflow (Default false) — das Workflow-PUT ueberschreibt Dashboard-ENV.
+      # Ablauf: docs/SPRINT_85_PERSISTENT_DISK.md (bezahlter Owner-Schritt).
       #
       # Render Persistent Disk (bezahltes Add-on): Mount-Pfad /data,
       # WORKSPACES_DIR=/data/workspaces (Service-Default) zeigt dann auf die

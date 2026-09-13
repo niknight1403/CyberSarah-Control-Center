@@ -355,8 +355,17 @@ async function deployWorkspace() {
   const defaultAllowedOrigins = `https://${appServiceName}.onrender.com,https://app.cybersarah-ki.com,https://www.cybersarah-ki.com,https://localhost,capacitor://localhost,http://localhost`;
   const allowedOrigin = env("WORKSPACE_ALLOWED_ORIGIN", defaultAllowedOrigins);
 
+  // Sprint 85: WORKSPACE_STORAGE_PERSISTENT kommt aus dem Workflow-Umfeld
+  // (GitHub-Secret, Default "false"). Bewusst NICHT per Dashboard setzen —
+  // das naechste PUT /env-vars dieses Skripts wuerde es ueberschreiben.
+  const storagePersistent = env("WORKSPACE_STORAGE_PERSISTENT", "false").trim() || "false";
   const buildEnv = (allowedOrigin, previewUrl) =>
-    buildWorkspaceEnv({ serviceAccessToken, allowedOrigin, previewPublicBaseUrl: previewUrl });
+    buildWorkspaceEnv({
+      serviceAccessToken,
+      allowedOrigin,
+      previewPublicBaseUrl: previewUrl,
+      extra: [`WORKSPACE_STORAGE_PERSISTENT=${storagePersistent}`],
+    });
 
   const { service, publicUrl } = await upsertService({
     serviceName,
@@ -387,7 +396,8 @@ async function deployWorkspace() {
   await verifyPublic(publicUrl, "/api/v1/health");
   log(`Workspace-Deployment abgeschlossen: ${publicUrl}`);
   log(
-    "Hinweis: WORKSPACES_DIR liegt auf Render Free auf ephemeraler Disk — Persistent Disk ist ein bezahlter Owner-Schritt.",
+    `Hinweis: WORKSPACE_STORAGE_PERSISTENT=${storagePersistent} gesetzt. ` +
+      "persistent gilt nur, wenn die Disk (Mount /data) wirklich existiert — der Service meldet den Modus konservativ im Health-Endpoint.",
   );
 }
 

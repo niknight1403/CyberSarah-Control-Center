@@ -27,7 +27,7 @@ Buchung ausschließlich über das Render-Dashboard (Owner-Handoff), nicht über 
 3. **Mount-Pfad:** `/data` — der Service-Default `WORKSPACES_DIR=/data/workspaces` zeigt damit auf die Disk; keine Env-Änderung an `WORKSPACES_DIR` nötig.
 4. **Größe:** 1 GB Startgröße (Kosten siehe Render-Konsole; jederzeit vergrößerbar, nicht verkleinerbar).
 5. Render startet den Service nach dem Anlegen der Disk automatisch neu — Achtung: Das Verzeichnis `/data` ersetzt beim ersten Mount den (leeren) Container-Pfad; Workspaces liegen erst nach dem nächsten `attach`/Clone wieder vor (siehe Migration, Abschnitt 4).
-6. Danach im Service die Env-Variable setzen: `WORKSPACE_STORAGE_PERSISTENT=true` (Bestätigung, dass die Disk produktiv ist — siehe Abschnitt 5).
+6. **Env-Variable bewusst NICHT per Render-Dashboard setzen** — der Render-Deploy-Workflow macht `PUT /services/{id}/env-vars` und wuerde sie beim naechsten Deploy ueberschreiben. Stattdessen: GitHub-Secret `WORKSPACE_STORAGE_PERSISTENT=true` im Repo setzen (Settings → Secrets and variables → Actions); der Workflow reicht es als ENV ans Deploy-Skript durch (Default: `false`). Danach einmal den Workflow *Render Deploy* (Target: `workspace`) laufen lassen.
 
 ## 3. Backup-/Restore-Strategie
 
@@ -60,6 +60,7 @@ Die Free-Tier-Instanz ist ephemeral — es gibt nichts Verwertbares zu migrieren
   # erwartet: {"status":"ready","version":"1.0.0","storage":{"mode":"persistent","persistent":true},...}
   ```
 - **In der App:** Einstellungen → Workspace-Service → Diagnose „Prüfen“: Zeile zeigt „Version 1.0.0 · Persistenter Speicher aktiv · …“.
+- **ENV-Verifikation im Workflow-Log:** Der Render-Deploy-Workspace-Job loggt `Hinweis: WORKSPACE_STORAGE_PERSISTENT=true gesetzt.`
 - **Reboot-Test:** In der App eine Workspace-Datei speichern → Render-Dashboard: Manual Deploy/Neustart → Datei erneut lesen. Nur mit Disk bestanden.
 
 ## 6. Betriebshinweise mit Disk (laut Render-Doku)
@@ -70,7 +71,7 @@ Die Free-Tier-Instanz ist ephemeral — es gibt nichts Verwertbares zu migrieren
 
 ## 7. Offene Owner-Handoffs
 
-- Render-Disk buchen (Abschnitt 2) und `WORKSPACE_STORAGE_PERSISTENT=true` setzen — beides Dashboard-Aktionen, bewusst nicht automatisiert.
+- Render-Disk buchen (Abschnitt 2, Dashboard-Aktion) und danach das GitHub-Secret `WORKSPACE_STORAGE_PERSISTENT=true` setzen plus einmal *Render Deploy* (Target `workspace`) laufen lassen — bewusst nicht automatisert.
 - Kostenentscheidung: Disk ist bezahlt (Free-Plan-Kontingent bleibt für beide Services erhalten).
 
 ## 8. Anschlussarbeit
