@@ -22,11 +22,12 @@
 
 Buchung ausschließlich über das Render-Dashboard (Owner-Handoff), nicht über den Blueprint — `render.yaml` hält die Disk-Deklaration deshalb **auskommentiert**:
 
-1. Render-Dashboard → Service `cybersarah-workspace` → *Disks* → *Add Disk*.
-2. **Mount-Pfad:** `/data` — der Service-Default `WORKSPACES_DIR=/data/workspaces` zeigt damit auf die Disk; keine Env-Änderung an `WORKSPACES_DIR` nötig.
-3. **Größe:** 1 GB Startgröße (Kosten siehe Render-Konsole; jederzeit vergrößerbar, nicht verkleinerbar).
-4. Render startet den Service nach dem Anlegen der Disk automatisch neu — Achtung: Das Verzeichnis `/data` ersetzt beim ersten Mount den (leeren) Container-Pfad; Workspaces liegen erst nach dem nächsten `attach`/Clone wieder vor (siehe Migration, Abschnitt 4).
-5. Danach im Service die Env-Variable setzen: `WORKSPACE_STORAGE_PERSISTENT=true` (Bestätigung, dass die Disk produktiv ist — siehe Abschnitt 5).
+1. **Voraussetzung (Render-Docs, verifiziert 13.09.):** Persistent Disks haengen nur an **bezahlten** Web-Services — der Workspace-Service muss also zunaechst von Free auf einen bezahlten Instance-Typ (Starter) umgestellt werden (Service → Settings → Instance Type). Kosten: Starter ~$7/Monat plus $0.25/GB/Monat fuer die Disk (sekundengenau abgerechnet).
+2. Render-Dashboard → Service `cybersarah-workspace` → *Disks* → *Add Disk*.
+3. **Mount-Pfad:** `/data` — der Service-Default `WORKSPACES_DIR=/data/workspaces` zeigt damit auf die Disk; keine Env-Änderung an `WORKSPACES_DIR` nötig.
+4. **Größe:** 1 GB Startgröße (Kosten siehe Render-Konsole; jederzeit vergrößerbar, nicht verkleinerbar).
+5. Render startet den Service nach dem Anlegen der Disk automatisch neu — Achtung: Das Verzeichnis `/data` ersetzt beim ersten Mount den (leeren) Container-Pfad; Workspaces liegen erst nach dem nächsten `attach`/Clone wieder vor (siehe Migration, Abschnitt 4).
+6. Danach im Service die Env-Variable setzen: `WORKSPACE_STORAGE_PERSISTENT=true` (Bestätigung, dass die Disk produktiv ist — siehe Abschnitt 5).
 
 ## 3. Backup-/Restore-Strategie
 
@@ -38,6 +39,7 @@ Buchung ausschließlich über das Render-Dashboard (Owner-Handoff), nicht über 
   # Download über die Render-Shell-Dateiansicht
   ```
   Restore umgekehrt per Entpacken an denselben Pfad. Das Log ist append-only — beim Restore vorhandene Zeilen behalten, Duplikate sind tolerierbar.
+- **Render-Snapshots (Bonus):** Render erstellt automatisch taeglich einen Disk-Snapshot (mindestens 7 Tage verfuegbar, Restore ueber die Disks-Seite). Wichtig laut Doku: Ein Snapshot-Restore setzt die Disk auf den Stand zurueck — danach geschriebene Daten gehen verloren. Der Snapshot ersetzt kein Git-Backup, ist aber ein zweites Netz.
 - **Kein weiterer Server-Zustand:** Der Service speichert bewusst keine Credentials persistent; Cloud-Provider-Keys verlässt die App nur pro Request (Header), nicht in die Disk.
 
 ## 4. Migrationsplan für bestehende Workspace-Daten
@@ -60,12 +62,18 @@ Die Free-Tier-Instanz ist ephemeral — es gibt nichts Verwertbares zu migrieren
 - **In der App:** Einstellungen → Workspace-Service → Diagnose „Prüfen“: Zeile zeigt „Version 1.0.0 · Persistenter Speicher aktiv · …“.
 - **Reboot-Test:** In der App eine Workspace-Datei speichern → Render-Dashboard: Manual Deploy/Neustart → Datei erneut lesen. Nur mit Disk bestanden.
 
-## 6. Offene Owner-Handoffs
+## 6. Betriebshinweise mit Disk (laut Render-Doku)
+
+- Nur **eine** Service-Instanz moeglich (kein horizontales Scaling mit Disk).
+- **Keine Zero-Downtime-Deploys mehr:** Render stoppt die alte Instanz vor dem Start der neuen — wenige Sekunden Verfuegbarkeitssprung pro Deploy. Das ist ein bewusster Schutz gegen Datenkorruption.
+- Disk-Groesse ist jederzeit erhoehbar (kein Downtime), aber **nicht verkleinerbar** — daher 1 GB als Startwert.
+
+## 7. Offene Owner-Handoffs
 
 - Render-Disk buchen (Abschnitt 2) und `WORKSPACE_STORAGE_PERSISTENT=true` setzen — beides Dashboard-Aktionen, bewusst nicht automatisiert.
 - Kostenentscheidung: Disk ist bezahlt (Free-Plan-Kontingent bleibt für beide Services erhalten).
 
-## 7. Anschlussarbeit
+## 8. Anschlussarbeit
 
 - `docs/render-deployment.md` (Ephemeral Storage) bei Buchung um den produktiven Modus ergänzen.
 - Backup-Automatisierung des Audit-Logs (z. B. wöchentlicher tar-Export) als eigener Folge-Sprint, sobald Disk-Betriebserfahrung vorliegt.
