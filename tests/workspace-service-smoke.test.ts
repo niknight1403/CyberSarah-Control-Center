@@ -24,6 +24,16 @@ describe.skipIf(process.env.CI)("workspace-service startup smoke (Sprint 73)", (
   it("startet auch mit unbeschreibbarem WORKSPACES_DIR (Fallback statt Crash)", async () => {
     const serviceDir = path.resolve(__dirname, "..", "workspace-service");
     expect(fsSync.existsSync(path.join(serviceDir, "src", "index.js"))).toBe(true);
+    // Sprint 85: Der Service hat ein eigenes package.json — ohne lokale
+    // Installation (cd workspace-service && npm install) stirbt der Child-
+    // Prozess sofort mit ERR_MODULE_NOT_FOUND und der Test laeuft in sein
+    // verwirrendes 25s-Timeout. Mit dieser Vorbedingung faellt er stattdessen
+    // sofort mit einer loesbaren Meldung.
+    if (!fsSync.existsSync(path.join(serviceDir, "node_modules"))) {
+      throw new Error(
+        "workspace-service/node_modules fehlt — bitte einmalig `npm install --omit=dev` im Ordner workspace-service ausfuehren.",
+      );
+    }
 
     const port = 18787 + Math.floor(Math.random() * 2000);
 

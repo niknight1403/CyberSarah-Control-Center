@@ -17,9 +17,17 @@ export type RemoteWorkspaceConfig = {
   fallbackProviderApiKey?: string;
 };
 
+// Sprint 85: Speicher-Modus des Workspace-Service (optional — aeltere
+// Service-Versionen melden das Feld noch nicht).
+export type RemoteWorkspaceStorage = {
+  mode: "persistent" | "ephemeral";
+  persistent: boolean;
+};
+
 export type RemoteHealth = {
   status: "ready" | "busy";
   version: string;
+  storage?: RemoteWorkspaceStorage;
   previewUrl?: string;
 };
 

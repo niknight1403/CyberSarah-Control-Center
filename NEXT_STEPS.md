@@ -1,6 +1,6 @@
 # CyberSarah Control Center — Nächste geplante Schritte
 
-Stand: 2026-09-11 (nach Release **1.3.0**, Tag `v1.3.0`)
+Stand: 2026-09-13 (nach Release **1.3.0**, Fixes bis **v1.3.3**)
 
 ## Abgeschlossen (Kurzbilanz)
 
@@ -17,8 +17,8 @@ Akzeptanzkriterium je Sprint: TypeScript sauber, volle Vitest-Suite gruen (Ausna
 |---|---|---|
 | 83 | Play-Store-Release vorbereiten | Store-Listing (Titel, Kurz-/Langbeschreibung, Grafiken) ist gemäß `PLAY_STORE_BEREITSCHAFT.md` fertig dokumentiert; Screenshots der Kernscreens (Chat, Studio, Admin-Dashboard, Diff-Viewer) liegen als Assets bereit; der Upload-Pfad fuer das Release-AAB aus dem GitHub-Release `v1.3.0-apk` ist Schritt fuer Schritt beschrieben; Data-Safety-Formular ist ausgefuellt dokumentiert. |
 | 84 | Custom Domain und Domain-Mapping abschließen (Render-Phase 5) | `app.cybersarah-ki.com` ist auf den Render-Workspace-Service gemappt; CORS-Konfiguration des Workspace-Service akzeptiert die Custom Domain; HTTPS/Redirect-Verhalten ist dokumentiert und die Verbindungspruefung der App gegen die produktive URL ist gruen. |
-| 85 | Persistent Disk für den Workspace-Service | Die Render-Disk-Konfiguration (bezahlt) ist dokumentiert: Mount-Pfad, Backup-/Restore-Strategie, Migrationsplan fuer bestehende Workspace-Daten; die App verbindet sich gegen die persistente Variante und der Smoke-Test des Workspace-Service ist auf dem produktiven Pfad gruen. |
-| 86 | Expo-SDK-Major-Upgrade als separater Sprint | Upgrade auf die naechste Expo-Hauptversion in einem eigenen Sprint: Abhaengigkeits-Matrix aktualisiert, NativeWind-Hauptversionswechsel geprueft (v4 ist die letzte der v4-Reihe), strengerer Typecheck bereinigt, `android/`-Ordner manuell angepasst (Quelle der Wahrheit, kein CNG), Web-Export, Server-Build und Release-AAB-Pipeline gruen. |
+| 85 | Persistent Disk für den Workspace-Service | **Entwicklungs-Anteil abgeschlossen (13.09.):** Modus-Erkennung + Health-Feld `storage`, App-Diagnose-Anzeige, Unit-Tests, Blueprint-Doku — siehe `docs/SPRINT_85_PERSISTENT_DISK.md`. **Offener Owner-Handoff:** Render-Disk buchen (Mount `/data`, 1 GB Startgröße) und `WORKSPACE_STORAGE_PERSISTENT=true` setzen; danach Verifikation laut Sprint-85-Doku (Abschnitt 5). |
+| 86 | Expo-SDK-Major-Upgrade als separater Sprint | **Zur Zeit nicht anstehend:** Das SDK-57-Major-Upgrade ist abgeschlossen (11.09., `docs/SPRINT_SDK57_UPGRADE.md`), und SDK 57 ist die aktuelle Hauptversion. Dieser Sprint entsteht neu, sobald SDK 58 veroeffentlicht ist — dann Abhaengigkeits-Matrix aktualisieren, NativeWind-Hauptversionswechsel pruefen, strengeren Typecheck bereinigen, `android/`-Ordner manuell anpassen (Quelle der Wahrheit, kein CNG), Web-Export, Server-Build und Release-AAB-Pipeline gruen. |
 
 ### Detailplanung Sprint 83 — Play-Store-Release (zuerst)
 

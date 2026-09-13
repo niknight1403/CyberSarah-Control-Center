@@ -61,7 +61,7 @@ Optional mit sinnvollen Defaults: `METRICS_TOKEN`, `OPENAI_API_KEY` (Managed-LLM
 
 ## Ephemeral Storage (WORKSPACES_DIR)
 
-Render Free hat **keine persistenten Disks** — der Storage ist ephemeral (flüchtig). Der Workspace-Service fällt ohne `WORKSPACES_DIR` auf ein beschreibbares lokales Verzeichnis zurück und warnt beim Start über Ephemeralität: Workspace-Repositorys liegen dann im Arbeitsspeicher/Dateisystem des Containers und verschwinden beim Re-Deploy. Da der Service die Repos per `git clone` aus Remote-Quellen bezieht, ist das für Preview-Zwecke funktional; langlebige Workspaces erfordern eine Render Persistent Disk (bezahlter Owner-Schritt, Upgrade-Pfad bleibt dokumentiert).
+Render Free hat **keine persistenten Disks** — der Storage ist ephemeral (flüchtig). Der Workspace-Service fällt ohne `WORKSPACES_DIR` auf ein beschreibbares lokales Verzeichnis zurück und warnt beim Start über Ephemeralität: Workspace-Repositorys liegen dann im Arbeitsspeicher/Dateisystem des Containers und verschwinden beim Re-Deploy. Da der Service die Repos per `git clone` aus Remote-Quellen bezieht, ist das für Preview-Zwecke funktional; langlebige Workspaces erfordern eine Render Persistent Disk (bezahlter Owner-Schritt, Upgrade-Pfad bleibt dokumentiert; Umsetzung und Owner-Schritte: `SPRINT_85_PERSISTENT_DISK.md`).
 
 ## Secrets-Architektur (unverändert)
 

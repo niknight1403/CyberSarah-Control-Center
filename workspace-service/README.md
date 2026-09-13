@@ -17,7 +17,7 @@ Place the service behind an HTTPS reverse proxy such as Caddy or Nginx, forwardi
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/v1/health` | Returns service readiness and version. |
+| `GET /api/v1/health` | Returns service readiness and version. Since Sprint 85 it also reports the storage mode (`storage: { mode, persistent }`) — `persistent` only when `WORKSPACE_STORAGE_PERSISTENT` is set and the resolved workspaces path matches the configured one. |
 | `POST /api/v1/repositories/attach` | Clones or updates an HTTPS GitHub repository and enumerates workspace files. |
 | `GET` / `PUT /api/v1/workspaces/:id/file` | Reads or writes an in-workspace source file after path validation. |
 | `GET / POST /api/v1/workspaces/:id/git/*` | Returns status, creates a commit, and pushes the current branch. |

@@ -75,3 +75,17 @@ services:
         sync: false
       - key: PREVIEW_PUBLIC_BASE_URL
         sync: false
+      # Sprint 85 (Persistent Disk): Erst NACH dem Bucken der Disk im
+      # Render-Dashboard aktivieren. Ablauf siehe
+      # docs/SPRINT_85_PERSISTENT_DISK.md (bezahlter Owner-Schritt).
+      # - key: WORKSPACE_STORAGE_PERSISTENT
+      #   value: "true"
+      #
+      # Render Persistent Disk (bezahltes Add-on): Mount-Pfad /data,
+      # WORKSPACES_DIR=/data/workspaces (Service-Default) zeigt dann auf die
+      # Disk. Beim Anwenden des Blueprints unkommentiert lassen, solange die
+      # Disk nicht gebucht ist — sonst schlaegt der Deploy am fehlenden Mount fehl.
+      # disk:
+      #   name: cybersarah-workspace-data
+      #   mountPath: /data
+      #   sizeGB: 1

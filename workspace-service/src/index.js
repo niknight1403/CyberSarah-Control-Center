@@ -9,6 +9,7 @@ import cors from "cors";
 import express from "express";
 import httpProxy from "http-proxy";
 import { z } from "zod";
+import { resolveStorageStatus } from "./storage-status.js";
 
 const execFileAsync = promisify(execFile);
 const port = Number(process.env.PORT ?? 8787);
@@ -69,6 +70,19 @@ async function resolveWorkspacesDirectory() {
   return lastResort;
 }
 const workspacesDirectory = await resolveWorkspacesDirectory();
+// Sprint 85: Speicher-Modus diagnostizieren (persistent vs. ephemeral).
+const storageStatus = resolveStorageStatus({ env: process.env, activeDir: workspacesDirectory });
+if (storageStatus.persistent) {
+  console.log(
+    `[workspaces] Speicher-Modus: persistent (${workspacesDirectory}) — Workspace-Daten ueberleben Re-Deploys.`,
+  );
+} else {
+  console.warn(
+    `[workspaces] Speicher-Modus: ephemeral — Workspace-Daten ueberleben kein Re-Deploy. ` +
+      `Persistent Disk (Mount /data) + WORKSPACES_DIR=/data/workspaces + WORKSPACE_STORAGE_PERSISTENT=true ` +
+      `siehe docs/SPRINT_85_PERSISTENT_DISK.md`,
+  );
+}
 const publicBaseUrl = (process.env.PREVIEW_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
 const serviceAccessToken = process.env.SERVICE_ACCESS_TOKEN ?? "";
 const allowedOrigin = process.env.ALLOWED_ORIGIN ?? "";
@@ -123,7 +137,7 @@ const externalActionAuditService = {
     const safeEvent = this.sanitize(event);
     try {
       await fs.mkdir(path.dirname(auditLogFile), { recursive: true });
-      await fs.appendFile(auditLogFile, `${JSON.stringify(safeEvent)}\\n`, "utf8");
+      await fs.appendFile(auditLogFile, `${JSON.stringify(safeEvent)}\n`, "utf8");
     } catch (error) {
       console.warn(JSON.stringify({ scope: "externalActionAuditService", status: "local-log-failed", message: error instanceof Error ? error.message : "unknown" }));
     }
@@ -524,7 +538,13 @@ app.use(
 // Health-Check bewusst oeffentlich (keine Secrets in der Antwort):
 // Platform-Health-Checks (z. B. Koyeb) senden keinen Bearer-Token.
 app.get("/api/v1/health", (_request, response) => {
-  response.json({ status: "ready", version: "1.0.0", previewUrl: publicBaseUrl || undefined });
+  // storage (Sprint 85): Modus-Meldung fuer die App-Diagnose — ohne Pfade/Secrets.
+  response.json({
+    status: "ready",
+    version: "1.0.0",
+    storage: { mode: storageStatus.mode, persistent: storageStatus.persistent },
+    previewUrl: publicBaseUrl || undefined,
+  });
 });
 
 app.post("/api/v1/providers/cloud/test", requireServiceAuthorization, async (request, response, next) => {
