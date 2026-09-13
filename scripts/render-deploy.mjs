@@ -56,7 +56,8 @@ async function apiFetch(path, options = {}) {
   });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(renderApiError(response.status, text));
+    // Sprint-84-Diagnose: Welche Anfrage schlug fehl? (Methode + Pfad)
+    throw new Error(`[${options.method ?? "GET"} ${path}] ${renderApiError(response.status, text)}`);
   }
   return text ? JSON.parse(text) : null;
 }
