@@ -418,6 +418,15 @@ async function deployCustomDomain() {
   };
   printDomain(domain);
 
+  // Manuellen DNS-Verifikations-Check anstossen (Render-API: /verify, 202).
+  // Noetig, wenn die Domain vor DNS-Aenderungen angelegt wurde und die
+  // automatische Hintergrunds-Verifikation sie nicht erfasst hat.
+  if ((domain?.verificationStatus ?? "unverified") !== "verified") {
+    const idOrName = encodeURIComponent(domain?.id ?? domainName);
+    await apiFetch(`/services/${service.id}/custom-domains/${idOrName}/verify`, { method: "POST" });
+    log("DNS-Verifikation manuell angestossen (POST /verify).");
+  }
+
   const deadline = Date.now() + waitMinutes * 60_000;
   while ((domain?.verificationStatus ?? "unverified") !== "verified" && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 30_000));
