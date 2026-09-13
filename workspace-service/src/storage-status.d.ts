@@ -8,13 +8,17 @@ export interface ResolveStorageStatusInput {
   activeDir: string;
   /** Default, wenn WORKSPACES_DIR nicht gesetzt ist. */
   defaultDir?: string;
+  /** Sprint-85-Follow-up: true, wenn der Neon-Postgres-Heartbeat erfolgreich war. */
+  databaseConnected?: boolean;
 }
 
 export interface StorageStatus {
-  mode: "persistent" | "ephemeral";
+  /** "persistent" = Render-Disk (bezahlte Variante), "postgres" = kostenlose Neon-Persistenz. */
+  mode: "persistent" | "postgres" | "ephemeral";
   persistent: boolean;
   declaredPersistent: boolean;
   onConfiguredPath: boolean;
+  databaseConnected: boolean;
 }
 
 export declare function resolveStorageStatus(input: ResolveStorageStatusInput): StorageStatus;

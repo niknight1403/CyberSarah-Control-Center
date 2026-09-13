@@ -17,10 +17,12 @@ export type RemoteWorkspaceConfig = {
   fallbackProviderApiKey?: string;
 };
 
-// Sprint 85: Speicher-Modus des Workspace-Service (optional — aeltere
-// Service-Versionen melden das Feld noch nicht).
+// Sprint 85 + Follow-up: Speicher-Modus des Workspace-Service (optional —
+// aeltere Service-Versionen melden das Feld noch nicht). "postgres" = die
+// kostenlose Neon-Persistenz (Audit-Log + WIP-Backups), "persistent" = die
+// bezahlte Render-Disk.
 export type RemoteWorkspaceStorage = {
-  mode: "persistent" | "ephemeral";
+  mode: "persistent" | "postgres" | "ephemeral";
   persistent: boolean;
 };
 

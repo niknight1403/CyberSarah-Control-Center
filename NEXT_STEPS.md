@@ -17,7 +17,7 @@ Akzeptanzkriterium je Sprint: TypeScript sauber, volle Vitest-Suite gruen (Ausna
 |---|---|---|
 | 83 | Play-Store-Release vorbereiten | Store-Listing (Titel, Kurz-/Langbeschreibung, Grafiken) ist gemäß `PLAY_STORE_BEREITSCHAFT.md` fertig dokumentiert; Screenshots der Kernscreens (Chat, Studio, Admin-Dashboard, Diff-Viewer) liegen als Assets bereit; der Upload-Pfad fuer das Release-AAB aus dem GitHub-Release `v1.3.0-apk` ist Schritt fuer Schritt beschrieben; Data-Safety-Formular ist ausgefuellt dokumentiert. |
 | 84 | Custom Domain und Domain-Mapping abschließen (Render-Phase 5) | `app.cybersarah-ki.com` ist auf den Render-Workspace-Service gemappt; CORS-Konfiguration des Workspace-Service akzeptiert die Custom Domain; HTTPS/Redirect-Verhalten ist dokumentiert und die Verbindungspruefung der App gegen die produktive URL ist gruen. |
-| 85 | Persistent Disk für den Workspace-Service | **Entwicklungs-Anteil abgeschlossen (13.09.):** Modus-Erkennung + Health-Feld `storage`, App-Diagnose-Anzeige, Unit-Tests, Blueprint-Doku — siehe `docs/SPRINT_85_PERSISTENT_DISK.md`. **Offener Owner-Handoff:** Render-Disk buchen (Mount `/data`, 1 GB Startgröße) und `WORKSPACE_STORAGE_PERSISTENT=true` setzen; danach Verifikation laut Sprint-85-Doku (Abschnitt 5). |
+| 85 | Persistent Disk für den Workspace-Service | **Erledigt (13.09.) — als KOSTENLOSE Alternative:** Statt der bezahlten Render-Disk persistiert der Workspace-Service jetzt über Neon-Postgres (`WORKSPACE_DATABASE_URL`, Schema `workspace_service`): Audit-Events + nicht gepushte WIP-Dateien überleben Re-Deploys. Health meldet `mode: "postgres"`, App-Diagnose zeigt „Persistenter Speicher aktiv (kostenloses Postgres-Backup)". Unit-Tests + Spawn-Smoke (DB-Ausfall → ehrlich ephemeral) grün. Render-Disk bleibt optionales Upgrade — siehe `docs/SPRINT_85_PERSISTENT_DISK.md` (Abschnitt 6b). |
 | 86 | Expo-SDK-Major-Upgrade als separater Sprint | **Zur Zeit nicht anstehend:** Das SDK-57-Major-Upgrade ist abgeschlossen (11.09., `docs/SPRINT_SDK57_UPGRADE.md`), und SDK 57 ist die aktuelle Hauptversion. Dieser Sprint entsteht neu, sobald SDK 58 veroeffentlicht ist — dann Abhaengigkeits-Matrix aktualisieren, NativeWind-Hauptversionswechsel pruefen, strengeren Typecheck bereinigen, `android/`-Ordner manuell anpassen (Quelle der Wahrheit, kein CNG), Web-Export, Server-Build und Release-AAB-Pipeline gruen. |
 
 ### Detailplanung Sprint 83 — Play-Store-Release (zuerst)
@@ -32,7 +32,7 @@ Akzeptanzkriterium je Sprint: TypeScript sauber, volle Vitest-Suite gruen (Ausna
 
 - Play-Store-Einreichung im Play Console durchfuehren (AAB-Upload aus Release `v1.3.0-apk`, Listing aus Sprint 83).
 - APK auf einem echten Android-Gerät installieren und Workspace-Service, Cloud-Keys sowie LAN/VPN-Provider-Endpoints testen (kein `127.0.0.1` fuer Remote-Modelserver).
-- Render-Konsole: Custom Domain bestätigen (84) und Persistent Disk buchen (85) — die Buchung/das DNS-Handling liegt beim Owner.
+- Render-Konsole: Custom Domain bestätigen (84) — Persistent Disk (85) ist nicht mehr nötig (kostenlose Postgres-Persistenz aktiv); eine eventuelle Disk-Buchung bleibt optionales Upgrade.
 
 ## Mittel- und langfristige Richtung (nach Sprint 86)
 

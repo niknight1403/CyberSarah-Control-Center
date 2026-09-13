@@ -10,6 +10,7 @@ import express from "express";
 import httpProxy from "http-proxy";
 import { z } from "zod";
 import { resolveStorageStatus } from "./storage-status.js";
+import { connectPersistence, createPersistence } from "./db-persistence.js";
 
 const execFileAsync = promisify(execFile);
 const port = Number(process.env.PORT ?? 8787);
@@ -70,8 +71,25 @@ async function resolveWorkspacesDirectory() {
   return lastResort;
 }
 const workspacesDirectory = await resolveWorkspacesDirectory();
-// Sprint 85: Speicher-Modus diagnostizieren (persistent vs. ephemeral).
-const storageStatus = resolveStorageStatus({ env: process.env, activeDir: workspacesDirectory });
+// Sprint 85 + Follow-up: Speicher-Modus diagnostizieren. Die kostenlose
+// Alternative zur Render-Disk ist Neon-Postgres (WORKSPACE_DATABASE_URL):
+// Heartbeat + Schema-Init beim Start, konservativ — ohne bestätigte
+// Verbindung bleibt der Modus ephemer und der Service laeuft weiter.
+const persistence = createPersistence({ env: process.env });
+const persistenceReady = await connectPersistence(persistence);
+if (persistence && !persistenceReady) {
+  console.warn(
+    "[workspaces] WARNUNG: WORKSPACE_DATABASE_URL gesetzt, aber Datenbank nicht erreichbar — Persistenz deaktiviert, Modus bleibt ephemer.",
+  );
+}
+if (persistenceReady) {
+  console.log("[workspaces] Neon-Postgres-Persistenz aktiv (Audit-Log + WIP-Dateibackups, Schema workspace_service).");
+}
+const storageStatus = resolveStorageStatus({
+  env: process.env,
+  activeDir: workspacesDirectory,
+  databaseConnected: persistenceReady,
+});
 if (storageStatus.persistent) {
   console.log(
     `[workspaces] Speicher-Modus: persistent (${workspacesDirectory}) — Workspace-Daten ueberleben Re-Deploys.`,
@@ -140,6 +158,13 @@ const externalActionAuditService = {
       await fs.appendFile(auditLogFile, `${JSON.stringify(safeEvent)}\n`, "utf8");
     } catch (error) {
       console.warn(JSON.stringify({ scope: "externalActionAuditService", status: "local-log-failed", message: error instanceof Error ? error.message : "unknown" }));
+    }
+    if (persistenceReady) {
+      try {
+        await persistence.appendAuditEvent(safeEvent);
+      } catch (error) {
+        console.warn(JSON.stringify({ scope: "externalActionAuditService", status: "db-append-failed", message: error instanceof Error ? error.message : "unknown" }));
+      }
     }
     const sink = process.env.EXTERNAL_ACTION_AUDIT_URL?.trim();
     if (sink) {
@@ -358,6 +383,18 @@ async function ensureWorkspace(repositoryUrl, branch, token) {
   if (!exists) {
     await fs.mkdir(workspacesDirectory, { recursive: true });
     await git(["clone", "--branch", branch, "--single-branch", repositoryUrl, workspacePath], workspacesDirectory, token);
+    // Sprint-85-Follow-up: Nach Re-Deploy wird frisch geclont — gesicherte
+    // WIP-Dateien (noch nicht gepushte Schreibvorgänge) aus Postgres restoren.
+    if (persistenceReady) {
+      try {
+        const restored = await persistence.restoreFileBackups(workspaceId, async (filePath, content) => {
+          await fs.writeFile(getSafeProjectPath(workspaceId, filePath), content, "utf8");
+        });
+        if (restored > 0) console.log(`[workspaces] ${restored} gesicherte WIP-Datei(en) fuer ${workspaceId} aus Postgres wiederhergestellt.`);
+      } catch (error) {
+        console.warn(`[workspaces] WIP-Restore fuer ${workspaceId} fehlgeschlagen: ${error instanceof Error ? error.message : "unknown"}`);
+      }
+    }
   } else {
     await git(["fetch", "origin", branch], workspacePath, token);
     await git(["checkout", "-B", branch, `origin/${branch}`], workspacePath, token);
@@ -632,6 +669,13 @@ app.put("/api/v1/workspaces/:workspaceId/file", requireServiceAuthorization, asy
     const destination = getSafeProjectPath(request.params.workspaceId, input.path);
     await fs.mkdir(path.dirname(destination), { recursive: true });
     await fs.writeFile(destination, input.content, "utf8");
+    if (persistenceReady) {
+      try {
+        await persistence.saveFileBackup(request.params.workspaceId, input.path, input.content);
+      } catch (error) {
+        console.warn(`[workspaces] WIP-Backup fuer ${request.params.workspaceId} fehlgeschlagen: ${error instanceof Error ? error.message : "unknown"}`);
+      }
+    }
     response.json({ saved: true, path: input.path });
   } catch (error) {
     next(error);
@@ -711,6 +755,13 @@ app.post("/api/v1/workspaces/:workspaceId/git/push", requireServiceAuthorization
     const { stdout } = await git(["push", "origin", `HEAD:refs/heads/${branch}`], workspacePath, getGitHubToken(request));
     const { stdout: commitSha } = await git(["rev-parse", "HEAD"], workspacePath, getGitHubToken(request));
     await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "push", status: "passed", branch, commitSha: commitSha.trim(), message: "Branch erfolgreich zum Remote übertragen." });
+    if (persistenceReady) {
+      try {
+        await persistence.clearFileBackups(request.params.workspaceId);
+      } catch (error) {
+        console.warn(`[workspaces] WIP-Cleanup fuer ${request.params.workspaceId} fehlgeschlagen: ${error instanceof Error ? error.message : "unknown"}`);
+      }
+    }
     response.json({ pushed: true, branch, output: stdout });
   } catch (error) {
     next(error);

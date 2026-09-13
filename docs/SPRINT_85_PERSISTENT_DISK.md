@@ -69,9 +69,34 @@ Die Free-Tier-Instanz ist ephemeral — es gibt nichts Verwertbares zu migrieren
 - **Keine Zero-Downtime-Deploys mehr:** Render stoppt die alte Instanz vor dem Start der neuen — wenige Sekunden Verfuegbarkeitssprung pro Deploy. Das ist ein bewusster Schutz gegen Datenkorruption.
 - Disk-Groesse ist jederzeit erhoehbar (kein Downtime), aber **nicht verkleinerbar** — daher 1 GB als Startwert.
 
+## 6b. Umgesetzt: KOSTENLOSE Alternative — Neon-Postgres-Persistenz
+
+Statt der bezahlten Render-Disk nutzt der Workspace-Service jetzt das
+bereits vorhandene Neon-Postgres (Free-Tier, `DATABASE_URL` des Projekts)
+als Persistenz-Schicht (`WORKSPACE_DATABASE_URL`, vom Render-Deploy-Workflow
+durchgereicht; eigenes Schema `workspace_service`, keine Kollision mit der
+Haupt-App). Modus im Health-Endpoint: `"postgres"` — die App-Diagnose zeigt
+„Persistenter Speicher aktiv (kostenloses Postgres-Backup)".
+
+**Was ueberlebt Re-Deploys jetzt (100 % kostenlos):**
+- **Audit-Events** (`workspace_service.audit_events`, idempotent via `event_id`)
+- **Nicht gepushte Datei-Schreibvorgänge** (`workspace_service.workspace_file_backups`):
+  Nach einem Re-Deploy wird der Workspace frisch geclont und das WIP aus der
+  DB wiederhergestellt; nach erfolgreichem Push wird es verworfen.
+
+**Bewusste Grenzen:**
+- Workspaces selbst sind Git-Clones — GitHub bleibt das primaere Storage-
+  Backend (Clone-on-demand wie bisher).
+- Committed-aber-nicht-gepushte Commits bleiben verloren (Git-Objekte zu
+  spiegeln waere unvertretbar komplex).
+- Ohne `WORKSPACE_DATABASE_URL` oder bei DB-Ausfall: Graceful Degradation —
+  der Service laeuft ephemer weiter, der Health-Endpoint meldet das ehrlich.
+- Die Render-Disk bleibt als optionales Upgrade nutzbar (Modus `persistent`
+  hat Vorrang, sollte sie je gebucht werden).
+
 ## 7. Offene Owner-Handoffs
 
-- Render-Disk buchen (Abschnitt 2, Dashboard-Aktion) und danach das GitHub-Secret `WORKSPACE_STORAGE_PERSISTENT=true` setzen plus einmal *Render Deploy* (Target `workspace`) laufen lassen — bewusst nicht automatisert.
+- ~~Render-Disk buchen~~ **Erledigt durch die kostenlose Alternative (Abschnitt 6b): nichts zu buchen, keine Kosten.** Die Disk-Buchung (Abschnitt 2) bleibt optional für den Fall, dass Dateisystem-Persistenz je gebraucht wird — dann wie beschrieben GitHub-Secret `WORKSPACE_STORAGE_PERSISTENT=true` setzen und *Render Deploy* (Target `workspace`) laufen lassen.
 - Kostenentscheidung: Disk ist bezahlt (Free-Plan-Kontingent bleibt für beide Services erhalten).
 
 ## 8. Anschlussarbeit

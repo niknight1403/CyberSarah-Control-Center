@@ -359,12 +359,18 @@ async function deployWorkspace() {
   // (GitHub-Secret, Default "false"). Bewusst NICHT per Dashboard setzen —
   // das naechste PUT /env-vars dieses Skripts wuerde es ueberschreiben.
   const storagePersistent = env("WORKSPACE_STORAGE_PERSISTENT", "false").trim() || "false";
+  // Sprint-85-Follow-up: KOSTENLOSE Persistenz ueber Neon-Postgres (gleiche
+  // DB wie die Haupt-App, eigenes Schema workspace_service). Ohne die URL
+  // bleibt der Service ephemer — Health meldet das ehrlich.
+  const workspaceDatabaseUrl = env("WORKSPACE_DATABASE_URL", "").trim();
+  const extraEnv = [`WORKSPACE_STORAGE_PERSISTENT=${storagePersistent}`];
+  if (workspaceDatabaseUrl) extraEnv.push(`WORKSPACE_DATABASE_URL=${workspaceDatabaseUrl}`);
   const buildEnv = (allowedOrigin, previewUrl) =>
     buildWorkspaceEnv({
       serviceAccessToken,
       allowedOrigin,
       previewPublicBaseUrl: previewUrl,
-      extra: [`WORKSPACE_STORAGE_PERSISTENT=${storagePersistent}`],
+      extra: extraEnv,
     });
 
   const { service, publicUrl } = await upsertService({
@@ -396,8 +402,8 @@ async function deployWorkspace() {
   await verifyPublic(publicUrl, "/api/v1/health");
   log(`Workspace-Deployment abgeschlossen: ${publicUrl}`);
   log(
-    `Hinweis: WORKSPACE_STORAGE_PERSISTENT=${storagePersistent} gesetzt. ` +
-      "persistent gilt nur, wenn die Disk (Mount /data) wirklich existiert — der Service meldet den Modus konservativ im Health-Endpoint.",
+    `Hinweis: WORKSPACE_STORAGE_PERSISTENT=${storagePersistent}, WORKSPACE_DATABASE_URL ${workspaceDatabaseUrl ? "gesetzt (Neon-Persistenz)" : "NICHT gesetzt (ephemeral)"}. ` +
+      "Der Service meldet den tatsaechlich verifizierten Modus konservativ im Health-Endpoint.",
   );
 }
 

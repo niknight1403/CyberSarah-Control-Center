@@ -88,4 +88,8 @@ jobs:
           # Sprint 85: erst auf "true" setzen, wenn die Render-Disk (Mount /data)
           # gebucht ist — siehe docs/SPRINT_85_PERSISTENT_DISK.md.
           WORKSPACE_STORAGE_PERSISTENT: ${{ secrets.WORKSPACE_STORAGE_PERSISTENT || 'false' }}
+          # Sprint-85-Follow-up (kostenlose Alternative): Neon-Postgres-Persistenz
+          # (Audit-Log + WIP-Backups, Schema workspace_service). Nutzt das
+          # bestehende DATABASE_URL-Secret — kein neuer Account, keine Kosten.
+          WORKSPACE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: node scripts/render-deploy.mjs --workspace

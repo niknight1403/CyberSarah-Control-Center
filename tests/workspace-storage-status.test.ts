@@ -4,11 +4,14 @@ import { describe, expect, it } from "vitest";
 import { resolveStorageStatus } from "../workspace-service/src/storage-status.js";
 
 /**
- * Sprint 85 (Persistent Disk): Unit-Tests fuer die Speicher-Modus-Erkennung.
+ * Sprint 85 (Persistent Disk) + Follow-up (Neon-Postgres): Unit-Tests fuer
+ * die Speicher-Modus-Erkennung.
  *
- * Der Modus muss bewusst konservativ sein: "persistent" gilt nur, wenn das
- * Flag WORKSPACE_STORAGE_PERSISTENT gesetzt UND der aktive Workspaces-Pfad
- * dem konfigurierten Pfad entspricht (kein Fallback aktiv). Der Spawn-Smoke
+ * Der Modus muss bewusst konservativ sein: "persistent" (Render-Disk) gilt
+ * nur, wenn das Flag WORKSPACE_STORAGE_PERSISTENT gesetzt UND der aktive
+ * Workspaces-Pfad dem konfigurierten Pfad entspricht (kein Fallback aktiv).
+ * Die KOSTENLOSE Alternative ist der Modus "postgres" (Heartbeat der
+ * Neon-Persistenz erfolgreich). Der Spawn-Smoke
  * (tests/workspace-service-smoke.test.ts) deckt nur den Fallback-Kandidaten
  * ab — diese Suite prueft die Kombinatorik deterministisch in der CI.
  */
@@ -76,5 +79,49 @@ describe("resolveStorageStatus (Sprint 85)", () => {
       activeDir: "/data/workspaces",
     });
     expect(status.persistent).toBe(false);
+  });
+});
+
+describe("resolveStorageStatus: Postgres-Modus (Sprint-85-Follow-up, kostenlose Alternative)", () => {
+  it("meldet postgres, wenn der Neon-Heartbeat erfolgreich war (persistent: true)", () => {
+    const status = resolveStorageStatus({
+      env: {},
+      activeDir: "/tmp/cybersarah-workspaces",
+      databaseConnected: true,
+    });
+    expect(status.mode).toBe("postgres");
+    expect(status.persistent).toBe(true);
+    expect(status.databaseConnected).toBe(true);
+  });
+
+  it("bleibt ephemeral, wenn die DB-URL gesetzt ist, der Heartbeat aber fehlschlug", () => {
+    const status = resolveStorageStatus({
+      env: {},
+      activeDir: "/tmp/cybersarah-workspaces",
+      databaseConnected: false,
+    });
+    expect(status.mode).toBe("ephemeral");
+    expect(status.persistent).toBe(false);
+  });
+
+  it("priorisiert die Render-Disk ueber Postgres (Disk ist die staerkere Garantie)", () => {
+    const status = resolveStorageStatus({
+      env: { WORKSPACES_DIR: "/data/workspaces", WORKSPACE_STORAGE_PERSISTENT: "true" },
+      activeDir: "/data/workspaces",
+      databaseConnected: true,
+    });
+    expect(status.mode).toBe("persistent");
+    expect(status.persistent).toBe(true);
+  });
+
+  it("postgres gilt auch auf dem Fallback-Pfad — der Speicher liegt ja ausserhalb des Dateisystems", () => {
+    const status = resolveStorageStatus({
+      env: {},
+      activeDir: path.resolve(process.cwd(), "workspaces"),
+      databaseConnected: true,
+    });
+    expect(status.mode).toBe("postgres");
+    expect(status.persistent).toBe(true);
+    expect(status.onConfiguredPath).toBe(false);
   });
 });

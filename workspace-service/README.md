@@ -44,3 +44,16 @@ The service accepts only `https://github.com/owner/repository(.git)` repository 
 [1]: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens "GitHub Docs: Managing personal access tokens"
 [2]: https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api "GitHub Docs: Authenticating to the REST API"
 [3]: https://docs.github.com/rest/repos/contents "GitHub Docs: Repository contents API"
+
+## Persistenz (Sprint 85 + Follow-up)
+
+Auf Render Free ist das Dateisystem ephemeral — zwei Persistenz-Wege:
+
+1. **Neon-Postgres (KOSTENLOS, aktiv):** `WORKSPACE_DATABASE_URL` persistiert
+   Audit-Events und nicht gepushte Datei-Schreibvorgänge (WIP) im Schema
+   `workspace_service`. Health meldet dann `"storage": {"mode": "postgres",
+   "persistent": true}`. Ohne URL oder bei DB-Ausfall: ephemer weiterlaufen
+   (Graceful Degradation).
+2. **Render Persistent Disk (bezahltes Upgrade):** Mount `/data` +
+   `WORKSPACE_STORAGE_PERSISTENT=true` → Modus `persistent`
+   (siehe docs/SPRINT_85_PERSISTENT_DISK.md).

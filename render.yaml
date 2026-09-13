@@ -81,6 +81,12 @@ services:
       # Workflow (Default false) — das Workflow-PUT ueberschreibt Dashboard-ENV.
       # Ablauf: docs/SPRINT_85_PERSISTENT_DISK.md (bezahlter Owner-Schritt).
       #
+      # Sprint-85-Follow-up (KOSTENLOSE Alternative, aktiv): Persistenz ueber
+      # das vorhandene Neon-Postgres (gleiche DATABASE_URL wie die Haupt-App,
+      # eigenes Schema workspace_service). Wird vom Render-Deploy-Workflow
+      # als WORKSPACE_DATABASE_URL durchgereicht — Audit-Log + WIP-Datei-
+      # backups ueberleben Re-Deploys ohne jegliche Kosten.
+      #
       # Render Persistent Disk (bezahltes Add-on): Mount-Pfad /data,
       # WORKSPACES_DIR=/data/workspaces (Service-Default) zeigt dann auf die
       # Disk. Beim Anwenden des Blueprints unkommentiert lassen, solange die
