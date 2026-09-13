@@ -26,6 +26,8 @@ import { rankProviders, type LatencySample, type ProviderScore } from "@/lib/pro
 import { DEFAULT_CONNECTOR_PREFERENCES, enabledConnectorCount, normalizeConnectorPreferences, CONNECTOR_PREFERENCE_STORAGE_KEY, toggleConnector, type ConnectorId, type ConnectorPreferences } from "@/lib/connector-preferences-logic";
 import { DEFAULT_SKILL_PREFERENCES, enabledSkillCount, normalizeSkillPreferences, SKILL_PREFERENCE_STORAGE_KEY, toggleSkill, type SkillId, type SkillPreferences } from "@/lib/skill-preferences-logic";
 import { FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ListRenderItemInfo } from "react-native";
+import { darken, withAlpha } from "@/lib/theme-color-utils";
+import { useColors } from "@/hooks/use-colors";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal; timestampMs?: number };
 type ChatAttachment = MediaAttachment;
@@ -36,6 +38,8 @@ type InnerTab = "chat" | "github" | "skills";
 const initialMessages: ChatMessage[] = [{ id: "agent-intro", role: "agent", content: "Willkommen im KI-Operations-Chat. Beschreibe eine Änderung, ein Problem oder ein Refactoring — ich kümmere mich darum." }];
 
 export default function ChatScreen() {
+    const colors = useColors();
+    const s = useMemo(() => createStyles(colors), [colors]);
   const { loadRemoteFiles, selectedFile } = useWorkspace();
   const { attachRepository, loadRepositoryDetails, loadWorkspaceHealth, settings } = useStudioSettings();
   const [activeTab, setActiveTab] = useState<InnerTab>("chat");
@@ -188,7 +192,7 @@ export default function ChatScreen() {
     }
   };
 
-  const statusColor = (st: ConnectorTestStatus) => st === "success" ? "#4ADE9C" : st === "error" ? "#FF8A96" : st === "testing" ? "#38E1FF" : "#8294A8";
+  const statusColor = (st: ConnectorTestStatus) => st === "success" ? colors.success : st === "error" ? colors.error : st === "testing" ? colors.tint : "#8294A8";
   const statusIcon = (st: ConnectorTestStatus) => st === "success" ? "OK" : st === "error" ? "X" : st === "testing" ? "…" : "○";
   const canSend = Boolean(prompt.trim()) && !isThinking && readyForChat;
 
@@ -221,7 +225,7 @@ export default function ChatScreen() {
             <View style={s.tabBar}>
               {([["chat", "chatbubbles", "Chat"], ["github", "logo-github", "GitHub"], ["skills", "sparkles", "Skills"]] as const).map(([tab, icon, label]) => (
                 <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[s.tab, activeTab === tab && s.tabActive]}>
-                  <Ionicons name={icon as never} size={14} color={activeTab === tab ? "#38E1FF" : "#6B7D90"} />
+                  <Ionicons name={icon as never} size={14} color={activeTab === tab ? colors.tint : "#6B7D90"} />
                   <Text style={[s.tabText, activeTab === tab && s.tabTextActive]}>{label}</Text>
                   {tab === "github" && settings.hasGitHubToken ? <View style={s.dot} /> : null}
                   {tab === "skills" ? <Text style={s.badge}>{enabledSkillCount(skillPreferences) + enabledConnectorCount(connectorPreferences)}</Text> : null}
@@ -265,7 +269,7 @@ export default function ChatScreen() {
                 ListFooterComponent={<>
                   {chatError ? (
                     <View style={s.errorRow}>
-                      <Ionicons name="warning" size={14} color="#FF8A96" />
+                      <Ionicons name="warning" size={14} color={colors.error} />
                       <Text style={s.error}>{chatError}</Text>
                     </View>
                   ) : null}
@@ -356,21 +360,22 @@ export default function ChatScreen() {
   );
 }
 
-const s = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingBottom: 28 },
   tabBar: { backgroundColor: "rgba(13, 21, 32, 0.85)", borderColor: "#1E2F47", borderRadius: 16, borderWidth: 1, flexDirection: "row", marginBottom: 12, padding: 4 },
   tab: { alignItems: "center", borderRadius: 12, flex: 1, flexDirection: "row", gap: 5, justifyContent: "center", paddingVertical: 9 },
-  tabActive: { backgroundColor: "rgba(56, 225, 255, 0.10)", borderColor: "rgba(56, 225, 255, 0.35)", borderWidth: 1 },
+  tabActive: { backgroundColor: withAlpha(colors.tint, 0.10), borderColor: withAlpha(colors.tint, 0.35), borderWidth: 1 },
   tabText: { color: "#6B7D90", fontSize: 12, fontWeight: "700" },
-  tabTextActive: { color: "#38E1FF" },
-  dot: { backgroundColor: "#4ADE9C", borderRadius: 4, height: 6, width: 6 },
-  badge: { backgroundColor: "#1E3A4A", borderRadius: 8, color: "#38E1FF", fontSize: 9, fontWeight: "900", overflow: "hidden", paddingHorizontal: 5, paddingVertical: 1 },
+  tabTextActive: { color: colors.tint },
+  dot: { backgroundColor: colors.success, borderRadius: 4, height: 6, width: 6 },
+  badge: { backgroundColor: withAlpha(colors.tint, 0.14), borderRadius: 8, color: colors.tint, fontSize: 9, fontWeight: "900", overflow: "hidden", paddingHorizontal: 5, paddingVertical: 1 },
   statusCard: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 12, overflow: "hidden", padding: 12 },
-  statusReady: { backgroundColor: "rgba(11, 21, 34, 0.9)", borderColor: "#24503E" },
-  statusWarn: { backgroundColor: "rgba(26, 21, 8, 0.9)", borderColor: "#5C4A1E" },
-  statusGlow: { backgroundColor: "#4ADE9C", borderRadius: 3, height: 8, shadowColor: "#4ADE9C", shadowOpacity: 0.8, shadowRadius: 6, width: 8 },
-  statusGlowWarn: { backgroundColor: "#F5C46B", borderRadius: 3, height: 8, width: 8 },
+  statusReady: { backgroundColor: withAlpha(colors.success, 0.1), borderColor: darken(colors.success, 0.6) },
+  statusWarn: { backgroundColor: withAlpha(colors.warning, 0.12), borderColor: darken(colors.warning, 0.68) },
+  statusGlow: { backgroundColor: colors.success, borderRadius: 3, height: 8, shadowColor: colors.success, shadowOpacity: 0.8, shadowRadius: 6, width: 8 },
+  statusGlowWarn: { backgroundColor: colors.warning, borderRadius: 3, height: 8, width: 8 },
   statusCopy: { flex: 1 },
   statusTitle: { color: "#DDE8F4", fontSize: 13, fontWeight: "800" },
   statusText: { color: "#8294A8", fontSize: 11, lineHeight: 16, marginTop: 2 },
@@ -380,8 +385,8 @@ const s = StyleSheet.create({
   dayDividerRow: { alignItems: "center", flexDirection: "row", gap: 10, marginBottom: 12, marginTop: 4 },
   dayDividerLine: { backgroundColor: "#1E2F47", flex: 1, height: 1 },
   dayDividerText: { color: "#5D7290", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
-  errorRow: { alignItems: "center", backgroundColor: "rgba(45, 18, 26, 0.85)", borderColor: "#6E2A3A", borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 7, marginBottom: 8, paddingHorizontal: 11, paddingVertical: 9 },
-  error: { color: "#FF8A96", flex: 1, fontSize: 11, lineHeight: 16 },
+  errorRow: { alignItems: "center", backgroundColor: withAlpha(colors.error, 0.12), borderColor: darken(colors.error, 0.6), borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 7, marginBottom: 8, paddingHorizontal: 11, paddingVertical: 9 },
+  error: { color: colors.error, flex: 1, fontSize: 11, lineHeight: 16 },
   connCard: { backgroundColor: "rgba(15, 22, 31, 0.9)", borderColor: "#243347", borderRadius: 16, borderWidth: 1, marginBottom: 12, padding: 14 },
   connRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   connInfo: { flex: 1, marginRight: 10 },
@@ -391,7 +396,7 @@ const s = StyleSheet.create({
   testBtn: { alignItems: "center", backgroundColor: "#131F2E", borderColor: "#2B3E55", borderRadius: 10, borderWidth: 1, flex: 1, flexDirection: "row", gap: 6, justifyContent: "center", paddingVertical: 9 },
   testBtnTxt: { color: "#9FBDD4", fontSize: 12, fontWeight: "700" },
   toggle: { backgroundColor: "#1A2433", borderRadius: 12, height: 24, justifyContent: "center", paddingHorizontal: 2, width: 44 },
-  toggleOn: { backgroundColor: "#16728B" },
+  toggleOn: { backgroundColor: withAlpha(colors.tint, 0.3) },
   knob: { backgroundColor: "#4A6070", borderRadius: 10, height: 20, width: 20 },
   knobOn: { backgroundColor: "#ECFBFF", marginLeft: 20 },
   mgBtn: { alignItems: "center", backgroundColor: "#1A2433", borderColor: "#2B3C52", borderRadius: 10, borderWidth: 1, justifyContent: "center", paddingHorizontal: 10, paddingVertical: 9 },
@@ -399,5 +404,6 @@ const s = StyleSheet.create({
   testResult: { fontSize: 11, lineHeight: 16, marginTop: 8 },
   skillRow: { alignItems: "center", borderTopColor: "#1E2B3B", borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", paddingVertical: 12 },
   settingsLink: { alignItems: "center", marginTop: 8, paddingVertical: 12 },
-  settingsLinkTxt: { color: "#38E1FF", fontSize: 13, fontWeight: "700" },
-});
+  settingsLinkTxt: { color: colors.tint, fontSize: 13, fontWeight: "700" },
+  });
+}

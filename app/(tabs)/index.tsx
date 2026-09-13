@@ -16,8 +16,12 @@ import { getWorkspaceSyncState } from "@/lib/workspace-sync-logic";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { darken, lighten, withAlpha } from "@/lib/theme-color-utils";
+import { useColors } from "@/hooks/use-colors";
 
 export default function WorkspaceScreen() {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   const { changedFileCount, files, hydrateFile, loadRemoteFiles, markFilesSynced, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
   const { commitRepository, createRepositoryPullRequest, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
@@ -253,7 +257,7 @@ export default function WorkspaceScreen() {
               <View style={styles.projectTopLine}>
                 <View style={styles.projectIdentity}>
                   <View style={styles.projectIcon}>
-                    <IconSymbol name="folder.fill" size={20} color="#52D8FF" />
+                    <IconSymbol name="folder.fill" size={20} color={colors.tint} />
                   </View>
                   <View>
                     <Text style={styles.projectName}>{repositoryLabel}</Text>
@@ -307,7 +311,7 @@ export default function WorkspaceScreen() {
           <>
             <View style={styles.editorHeader}>
               <View style={styles.editorFileIdentity}>
-                <IconSymbol name="doc.text.fill" size={17} color="#8B7CFF" />
+                <IconSymbol name="doc.text.fill" size={17} color={colors.tint} />
                 <View>
                   <Text style={styles.editorFileName}>{selectedFile.name}</Text>
                   <Text style={styles.editorPath}>{selectedFile.path}</Text>
@@ -366,13 +370,13 @@ export default function WorkspaceScreen() {
             <StudioSection label="Console" title="Aktiver Kontext" />
             <View style={styles.consoleCard}>
               <View style={styles.consolePrompt}>
-                <IconSymbol name="terminal.fill" size={16} color="#45D996" />
+                <IconSymbol name="terminal.fill" size={16} color={colors.success} />
                 <Text style={styles.consolePromptText}>workspace:{settings.branch}</Text>
               </View>
               <Text style={styles.consoleText}>{hasAttachedRepository ? `Verbunden mit ${repositoryLabel} auf ${settings.branch}.` : "Sichere Remote-Verbindung noch nicht konfiguriert."}</Text>
               <TouchableOpacity activeOpacity={0.75} onPress={() => router.push("/settings" as never)} style={styles.consoleLink}>
                 <Text style={styles.consoleLinkText}>Verbindung einrichten</Text>
-                <IconSymbol name="arrow.right" size={14} color="#52D8FF" />
+                <IconSymbol name="arrow.right" size={14} color={colors.tint} />
               </TouchableOpacity>
             </View>
           </>
@@ -392,14 +396,14 @@ export default function WorkspaceScreen() {
               style={[styles.fileRow, isSelected && styles.fileRowSelected]}
             >
               <View style={[styles.fileIcon, isSelected && styles.fileIconSelected]}>
-                <IconSymbol name="doc.text.fill" size={16} color={isSelected ? "#52D8FF" : "#8B9AAE"} />
+                <IconSymbol name="doc.text.fill" size={16} color={isSelected ? colors.tint : "#8B9AAE"} />
               </View>
               <View style={styles.fileTextArea}>
                 <Text style={[styles.fileName, isSelected && styles.fileNameSelected]}>{item.name}</Text>
                 <Text numberOfLines={1} style={styles.filePath}>{item.path}</Text>
               </View>
               {item.changed ? <View style={styles.changedDot} /> : null}
-              <IconSymbol name="chevron.right" size={17} color={isSelected ? "#52D8FF" : "#647388"} />
+              <IconSymbol name="chevron.right" size={17} color={isSelected ? colors.tint : "#647388"} />
             </TouchableOpacity>
           );
         }}
@@ -419,8 +423,10 @@ function formatCommitDate(value: string) {
 }
 
 function RepositoryQualityPanel({ quality }: { quality: RepositoryQuality }) {
-  const mergeTone = getQualityTone(quality.merge.state);
-  const ciTone = getQualityTone(quality.ci.state);
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
+  const mergeTone = getQualityTone(styles, quality.merge.state);
+  const ciTone = getQualityTone(styles, quality.ci.state);
   return (
     <View style={styles.qualityPanel}>
       <View style={styles.qualityPillRow}>
@@ -430,30 +436,31 @@ function RepositoryQualityPanel({ quality }: { quality: RepositoryQuality }) {
       {quality.pullRequest ? <Text style={styles.qualityPrText}>PR #{quality.pullRequest.number}: {quality.pullRequest.headBranch} → {quality.pullRequest.baseBranch}</Text> : <Text style={styles.qualityPrText}>Für den aktuellen Branch ist kein offener Pull Request vorhanden.</Text>}
       {quality.pullRequest ? <View style={styles.reviewMetrics}><Text style={styles.reviewMetric}>Reviewer <Text style={styles.qualityMetricStrong}>{quality.reviews.reviewerCount}</Text></Text><Text style={styles.reviewMetricApproved}>Genehmigt <Text style={styles.qualityMetricStrong}>{quality.reviews.approvedCount}</Text></Text><Text style={styles.reviewMetricChanges}>Änderungen <Text style={styles.qualityMetricStrong}>{quality.reviews.requestedChangesCount}</Text></Text></View> : null}
       <View style={styles.qualityMetrics}><Text style={styles.qualityMetric}>Bestanden <Text style={styles.qualityMetricStrong}>{quality.ci.passed}</Text></Text><Text style={styles.qualityMetric}>Läuft <Text style={styles.qualityMetricStrong}>{quality.ci.pending}</Text></Text><Text style={styles.qualityMetric}>Fehler <Text style={styles.qualityMetricStrong}>{quality.ci.failed}</Text></Text></View>
-      {quality.ci.checks.length ? quality.ci.checks.map((check) => <View key={`${check.name}-${check.status}`} style={styles.checkRow}><View style={[styles.checkDot, getQualityTone(check.conclusion ?? check.status).dot]} /><Text numberOfLines={1} style={styles.checkName}>{check.name}</Text><Text style={styles.checkState}>{check.conclusion ?? check.status}</Text></View>) : <Text style={styles.qualityEmpty}>GitHub meldet für diesen Pull Request noch keine Check-Runs oder Commit-Status-Prüfungen.</Text>}
+      {quality.ci.checks.length ? quality.ci.checks.map((check) => <View key={`${check.name}-${check.status}`} style={styles.checkRow}><View style={[styles.checkDot, getQualityTone(styles, check.conclusion ?? check.status).dot]} /><Text numberOfLines={1} style={styles.checkName}>{check.name}</Text><Text style={styles.checkState}>{check.conclusion ?? check.status}</Text></View>) : <Text style={styles.qualityEmpty}>GitHub meldet für diesen Pull Request noch keine Check-Runs oder Commit-Status-Prüfungen.</Text>}
     </View>
   );
 }
 
-function getQualityTone(state: string) {
+function getQualityTone(styles: ReturnType<typeof createStyles>, state: string) {
   if (["ready", "passed", "merged", "success"].includes(state)) return { container: styles.qualityReady, dot: styles.dotReady, text: styles.textReady };
   if (["failing", "blocked", "failure", "error", "cancelled", "timed_out"].includes(state)) return { container: styles.qualityFailure, dot: styles.dotFailure, text: styles.textFailure };
   if (["running", "checking", "attention", "draft"].includes(state)) return { container: styles.qualityWarning, dot: styles.dotWarning, text: styles.textWarning };
   return { container: styles.qualityNeutral, dot: styles.dotNeutral, text: styles.textNeutral };
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   content: { paddingBottom: 20 },
   projectCard: { backgroundColor: "#121A26", borderColor: "#2A3B52", borderRadius: 18, borderWidth: 1, marginBottom: 26, padding: 15 },
   projectTopLine: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   projectIdentity: { alignItems: "center", flexDirection: "row", gap: 10, flex: 1, marginRight: 8 },
-  projectIcon: { alignItems: "center", backgroundColor: "#153444", borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
+  projectIcon: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.1), borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
   projectName: { color: "#F1F5FA", fontSize: 15, fontWeight: "800", marginBottom: 2 },
   projectPath: { color: "#8493A7", fontSize: 12 },
   projectFooter: { alignItems: "center", borderTopColor: "#26364B", borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", marginTop: 14, paddingTop: 12 },
   projectState: { color: "#9BABBE", fontSize: 12 },
-  healthPanel: { backgroundColor: "#101B22", borderColor: "#2C5864", borderRadius: 16, borderWidth: 1, marginBottom: 25, marginTop: -12, padding: 13 },
-  healthPanelError: { backgroundColor: "#21161C", borderColor: "#6E3C4B" },
+  healthPanel: { backgroundColor: "#101B22", borderColor: withAlpha(colors.tint, 0.2), borderRadius: 16, borderWidth: 1, marginBottom: 25, marginTop: -12, padding: 13 },
+  healthPanelError: { backgroundColor: darken(colors.error, 0.85), borderColor: darken(colors.error, 0.62) },
   healthHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   healthEyebrow: { color: "#7AA6B0", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
   healthTitle: { color: "#E8F5F8", fontSize: 14, fontWeight: "800" },
@@ -463,53 +470,53 @@ const styles = StyleSheet.create({
   repositoryHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   repositoryEyebrow: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
   repositoryTitle: { color: "#EDF5FC", fontSize: 16, fontWeight: "800" },
-  refreshButton: { alignItems: "center", backgroundColor: "#173646", borderColor: "#367F98", borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
-  refreshButtonText: { color: "#7BE4FF", fontSize: 11, fontWeight: "800" },
+  refreshButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.25), borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
+  refreshButtonText: { color: lighten(colors.tint, 0.15), fontSize: 11, fontWeight: "800" },
   repositoryHint: { color: "#91A1B5", fontSize: 12, lineHeight: 17, marginTop: 10 },
   branchList: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 12 },
   branchChip: { alignItems: "center", backgroundColor: "#172130", borderColor: "#33445B", borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
-  branchChipSelected: { backgroundColor: "#153646", borderColor: "#52D8FF" },
+  branchChipSelected: { backgroundColor: withAlpha(colors.tint, 0.1), borderColor: colors.tint },
   branchChipText: { color: "#A6B5C6", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
-  branchChipTextSelected: { color: "#A9EFFF" },
+  branchChipTextSelected: { color: lighten(colors.tint, 0.3) },
   commitDivider: { backgroundColor: "#26384D", height: 1, marginTop: 16 },
   commitLabel: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 8, marginTop: 14 },
   commitRow: { alignItems: "center", flexDirection: "row", gap: 9, marginTop: 10 },
-  commitHash: { backgroundColor: "#221F3A", borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
-  commitHashText: { color: "#B4A8FF", fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
+  commitHash: { backgroundColor: withAlpha(colors.tint, 0.12), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
+  commitHashText: { color: lighten(colors.tint, 0.12), fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
   commitTextArea: { flex: 1 },
   commitMessage: { color: "#DDE7F1", fontSize: 12, fontWeight: "700" },
   commitMeta: { color: "#7B8B9E", fontSize: 11, marginTop: 2 },
   emptyRepositoryText: { color: "#8293A8", fontSize: 12, marginTop: 7 },
-  repositoryError: { color: "#FF9AA4", fontSize: 12, lineHeight: 17, marginTop: 12 },
+  repositoryError: { color: colors.error, fontSize: 12, lineHeight: 17, marginTop: 12 },
   qualityDivider: { backgroundColor: "#26384D", height: 1, marginTop: 17 },
   qualityHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 9, marginTop: 14 },
   qualityLabel: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
-  qualityRefreshButton: { alignItems: "center", backgroundColor: "#152A39", borderColor: "#2D607A", borderRadius: 9, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
-  qualityRefresh: { color: "#82D9F1", fontSize: 10, fontWeight: "800" },
+  qualityRefreshButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.25), borderRadius: 9, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
+  qualityRefresh: { color: lighten(colors.tint, 0.15), fontSize: 10, fontWeight: "800" },
   qualityPanel: { backgroundColor: "#0C131E", borderColor: "#263950", borderRadius: 13, borderWidth: 1, padding: 11 },
   qualityPillRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   qualityPill: { alignItems: "center", borderRadius: 9, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 8, paddingVertical: 6 },
   qualityPillText: { fontSize: 11, fontWeight: "800" },
   qualityDot: { borderRadius: 4, height: 7, width: 7 },
-  qualityReady: { backgroundColor: "rgba(69,217,150,0.11)", borderColor: "rgba(69,217,150,0.4)" },
+  qualityReady: { backgroundColor: withAlpha(colors.success, 0.11), borderColor: withAlpha(colors.success, 0.4) },
   qualityFailure: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.42)" },
   qualityWarning: { backgroundColor: "rgba(246,186,94,0.10)", borderColor: "rgba(246,186,94,0.38)" },
   qualityNeutral: { backgroundColor: "rgba(140,157,181,0.10)", borderColor: "rgba(140,157,181,0.3)" },
-  dotReady: { backgroundColor: "#45D996" },
-  dotFailure: { backgroundColor: "#FF6B7A" },
-  dotWarning: { backgroundColor: "#F6BA5E" },
+  dotReady: { backgroundColor: colors.success },
+  dotFailure: { backgroundColor: colors.error },
+  dotWarning: { backgroundColor: colors.warning },
   dotNeutral: { backgroundColor: "#8A9BB0" },
-  textReady: { color: "#7BE5AE" },
-  textFailure: { color: "#FFA3AD" },
-  textWarning: { color: "#F2C979" },
+  textReady: { color: colors.success },
+  textFailure: { color: colors.error },
+  textWarning: { color: colors.warning },
   textNeutral: { color: "#A2B1C2" },
   qualityPrText: { color: "#B0BFCE", fontSize: 11, lineHeight: 16, marginTop: 10 },
   qualityMetrics: { flexDirection: "row", gap: 13, marginTop: 10 },
   reviewMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 11, marginTop: 9 },
   qualityMetric: { color: "#8294A8", fontSize: 11 },
   reviewMetric: { color: "#AAB8C8", fontSize: 11 },
-  reviewMetricApproved: { color: "#7BE5AE", fontSize: 11 },
-  reviewMetricChanges: { color: "#F2C979", fontSize: 11 },
+  reviewMetricApproved: { color: colors.success, fontSize: 11 },
+  reviewMetricChanges: { color: colors.warning, fontSize: 11 },
   qualityMetricStrong: { color: "#DFE9F5", fontWeight: "800" },
   checkRow: { alignItems: "center", borderTopColor: "#1E2B3B", borderTopWidth: 1, flexDirection: "row", gap: 7, marginTop: 9, paddingTop: 9 },
   checkDot: { borderRadius: 4, height: 7, width: 7 },
@@ -519,12 +526,12 @@ const styles = StyleSheet.create({
   fileRow: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 10, marginBottom: 5, padding: 10 },
   fileRowSelected: { backgroundColor: "#172A39" },
   fileIcon: { alignItems: "center", backgroundColor: "#1A2433", borderRadius: 9, height: 33, justifyContent: "center", width: 33 },
-  fileIconSelected: { backgroundColor: "#173B4B" },
+  fileIconSelected: { backgroundColor: withAlpha(colors.tint, 0.12) },
   fileTextArea: { flex: 1 },
   fileName: { color: "#CCD7E4", fontSize: 13, fontWeight: "700", marginBottom: 2 },
   fileNameSelected: { color: "#F5FAFF" },
   filePath: { color: "#758499", fontSize: 11 },
-  changedDot: { backgroundColor: "#F6BA5E", borderRadius: 4, height: 7, width: 7 },
+  changedDot: { backgroundColor: colors.warning, borderRadius: 4, height: 7, width: 7 },
   editorHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 11, marginTop: 21 },
   editorFileIdentity: { alignItems: "center", flexDirection: "row", flex: 1, gap: 9, marginRight: 8 },
   editorFileName: { color: "#EAF1F9", fontSize: 13, fontWeight: "800", marginBottom: 2 },
@@ -538,37 +545,38 @@ const styles = StyleSheet.create({
   gitBarHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   gitBarEyebrow: { color: "#7B90A8", fontSize: 10, fontWeight: "900", letterSpacing: 1.05 },
   gitBarCount: { color: "#9FCBDA", fontSize: 11, fontWeight: "700" },
-  diffPreview: { backgroundColor: "#0B141D", borderColor: "#29445A", borderRadius: 11, borderWidth: 1, marginBottom: 10, padding: 10 },
+  diffPreview: { backgroundColor: "#0B141D", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 11, borderWidth: 1, marginBottom: 10, padding: 10 },
   diffPreviewTitle: { color: "#7794AB", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: 4 },
   diffRow: { alignItems: "center", borderTopColor: "#1B2D3D", borderTopWidth: 1, flexDirection: "row", gap: 9, justifyContent: "space-between", paddingVertical: 6 },
   diffPath: { color: "#C6D9E9", flex: 1, fontFamily: codeFont, fontSize: 10, fontWeight: "700" },
-  diffCounts: { color: "#70D9B0", fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
-  diffMore: { color: "#8C9FB2", fontSize: 10, marginTop: 4 }, conflictKind: { color: "#F2C979", fontSize: 9, fontWeight: "900", marginLeft: 6 },
+  diffCounts: { color: colors.success, fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
+  diffMore: { color: "#8C9FB2", fontSize: 10, marginTop: 4 }, conflictKind: { color: colors.warning, fontSize: 9, fontWeight: "900", marginLeft: 6 },
   commitInput: { backgroundColor: "#0C131E", borderColor: "#2B3C52", borderRadius: 11, borderWidth: 1, color: "#E7F0F9", fontSize: 13, minHeight: 44, paddingHorizontal: 11, paddingVertical: 9 },
   gitActions: { flexDirection: "row", gap: 8, marginTop: 10 },
   gitActionButton: { alignItems: "center", borderRadius: 11, flex: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
   commitButton: { backgroundColor: "#22314A", borderColor: "#6678A8", borderWidth: 1 },
-  pushButton: { backgroundColor: "#16728B", borderColor: "#52D8FF", borderWidth: 1 },
+  pushButton: { backgroundColor: withAlpha(colors.tint, 0.3), borderColor: colors.tint, borderWidth: 1 },
   gitActionDisabled: { opacity: 0.45 },
-  commitButtonText: { color: "#DDE6FF", fontSize: 12, fontWeight: "800" },
+  commitButtonText: { color: lighten(colors.tint, 0.35), fontSize: 12, fontWeight: "800" },
   pushButtonText: { color: "#ECFBFF", fontSize: 12, fontWeight: "800" },
   gitFeedback: { fontSize: 12, lineHeight: 17, marginTop: 10 },
-  gitFeedbackSuccess: { color: "#6FE0A7" },
-  gitFeedbackError: { color: "#FF9AA4" },
+  gitFeedbackSuccess: { color: colors.success },
+  gitFeedbackError: { color: colors.error },
   gitHint: { color: "#8294AA", fontSize: 11, lineHeight: 16, marginTop: 10 },
-  conflictWarning: { color: "#F2C979", fontWeight: "800" },
+  conflictWarning: { color: colors.warning, fontWeight: "800" },
   pullRequestBar: { borderTopColor: "#2B3E55", borderTopWidth: 1, marginTop: 14, paddingTop: 14 },
-  pullRequestEyebrow: { color: "#B9A8FF", fontSize: 10, fontWeight: "900", letterSpacing: 1.05, marginBottom: 5 },
+  pullRequestEyebrow: { color: lighten(colors.tint, 0.12), fontSize: 10, fontWeight: "900", letterSpacing: 1.05, marginBottom: 5 },
   pullRequestHint: { color: "#94A4B8", fontSize: 11, lineHeight: 16, marginBottom: 9 },
   branchInline: { color: "#B9EFFF", fontFamily: codeFont, fontWeight: "800" },
   pullRequestInput: { marginTop: 8 },
   pullRequestBody: { marginTop: 8, minHeight: 76 },
-  pullRequestButton: { alignItems: "center", backgroundColor: "#473C80", borderColor: "#9E91FF", borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 10, minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
+  pullRequestButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.22), borderColor: colors.tint, borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 10, minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
   pullRequestButtonText: { color: "#F3F1FF", fontSize: 12, fontWeight: "900" },
   consoleCard: { backgroundColor: "#0F161F", borderColor: "#243347", borderRadius: 16, borderWidth: 1, padding: 14 },
   consolePrompt: { alignItems: "center", flexDirection: "row", gap: 7, marginBottom: 9 },
-  consolePromptText: { color: "#6BE5A7", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
+  consolePromptText: { color: colors.success, fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
   consoleText: { color: "#A2B0C1", fontFamily: codeFont, fontSize: 12, lineHeight: 18 },
   consoleLink: { alignItems: "center", flexDirection: "row", gap: 6, marginTop: 12, minHeight: 44 },
-  consoleLinkText: { color: "#52D8FF", fontSize: 12, fontWeight: "800" },
-});
+  consoleLinkText: { color: colors.tint, fontSize: 12, fontWeight: "800" },
+  });
+}

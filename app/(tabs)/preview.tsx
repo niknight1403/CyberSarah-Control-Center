@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { EmptySurface, PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -5,8 +6,11 @@ import { useStudioSettings } from "@/lib/studio-settings";
 import { useWorkspace } from "@/lib/workspace-context";
 import { router } from "expo-router";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useColors } from "@/hooks/use-colors";
 
 export default function PreviewScreen() {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   const { events, lastRefreshLabel, refreshPreview } = useWorkspace();
   const { settings } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
@@ -53,7 +57,7 @@ export default function PreviewScreen() {
         }
         renderItem={({ item }) => {
           const icon = item.level === "success" ? "checkmark.circle.fill" : item.level === "warning" ? "exclamationmark.triangle.fill" : "terminal.fill";
-          const color = item.level === "success" ? "#45D996" : item.level === "warning" ? "#F6BA5E" : "#52D8FF";
+          const color = item.level === "success" ? colors.success : item.level === "warning" ? colors.warning : colors.tint;
           return (
             <TouchableOpacity activeOpacity={0.78} style={styles.logRow}>
               <IconSymbol name={icon} size={18} color={color} />
@@ -71,7 +75,8 @@ export default function PreviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   content: { paddingBottom: 20 },
   statusCard: {
     alignItems: "center",
@@ -117,4 +122,5 @@ const styles = StyleSheet.create({
   logTextArea: { flex: 1 },
   logLabel: { color: "#DCE5F0", fontSize: 13, fontWeight: "800", marginBottom: 3 },
   logDetail: { color: "#8493A7", fontSize: 12, lineHeight: 17 },
-});
+  });
+}

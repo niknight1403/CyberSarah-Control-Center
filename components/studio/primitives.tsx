@@ -1,6 +1,8 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from "react-native";
+import { withAlpha } from "@/lib/theme-color-utils";
+import { useColors } from "@/hooks/use-colors";
 
 type IconName = Parameters<typeof IconSymbol>[0]["name"];
 
@@ -17,6 +19,8 @@ export function StudioHeader({
   actionIcon?: IconName;
   onAction?: () => void;
 }) {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.header}>
       <View style={styles.titleGroup}>
@@ -44,6 +48,8 @@ export function StatusBadge({
   label: string;
   tone?: "ready" | "warning" | "neutral" | "accent";
 }) {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   const toneStyle: ViewStyle =
     tone === "ready"
       ? styles.readyBadge
@@ -77,6 +83,8 @@ export function StudioSection({
   title: string;
   trailing?: ReactNode;
 }) {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.sectionHeading}>
       <View>
@@ -99,6 +107,8 @@ export function PrimaryButton({
   onPress: () => void;
   disabled?: boolean;
 }) {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
       accessibilityRole="button"
@@ -122,10 +132,12 @@ export function EmptySurface({
   title: string;
   description: string;
 }) {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.emptySurface}>
       <View style={styles.emptyIcon}>
-        <IconSymbol name={icon} size={23} color="#52D8FF" />
+        <IconSymbol name={icon} size={23} color={colors.tint} />
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyDescription}>{description}</Text>
@@ -133,7 +145,8 @@ export function EmptySurface({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   header: {
     alignItems: "center",
     flexDirection: "row",
@@ -162,12 +175,12 @@ const styles = StyleSheet.create({
   },
   badge: { borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.2 },
-  readyBadge: { backgroundColor: "rgba(69,217,150,0.13)" },
-  readyText: { color: "#45D996" },
+  readyBadge: { backgroundColor: withAlpha(colors.success, 0.13) },
+  readyText: { color: colors.success },
   warningBadge: { backgroundColor: "rgba(246,186,94,0.15)" },
-  warningText: { color: "#F6BA5E" },
-  accentBadge: { backgroundColor: "rgba(82,216,255,0.14)" },
-  accentText: { color: "#52D8FF" },
+  warningText: { color: colors.warning },
+  accentBadge: { backgroundColor: withAlpha(colors.tint, 0.14) },
+  accentText: { color: colors.tint },
   neutralBadge: { backgroundColor: "#202B3A" },
   neutralText: { color: "#B9C4D1" },
   sectionHeading: {
@@ -187,7 +200,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: "#F2F6FC", fontSize: 17, fontWeight: "700", letterSpacing: -0.2 },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#52D8FF",
+    backgroundColor: colors.tint,
     borderRadius: 14,
     flexDirection: "row",
     gap: 8,
@@ -218,4 +231,5 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: "#F2F6FC", fontSize: 16, fontWeight: "800", marginBottom: 7 },
   emptyDescription: { color: "#99A7B8", fontSize: 13, lineHeight: 19, textAlign: "center" },
-});
+  });
+}

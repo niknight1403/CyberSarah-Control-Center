@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { CYBERSARAH_REVENUE_REPOSITORY_NAME, CYBERSARAH_REVENUE_REPOSITORY_URL, CYBERSARAH_REVENUE_DEFAULT_BRANCH, normalizeBranch, normalizeRepositoryUrl } from "@/lib/repository-intent-logic";
 import { PrimaryButton } from "@/components/studio/primitives";
+import { lighten, withAlpha } from "@/lib/theme-color-utils";
+import { useColors } from "@/hooks/use-colors";
 
 export type RepositoryConnectResult = { workspaceId: string; branch: string; files: string[] };
 
@@ -11,6 +13,8 @@ type RepositoryConnectCardProps = {
 };
 
 export function RepositoryConnectCard({ onConnect, onClose }: RepositoryConnectCardProps) {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   const [repositoryUrl, setRepositoryUrl] = useState(CYBERSARAH_REVENUE_REPOSITORY_URL);
   const [branch, setBranch] = useState(CYBERSARAH_REVENUE_DEFAULT_BRANCH);
   const [state, setState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
@@ -52,23 +56,25 @@ export function RepositoryConnectCard({ onConnect, onClose }: RepositoryConnectC
   );
 }
 
-const styles = StyleSheet.create({
-  card: { backgroundColor: "#171827", borderColor: "#4A427D", borderRadius: 20, borderWidth: 1, marginBottom: 16, padding: 15 },
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+  card: { backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.4), borderRadius: 20, borderWidth: 1, marginBottom: 16, padding: 15 },
   headerRow: { alignItems: "center", flexDirection: "row", gap: 10 },
-  icon: { alignItems: "center", backgroundColor: "#302B5A", borderRadius: 16, height: 38, justifyContent: "center", width: 38 },
-  iconText: { color: "#D9D4FF", fontSize: 20, fontWeight: "900" },
+  icon: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.16), borderRadius: 16, height: 38, justifyContent: "center", width: 38 },
+  iconText: { color: lighten(colors.tint, 0.35), fontSize: 20, fontWeight: "900" },
   headerCopy: { flex: 1 },
-  eyebrow: { color: "#A9A0F0", fontSize: 9, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
-  title: { color: "#F4F1FF", fontSize: 15, fontWeight: "900" },
+  eyebrow: { color: colors.tint, fontSize: 9, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
+  title: { color: lighten(colors.tint, 0.45), fontSize: 15, fontWeight: "900" },
   closeButton: { alignItems: "center", minHeight: 40, minWidth: 40, justifyContent: "center" },
   closeText: { color: "#A6B1C2", fontSize: 24, lineHeight: 26 },
   description: { color: "#B0AEC2", fontSize: 11, lineHeight: 16, marginBottom: 14, marginTop: 12 },
   label: { color: "#8E9CAF", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: 6, marginTop: 4 },
   input: { backgroundColor: "#101521", borderColor: "#34435B", borderRadius: 11, borderWidth: 1, color: "#EDF4FC", fontSize: 12, minHeight: 44, paddingHorizontal: 11 },
   inputError: { borderColor: "#B96872" },
-  success: { backgroundColor: "#132D2C", borderColor: "#2D7C6D", borderRadius: 11, borderWidth: 1, marginBottom: 10, marginTop: 12, padding: 10 },
-  successTitle: { color: "#8CE5B5", fontSize: 11, fontWeight: "900" },
-  successText: { color: "#B6D9CB", fontSize: 10, marginTop: 3 },
-  error: { color: "#FF9BA6", fontSize: 10, lineHeight: 15, marginVertical: 10 },
+  success: { backgroundColor: "#132D2C", borderColor: withAlpha(colors.success, 0.4), borderRadius: 11, borderWidth: 1, marginBottom: 10, marginTop: 12, padding: 10 },
+  successTitle: { color: lighten(colors.success, 0.2), fontSize: 11, fontWeight: "900" },
+  successText: { color: lighten(colors.success, 0.3), fontSize: 10, marginTop: 3 },
+  error: { color: colors.error, fontSize: 10, lineHeight: 15, marginVertical: 10 },
   footer: { color: "#76869C", fontSize: 9, lineHeight: 14, marginTop: 9, textAlign: "center" },
-});
+  });
+}

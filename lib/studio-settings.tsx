@@ -53,8 +53,15 @@ export type StudioSettingsInput = Omit<StudioSettings, "hasServiceAccessToken" |
 };
 export type RemoteWorkspaceChange = { path: string; content: string };
 
+/** Sprint 84: oeffentliche Default-Adresse des Workspace-Service (render.yaml).
+ * URL ist keine geheimnistragende Information (Endpoints erfordern das
+ * Service-Token); als Default stellt sie sicher, dass die Repository-
+ * Verbindung auch ohne Admin-Proxy (z. B. nach Neuinstallation) direkt
+ * den Service erreicht, statt auf eine leere Basis-URL zu laufen. */
+const DEFAULT_WORKSPACE_URL = "https://cybersarah-workspace.onrender.com";
+
 const defaultSettings: StudioSettings = {
-  workspaceUrl: "",
+  workspaceUrl: DEFAULT_WORKSPACE_URL,
   repositoryUrl: "",
   branch: "main",
   provider: getDefaultFreeProvider(),
@@ -148,6 +155,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
       try {
         const stored = await AsyncStorage.getItem(PREFERENCES_KEY);
         const parsed = stored ? (JSON.parse(stored) as Partial<StudioSettings>) : {};
+        // Sprint 84: leere workspaceUrl (alte Installationen) auf Default heben.
         const [hasServiceAccessToken, hasGitHubToken, hasProviderKey] = await Promise.all([
           hasSecureValue(SERVICE_ACCESS_TOKEN_KEY),
           hasSecureValue(GITHUB_TOKEN_KEY),
@@ -156,7 +164,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
         const providerKeyEntries = await Promise.all(providerOptions.filter((option) => option.id !== "managed" && option.id !== "auto").map(async (option) => [option.id, await hasSecureValue(providerKeyStorageKey(option.id))] as const));
         const providerKeyStatus = Object.fromEntries(providerKeyEntries) as ProviderKeyStatus;
         if (hasProviderKey && parsed.provider && parsed.provider !== "managed") providerKeyStatus[parsed.provider] = true;
-        setSettings({ ...defaultSettings, ...parsed, localProviderEndpoints: normalizeLocalProviderEndpoints(parsed.localProviderEndpoints), hasServiceAccessToken, hasGitHubToken, hasProviderKey: Boolean(providerKeyStatus[parsed.provider ?? defaultSettings.provider]), providerKeyStatus });
+        setSettings({ ...defaultSettings, ...parsed, workspaceUrl: parsed.workspaceUrl?.trim() || defaultSettings.workspaceUrl, localProviderEndpoints: normalizeLocalProviderEndpoints(parsed.localProviderEndpoints), hasServiceAccessToken, hasGitHubToken, hasProviderKey: Boolean(providerKeyStatus[parsed.provider ?? defaultSettings.provider]), providerKeyStatus });
       } finally {
         setLoading(false);
       }
@@ -207,6 +215,10 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [settings.provider]);
 
   const attachRepository = useCallback(async (input: StudioSettingsInput) => {
+    // Sprint 84: Guard — ohne Basis-URL (weder Admin-Proxy noch hinterlegte
+    // Service-URL) wuerde fetch relativ auf https://localhost/... laufen und
+    // HTML statt JSON liefern; daher hier mit klarer Fehlermeldung abbrechen.
+    if (!proxyBaseUrl && !input.workspaceUrl?.trim()) throw new Error("Hinterlege zuerst die HTTPS-URL des Workspace-Service.");
     const storedSettings = await saveSettings(input);
     const [storedServiceToken, storedGitHubToken, storedProviderKey] = await Promise.all([
       readSecureValue(SERVICE_ACCESS_TOKEN_KEY),
@@ -227,7 +239,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(nextSettings));
     setSettings(nextSettings);
     return { ...attached, files };
-  }, [saveSettings]);
+  }, [proxyBaseUrl, resolveWorkspaceBaseUrl, saveSettings]);
 
   const readAttachedFile = useCallback(async (path: string) => {
     if ((!settings.workspaceUrl && !proxyBaseUrl) || !settings.workspaceId) throw new Error("Kein Repository ist mit dem Workspace-Service verbunden.");

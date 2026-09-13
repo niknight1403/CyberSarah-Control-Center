@@ -2,10 +2,14 @@ import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
 import * as Auth from "@/lib/_core/auth";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { lighten, withAlpha } from "@/lib/theme-color-utils";
+import { useColors } from "@/hooks/use-colors";
 
 export default function AccountScreen() {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -160,32 +164,34 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   page: { flex: 1, paddingTop: 20 },
-  eyebrow: { color: "#8BDDF5", fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
+  eyebrow: { color: lighten(colors.tint, 0.2), fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
   title: { color: "#F1F6FF", fontSize: 28, fontWeight: "900", marginTop: 8 },
   lead: { color: "#9EADBF", fontSize: 13, lineHeight: 20, marginTop: 9 },
-  card: { backgroundColor: "#111B29", borderColor: "#2A405B", borderRadius: 18, borderWidth: 1, marginTop: 22, padding: 16 },
+  card: { backgroundColor: "#111B29", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 18, borderWidth: 1, marginTop: 22, padding: 16 },
   switchRow: { backgroundColor: "#0B121D", borderRadius: 10, flexDirection: "row", marginBottom: 14, padding: 3 },
   switchButton: { alignItems: "center", borderRadius: 8, flex: 1, paddingVertical: 10 },
-  switchButtonActive: { backgroundColor: "#20415B" },
+  switchButtonActive: { backgroundColor: withAlpha(colors.tint, 0.16) },
   switchText: { color: "#D8E9F8", fontSize: 12, fontWeight: "800" },
-  input: { backgroundColor: "#0B121D", borderColor: "#2A405B", borderRadius: 11, borderWidth: 1, color: "#F1F6FF", fontSize: 14, marginTop: 10, minHeight: 48, paddingHorizontal: 12 },
-  primaryButton: { alignItems: "center", backgroundColor: "#16728B", borderColor: "#55D5F3", borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 15, minHeight: 48 },
+  input: { backgroundColor: "#0B121D", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 11, borderWidth: 1, color: "#F1F6FF", fontSize: 14, marginTop: 10, minHeight: 48, paddingHorizontal: 12 },
+  primaryButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.3), borderColor: colors.tint, borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 15, minHeight: 48 },
   primaryButtonText: { color: "#F5FDFF", fontSize: 13, fontWeight: "900" },
   disabled: { opacity: 0.45 },
   name: { color: "#F1F6FF", fontSize: 18, fontWeight: "900" },
   email: { color: "#9EADBF", fontSize: 13, marginTop: 5 },
   roleBadge: { alignSelf: "flex-start", backgroundColor: "#293646", borderRadius: 999, marginTop: 14, paddingHorizontal: 10, paddingVertical: 6 },
-  roleBadgeAdmin: { backgroundColor: "#3F2A66" },
+  roleBadgeAdmin: { backgroundColor: withAlpha(colors.tint, 0.2) },
   roleText: { color: "#D9ECFA", fontSize: 10, fontWeight: "900", letterSpacing: 0.7 },
-  adminCopy: { color: "#CFC2FF", fontSize: 12, lineHeight: 18, marginTop: 12 },
-  billingCard: { backgroundColor: "#0B121D", borderColor: "#3F2E63", borderRadius: 12, borderWidth: 1, marginTop: 16, padding: 12 },
-  billingTitle: { color: "#D4C4FF", fontSize: 10, fontWeight: "900", letterSpacing: 0.9 },
-  billingCopy: { color: "#AFA3C9", fontSize: 12, lineHeight: 18, marginTop: 6 },
-  billingButton: { alignItems: "center", backgroundColor: "#2B2150", borderColor: "#9274E8", borderRadius: 9, borderWidth: 1, marginTop: 11, paddingVertical: 10 },
+  adminCopy: { color: lighten(colors.tint, 0.28), fontSize: 12, lineHeight: 18, marginTop: 12 },
+  billingCard: { backgroundColor: "#0B121D", borderColor: withAlpha(colors.tint, 0.2), borderRadius: 12, borderWidth: 1, marginTop: 16, padding: 12 },
+  billingTitle: { color: lighten(colors.tint, 0.28), fontSize: 10, fontWeight: "900", letterSpacing: 0.9 },
+  billingCopy: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  billingButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.14), borderColor: colors.tint, borderRadius: 9, borderWidth: 1, marginTop: 11, paddingVertical: 10 },
   billingButtonText: { color: "#E9E1FF", fontSize: 12, fontWeight: "900" },
   secondaryButton: { alignItems: "center", borderColor: "#425D78", borderRadius: 10, borderWidth: 1, marginTop: 18, paddingVertical: 11 },
-  secondaryButtonText: { color: "#B8D9ED", fontSize: 12, fontWeight: "800" },
-  message: { color: "#9DE8B4", fontSize: 12, lineHeight: 18, marginTop: 14 },
-});
+  secondaryButtonText: { color: lighten(colors.tint, 0.35), fontSize: 12, fontWeight: "800" },
+  message: { color: lighten(colors.success, 0.2), fontSize: 12, lineHeight: 18, marginTop: 14 },
+  });
+}

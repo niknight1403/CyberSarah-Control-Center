@@ -87,6 +87,8 @@ import {
   View,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
+import { darken, lighten, withAlpha } from "@/lib/theme-color-utils";
+import { useColors } from "@/hooks/use-colors";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal };
 type ChatAttachment = MediaAttachment;
@@ -114,6 +116,8 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export default function AgentScreen() {
+    const colors = useColors();
+    const styles = useMemo(() => createStyles(colors), [colors]);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   useAdminAutoRouter(accountQuery.data ?? null);
   const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } =
@@ -828,7 +832,7 @@ export default function AgentScreen() {
                 />
                 <View style={styles.chatHero}>
                   <View style={styles.chatHeroIcon}>
-                    <IconSymbol name="sparkles" size={19} color="#D8D3FF" />
+                    <IconSymbol name="sparkles" size={19} color={lighten(colors.tint, 0.3)} />
                   </View>
                   <View style={styles.chatHeroCopy}>
                     <Text style={styles.chatHeroTitle}>
@@ -901,7 +905,7 @@ export default function AgentScreen() {
                     <IconSymbol
                       name="sparkles"
                       size={17}
-                      color={readyForChat ? "#B9B2FF" : "#F6BA5E"}
+                      color={readyForChat ? lighten(colors.tint, 0.12) : colors.warning}
                     />
                   </View>
                   <View style={styles.readinessCopy}>
@@ -931,7 +935,7 @@ export default function AgentScreen() {
                 >
                   <View style={styles.providerStatusIcon}>
                     {providerActivity === "requesting" ? (
-                      <ActivityIndicator color="#52D8FF" size="small" />
+                      <ActivityIndicator color={colors.tint} size="small" />
                     ) : (
                       <View
                         style={[
@@ -966,7 +970,7 @@ export default function AgentScreen() {
                     <IconSymbol
                       name="doc.text.fill"
                       size={14}
-                      color="#8B7CFF"
+                      color={colors.tint}
                     />
                     <Text numberOfLines={1} style={styles.contextText}>
                       {contextLabel}
@@ -989,7 +993,7 @@ export default function AgentScreen() {
                       styles.contextChipDisabled,
                   ]}
                 >
-                  <IconSymbol name="bolt.fill" size={14} color="#52D8FF" />
+                  <IconSymbol name="bolt.fill" size={14} color={colors.tint} />
                   <Text numberOfLines={1} style={styles.contextText}>
                     {connectionTest.status === "checking"
                       ? "KI-Verbindung wird geprüft …"
@@ -1150,7 +1154,7 @@ export default function AgentScreen() {
                       ]}
                     >
                       {mediaPickerBusy ? (
-                        <ActivityIndicator color="#52D8FF" size="small" />
+                        <ActivityIndicator color={colors.tint} size="small" />
                       ) : (
                         <Text style={styles.plusButtonText}>＋</Text>
                       )}
@@ -1478,7 +1482,7 @@ export default function AgentScreen() {
                                 {isLoading ? (
                                   <View style={styles.previewLoading}>
                                     <ActivityIndicator
-                                      color="#52D8FF"
+                                      color={colors.tint}
                                       size="small"
                                     />
                                     <Text style={styles.previewLoadingText}>
@@ -1576,7 +1580,7 @@ export default function AgentScreen() {
                 </View>
                 <View style={styles.backupCard}>
                   <View style={styles.backupTitleRow}>
-                    <IconSymbol name="lock.fill" size={16} color="#F2C979" />
+                    <IconSymbol name="lock.fill" size={16} color={colors.warning} />
                     <Text style={styles.backupTitle}>
                       VERSCHLÜSSELTES SUPPORT-BACKUP
                     </Text>
@@ -1673,7 +1677,7 @@ export default function AgentScreen() {
                 >
                   {!isUser ? (
                     <View style={styles.agentAvatar}>
-                      <IconSymbol name="sparkles" size={16} color="#B9B2FF" />
+                      <IconSymbol name="sparkles" size={16} color={lighten(colors.tint, 0.12)} />
                     </View>
                   ) : null}
                   <View
@@ -1835,13 +1839,14 @@ export default function AgentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingBottom: 20 },
   chatHero: {
     alignItems: "center",
-    backgroundColor: "#171827",
-    borderColor: "#37335C",
+    backgroundColor: withAlpha(colors.tint, 0.1),
+    borderColor: withAlpha(colors.tint, 0.16),
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: "row",
@@ -1851,7 +1856,7 @@ const styles = StyleSheet.create({
   },
   chatHeroIcon: {
     alignItems: "center",
-    backgroundColor: "#302B5A",
+    backgroundColor: withAlpha(colors.tint, 0.16),
     borderRadius: 17,
     height: 44,
     justifyContent: "center",
@@ -1890,11 +1895,11 @@ const styles = StyleSheet.create({
     marginBottom: 13,
     padding: 12,
   },
-  readinessReady: { backgroundColor: "#181A2F", borderColor: "#4D477A" },
-  readinessWaiting: { backgroundColor: "#211D16", borderColor: "#6A542A" },
+  readinessReady: { backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.22) },
+  readinessWaiting: { backgroundColor: darken(colors.warning, 0.85), borderColor: darken(colors.warning, 0.6) },
   readinessIcon: {
     alignItems: "center",
-    backgroundColor: "#25233E",
+    backgroundColor: withAlpha(colors.tint, 0.12),
     borderRadius: 11,
     height: 35,
     justifyContent: "center",
@@ -1917,9 +1922,9 @@ const styles = StyleSheet.create({
     marginBottom: 13,
     padding: 11,
   },
-  providerStatusLocal: { backgroundColor: "#132B2D", borderColor: "#2F746B" },
-  providerStatusCloud: { backgroundColor: "#17253A", borderColor: "#315D82" },
-  providerStatusWarning: { backgroundColor: "#2A2118", borderColor: "#8A6330" },
+  providerStatusLocal: { backgroundColor: darken(colors.success, 0.78), borderColor: darken(colors.success, 0.55) },
+  providerStatusCloud: { backgroundColor: "#17253A", borderColor: withAlpha(colors.tint, 0.25) },
+  providerStatusWarning: { backgroundColor: darken(colors.warning, 0.85), borderColor: darken(colors.warning, 0.55) },
   providerStatusIcon: {
     alignItems: "center",
     backgroundColor: "#0D151E",
@@ -1929,9 +1934,9 @@ const styles = StyleSheet.create({
     width: 30,
   },
   providerStatusDot: { borderRadius: 6, height: 11, width: 11 },
-  providerStatusDotLocal: { backgroundColor: "#78DFA8" },
-  providerStatusDotCloud: { backgroundColor: "#52D8FF" },
-  providerStatusDotWarning: { backgroundColor: "#F6BA5E" },
+  providerStatusDotLocal: { backgroundColor: colors.success },
+  providerStatusDotCloud: { backgroundColor: colors.tint },
+  providerStatusDotWarning: { backgroundColor: colors.warning },
   providerStatusCopy: { flex: 1, minWidth: 0 },
   providerStatusEyebrow: {
     color: "#8E9CAF",
@@ -1962,10 +1967,10 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   connectionTestTextError: {
-    color: "#FF7A85",
+    color: colors.error,
   },
   connectionTestTextReady: {
-    color: "#6FE3A5",
+    color: colors.success,
   },
   contextChipDisabled: {
     opacity: 0.55,
@@ -2055,7 +2060,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   proposalQueueActionPrimary: {
-    backgroundColor: "#1E3A5F",
+    backgroundColor: withAlpha(colors.tint, 0.16),
     borderColor: "#3D5A85",
   },
   proposalQueueActionText: {
@@ -2088,7 +2093,7 @@ const styles = StyleSheet.create({
   userMessageRow: { justifyContent: "flex-end" },
   agentAvatar: {
     alignItems: "center",
-    backgroundColor: "#25233E",
+    backgroundColor: withAlpha(colors.tint, 0.12),
     borderRadius: 13,
     height: 27,
     justifyContent: "center",
@@ -2104,13 +2109,13 @@ const styles = StyleSheet.create({
   agentBubble: { backgroundColor: "#151C29", borderTopLeftRadius: 5 },
   userBubble: { backgroundColor: "#20354A", borderTopRightRadius: 5 },
   messageRole: {
-    color: "#B9B2FF",
+    color: lighten(colors.tint, 0.12),
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.1,
     marginBottom: 5,
   },
-  userMessageRole: { color: "#78DCF7" },
+  userMessageRole: { color: lighten(colors.tint, 0.15) },
   messageText: { color: "#E5ECF5", fontSize: 14, lineHeight: 20 },
   changeList: {
     borderTopColor: "#2A3548",
@@ -2134,7 +2139,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 5,
   },
-  changeRowSelected: { backgroundColor: "#1B3142" },
+  changeRowSelected: { backgroundColor: withAlpha(colors.tint, 0.13) },
   changeSelection: {
     alignItems: "center",
     borderColor: "#63718A",
@@ -2145,8 +2150,8 @@ const styles = StyleSheet.create({
     width: 18,
   },
   changeSelectionSelected: {
-    backgroundColor: "#52D8FF",
-    borderColor: "#52D8FF",
+    backgroundColor: colors.tint,
+    borderColor: colors.tint,
   },
   changeSelectionMark: {
     color: "#071218",
@@ -2156,7 +2161,7 @@ const styles = StyleSheet.create({
   },
   changeCopy: { flex: 1 },
   changePath: {
-    color: "#C9C0FF",
+    color: lighten(colors.tint, 0.25),
     fontFamily: "monospace",
     fontSize: 11,
     fontWeight: "800",
@@ -2169,8 +2174,8 @@ const styles = StyleSheet.create({
   },
   applyButton: {
     alignItems: "center",
-    backgroundColor: "#206275",
-    borderColor: "#52D8FF",
+    backgroundColor: withAlpha(colors.tint, 0.25),
+    borderColor: colors.tint,
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: "row",
@@ -2184,7 +2189,7 @@ const styles = StyleSheet.create({
   applyText: { color: "#E6FAFF", fontSize: 12, fontWeight: "900" },
   undoButton: {
     alignItems: "center",
-    borderColor: "#B49A5C",
+    borderColor: darken(colors.warning, 0.35),
     borderRadius: 10,
     borderWidth: 1,
     justifyContent: "center",
@@ -2192,15 +2197,15 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 12,
   },
-  undoText: { color: "#F2C979", fontSize: 12, fontWeight: "900" },
+  undoText: { color: colors.warning, fontSize: 12, fontWeight: "900" },
   appliedText: {
-    color: "#78DFA8",
+    color: colors.success,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 12,
   },
   restoredText: {
-    color: "#F2C979",
+    color: colors.warning,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 12,
@@ -2231,11 +2236,11 @@ const styles = StyleSheet.create({
     minWidth: 108,
     paddingHorizontal: 10,
   },
-  plusButtonText: { color: "#52D8FF", fontSize: 25, lineHeight: 28 },
+  plusButtonText: { color: colors.tint, fontSize: 25, lineHeight: 28 },
   toolbarButtonText: { color: "#C7D4E4", fontSize: 11, fontWeight: "800" },
   toolsButton: {
     alignItems: "center",
-    borderColor: "#493F70",
+    borderColor: withAlpha(colors.tint, 0.22),
     borderRadius: 12,
     borderWidth: 1,
     flex: 1,
@@ -2243,7 +2248,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 8,
   },
-  toolsButtonText: { color: "#C9BFFF", fontSize: 11, fontWeight: "800" },
+  toolsButtonText: { color: lighten(colors.tint, 0.25), fontSize: 11, fontWeight: "800" },
   attachMenu: {
     backgroundColor: "#0E151F",
     borderColor: "#33445B",
@@ -2264,7 +2269,7 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 5,
   },
-  attachOptionIcon: { color: "#52D8FF", fontSize: 20, marginBottom: 2 },
+  attachOptionIcon: { color: colors.tint, fontSize: 20, marginBottom: 2 },
   attachOptionText: {
     color: "#C9D6E5",
     fontSize: 10,
@@ -2273,14 +2278,14 @@ const styles = StyleSheet.create({
   },
   toolsMenu: {
     backgroundColor: "#111622",
-    borderColor: "#493F70",
+    borderColor: withAlpha(colors.tint, 0.22),
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 10,
     padding: 12,
   },
   toolsMenuLabel: {
-    color: "#9D91E8",
+    color: colors.tint,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1,
@@ -2295,7 +2300,7 @@ const styles = StyleSheet.create({
     minHeight: 38,
   },
   toolName: { color: "#D7E1EE", fontSize: 12, fontWeight: "700" },
-  toolStatusActive: { color: "#78DFA8", fontSize: 10, fontWeight: "900" },
+  toolStatusActive: { color: colors.success, fontSize: 10, fontWeight: "900" },
   toolNameBlock: { flex: 1, paddingVertical: 7 },
   toolDetail: { color: "#8798AD", fontSize: 10, marginTop: 2 },
   connectorActions: { alignItems: "center", flexDirection: "row", gap: 7 },
@@ -2308,17 +2313,17 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingHorizontal: 8,
   },
-  configureButtonText: { color: "#9FD9E8", fontSize: 10, fontWeight: "800" },
+  configureButtonText: { color: lighten(colors.tint, 0.3), fontSize: 10, fontWeight: "800" },
   testButton: {
     alignItems: "center",
-    borderColor: "#27677D",
+    borderColor: withAlpha(colors.tint, 0.22),
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 36,
     paddingHorizontal: 8,
   },
-  testButtonText: { color: "#66D9F3", fontSize: 10, fontWeight: "800" },
+  testButtonText: { color: colors.tint, fontSize: 10, fontWeight: "800" },
   connectorTestText: {
     color: "#8293A8",
     fontSize: 9,
@@ -2338,8 +2343,8 @@ const styles = StyleSheet.create({
   },
   skillToggleOn: {
     alignItems: "flex-end",
-    backgroundColor: "#1C6377",
-    borderColor: "#52D8FF",
+    backgroundColor: withAlpha(colors.tint, 0.25),
+    borderColor: colors.tint,
   },
   skillToggleKnob: {
     backgroundColor: "#9EACBD",
@@ -2399,7 +2404,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 88,
   },
-  previewFallbackIcon: { color: "#52D8FF", fontSize: 23, fontWeight: "900" },
+  previewFallbackIcon: { color: colors.tint, fontSize: 23, fontWeight: "900" },
   previewFallbackKind: {
     color: "#829DB8",
     fontSize: 8,
@@ -2460,10 +2465,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 10,
   },
-  chatError: { color: "#FF9AA4", fontSize: 11, lineHeight: 16, marginTop: 9 },
+  chatError: { color: colors.error, fontSize: 11, lineHeight: 16, marginTop: 9 },
   backupCard: {
-    backgroundColor: "#191712",
-    borderColor: "#62502D",
+    backgroundColor: darken(colors.warning, 0.87),
+    borderColor: darken(colors.warning, 0.62),
     borderRadius: 18,
     borderWidth: 1,
     marginTop: 16,
@@ -2476,20 +2481,20 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   backupTitle: {
-    color: "#F2D48F",
+    color: colors.warning,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.1,
   },
   backupHint: {
-    color: "#B5A987",
+    color: darken(colors.warning, 0.25),
     fontSize: 11,
     lineHeight: 16,
     marginBottom: 11,
   },
   backupInput: {
     backgroundColor: "#121823",
-    borderColor: "#51442C",
+    borderColor: darken(colors.warning, 0.65),
     borderRadius: 10,
     borderWidth: 1,
     color: "#EDF4FC",
@@ -2499,25 +2504,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
   },
   backupSuccess: {
-    color: "#78DFA8",
+    color: colors.success,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 9,
   },
-  backupError: { color: "#FF9AA4", fontSize: 11, lineHeight: 16, marginTop: 9 },
+  backupError: { color: colors.error, fontSize: 11, lineHeight: 16, marginTop: 9 },
   backupVerification: {
-    borderTopColor: "#665632",
+    borderTopColor: darken(colors.warning, 0.62),
     borderTopWidth: 1,
     marginTop: 11,
     paddingTop: 10,
   },
   backupVerificationTitle: {
-    color: "#8DE3B6",
+    color: lighten(colors.success, 0.15),
     fontSize: 11,
     fontWeight: "900",
     marginBottom: 4,
   },
-  backupVerificationText: { color: "#C4B993", fontSize: 10, lineHeight: 15 },
+  backupVerificationText: { color: darken(colors.warning, 0.2), fontSize: 10, lineHeight: 15 },
   backupPreviewExcerpt: {
     color: "#E2D9C0",
     fontSize: 10,
@@ -2525,4 +2530,5 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     marginTop: 6,
   },
-});
+  });
+}
