@@ -68,6 +68,8 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Sprint 85: Gemini-Key fuer On-Server-Fallback (Forge > Gemini > OpenAI)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
@@ -103,6 +105,8 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Sprint 85: Gemini-Key fuer On-Server-Fallback (Forge > Gemini > OpenAI)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
