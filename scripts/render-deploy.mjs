@@ -348,8 +348,11 @@ async function deployWorkspace() {
 
   // Sprint 73: ALLOWED_ORIGIN muss die App-Domains enthalten — nicht die
   // eigene Workspace-URL (fuehrte zu "Origin ist nicht erlaubt" / CORS-Blockade).
+  // Sprint 85: zusaetzlich die Capacitor-Android-Origins (siehe
+  // lib/allowed-origins-logic.ts) — ohne sie blockiert dieser Service jeden
+  // direkten Repository-Connect-Call aus der APK mit "Failed to fetch".
   const appServiceName = env("RENDER_SERVICE_NAME", "cybersarah-control-center");
-  const defaultAllowedOrigins = `https://${appServiceName}.onrender.com,https://app.cybersarah-ki.com,https://www.cybersarah-ki.com`;
+  const defaultAllowedOrigins = `https://${appServiceName}.onrender.com,https://app.cybersarah-ki.com,https://www.cybersarah-ki.com,https://localhost,capacitor://localhost,http://localhost`;
   const allowedOrigin = env("WORKSPACE_ALLOWED_ORIGIN", defaultAllowedOrigins);
 
   const buildEnv = (allowedOrigin, previewUrl) =>
