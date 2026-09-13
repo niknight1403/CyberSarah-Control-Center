@@ -1,0 +1,31 @@
+name: Admin Seeding
+
+# Setzt das produktive Admin-Konto (ADMIN_EMAIL) auf das Passwort aus dem
+# Secret ADMIN_PASSWORD. Idempotent: ensureAdminAccount updated ein
+# bestehendes Konto (inkl. Rolle admin) statt ein zweites anzulegen.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: seed-admin
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Abhaengigkeiten installieren
+        run: npm ci --no-audit --no-fund
+      - name: Admin-Konto provisionieren
+        env:
+          ADMIN_EMAIL: niko.oeben@gmail.com
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx tsx scripts/seed-admin.ts
