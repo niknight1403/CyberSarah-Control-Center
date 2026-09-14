@@ -1,5 +1,13 @@
 import { TRPCError } from "@trpc/server";
-import { insertChatTurn, listChatMessages, listChatSessions } from "./db";
+import { insertChatTurn, insertAgentLearningRecord, listChatMessages, listChatSessions, listRecentAgentLearnings } from "./db";
+import {
+  buildLearningRecord,
+  deriveLearningFromTurn,
+  formatLearningsForContext,
+  isAgentLearningKind,
+  selectRelevantLearnings,
+  turnDeservesLearning,
+} from "../lib/agent-memory-logic";
 import { sanitizeSessionId } from "../lib/chat-session-logic";
 import {
   DEFAULT_DAILY_CHAT_LIMIT,
@@ -344,7 +352,7 @@ export const developmentChatRouter = router({
           console.warn("[developmentChat] Quotenpruefung uebersprungen:", error);
         }
       }
-      const result = await handleDevelopmentChat({ ...input, role: ctx.user.role });
+      const result = await handleDevelopmentChat({ ...input, role: ctx.user.role, userOpenId: ctx.user.openId });
       // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
       // Persistenzfehler brechen die Chat-Antwort nicht ab).
       try {
@@ -611,13 +619,71 @@ type AgentToolChatInput = {
   workspaceId?: string;
   githubToken?: string;
   branch?: string;
+  userOpenId?: string;
 };
+
+/**
+ * Sprint 94 — Langzeit-Gedächtnis: Top-Learnings zum aktuellen Prompt laden
+ * (Best-Effort — bei Datenbankproblemen bleibt der Prompt unveraendert).
+ */
+async function loadLearningContext(userOpenId: string | undefined, prompt: string): Promise<string> {
+  if (!userOpenId) return "";
+  try {
+    const learnings = await listRecentAgentLearnings(userOpenId, 50);
+    const ranked = learnings.map((learning) => ({
+      kind: learning.kind,
+      title: learning.title,
+      detail: learning.detail,
+      keywords: learning.keywords,
+      createdAt: learning.createdAt.toISOString(),
+    }));
+    return formatLearningsForContext(selectRelevantLearnings(ranked, prompt));
+  } catch (error) {
+    console.warn("[agentMemory] Learnings nicht geladen:", error instanceof Error ? error.message.slice(0, 120) : error);
+    return "";
+  }
+}
+
+/** Sprint 94 — save_learning ausfuehren (Datenbank statt Workspace-Service). */
+async function executeSaveLearningTool(userOpenId: string | undefined, args: Record<string, unknown>): Promise<string> {
+  const title = typeof args.title === "string" ? args.title : "";
+  const detail = typeof args.detail === "string" ? args.detail : "";
+  const rawKind = typeof args.kind === "string" ? args.kind : undefined;
+  if (!title.trim() || !detail.trim()) return "FEHLER: save_learning benoetigt 'title' und 'detail'.";
+  if (!userOpenId) return "FEHLER: Langzeit-Gedächtnis ist nur fuer angemeldete Nutzer verfuegbar.";
+  const record = buildLearningRecord({
+    title,
+    detail,
+    kind: rawKind && isAgentLearningKind(rawKind) ? rawKind : undefined,
+  });
+  try {
+    await insertAgentLearningRecord({ userOpenId, ...record });
+    return `Learning gespeichert [${record.kind}]: ${record.title}`;
+  } catch (error) {
+    console.warn("[agentMemory] Learning nicht gespeichert:", error instanceof Error ? error.message.slice(0, 120) : error);
+    return "FEHLER: Learning konnte nicht gespeichert werden (Datenbank nicht erreichbar).";
+  }
+}
+
+/** Sprint 94 — Auto-Learning nach nutzwerkzeuglastigen Turns (Best-Effort, nie blockierend). */
+async function storeAutoLearning(input: AgentToolChatInput, userMessage: string, assistantSummary: string, toolsUsed: string[]): Promise<void> {
+  if (!input.userOpenId || !turnDeservesLearning(toolsUsed)) return;
+  try {
+    const record = buildLearningRecord(deriveLearningFromTurn(userMessage, assistantSummary, toolsUsed));
+    await insertAgentLearningRecord({ userOpenId: input.userOpenId, ...record });
+    console.log(`[agentMemory] Auto-Learning gespeichert [${record.kind}]`);
+  } catch (error) {
+    console.warn("[agentMemory] Auto-Learning nicht gespeichert:", error instanceof Error ? error.message.slice(0, 120) : error);
+  }
+}
 
 /** Ein Agent-Loop-Lauf gegen genau einen Provider. */
 async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput): Promise<DevelopmentChatResult> {
   const githubToken = resolveAgentGithubToken(input.role, input.githubToken);
+  const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const learningContext = await loadLearningContext(input.userOpenId, lastUserMessage);
   const conversation: Message[] = [
-    { role: "system", content: buildAgentSystemPrompt(input.branch ?? "main") },
+    { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main")}${learningContext}` },
     ...input.messages.map((message) => ({ role: message.role, content: message.content })),
   ];
   const businessTools = BUSINESS_TOOL_NAMES.map((name) => ({
@@ -629,6 +695,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     },
   }));
   const tools = [...(AGENT_TOOL_DEFINITIONS as unknown as Tool[]), ...(businessTools as unknown as Tool[])];
+  const toolsUsedInTurn = new Set<string>();
 
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
     const payload = await callProviderWithTools(provider, conversation, input.model, tools);
@@ -636,6 +703,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     const toolCalls: ToolCall[] = choice?.message?.tool_calls ?? [];
     if (!toolCalls.length) {
       const content = extractContent(payload);
+      await storeAutoLearning(input, lastUserMessage, content, [...toolsUsedInTurn]);
       return { content, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
     }
     conversation.push({
@@ -645,18 +713,23 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     });
     for (const call of toolCalls) {
       const toolName = call.function?.name ?? "";
-      const toolResult = isAgentToolName(toolName)
-        ? await executeAgentTool(toolName, input.workspaceId ?? "", parseToolArguments(call.function?.arguments), githubToken)
-        : isBusinessToolName(toolName)
-          ? formatBusinessResult(toolName, await executeBusinessSnapshot(toolName))
-          : `FEHLER: Unbekanntes Werkzeug '${toolName}'.`;
+      toolsUsedInTurn.add(toolName);
+      const toolResult = toolName === "save_learning"
+        ? await executeSaveLearningTool(input.userOpenId, parseToolArguments(call.function?.arguments))
+        : isAgentToolName(toolName)
+          ? await executeAgentTool(toolName, input.workspaceId ?? "", parseToolArguments(call.function?.arguments), githubToken)
+          : isBusinessToolName(toolName)
+            ? formatBusinessResult(toolName, await executeBusinessSnapshot(toolName))
+            : `FEHLER: Unbekanntes Werkzeug '${toolName}'.`;
       conversation.push({ role: "tool", tool_call_id: call.id, content: toolResult.slice(0, MAX_TOOL_RESULT_CHARS) });
     }
   }
 
   // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen.
   const payload = await callProviderWithTools(provider, conversation, input.model, undefined);
-  return { content: extractContent(payload), model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
+  const finalContent = extractContent(payload);
+  await storeAutoLearning(input, lastUserMessage, finalContent, [...toolsUsedInTurn]);
+  return { content: finalContent, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
 }
 
 /** Agent-Modus mit Provider-Failover (auto) bzw. fixem Provider. */
@@ -825,6 +898,7 @@ export async function handleDevelopmentChat(input: {
   workspaceId?: string;
   githubToken?: string;
   branch?: string;
+  userOpenId?: string;
 }): Promise<DevelopmentChatResult> {
   if (input.workspaceId) {
     return handleAgentToolChat(input);

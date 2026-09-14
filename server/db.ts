@@ -7,6 +7,8 @@ import {
   InsertChatMessage,
   InsertUser,
   users,
+  InsertAgentLearning,
+  agentLearnings,
 } from "../drizzle/schema";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
@@ -417,4 +419,28 @@ export async function setBillingSubscriptionStatus(stripeSubscriptionId: string,
     .update(billingSubscriptions)
     .set({ status })
     .where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId));
+}
+
+
+/**
+ * Sprint 94 — Langzeit-Gedächtnis des Agenten (Datenbankzugriff).
+ * Reine Regeln (Verdichtung, Ranking) liegen in lib/agent-memory-logic.ts.
+ */
+export async function insertAgentLearningRecord(input: InsertAgentLearning) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Learning nicht speicherbar.");
+  const [saved] = await db.insert(agentLearnings).values(input).returning();
+  return saved;
+}
+
+/** Letzte Learnings eines Nutzers (Neueste zuerst, gekappt). */
+export async function listRecentAgentLearnings(userOpenId: string, limit = 50) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Learnings nicht lesbar.");
+  return db
+    .select()
+    .from(agentLearnings)
+    .where(eq(agentLearnings.userOpenId, userOpenId))
+    .orderBy(desc(agentLearnings.createdAt), desc(agentLearnings.id))
+    .limit(Math.max(1, Math.min(limit, 200)));
 }
