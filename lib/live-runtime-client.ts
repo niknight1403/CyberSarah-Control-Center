@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { getApiBaseUrl } from "@/constants/oauth";
+import { resolvePreviewTargetUrl } from "@/lib/live-runtime-view-logic";
+import { useStudioSettings } from "@/lib/studio-settings";
 import * as Auth from "@/lib/_core/auth";
 import { trpc } from "@/lib/trpc";
 import {
@@ -139,9 +141,9 @@ export function useClearRuntimeLogs() {
 
 /** Vorschau-Ziel: Workspace-Service bevorzugt, sonst API-Basis (Web-Export). */
 export function usePreviewTargetUrl(): string | null {
-  const { settings } = trpc.useContext() ? { settings: null } : { settings: null };
-  return useMemo(() => {
-    void settings;
-    return getApiBaseUrl();
-  }, [settings]);
+  const { settings } = useStudioSettings();
+  return useMemo(
+    () => resolvePreviewTargetUrl(settings.workspaceUrl, getApiBaseUrl()),
+    [settings.workspaceUrl],
+  );
 }

@@ -1,35 +1,99 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { EmptySurface, PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
+import { useLiveRuntimeLogs, useLiveRuntimeStatus, useClearRuntimeLogs, usePreviewTargetUrl } from "@/lib/live-runtime-client";
+import { buildPreviewViewModel } from "@/lib/live-runtime-view-logic";
+import { formatLogTime, type LiveRuntimeLogEntry } from "@/lib/live-runtime-sse-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
-import { useWorkspace } from "@/lib/workspace-context";
-import { router } from "expo-router";
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { trpc } from "@/lib/trpc";
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { withAlpha } from "@/lib/theme-color-utils";
 import { useColors } from "@/hooks/use-colors";
 
+/**
+ * Sprint 111 — Preview-Tab mit echter Live-Runtime-Anbindung.
+ *
+ * Web: SSE-Log-Streaming (5-s-Status-Polling). Nativ: tRPC-Polling.
+ * Der Protokollverlauf ist echt, Status/Ping/Uptime kommen vom Server —
+ * ohne Workspace-Service oder Verbindung gelten ehrliche Offline-Zustaende.
+ */
 export default function PreviewScreen() {
     const colors = useColors();
     const styles = useMemo(() => createStyles(colors), [colors]);
-  const { events, lastRefreshLabel, refreshPreview } = useWorkspace();
+  const status = useLiveRuntimeStatus();
+  const { entries, connection, clearLocal } = useLiveRuntimeLogs(200);
+  const clearLogs = useClearRuntimeLogs();
+  const previewUrl = usePreviewTargetUrl();
   const { settings } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
+  const [clearBusy, setClearBusy] = useState(false);
+  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  const isAdmin = (accountQuery.data?.role ?? null) === "admin";
+
+  const vm = useMemo(
+    () => buildPreviewViewModel({ status, connection, previewUrl, isAdmin, logEntryCount: entries.length }),
+    [status, connection, previewUrl, isAdmin, entries.length],
+  );
+
+  const handleClearLogs = useCallback(async () => {
+    if (clearBusy) return;
+    setClearBusy(true);
+    try {
+      if (connection === "streaming") {
+        // Nur der lokale Zwischenstand — der Server-Puffer bleibt fuer alle Nutzer.
+        clearLocal();
+      } else {
+        const result = await clearLogs.mutateAsync();
+        clearLocal();
+        const cleared = typeof result === "number" ? result : null;
+        Alert.alert("Protokoll geleert", cleared !== null ? `${cleared} Server-Einträge wurden entfernt.` : "Der Server-Zwischenstand wurde geleert.");
+      }
+    } catch (error) {
+      Alert.alert("Leeren fehlgeschlagen", error instanceof Error ? error.message : "Das Protokoll konnte nicht geleert werden.");
+    } finally {
+      setClearBusy(false);
+    }
+  }, [clearBusy, clearLocal, clearLogs, connection]);
 
   return (
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <FlatList
         contentContainerStyle={styles.content}
-        data={events}
-        keyExtractor={(event) => event.id}
+        data={entries}
+        keyExtractor={(entry) => entry.id}
         ListHeaderComponent={
           <>
-            <StudioHeader eyebrow="Remote Runtime" title="Vorschau" actionIcon="arrow.clockwise" actionLabel="Vorschau aktualisieren" onAction={refreshPreview} />
+            <StudioHeader eyebrow="Remote Runtime" title="Vorschau" actionIcon="arrow.clockwise" actionLabel="Laufzeit aktualisieren" onAction={() => void accountQuery.refetch()} />
             <View style={styles.statusCard}>
-              <View>
+              <View style={styles.statusColumn}>
                 <Text style={styles.statusLabel}>AUSFÜHRUNGSUMGEBUNG</Text>
-                <Text style={styles.statusTitle}>{hasWorkspaceService ? "Service-Adresse gespeichert" : "Workspace-Service nicht verbunden"}</Text>
+                <Text style={styles.statusTitle}>{vm.headline}</Text>
+                <Text style={styles.statusText}>{vm.description}</Text>
               </View>
-              <StatusBadge label={hasWorkspaceService ? "Bereit zur Prüfung" : "Offline"} tone={hasWorkspaceService ? "ready" : "warning"} />
+              <View style={styles.badgeColumn}>
+                <StatusBadge label={vm.stateBadge.label} tone={vm.stateBadge.tone} />
+                <StatusBadge label={vm.connectionBadge.label} tone={vm.connectionBadge.tone} />
+              </View>
+            </View>
+            <View style={styles.metricsRow}>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricValue}>{vm.uptimeLabel}</Text>
+                <Text style={styles.metricLabel}>Uptime</Text>
+              </View>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricValue}>{vm.pingLabel}</Text>
+                <Text style={styles.metricLabel}>Latenz</Text>
+              </View>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricValue}>{status?.port ?? "–"}</Text>
+                <Text style={styles.metricLabel}>Port</Text>
+              </View>
+              <View style={styles.metricChip}>
+                <Text style={styles.metricValue}>{vm.logCountLabel.split(" ")[0]}</Text>
+                <Text style={styles.metricLabel}>Ereignisse</Text>
+              </View>
             </View>
             <View style={styles.previewFrame}>
               <View style={styles.previewBrowserBar}>
@@ -38,37 +102,68 @@ export default function PreviewScreen() {
                   <View style={styles.browserDot} />
                   <View style={styles.browserDot} />
                 </View>
-                <Text numberOfLines={1} style={styles.previewUrl}>
-                  {hasWorkspaceService ? `${settings.workspaceUrl}/preview` : "Keine Preview-URL"}
-                </Text>
+                <Text numberOfLines={1} style={styles.previewUrl}>{vm.urlLabel}</Text>
+                {vm.isLive ? <View style={styles.liveDot} /> : null}
               </View>
-              <EmptySurface
-                description={hasWorkspaceService ? "Die Service-Adresse ist gespeichert. Starte dort einen Preview-Prozess, um Hot Reload und Logs zu laden." : "Konfiguriere die HTTPS-Adresse deines Workspace-Service. Danach werden Hot Reload, Logs und die Live-Vorschau hier angezeigt."}
-                icon="play.rectangle.fill"
-                title={hasWorkspaceService ? "Preview-Prozess noch nicht gestartet" : "Bereit für deine Live-App"}
-              />
+              {hasWorkspaceService ? (
+                <View style={styles.previewBody}>
+                  <EmptySurface
+                    description="Die Workspace-Vorschau läuft im Service-Prozess. Status, Protokoll und Preview-URL hierüber bleiben live verbunden."
+                    icon="play.rectangle.fill"
+                    title={vm.isLive ? "Live-Verbindung zum Workspace-Service" : "Workspace-Service verbunden"}
+                  />
+                </View>
+              ) : (
+                <View style={styles.previewBody}>
+                  <EmptySurface
+                    description="Ohne Workspace-Service zeigt die Vorschau den Web-Export der produktiven API. Verbinde einen Workspace-Service für Hot Reload und eigene Preview-Prozesse."
+                    icon="play.rectangle.fill"
+                    title="Web-Export als Vorschau-Ziel"
+                  />
+                </View>
+              )}
             </View>
             <View style={styles.actionBlock}>
-              <PrimaryButton icon="link" label="Workspace verbinden" onPress={() => router.push("/settings" as never)} />
-              <Text style={styles.refreshCaption}>{lastRefreshLabel}</Text>
+              <PrimaryButton
+                icon={clearBusy ? "hourglass" : "trash"}
+                label={clearBusy ? "Leert Protokoll …" : "Protokoll leeren"}
+                disabled={!vm.showClearButton || clearBusy}
+                onPress={() => void handleClearLogs()}
+              />
+              <Text style={styles.refreshCaption}>
+                {vm.showClearButton
+                  ? connection === "streaming"
+                    ? "Leert den lokalen Live-Zwischenstand (Server-Puffer bleibt erhalten)."
+                    : "Leert den Server-Protokollpuffer (Admin)."
+                  : "Das Leeren ist ab Admin-Rolle mit vorhandenen Ereignissen verfügbar."}
+              </Text>
             </View>
-            <StudioSection label="Console" title="Letzte Runtime-Ereignisse" />
+            <StudioSection label="Console" title="Live-Laufzeitprotokoll" />
           </>
         }
-        renderItem={({ item }) => {
-          const icon = item.level === "success" ? "checkmark.circle.fill" : item.level === "warning" ? "exclamationmark.triangle.fill" : "terminal.fill";
-          const color = item.level === "success" ? colors.success : item.level === "warning" ? colors.warning : colors.tint;
-          return (
-            <TouchableOpacity activeOpacity={0.78} style={styles.logRow}>
-              <IconSymbol name={icon} size={18} color={color} />
-              <View style={styles.logTextArea}>
-                <Text style={styles.logLabel}>{item.label}</Text>
-                <Text style={styles.logDetail}>{item.detail}</Text>
+        ListEmptyComponent={
+          <View style={styles.emptyLogsCard}>
+            <IconSymbol name="terminal.fill" size={26} color={colors.tint} />
+            <Text style={styles.emptyLogsTitle}>{vm.isLive ? "Warte auf Ereignisse …" : "Keine Ereignisse empfangen"}</Text>
+            <Text style={styles.emptyLogsText}>{vm.isLive ? "Die Live-Verbindung steht — sobald der Server protokolliert, erscheinen die Einträge hier in Echtzeit." : "Sobald eine Live-Verbindung zur Laufzeit besteht, erscheinen hier Server-Ereignisse in Echtzeit."}</Text>
+          </View>
+        }
+        renderItem={({ item }: { item: LiveRuntimeLogEntry }) => (
+          <View style={styles.logRow}>
+            <IconSymbol
+              name={item.level === "success" ? "checkmark.circle.fill" : item.level === "warn" || item.level === "error" ? "exclamationmark.triangle.fill" : "terminal.fill"}
+              size={18}
+              color={item.level === "success" ? colors.success : item.level === "warn" ? colors.warning : item.level === "error" ? colors.error : colors.tint}
+            />
+            <View style={styles.logTextArea}>
+              <View style={styles.logMetaRow}>
+                <Text style={styles.logSource}>{item.source}</Text>
+                <Text style={styles.logTime}>{formatLogTime(item.atMs)}</Text>
               </View>
-              <IconSymbol name="chevron.right" size={17} color="#617187" />
-            </TouchableOpacity>
-          );
-        }}
+              <Text style={styles.logDetail}>{item.message}</Text>
+            </View>
+          </View>
+        )}
         showsVerticalScrollIndicator={false}
       />
     </ScreenContainer>
@@ -79,18 +174,34 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
   content: { paddingBottom: 20 },
   statusCard: {
-    alignItems: "center",
     backgroundColor: "#151C28",
     borderColor: "#29384A",
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
+    gap: 12,
     justifyContent: "space-between",
-    marginBottom: 14,
+    marginBottom: 12,
     padding: 15,
   },
-  statusLabel: { color: "#75859B", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 4 },
-  statusTitle: { color: "#EAF0F8", fontSize: 14, fontWeight: "800" },
+  statusColumn: { flex: 1, gap: 4 },
+  statusLabel: { color: "#75859B", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
+  statusTitle: { color: "#EAF0F8", flex: 1, flexWrap: "wrap", fontSize: 14, fontWeight: "800" },
+  statusText: { color: "#8493A7", flex: 1, flexWrap: "wrap", fontSize: 11, lineHeight: 16 },
+  badgeColumn: { alignItems: "flex-end", gap: 6, justifyContent: "flex-start" },
+  metricsRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
+  metricChip: {
+    alignItems: "center",
+    backgroundColor: "#111825",
+    borderColor: "#243248",
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 10,
+  },
+  metricValue: { color: "#E7EEF7", fontSize: 14, fontWeight: "900" },
+  metricLabel: { color: "#718094", fontSize: 10, fontWeight: "700", marginTop: 3 },
   previewFrame: { backgroundColor: "#0E131B", borderColor: "#2A3950", borderRadius: 19, borderWidth: 1, overflow: "hidden" },
   previewBrowserBar: {
     alignItems: "center",
@@ -105,8 +216,13 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   browserDots: { flexDirection: "row", gap: 4 },
   browserDot: { backgroundColor: "#536175", borderRadius: 3, height: 6, width: 6 },
   previewUrl: { color: "#8090A4", flex: 1, fontSize: 11 },
-  actionBlock: { marginBottom: 26, marginTop: 14 },
-  refreshCaption: { color: "#718094", fontSize: 11, marginTop: 9, textAlign: "center" },
+  liveDot: { backgroundColor: colors.success, borderRadius: 4, height: 8, shadowColor: colors.success, shadowOpacity: 0.7, shadowRadius: 5, width: 8 },
+  previewBody: { padding: 14 },
+  actionBlock: { marginBottom: 20, marginTop: 14 },
+  refreshCaption: { color: "#718094", fontSize: 11, lineHeight: 16, marginTop: 9, textAlign: "center" },
+  emptyLogsCard: { alignItems: "center", backgroundColor: "#111B28", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 22 },
+  emptyLogsTitle: { color: "#EAF5FF", fontSize: 15, fontWeight: "900", marginTop: 10 },
+  emptyLogsText: { color: "#9AABBF", fontSize: 12, lineHeight: 18, marginTop: 5, textAlign: "center" },
   logRow: {
     alignItems: "center",
     backgroundColor: "#121823",
@@ -120,7 +236,17 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     padding: 13,
   },
   logTextArea: { flex: 1 },
-  logLabel: { color: "#DCE5F0", fontSize: 13, fontWeight: "800", marginBottom: 3 },
+  logMetaRow: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 3 },
+  logSource: { color: lightenSafe(colors.tint), flex: 1, fontSize: 10, fontWeight: "900" },
+  logTime: { color: "#617187", fontSize: 10, fontWeight: "700" },
   logDetail: { color: "#8493A7", fontSize: 12, lineHeight: 17 },
   });
+}
+
+function lightenSafe(tint: string): string {
+  try {
+    return withAlpha(tint, 0.95);
+  } catch {
+    return tint;
+  }
 }

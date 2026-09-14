@@ -41,6 +41,8 @@ const MAPPING = {
   "lock.open.fill": "lock-open",
   "arrow.down.circle.fill": "arrow-downward",
   "doc.fill": "description",
+  "trash": "delete",
+  "hourglass": "hourglass-empty",
 } as const satisfies Record<string, ComponentProps<typeof MaterialIcons>["name"]>;
 
 /**
