@@ -199,7 +199,7 @@ export default function ChatScreen() {
       const unauthorized = raw.includes("10001") || /please login/i.test(raw);
       setChatError(
         unauthorized
-          ? "Sitzung abgelaufen — bitte im Tab „Konto" neu anmelden."
+          ? "Sitzung abgelaufen — bitte im Tab \u201eKonto\u201c neu anmelden."
           : raw || "Anfrage fehlgeschlagen.",
       );
     } finally {
