@@ -50,11 +50,22 @@ describe("chat-quota-logic", () => {
     expect(exhausted.resetsAt).toBe("2026-09-11T00:00:00.000Z");
   });
 
-  it("umgeht die Quote fuer Admins", () => {
+  it("umgeht die Quote fuer Admins (Sprint 108: UNLIMITED_TOKENS / QUOTA_EXEMPT)", () => {
     const admin = evaluateChatQuota({ dailyLimit: 3, role: "admin" }, 99, NOW);
     expect(admin.allowed).toBe(true);
     expect(admin.reason).toBeNull();
     expect(admin.remaining).toBe(Number.POSITIVE_INFINITY);
+    expect(admin.status).toBe("UNLIMITED_TOKENS");
+    expect(admin.quotaExempt).toBe(true);
+  });
+
+  it("weist Nicht-Admins den aktiven bzw. erschoepften System-State zu", () => {
+    const active = evaluateChatQuota({ dailyLimit: 3, role: "user" }, 1, NOW);
+    expect(active.status).toBe("ACTIVE");
+    expect(active.quotaExempt).toBe(false);
+    const exhausted = evaluateChatQuota({ dailyLimit: 3, role: "user" }, 3, NOW);
+    expect(exhausted.status).toBe("EXHAUSTED");
+    expect(exhausted.quotaExempt).toBe(false);
   });
 
   it("verteidigt sich gegen unbrauchbare Limits und negative Zaehler", () => {

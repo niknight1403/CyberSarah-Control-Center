@@ -62,12 +62,17 @@ async function probeWorkspace(): Promise<OpsCheckInput> {
 }
 
 function probeChat(): OpsCheckInput {
+  // Sprint 108: Zero-Cost-Prioritaet — die Ops-Check meldet den aktiven
+  // Endpoint der Gratis-Kette (Groq > OpenRouter > Gemini) vor den Paid-Stufen.
   const env: ManagedLlmEnv = {
     forgeApiUrl: process.env.AI_FORGE_API_URL?.trim() || undefined,
     forgeApiKey: process.env.AI_FORGE_API_KEY?.trim() || undefined,
     openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
     openaiApiKey:
       process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,
+    groqApiKey: process.env.AI_GROQ_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim() || undefined,
+    openrouterApiKey:
+      process.env.AI_OPENROUTER_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() || undefined,
   };
   const endpoint = resolveManagedLlmEndpoint(env);
   if (endpoint) {
@@ -76,7 +81,7 @@ function probeChat(): OpsCheckInput {
   return {
     kind: "chat",
     state: "degraded",
-    detail: "weder Forge-Key noch OpenAI-Fallback konfiguriert",
+    detail: "kein KI-Key konfiguriert (Groq/OpenRouter/Gemini/Forge/OpenAI)",
   };
 }
 

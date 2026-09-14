@@ -1,14 +1,14 @@
 /**
- * Sprint 85 — Default-Modell des On-Server-Providers.
- *
- * Ohne explizites Modell (z. B. beim KI-Verbindungstest oder wenn der Client
- * keins mitschickt) hat invokeLLM keinen model-Parameter gesetzt, was OpenAI
- * mit 400 "you must provide a model parameter" ablehnt. Das Default-Modell
- * muss zum aufgeloesten Endpoint passen: Ein Gemini-Endpoint braucht ein
+ * Sprint 85 — Managed-Modell-Aufloesung pro Endpoint-Source.
  * Gemini-Modell, Forge/OpenAI ein OpenAI-Modell. Die Aufloesung ist
  * deterministisch und ohne ENV-Zugriff testbar.
+ *
+ * Sprint 108 — Zero-Cost-Routing: Groq- und OpenRouter-Endpoints bekommen
+ * eigene Gratis-Defaults (llama-3.3-70b-versatile / Free-Instruct-Modell),
+ * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
+ * KOSTENFREIES Modell pro Source waehlt.
  */
-export type ManagedModelSource = "forge" | "gemini" | "openai";
+export type ManagedModelSource = "forge" | "gemini" | "openai" | "groq" | "openrouter";
 
 export function resolveManagedModel(
   requestedModel: string | undefined,
@@ -20,6 +20,15 @@ export function resolveManagedModel(
 
   if (source === "gemini") {
     return env.AI_GEMINI_MODEL?.trim() || "gemini-flash-latest";
+  }
+
+  if (source === "groq") {
+    return env.AI_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile";
+  }
+
+  if (source === "openrouter") {
+    // OpenRouter Free-Tier-Modell (kostenlos, ENV ueberschreibbar).
+    return env.AI_OPENROUTER_MODEL?.trim() || "meta-llama/llama-3.3-70b-instruct:free";
   }
 
   const candidates = [

@@ -1,7 +1,8 @@
 /**
  * Sprint 85 — Live-Integration der autonomen API-Key-Rotation:
- * invokeLLM verwaltet einen Pool der Managed-Endpoints (Forge > Gemini >
- * OpenAI) und rotiert bei 429-/Quota-/Auth-Fehlern automatisch auf den
+ * invokeLLM verwaltet einen Pool der Managed-Endpoints (Sprint 108:
+ * Gratis-Kette Groq > OpenRouter > Gemini; Paid nur per Admin-Override)
+ * und rotiert bei 429-/Quota-/Auth-Fehlern automatisch auf den
  * naechsten gesunden Key. Exhausted Keys (401/402/403) werden in
  * Folgerequests ausgelassen, bis der Pool-Status sich erholen kann.
  */
@@ -32,12 +33,19 @@ describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
     delete process.env.BUILT_IN_FORGE_API_URL;
     process.env.AI_GEMINI_API_KEY = "gem-test-key-1234";
     process.env.OPENAI_API_KEY = "sk-openai-test-5678";
+    // Sprint 108: Die Rotations-Mechanik wird hier mit aktivem Admin-Override
+    // (AI_ALLOW_PAID_LLM_FALLBACK) getestet — der Standard-Zustand (Gratis-
+    // Kette ohne Paid-Fallback) deckt der eigene Test unten ab.
+    process.env.AI_ALLOW_PAID_LLM_FALLBACK = "true";
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.AI_GEMINI_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.AI_ALLOW_PAID_LLM_FALLBACK;
+    delete process.env.GROQ_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
   });
 
   it("rotiert bei 429 automatisch auf den naechsten Key mit passendem Modell", async () => {
@@ -88,6 +96,35 @@ describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
     await invokeLLM({ messages: [{ role: "user", content: "hi again" }] });
     expect(calls.length).toBe(1);
     expect(calls[0].url).toContain(OPENAI_URL);
+  });
+
+  it("Sprint 108: rotiert standardmaessig NUR durch die Gratis-Kette (Groq > OpenRouter > Gemini)", async () => {
+    const calls: Call[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: { body: string; headers: Record<string, string> }) => {
+        calls.push({ url, body: JSON.parse(init.body) as Record<string, unknown> });
+        if (url.includes("groq.com")) {
+          return fakeResponse(429, { error: { message: "Rate limit reached" } });
+        }
+        return fakeResponse(200, { model: "free-model", content: "ok" });
+      }),
+    );
+
+    delete process.env.AI_ALLOW_PAID_LLM_FALLBACK;
+    process.env.GROQ_API_KEY = "gsk-free-key";
+    process.env.OPENROUTER_API_KEY = "sk-or-free-key";
+
+    const result = await invokeLLM({ messages: [{ role: "user", content: "hi" }] });
+
+    expect(result).toMatchObject({ model: "free-model" });
+    // Kette: Groq (429) -> OpenRouter (Erfolg). Kein kostenpflichtiger Endpoint.
+    expect(calls.length).toBe(2);
+    expect(calls[0].url).toContain("api.groq.com");
+    expect(calls[0].body.model).toBe("llama-3.3-70b-versatile");
+    expect(calls[1].url).toContain("openrouter.ai");
+    expect(calls[1].body.model).toBe("meta-llama/llama-3.3-70b-instruct:free");
+    expect(calls.every((call) => !call.url.includes("api.openai.com"))).toBe(true);
   });
 
   it("wirft den letzten Fehler, wenn alle Keys der Kette scheitern", async () => {

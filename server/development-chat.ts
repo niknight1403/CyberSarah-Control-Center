@@ -134,7 +134,7 @@ function getProviderConfig(provider: Exclude<ProviderId, "managed" | "anthropic"
     openrouter: {
       endpoint: getEnv("AI_OPENROUTER_BASE_URL") ?? "https://openrouter.ai/api/v1/chat/completions",
       apiKey: getEnv("AI_OPENROUTER_API_KEY") ?? getEnv("OPENROUTER_API_KEY"),
-      defaultModel: getEnv("AI_OPENROUTER_MODEL") ?? "openrouter/free",
+      defaultModel: getEnv("AI_OPENROUTER_MODEL") ?? "meta-llama/llama-3.3-70b-instruct:free",
       headers: { "HTTP-Referer": getEnv("APP_BASE_URL") ?? "https://localhost", "X-Title": "CyberSarah Control Center" },
     },
     groq: {
@@ -296,6 +296,37 @@ function getChatCompressionLimit(): number {
 }
 
 export const developmentChatRouter = router({
+  /**
+   * Sprint 108 — System-State der Chat-Quote: Der Admin-Account arbeitet mit
+   * UNLIMITED_TOKENS (QUOTA_EXEMPT) — keine Obergrenze, kein Zaehler. Alle
+   * anderen Konten erhalten die Fair-Use-Tagesbewertung.
+   */
+  quota: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      const recentMessages = await listChatMessages(ctx.user.openId, 500);
+      const usedToday = countMessagesToday(recentMessages, new Date());
+      return evaluateChatQuota(
+        {
+          dailyLimit: Number(process.env.DAILY_CHAT_LIMIT) || DEFAULT_DAILY_CHAT_LIMIT,
+          role: ctx.user.role,
+        },
+        usedToday,
+        new Date(),
+      );
+    } catch (error) {
+      console.warn("[developmentChat] Quotenabruf fehlgeschlagen:", error);
+      // Best-Effort: Bei unbekannter Historie gilt die aktive Tagesquote.
+      return evaluateChatQuota(
+        {
+          dailyLimit: Number(process.env.DAILY_CHAT_LIMIT) || DEFAULT_DAILY_CHAT_LIMIT,
+          role: "user",
+        },
+        0,
+        new Date(),
+      );
+    }
+  }),
+
   providers: protectedProcedure.query(() => ({
     providers: [
       { id: "auto", label: "Autonomer Superagent / Auto-Router", type: "auto" },

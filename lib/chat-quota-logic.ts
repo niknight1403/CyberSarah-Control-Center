@@ -5,6 +5,11 @@
  * Tabellen: Die Quote wird aus der persistenten chatMessages-Historie
  * abgeleitet (Nutzer-Nachrichten des aktuellen UTC-Tages). Admins sind
  * ausgenommen. Reine Logik — der Router zaehlt nur Historie und fragt nach.
+ *
+ * Sprint 108 — UNBEGRENZTE ADMIN-ELITE-FREIGABE: Der Admin-Account traegt
+ * im System-State den Status UNLIMITED_TOKENS / QUOTA_EXEMPT — keine
+ * Obergrenze, kein Zaehler, keine Kontingenterschoepfung. Alle anderen
+ * Rollen nutzen weiterhin die Fair-Use-Tagesquote.
  */
 
 export interface ChatQuotaConfig {
@@ -22,6 +27,14 @@ export interface ChatQuotaEvaluation {
   /** ISO-Zeitstempel, zu dem die Quote zurueckgesetzt wird (naechste UTC-Mitternacht). */
   resetsAt: string;
   reason: string | null;
+  /**
+   * Sprint 108 — System-State des Kontos:
+   * 'UNLIMITED_TOKENS' = Admin, QUOTA_EXEMPT (unendliche Ressourcen),
+   * 'ACTIVE' = Tagesquote aktiv, 'EXHAUSTED' = Tageslimit erreicht.
+   */
+  status: "UNLIMITED_TOKENS" | "ACTIVE" | "EXHAUSTED";
+  /** Admin-Konten sind von jeder Kontingenterschöpfung ausgenommen. */
+  quotaExempt: boolean;
 }
 
 /** Tagesschlüssel eines Zeitstempels (UTC, YYYY-MM-DD) — deterministisch. */
@@ -64,7 +77,7 @@ export function countMessagesToday(
   ).length;
 }
 
-/** Bewertet die Quote: Admins umgehen sie, andere Nutzen das Tageslimit. */
+/** Bewertet die Quote: Admins arbeiten UNLIMITED (QUOTA_EXEMPT), andere nutzen das Tageslimit. */
 export function evaluateChatQuota(
   config: ChatQuotaConfig,
   usedToday: number,
@@ -82,6 +95,8 @@ export function evaluateChatQuota(
       dailyLimit,
       resetsAt,
       reason: null,
+      status: "UNLIMITED_TOKENS",
+      quotaExempt: true,
     };
   }
 
@@ -93,6 +108,8 @@ export function evaluateChatQuota(
       dailyLimit,
       resetsAt,
       reason: `Tageslimit erreicht (${used}/${dailyLimit} Nachrichten). Die Quota wird um ${resetsAt} zurueckgesetzt.`,
+      status: "EXHAUSTED",
+      quotaExempt: false,
     };
   }
 
@@ -103,6 +120,8 @@ export function evaluateChatQuota(
     dailyLimit,
     resetsAt,
     reason: null,
+    status: "ACTIVE",
+    quotaExempt: false,
   };
 }
 

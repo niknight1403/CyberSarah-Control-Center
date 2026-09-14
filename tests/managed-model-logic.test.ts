@@ -30,6 +30,18 @@ describe("resolveManagedModel (Sprint 85)", () => {
     ).toBe("openai-b");
   });
 
+  it("Sprint 108: nutzt fuer Groq-Endpoints das Gratis-Default-Modell", () => {
+    expect(resolveManagedModel(undefined, "groq", {})).toBe("llama-3.3-70b-versatile");
+    expect(resolveManagedModel(undefined, "groq", { AI_GROQ_MODEL: "llama-3.1-8b-instant" })).toBe("llama-3.1-8b-instant");
+  });
+
+  it("Sprint 108: nutzt fuer OpenRouter-Endpoints ein Free-Tier-Modell", () => {
+    expect(resolveManagedModel(undefined, "openrouter", {})).toBe("meta-llama/llama-3.3-70b-instruct:free");
+    expect(
+      resolveManagedModel(undefined, "openrouter", { AI_OPENROUTER_MODEL: "google/gemma-3-27b-it:free" }),
+    ).toBe("google/gemma-3-27b-it:free");
+  });
+
   it("liefert gpt-4o-mini, wenn weder Anforderung noch ENV ein Modell liefern", () => {
     expect(resolveManagedModel(undefined, "openai", {})).toBe("gpt-4o-mini");
     expect(resolveManagedModel("   ", "forge", { AI_MANAGED_MODEL: "   " })).toBe("gpt-4o-mini");

@@ -503,7 +503,7 @@ async function invokeProvider(request, messages) {
     managed: { baseUrl: process.env.MANAGED_LLM_BASE_URL, key: boundProviderKey, model: process.env.MANAGED_LLM_MODEL ?? "gpt-4o-mini" },
     openai: { baseUrl: "https://api.openai.com/v1/chat/completions", key: boundProviderKey, model: process.env.OPENAI_MODEL ?? "gpt-4o-mini" },
     gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/models", key: boundProviderKey, model: process.env.GEMINI_MODEL ?? "gemini-3.6-flash" },
-    openrouter: { baseUrl: "https://openrouter.ai/api/v1/chat/completions", key: boundProviderKey, model: process.env.OPENROUTER_MODEL ?? "openrouter/free" },
+    openrouter: { baseUrl: "https://openrouter.ai/api/v1/chat/completions", key: boundProviderKey, model: process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free" },
     groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: boundProviderKey, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
     together: { baseUrl: "https://api.together.xyz/v1/chat/completions", key: boundProviderKey, model: process.env.TOGETHER_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
     anthropic: { baseUrl: "https://api.anthropic.com/v1/messages", key: boundProviderKey, model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest" },

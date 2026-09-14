@@ -238,14 +238,29 @@ const normalizeToolChoice = (
  * automatisch auf den OpenAI-Endpoint zurueck (deterministisch getestet in
  * tests/managed-llm-fallback-logic.test.ts).
  */
+/**
+ * Sprint 108 — PERMANENTE ZERO-COST-ROUTING-GARANTIE: Der Managed-Pool
+ * priorisiert ausnahmslos kostenfreie Endpunkte (Groq > OpenRouter > Gemini).
+ * Kostenpflichtige Endpoints (Forge > OpenAI) greifen nur bei explizitem
+ * Admin-Override (AI_ALLOW_PAID_LLM_FALLBACK=true) oder als Zero-Config-
+ * Notfall, wenn ueberhaupt kein Gratis-Key konfiguriert ist.
+ */
+const managedLlmEnv = () => ({
+  forgeApiUrl: ENV.forgeApiUrl,
+  forgeApiKey: ENV.forgeApiKey,
+  openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
+  geminiApiKey: process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || undefined,
+  openaiApiKey: process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,
+  groqApiKey: process.env.AI_GROQ_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim() || undefined,
+  groqBaseUrl: process.env.AI_GROQ_BASE_URL?.trim() || undefined,
+  openrouterApiKey: process.env.AI_OPENROUTER_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim() || undefined,
+  openrouterBaseUrl: process.env.AI_OPENROUTER_BASE_URL?.trim() || undefined,
+  openrouterReferer: process.env.AI_OPENROUTER_REFERER?.trim() || process.env.APP_BASE_URL?.trim() || undefined,
+  allowPaidFallback: process.env.AI_ALLOW_PAID_LLM_FALLBACK?.trim().toLowerCase() === "true",
+});
+
 const resolveManagedEndpoint = () => {
-  const endpoint = resolveManagedLlmEndpoint({
-    forgeApiUrl: ENV.forgeApiUrl,
-    forgeApiKey: ENV.forgeApiKey,
-    openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
-    geminiApiKey: process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || undefined,
-    openaiApiKey: process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,
-  });
+  const endpoint = resolveManagedLlmEndpoint(managedLlmEnv());
   if (!endpoint) {
     throw new Error(MANAGED_LLM_NO_KEY_MESSAGE);
   }
@@ -268,13 +283,7 @@ const maskKeyLabel = (apiKey: string): string => `…${apiKey.slice(-4)}`;
 
 /** Kandidaten-Kette aufloesen und Pool-Zustaende synchronisieren/auffrischen. */
 const resolveManagedCandidates = (): ManagedLlmEndpoint[] => {
-  const endpoints = resolveManagedLlmEndpoints({
-    forgeApiUrl: ENV.forgeApiUrl,
-    forgeApiKey: ENV.forgeApiKey,
-    geminiApiKey: process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || undefined,
-    openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
-    openaiApiKey: process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,
-  });
+  const endpoints = resolveManagedLlmEndpoints(managedLlmEnv());
   if (endpoints.length === 0) {
     throw new Error(MANAGED_LLM_NO_KEY_MESSAGE);
   }
@@ -498,6 +507,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${endpoint.apiKey}`,
+          ...(endpoint.headers ?? {}),
         },
         body: JSON.stringify(attemptPayload),
       });
