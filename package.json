@@ -99,7 +99,7 @@
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.8",
-    "esbuild": "^0.25.12",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.2",
     "eslint-config-expo": "~57.0.2",
     "pm2": "^7.0.4",
@@ -117,7 +117,7 @@
       "js-yaml": "4.3.2"
     },
     "@esbuild-kit/core-utils": {
-      "esbuild": "^0.25.0"
+      "esbuild": "^0.28.2"
     },
     "uuid": "11.1.1"
   }
