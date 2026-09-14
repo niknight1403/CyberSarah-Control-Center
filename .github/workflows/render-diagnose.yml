@@ -50,4 +50,11 @@ jobs:
                   commit = deploy.get("commit")
                   cid = commit.get("id", "?")[:7] if isinstance(commit, dict) else str(commit)
                   print(f"  {deploy.get('id')} | {deploy.get('status')} | commit={cid} | erstellt={deploy.get('createdAt')} | beendet={deploy.get('finishedAt')}")
+          print()
+          print("--- App-Service: WORKSPACE_SERVICE_URL (Diagnose) ---")
+          app_sid = "srv-dahjgllg1s2s73bf9u4g"
+          for ev in api(f"/services/{app_sid}/env-vars?limit=100"):
+              item = ev.get("envVar", ev)
+              if item.get("key") == "WORKSPACE_SERVICE_URL":
+                  print("WORKSPACE_SERVICE_URL =", item.get("value"))
           PY
