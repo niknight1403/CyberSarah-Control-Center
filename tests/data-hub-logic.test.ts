@@ -8,9 +8,12 @@ import {
   formatCryptoLine,
   formatCurrency,
   getBinanceSymbols,
+  getKrakenPairs,
   isBusinessToolName,
   isRetryableStatus,
   normalizeCryptoTicker,
+  normalizeGa4Report,
+  normalizeKrakenTicker,
 } from "../lib/data-hub-logic";
 
 describe("data-hub-logic (Sprint 90)", () => {
@@ -55,8 +58,15 @@ describe("data-hub-logic (Sprint 90)", () => {
     expect(isRetryableStatus(401)).toBe(false);
   });
 
-  it("kennt genau die drei Business-Tools und formatiert deren Ergebnisse", () => {
-    expect(BUSINESS_TOOL_NAMES).toEqual(["get_revenue_metrics", "get_crypto_prices", "get_analytics_overview"]);
+  it("kennt genau die sechs Business-Tools und formatiert deren Ergebnisse", () => {
+    expect(BUSINESS_TOOL_NAMES).toEqual([
+      "get_revenue_metrics",
+      "get_crypto_prices",
+      "get_analytics_overview",
+      "get_crm_contacts",
+      "get_content_channels_status",
+      "get_ai_services_status",
+    ]);
     expect(isBusinessToolName("get_crypto_prices")).toBe(true);
     expect(isBusinessToolName("delete_repo")).toBe(false);
 
@@ -69,5 +79,63 @@ describe("data-hub-logic (Sprint 90)", () => {
       formatBusinessResult("get_crypto_prices", { tickers: [{ symbol: "BTCUSDT", priceUsd: 60000, changePercent: -2, fetchedAt: "" }] }),
     ).toContain("BTC: 60.000,00 $");
     expect(formatBusinessResult("get_analytics_overview", { modules: ["Router-Health"] })).toContain("Router-Health");
+  });
+
+  it("erweitert den Sub-Agenten-Routing um GA4-, CRM-, Content- und KI-Prompts (Sprint 93)", () => {
+    expect(classifyBusinessDomain("Hole die GA4-Zahlen der letzten Woche")).toBe("analytics");
+    expect(classifyBusinessDomain("Recherchiere den Trend mit Perplexity")).toBe("content");
+    expect(classifyBusinessDomain("Wie steht der Kurs auf Kraken?")).toBe("trading");
+  });
+
+  it("formatiert GA4-Ergebnisse mit Konversionsrate und Nicht-Konfiguriert-Hinweis", () => {
+    expect(formatBusinessResult("get_analytics_overview", { status: "ok", activeUsers: 421, sessions: 1200, conversions: 39 })).toBe(
+      "GA4 (7 Tage): 421 aktive Nutzer, 1.200 Sitzungen, 39 Conversions (Konversionsrate 3,25 %).",
+    );
+    expect(formatBusinessResult("get_analytics_overview", { status: "not-configured", modules: ["Router-Health"] })).toMatch(/GA4_PROPERTY_ID/);
+  });
+
+  it("formatiert CRM-, Content- und KI-Dienste-Ergebnisse", () => {
+    expect(
+      formatBusinessResult("get_crm_contacts", { status: "ok", totalContacts: 1248, contactsCreatedLast24h: 3, salesforce: "not-configured" }),
+    ).toContain("1.248 HubSpot-Kontakte");
+    expect(formatBusinessResult("get_crm_contacts", { status: "not-configured" })).toMatch(/HUBSPOT_ACCESS_TOKEN/);
+    expect(
+      formatBusinessResult("get_content_channels_status", {
+        channels: [
+          { name: "TikTok", status: "ok", detail: "konfiguriert" },
+          { name: "Instagram", status: "not-configured" },
+        ],
+      }),
+    ).toContain("TikTok: konfiguriert");
+    expect(
+      formatBusinessResult("get_ai_services_status", {
+        services: [
+          { name: "Perplexity (Recherche)", configured: true },
+          { name: "ElevenLabs (Sprachausgabe)", configured: false },
+        ],
+      }),
+    ).toContain("Perplexity (Recherche): verfuegbar");
+  });
+
+  it("normalisiert Kraken-Ticker (Fallback-Quelle) und GA4-Reports deterministisch", () => {
+    const pairs = getKrakenPairs();
+    expect(pairs).toHaveLength(3);
+    const kraken = normalizeKrakenTicker(pairs[0], {
+      error: [],
+      result: { XXBTZUSD: { a: ["61000.0"], b: ["60990.0"], c: ["61200.5"], o: ["60500.0"] } },
+    });
+    expect(kraken).toMatchObject({ symbol: "BTCUSDT", priceUsd: 61200.5, changePercent: 1.16 });
+    expect(normalizeKrakenTicker(pairs[0], { error: ["EQuery:Unknown pair"], result: {} })).toBeNull();
+    expect(normalizeKrakenTicker(pairs[0], null)).toBeNull();
+
+    const ga4 = normalizeGa4Report({
+      rows: [
+        { metricValues: [{ value: "300" }, { value: "800" }, { value: "20" }] },
+        { metricValues: [{ value: "121" }, { value: "400" }, { value: "19" }] },
+      ],
+    });
+    expect(ga4).toMatchObject({ activeUsers: 421, sessions: 1200, conversions: 39 });
+    expect(normalizeGa4Report({})).toBeNull();
+    expect(normalizeGa4Report({ rows: "keine liste" })).toBeNull();
   });
 });

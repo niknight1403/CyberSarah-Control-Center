@@ -18,10 +18,10 @@ export type BusinessDomain = "revenue" | "trading" | "analytics" | "crm" | "cont
 
 const DOMAIN_KEYWORDS: Record<Exclude<BusinessDomain, "general">, string[]> = {
   revenue: ["einnahmen", "umsatz", "revenue", "abrechnung", "abonnement", "subscription", "stripe", "mrr", "zahlungen", "euro verdient"],
-  trading: ["bitcoin", "btc", "ethereum", "eth", "solana", "sol", "kurs", "krypto", "crypto", "trading", "preis von", "binance"],
+  trading: ["bitcoin", "btc", "ethereum", "eth", "solana", "sol", "kurs", "krypto", "crypto", "trading", "preis von", "binance", "kraken"],
   analytics: ["kampagne", "conversion", "konversion", "analytics", "traffic", "besucher", "ga4", "performance", "reichweite"],
   crm: ["kunden", "crm", "leads", "hubspot", "salesforce", "kontakte", "kundenliste"],
-  content: ["content", "post", "instagram", "tiktok", "social media", "veroeffentlichen", "video", "reel"],
+  content: ["content", "post", "instagram", "tiktok", "social media", "veroeffentlichen", "video", "reel", "perplexity", "recherche", "elevenlabs", "sprachausgabe", "stimme", "symphony"],
 };
 
 /**
@@ -77,7 +77,55 @@ export function normalizeCryptoTicker(raw: unknown): CryptoTicker | null {
   };
 }
 
+
+/* ==================== Kraken-Fallback (Trading) ==================== */
+
+const KRAKEN_PAIRS = [
+  { pair: "XXBTZUSD", symbol: "BTCUSDT" },
+  { pair: "XETHZUSD", symbol: "ETHUSDT" },
+  { pair: "SOLUSD", symbol: "SOLUSDT" },
+] as const;
+
+export type KrakenPair = (typeof KRAKEN_PAIRS)[number];
+
+export function getKrakenPairs(): KrakenPair[] {
+  return [...KRAKEN_PAIRS];
+}
+
+/**
+ * Normalisiert eine Kraken-Ticker-Antwort
+ * ({ error: [], result: { XXBTZUSD: { a: [ask], b: [bid], c: [lastTrade], o: [todayOpen] } } })
+ * in ein typsicheres CryptoTicker-Objekt. Die 24h-Veraenderung wird aus
+ * Tageseroeffnung (o) vs. letztem Handel (c) abgeleitet — das entspricht
+ * dem Geist der Binance-Metrik, ohne eine zusaetzliche Abfrage zu benoetigen.
+ */
+export function normalizeKrakenTicker(pair: KrakenPair, raw: unknown): CryptoTicker | null {
+  if (!raw || typeof raw !== "object") return null;
+  const result = (raw as Record<string, unknown>).result;
+  if (!result || typeof result !== "object") return null;
+  const entry = (result as Record<string, unknown>)[pair.pair];
+  if (!entry || typeof entry !== "object") return null;
+  const record = entry as Record<string, unknown>;
+  const lastTrade = Array.isArray(record.c) ? Number(record.c[0]) : NaN;
+  const todayOpen = Array.isArray(record.o) ? Number(record.o[0]) : NaN;
+  if (!Number.isFinite(lastTrade) || lastTrade <= 0) return null;
+  const changePercent =
+    Number.isFinite(todayOpen) && todayOpen > 0 ? Number((((lastTrade - todayOpen) / todayOpen) * 100).toFixed(2)) : 0;
+  return {
+    symbol: pair.symbol,
+    priceUsd: Number(lastTrade.toFixed(2)),
+    changePercent,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 /* ==================== Formatierung ==================== */
+
+/** Deutsch formatierte Ganzzahl mit Tausenderpunkten: 1248 -> "1.248". */
+export function formatGermanNumber(value: number): string {
+  const safe = Number.isFinite(value) ? Math.round(value) : 0;
+  return safe.toLocaleString("de-DE");
+}
 
 /** Deutsch formatierter Waehrungsbetrag: 1248.32 -> "1.248,32 €". */
 export function formatCurrency(value: number, currency: "EUR" | "USD" = "EUR"): string {
@@ -90,6 +138,42 @@ export function formatCurrency(value: number, currency: "EUR" | "USD" = "EUR"): 
 export function formatCryptoLine(ticker: CryptoTicker): string {
   const sign = ticker.changePercent >= 0 ? "+" : "";
   return `${ticker.symbol.replace("USDT", "")}: ${formatCurrency(ticker.priceUsd, "USD")} (${sign}${ticker.changePercent} % 24h)`;
+}
+
+
+/* ==================== GA4-Report (Analytics) ==================== */
+
+export type Ga4Metrics = {
+  activeUsers: number;
+  sessions: number;
+  conversions: number;
+  fetchedAt: string;
+};
+
+/**
+ * Normalisiert die Zeilen einer GA4-Data-API-runReport-Antwort
+ * ({ rows: [{ metricValues: [{ value }, ...] }] }) in ein typsicheres
+ * Objekt. Ungueltige/fehlende Werte zaehlen als 0 statt den Report zu reissen.
+ */
+export function normalizeGa4Report(raw: unknown): Ga4Metrics | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rows = (raw as Record<string, unknown>).rows;
+  if (!Array.isArray(rows)) return null;
+  const sums = { activeUsers: 0, sessions: 0, conversions: 0 };
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const metricValues = (row as Record<string, unknown>).metricValues;
+    if (!Array.isArray(metricValues)) continue;
+    const pick = (index: number): number => {
+      const value = metricValues[index];
+      const parsed = value && typeof value === "object" ? Number((value as Record<string, unknown>).value) : NaN;
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    sums.activeUsers += pick(0);
+    sums.sessions += pick(1);
+    sums.conversions += pick(2);
+  }
+  return { ...sums, fetchedAt: new Date().toISOString() };
 }
 
 /* ==================== Selbstheilung: Retry-Politik ==================== */
@@ -113,7 +197,14 @@ export function isRetryableStatus(status: number): boolean {
 /* ==================== Business-Tool-Schemas (Master-Agent) ==================== */
 
 /** Nur-Lese-Business-Tools des Master-Agenten — keine schreibenden Aktionen. */
-export const BUSINESS_TOOL_NAMES = ["get_revenue_metrics", "get_crypto_prices", "get_analytics_overview"] as const;
+export const BUSINESS_TOOL_NAMES = [
+  "get_revenue_metrics",
+  "get_crypto_prices",
+  "get_analytics_overview",
+  "get_crm_contacts",
+  "get_content_channels_status",
+  "get_ai_services_status",
+] as const;
 
 export type BusinessToolName = (typeof BUSINESS_TOOL_NAMES)[number];
 
@@ -128,7 +219,13 @@ export const BUSINESS_TOOL_DESCRIPTIONS: Record<BusinessToolName, string> = {
   get_crypto_prices:
     "Liefert Echtzeit-Kurse fuer BTC, ETH und SOL (Binance oeffentliche API, 24h-Veraenderung). Kein API-Key noetig.",
   get_analytics_overview:
-    "Liefert den System-Status der Analytics-Integrationen (verfuegbare Module, Aktivitaet). Externe Analytics-APIs (GA4) muessen zusaetzlich konfiguriert werden.",
+    "Liefert Analytics-Kennzahlen (GA4: aktive Nutzer, Sitzungen, Conversions der letzten 7 Tage). Voraussetzung: GA4_PROPERTY_ID + GA4_ACCESS_TOKEN konfiguriert; sonst klarer Nicht-Konfiguriert-Status.",
+  get_crm_contacts:
+    "Liefert CRM-Kennzahlen: HubSpot-Kontakte und -Neukunden (letzte 24 h) sowie den Konfigurationsstatus von Salesforce. Voraussetzung: HUBSPOT_ACCESS_TOKEN.",
+  get_content_channels_status:
+    "Liefert den Status der Content-Kanaele: TikTok (Content-Posting-API) und Instagram (Profil, Follower). Voraussetzung: TIKTOK-/INSTAGRAM-Zugangsdaten.",
+  get_ai_services_status:
+    "Liefert den Status der KI-Dienste (Perplexity Recherche, ElevenLabs Sprachausgabe, TikTok Symphony) — verfuegbar, sobald die jeweiligen API-Keys hinterlegt sind.",
 };
 
 /** Formatiert das Ergebnis eines Business-Tools als kompakte Modell-Antwort. */
@@ -147,7 +244,39 @@ export function formatBusinessResult(tool: BusinessToolName, payload: unknown): 
     const last24h = formatCurrency(Number(record.revenueLast24hEur ?? 0));
     return `Einnahmen: Gesamtbalance ${total}, letzte 24 h ${last24h}, aktive Abonnements: ${String(record.activeSubscriptions ?? 0)}.`;
   }
-  // get_analytics_overview
-  const modules = Array.isArray(record.modules) ? (record.modules as string[]) : [];
-  return `Analytics-Uebersicht: verfuegbare Module: ${modules.length > 0 ? modules.join(", ") : "keine"}. Externe Kampagnen-APIs (GA4, TikTok) benoetigen zusaetzliche Zugangsdaten.`;
+  if (tool === "get_analytics_overview") {
+    if (record.status === "ok") {
+      const users = Number(record.activeUsers ?? 0);
+      const sessions = Number(record.sessions ?? 0);
+      const conversions = Number(record.conversions ?? 0);
+      const rate = sessions > 0 ? ((conversions / sessions) * 100).toFixed(2).replace(".", ",") : "0";
+      return `GA4 (7 Tage): ${formatGermanNumber(users)} aktive Nutzer, ${formatGermanNumber(sessions)} Sitzungen, ${formatGermanNumber(conversions)} Conversions (Konversionsrate ${rate} %).`;
+    }
+    const modules = Array.isArray(record.modules) ? (record.modules as string[]) : [];
+    return `Analytics-Uebersicht: verfuegbare Module: ${modules.length > 0 ? modules.join(", ") : "keine"}. GA4 wird aktiv, sobald GA4_PROPERTY_ID + GA4_ACCESS_TOKEN hinterlegt sind.`;
+  }
+  if (tool === "get_crm_contacts") {
+    if (record.status === "ok") {
+      const total = Number(record.totalContacts ?? 0);
+      const recent = Number(record.contactsCreatedLast24h ?? 0);
+      const salesforce = String(record.salesforce ?? "not-configured");
+      return `CRM: ${formatGermanNumber(total)} HubSpot-Kontakte, ${formatGermanNumber(recent)} Neukontakte in den letzten 24 h; Salesforce: ${salesforce === "ok" ? "verbunden" : "nicht konfiguriert"}.`;
+    }
+    return "CRM ist auf dem Server nicht konfiguriert (HUBSPOT_ACCESS_TOKEN fehlt). Bitte in den Umgebungsvariablen hinterlegen.";
+  }
+  if (tool === "get_content_channels_status") {
+    const channels = Array.isArray(record.channels)
+      ? (record.channels as { name: string; status: string; detail?: string }[]).map(
+          (channel) => `${channel.name}: ${channel.status === "ok" ? channel.detail ?? "verbunden" : "nicht konfiguriert"}`,
+        )
+      : [];
+    return `Content-Kanaele — ${channels.length > 0 ? channels.join("; ") : "keine Kanaele konfiguriert"}.`;
+  }
+  // get_ai_services_status
+  const services = Array.isArray(record.services)
+    ? (record.services as { name: string; configured: boolean }[]).map(
+        (service) => `${service.name}: ${service.configured ? "verfuegbar" : "Key fehlt"}`,
+      )
+    : [];
+  return `KI-Dienste — ${services.length > 0 ? services.join("; ") : "keine Dienste registriert"}.`;
 }

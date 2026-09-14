@@ -15,7 +15,12 @@ import { useColors } from "@/hooks/use-colors";
 type DashboardData = {
   revenue: { status: string; totalBalanceEur?: number; revenueLast24hEur?: number; activeSubscriptions?: number };
   trading: { status: string; tickers: { symbol: string; priceUsd: number; changePercent: number }[]; error?: string };
-  analytics: { modules: string[]; note: string };
+  analytics:
+    | { status: "ok"; activeUsers: number; sessions: number; conversions: number }
+    | { status: "not-configured"; modules: string[] };
+  crm?: { status: string; totalContacts?: number; contactsCreatedLast24h?: number; salesforce?: string };
+  content?: { channels: { name: string; status: string; detail?: string }[] };
+  aiServices?: { services: { name: string; configured: boolean }[] };
 };
 
 function Tile({ title, value, detail, tone }: { title: string; value: string; detail: string; tone: "ok" | "warn" }) {
@@ -41,6 +46,18 @@ export default function DashboardScreen() {
   const cryptoLine = (trading?.tickers ?? [])
     .map((ticker) => `${ticker.symbol.replace("USDT", "")} ${ticker.priceUsd.toLocaleString("de-DE", { maximumFractionDigits: 0 })}$`)
     .join(" · ");
+
+  const channels = data?.content?.channels ?? [];
+  const aiServices = data?.aiServices?.services ?? [];
+  const activeChannels = channels.filter((channel) => channel.status === "ok").length;
+  const activeAiServices = aiServices.filter((service) => service.configured).length;
+  const integrationsDetail =
+    [
+      ...channels.map((channel) => `${channel.name}: ${channel.status === "ok" ? channel.detail ?? "verbunden" : "Key fehlt"}`),
+      ...aiServices.map((service) => `${service.name}: ${service.configured ? "verfuegbar" : "Key fehlt"}`),
+    ]
+      .slice(0, 2)
+      .join(" · ");
 
   return (
     <ScreenContainer>
@@ -81,10 +98,36 @@ export default function DashboardScreen() {
         />
 
         <Tile
-          title="Analytics"
-          tone="ok"
-          value={`${data?.analytics?.modules?.length ?? 0} Module`}
-          detail={data?.analytics?.note ?? "System-Status der Analyse-Integrationen."}
+          title="Analytics (GA4, 7 Tage)"
+          tone={data?.analytics?.status === "ok" ? "ok" : "warn"}
+          value={
+            data?.analytics?.status === "ok"
+              ? `${data.analytics.activeUsers.toLocaleString("de-DE")} aktive Nutzer`
+              : "Nicht konfiguriert"
+          }
+          detail={
+            data?.analytics?.status === "ok"
+              ? `${data.analytics.sessions.toLocaleString("de-DE")} Sitzungen · ${data.analytics.conversions.toLocaleString("de-DE")} Conversions`
+              : "GA4_PROPERTY_ID + GA4_ACCESS_TOKEN im Server hinterlegen für Kampagnen-Daten."
+          }
+        />
+
+        <Tile
+          title="CRM (HubSpot)"
+          tone={data?.crm?.status === "ok" ? "ok" : "warn"}
+          value={data?.crm?.status === "ok" ? `${(data.crm.totalContacts ?? 0).toLocaleString("de-DE")} Kontakte` : "Nicht konfiguriert"}
+          detail={
+            data?.crm?.status === "ok"
+              ? `${data.crm.contactsCreatedLast24h ?? 0} Neukontakte (24 h) · Salesforce: ${data.crm.salesforce === "ok" ? "verbunden" : "nicht konfiguriert"}`
+              : "HUBSPOT_ACCESS_TOKEN im Server hinterlegen für Kunden-Daten."
+          }
+        />
+
+        <Tile
+          title="Content & KI-Dienste"
+          tone={activeChannels > 0 || activeAiServices > 0 ? "ok" : "warn"}
+          value={`${activeChannels}/${channels.length} Kanäle · ${activeAiServices}/${aiServices.length} KI-Dienste`}
+          detail={integrationsDetail || "TikTok/Instagram-Keys und Perplexity/ElevenLabs hinterlegen."}
         />
 
         <Tile
