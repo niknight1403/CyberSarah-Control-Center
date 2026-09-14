@@ -23,6 +23,12 @@ type DashboardData = {
   aiServices?: { services: { name: string; configured: boolean }[] };
 };
 
+type OpsOverview = {
+  overall: "unknown" | "ok" | "degraded" | "down";
+  focus: string | null;
+  checks: { label: string; state: "unknown" | "ok" | "degraded" | "down"; stale: boolean }[];
+};
+
 function Tile({ title, value, detail, tone }: { title: string; value: string; detail: string; tone: "ok" | "warn" }) {
   const colors = useColors();
   return (
@@ -37,9 +43,44 @@ function Tile({ title, value, detail, tone }: { title: string; value: string; de
   );
 }
 
+function OpsWatchTile({ overview }: { overview: OpsOverview }) {
+  const colors = useColors();
+  const stateLabel = { ok: "GRÜN", degraded: "EINGESCHRÄNKT", down: "KRITISCH", unknown: "UNBEKANNT" }[overview.overall];
+  const tone = overview.overall === "ok" ? "ok" : "warn";
+  return (
+    <View style={styles.opsTile}>
+      <View style={styles.tileHeader}>
+        <AiOrb state={tone === "ok" ? "idle" : "error"} size={18} />
+        <Text style={[styles.tileTitle, { color: colors.muted }]}>Betriebswacht (Admin)</Text>
+        <Text style={[styles.opsState, { color: tone === "ok" ? colors.tint : colors.warning }]}>{stateLabel}</Text>
+      </View>
+      <Text style={[styles.opsFocus, { color: colors.text }]}>{overview.focus ?? "Keine Messwerte vorhanden."}</Text>
+      <View style={styles.checkList}>
+        {overview.checks.map((check) => (
+          <View key={check.label} style={styles.checkRow}>
+            <View style={[styles.checkDot, { backgroundColor: check.state === "ok" ? colors.tint : colors.warning }]} />
+            <Text style={[styles.checkLabel, { color: colors.muted }]}>{check.label}</Text>
+            <Text style={[styles.checkValue, { color: colors.text }]}>
+              {check.stale ? "veraltet" : check.state === "ok" ? "ok" : check.state === "unknown" ? "unbekannt" : "prüfen"}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const colors = useColors();
   const { data, isLoading, error } = trpc.dataHub.dashboard.useQuery();
+  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  const isAdmin = accountQuery.data?.role === "admin";
+  const opsQuery = trpc.ops.overview.useQuery(undefined, {
+    enabled: isAdmin,
+    retry: false,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
 
   const revenue = data?.revenue;
   const trading = data?.trading;
@@ -140,6 +181,10 @@ export default function DashboardScreen() {
               : (data?.system?.recentErrors ?? []).slice(0, 2).join(" · ")
           }
         />
+
+        {isAdmin && (opsQuery.data || opsQuery.isLoading) ? (
+          opsQuery.data ? <OpsWatchTile overview={opsQuery.data} /> : <Tile title="Betriebswacht (Admin)" tone="warn" value="Prüfung läuft …" detail="API, Datenbank, Workspace und KI-Chat werden geprüft." />
+        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
@@ -156,4 +201,12 @@ const styles = StyleSheet.create({
   tileTitle: { fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   tileValue: { fontSize: 20, fontWeight: "800" },
   tileDetail: { fontSize: 12 },
+  opsTile: { backgroundColor: "rgba(0, 190, 160, 0.08)", borderColor: "rgba(0, 190, 160, 0.28)", borderRadius: 14, borderWidth: 1, gap: 10, padding: 16 },
+  opsState: { fontSize: 10, fontWeight: "800", marginLeft: "auto" },
+  opsFocus: { fontSize: 13, fontWeight: "700", lineHeight: 19 },
+  checkList: { gap: 6 },
+  checkRow: { alignItems: "center", flexDirection: "row", gap: 7 },
+  checkDot: { borderRadius: 4, height: 7, width: 7 },
+  checkLabel: { flex: 1, fontSize: 11 },
+  checkValue: { fontSize: 11, fontWeight: "700" },
 });

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: "VersionName für die APK (z. B. 1.0.0)"
+        description: "VersionName für die APK (z. B. 2.0.0)"
         required: false
-        default: "1.0.0"
+        default: "2.0.0"
 
 permissions:
   contents: write
@@ -32,6 +32,11 @@ jobs:
 
       - name: Abhaengigkeiten installieren (inkl. devDependencies)
         run: npm ci --no-audit --no-fund
+
+      - name: Release-Version setzen und validieren
+        env:
+          VERSION_NAME: ${{ github.event.inputs.version_name || '2.0.0' }}
+        run: node scripts/set-release-version.mjs "$VERSION_NAME"
 
       - name: TypeScript-Check
         run: npm run check
@@ -124,7 +129,7 @@ jobs:
       - name: APK umbenennen und Release veroeffentlichen
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ github.event.inputs.version_name || '1.0.0' }}
+          VERSION: ${{ github.event.inputs.version_name || '2.0.0' }}
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk \
             "CyberSarah-ControlCenter-v${VERSION}-debug.apk"
