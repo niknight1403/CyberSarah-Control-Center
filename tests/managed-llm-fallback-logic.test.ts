@@ -3,6 +3,7 @@ import {
   GEMINI_OPENAI_COMPAT_URL,
   MANAGED_LLM_NO_KEY_MESSAGE,
   resolveManagedLlmEndpoint,
+  resolveManagedLlmEndpoints,
   type ManagedLlmEnv,
 } from "../lib/managed-llm-fallback-logic";
 
@@ -84,6 +85,31 @@ describe("resolveManagedLlmEndpoint", () => {
       apiKey: "forge-key",
       source: "forge",
     });
+  });
+});
+
+describe("resolveManagedLlmEndpoints (Sprint 85 — Key-Pool-Kette)", () => {
+  it("liefert alle konfigurierten Endpoints in Kosten-Prioritaet", () => {
+    const env: ManagedLlmEnv = {
+      forgeApiKey: "forge-key",
+      geminiApiKey: "gem-key",
+      openaiApiKey: "sk-openai-key",
+    };
+    expect(resolveManagedLlmEndpoints(env).map((e) => e.source)).toEqual([
+      "forge",
+      "gemini",
+      "openai",
+    ]);
+  });
+
+  it("laesst unkonfigurierte Stufen einfach aus", () => {
+    expect(resolveManagedLlmEndpoints({ geminiApiKey: "gem-key" }).map((e) => e.source)).toEqual([
+      "gemini",
+    ]);
+    expect(
+      resolveManagedLlmEndpoints({ forgeApiKey: "f", openaiApiKey: "o" }).map((e) => e.source),
+    ).toEqual(["forge", "openai"]);
+    expect(resolveManagedLlmEndpoints({})).toEqual([]);
   });
 });
 

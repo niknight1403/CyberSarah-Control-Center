@@ -88,7 +88,12 @@ export function recordKeyObservation(entry: KeyPoolEntry, observation: KeyObserv
       cooldownUntilMs: nowMs > 0 ? nowMs + KEY_ROTATION_COOLDOWN_MS : Number.MAX_SAFE_INTEGER,
     };
   }
-  if (observation.httpStatus === 402 || observation.httpStatus === 403 || next.remainingCredits === 0) {
+  if (
+    observation.httpStatus === 401 ||
+    observation.httpStatus === 402 ||
+    observation.httpStatus === 403 ||
+    next.remainingCredits === 0
+  ) {
     return { ...next, status: "exhausted", cooldownUntilMs: null };
   }
   if (next.status === "cooling" && next.cooldownUntilMs !== null && next.cooldownUntilMs <= nowMs) {

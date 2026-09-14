@@ -69,6 +69,26 @@ export function resolveManagedLlmEndpoint(env: ManagedLlmEnv): ManagedLlmEndpoin
   return null;
 }
 
+/**
+ * Sprint 85 — Alle verfuegbaren Managed-Endpoints in Ketten-Prioritaet
+ * (Forge > Gemini > OpenAI). Grundlage fuer den autonomen Key-Pool:
+ * invokeLLM rotiert bei 429/Quota-/Auth-Fehlern auf den naechsten
+ * verfuegbaren Endpoint (siehe server/_core/llm.ts).
+ */
+export function resolveManagedLlmEndpoints(env: ManagedLlmEnv): ManagedLlmEndpoint[] {
+  const rest: ManagedLlmEnv = { ...env };
+  const endpoints: ManagedLlmEndpoint[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const endpoint = resolveManagedLlmEndpoint(rest);
+    if (!endpoint) break;
+    endpoints.push(endpoint);
+    if (endpoint.source === "forge") rest.forgeApiKey = undefined;
+    else if (endpoint.source === "gemini") rest.geminiApiKey = undefined;
+    else rest.openaiApiKey = undefined;
+  }
+  return endpoints;
+}
+
 /** Fehlermeldung, wenn gar kein Key konfiguriert ist. */
 export const MANAGED_LLM_NO_KEY_MESSAGE =
   "OPENAI_API_KEY is not configured (weder Forge- noch Gemini- noch OpenAI-Key serverseitig gesetzt).";

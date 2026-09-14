@@ -3,8 +3,17 @@ import { ENV } from "./env";
 import {
   MANAGED_LLM_NO_KEY_MESSAGE,
   resolveManagedLlmEndpoint,
+  resolveManagedLlmEndpoints,
+  type ManagedLlmEndpoint,
 } from "../../lib/managed-llm-fallback-logic";
 import { resolveManagedModel } from "../../lib/managed-model-logic";
+import {
+  createKeyPoolEntry,
+  recordKeyObservation,
+  refreshKeyPool,
+  type KeyObservation,
+  type KeyPoolEntry,
+} from "../../lib/key-rotation-logic";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -229,6 +238,63 @@ const resolveManagedEndpoint = () => {
   return endpoint;
 };
 
+/**
+ * Sprint 85 — Autonome API-Key-Rotation (Live-Integration der Bibliothek
+ * lib/key-rotation-logic.ts): Der Managed-Aufruf verwaltet einen Pool aller
+ * konfigurierten Endpoints (Forge > Gemini > OpenAI, kostenpriorisiert).
+ * 429 → Cooldown (60 s), 401/402/403 → Key gilt als erschöpft, Latenz und
+ * Restguthaben fliessen in den Health-Score ein. invokeLLM rotiert bei
+ * Fehlern automatisch auf den naechsten gesunden Key — ohne manuelles
+ * Eingreifen und ohne Ausfuehrungskontext zu verlieren.
+ */
+const managedEndpoints = new Map<string, ManagedLlmEndpoint>();
+const managedPool = new Map<string, KeyPoolEntry>();
+
+const maskKeyLabel = (apiKey: string): string => `…${apiKey.slice(-4)}`;
+
+/** Kandidaten-Kette aufloesen und Pool-Zustaende synchronisieren/auffrischen. */
+const resolveManagedCandidates = (): ManagedLlmEndpoint[] => {
+  const endpoints = resolveManagedLlmEndpoints({
+    forgeApiUrl: ENV.forgeApiUrl,
+    forgeApiKey: ENV.forgeApiKey,
+    geminiApiKey: process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || undefined,
+    openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
+    openaiApiKey: process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,
+  });
+  if (endpoints.length === 0) {
+    throw new Error(MANAGED_LLM_NO_KEY_MESSAGE);
+  }
+  const nowMs = Date.now();
+  for (const endpoint of endpoints) {
+    if (!managedEndpoints.has(endpoint.source)) {
+      managedEndpoints.set(endpoint.source, endpoint);
+    }
+    const existing = managedPool.get(endpoint.source);
+    const entry = existing
+      ? recordKeyObservation(existing, { nowMs })
+      : createKeyPoolEntry({
+          id: endpoint.source,
+          provider: "managed",
+          label: maskKeyLabel(endpoint.apiKey),
+        });
+    managedPool.set(endpoint.source, refreshKeyPool([entry], nowMs)[0]);
+  }
+  return endpoints;
+};
+
+/** Beobachtung in den Pool-Eintrag des Sources einarbeiten. */
+const recordPoolObservation = (source: string, observation: KeyObservation): void => {
+  const entry = managedPool.get(source);
+  if (!entry) return;
+  managedPool.set(source, recordKeyObservation(entry, { ...observation, nowMs: Date.now() }));
+};
+
+/** Test-Hook: Pool-Zustand zuruecksetzen. */
+export function resetManagedKeyPoolForTests(): void {
+  managedEndpoints.clear();
+  managedPool.clear();
+};
+
 const normalizeResponseFormat = ({
   responseFormat,
   response_format,
@@ -305,6 +371,12 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
       if (response.ok || attempt === RETRY_MAX_RETRIES) {
         return response;
       }
+      // Sprint 85: 4xx (Auth/Quota/Modellfehler) nicht blind wiederholen —
+      // der autonome Key-Pool in invokeLLM rotiert sofort auf den naechsten
+      // Endpoint. Nur 5xx und Netzwerkfehler sind echte Retry-Kandidaten.
+      if (response.status < 500) {
+        return response;
+      }
 
       const retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
       try {
@@ -332,7 +404,7 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  const endpoint = resolveManagedEndpoint();
+  const candidates = resolveManagedCandidates();
 
   const {
     messages,
@@ -350,13 +422,19 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     max_tokens,
   } = params;
 
-  // Sprint 85: Der model-Parameter ist Pflicht — ohne explizites Modell
-  // greift ein endpoint-bewusstes Default (siehe managed-model-logic).
-  const resolvedModel = model ?? resolveManagedModel(undefined, endpoint.source);
+  // Nur aktive Keys in Ketten-Prioritaet versuchen; sind alle abgekuehlt
+  // oder erschöpft, wird die Kette trotzdem durchprobiert (Best-Effort),
+  // damit der Service nicht stumm bleibt, bis Cooldowns ablaufen.
+  const activeSources = new Set(
+    [...managedPool.values()].filter((entry) => entry.status === "active").map((entry) => entry.id),
+  );
+  let ordered = candidates.filter((endpoint) => activeSources.has(endpoint.source));
+  if (ordered.length === 0) {
+    ordered = [...candidates];
+  }
 
   const payload: Record<string, unknown> = {
     messages: messages.map(normalizeMessage),
-    model: resolvedModel,
   };
 
   if (tools && tools.length > 0) {
@@ -391,21 +469,48 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetchWithBackoff(endpoint.url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${endpoint.apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+  let lastError: unknown;
+  for (const endpoint of ordered) {
+    // Sprint 85: model ist Pflicht und muss zum jeweiligen Endpoint passen
+    // (Gemini-Endpoint → Gemini-Modell, Forge/OpenAI → OpenAI-Modell).
+    const attemptPayload = {
+      ...payload,
+      model: model ?? resolveManagedModel(undefined, endpoint.source),
+    };
+    const startedAt = Date.now();
+    try {
+      const response = await fetchWithBackoff(endpoint.url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${endpoint.apiKey}`,
+        },
+        body: JSON.stringify(attemptPayload),
+      });
+      const latencyMs = Date.now() - startedAt;
+      if (!response.ok) {
+        const errorText = await response.text();
+        lastError = new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+        // 429 → Cooldown, 401/402/403 → erschöpft (Auth/Guthaben),
+        // andere Status bleiben ohne Zustandsänderung (nur Latenz fließt ein).
+        if ([401, 402, 403, 429].includes(response.status)) {
+          recordPoolObservation(endpoint.source, { httpStatus: response.status, latencyMs });
+        } else {
+          recordPoolObservation(endpoint.source, { latencyMs });
+        }
+        continue;
+      }
+      recordPoolObservation(endpoint.source, { latencyMs });
+      return (await response.json()) as InvokeResult;
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
   }
 
-  return (await response.json()) as InvokeResult;
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("LLM invoke failed: alle Managed-Keys im Cooldown oder erschöpft");
 }
 
 export type ModelInfo = {
