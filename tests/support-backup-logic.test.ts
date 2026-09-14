@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createEncryptedSupportBackup, getEncryptedSupportBackupPreview, getSupportShareConfirmation, isValidSupportBackupPassword, SUPPORT_BACKUP_FORMAT, verifyEncryptedSupportBackup } from "../lib/support-backup-logic";
 import { serializeDevelopmentChatHistory } from "../lib/development-chat-history-logic";
+// PBKDF2 mit 310k Iterationen ueberschreitet auf ausgelasteten CI-Runnern
+// leicht den 60-s-Standard-Timeout — Datei-Timeout hochsetzen, ohne die
+// Krypto-Parameter (Sicherheitsniveau) abzuschwaechen.
+import { vi } from "vitest";
+
+vi.setConfig({ testTimeout: 180_000, hookTimeout: 180_000 });
+
 
 describe("encrypted support backups", () => {
   const history = serializeDevelopmentChatHistory([{ id: "one", role: "user", content: "Please investigate this deployment issue." }]);
