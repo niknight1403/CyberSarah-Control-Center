@@ -256,3 +256,11 @@
 - [x] Neuer Dashboard-Tab mit Live-Tiles im Living-AI-Look (#030617)
 - [x] 621/621 Tests gruen, tsc sauber
 - Offen: externe API-Keys (HubSpot/Salesforce/GA4/TikTok/Instagram/Kraken/Perplexity/ElevenLabs) durch Owner
+
+## Sprint 110 - Zentrale Betriebsansicht (14.09.2026) - erledigt
+- [x] ops.overview um PaaS-Checks erweitert: Render-Deploy-Status (key-gated via RENDER_API_KEY), Neon-Postgres-Roundtrip-Latenz, Uptime-Waechter-Ergebnis 24 h (GitHub-Issues, keyless), Workspace-Modus (postgres/ephemeral aus Health-Endpoint)
+- [x] Warnstufen je Komponente (ok/Warnung/kritisch) mit Zeitstempel und letztem Fehlerbild in lib/ops-overview-logic.ts + Dashboard-Betriebswacht-Kachel
+- [x] Admin-Benachrichtigung bei Stufenwechsel zu kritisch: server/ops-alerts.ts mit Stufenverlauf + Discord-Webhook (analog Uptime-Waechter, key-gated)
+- [x] 10 neue deterministische Tests (tests/ops-paas-logic.test.ts); 671/671 Tests gruen, tsc sauber, Server-Build erfolgreich
+- [x] Doku: docs/SPRINT_110_ZENTRALE_BETRIEBSANSICHT.md; .env.example um vier optionale Variablen ergaenzt
+- Offen (bewusst): Render-Deploy-Check ohne Key 'unknown'; Stufenverlauf prozesslokal (kein Erstalarm nach Restart)

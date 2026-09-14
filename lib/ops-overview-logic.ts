@@ -1,5 +1,9 @@
 /**
  * Sprint 56 — Zentrale Betriebsuebersicht: aggregierte Statusbewertung.
+ * Sprint 110 — Erweitert um PaaS-Betriebspfade (Render-Deploy, Neon-Postgres,
+ * Uptime-Waechter), Warnstufen je Komponente (ok/Warnung/kritisch) mit
+ * Zeitstempel und letztem Fehlerbild sowie Stufenwechsel-Erkennung fuer
+ * Admin-Benachrichtigungen.
  *
  * Konsolidiert die Pruefzustaende der Betriebspfade (API-Health/-Ready,
  * Datenbank, Workspace-Service, Metriken) in ein Gesamtbild mit
@@ -13,7 +17,10 @@ export type CheckKind =
   | "apiHealth"
   | "apiReady"
   | "database"
+  | "neonPostgres"
   | "workspace"
+  | "renderDeploy"
+  | "uptimeWatcher"
   | "metrics"
   | "chat";
 
@@ -27,14 +34,40 @@ export interface OpsCheckInput {
   /** Millisekunden bis Messwerte als veraltet gelten (Default 120000). */
   staleAfterMs?: number;
   detail?: string;
+  /** Sprint 110: Messzeitpunkt als Epoch-Millisekunden (Serveruhr). */
+  checkedAt?: number | null;
+  /** Sprint 110: letztes bekanntes Fehlerbild (ueber Messungen hinweg). */
+  lastFailure?: string | null;
 }
 
 export type OpsOverallState = "unknown" | "ok" | "degraded" | "down";
+
+/** Sprint 110: Warnstufe je Komponente fuer die zentrale Betriebsansicht. */
+export type OpsLevel = "ok" | "warnung" | "kritisch" | "unbekannt";
+
+export function levelForState(state: CheckState): OpsLevel {
+  switch (state) {
+    case "ok":
+      return "ok";
+    case "degraded":
+      return "warnung";
+    case "down":
+      return "kritisch";
+    default:
+      return "unbekannt";
+  }
+}
 
 export interface OpsCheckView extends OpsCheckInput {
   label: string;
   stale: boolean;
   message: string;
+  /** Sprint 110: abgeleitete Warnstufe (ok/Warnung/kritisch/unbekannt). */
+  level: OpsLevel;
+  /** Sprint 110: Messzeitpunkt oder null, wenn nicht gemessen. */
+  checkedAt: number | null;
+  /** Sprint 110: letztes bekanntes Fehlerbild oder null. */
+  lastFailure: string | null;
 }
 
 export interface OpsOverview {
@@ -48,7 +81,10 @@ const DEFAULT_LABELS: Record<CheckKind, string> = {
   apiHealth: "/api/health",
   apiReady: "/api/ready",
   database: "Datenbank",
+  neonPostgres: "Neon-Postgres",
   workspace: "Workspace-Service",
+  renderDeploy: "Render-Deploy",
+  uptimeWatcher: "Uptime-Wächter",
   metrics: "Metriken",
   chat: "KI-Chat",
 };
@@ -76,6 +112,14 @@ function messageFor(kind: CheckKind, state: CheckState): string {
         : state === "down"
           ? "Datenbank nicht verbunden — DATABASE_URL und Neon-Verfuegbarkeit pruefen."
           : "Datenbankstatus unklar — Verbindung testen.";
+    case "neonPostgres":
+      return state === "ok"
+        ? "Neon-Postgres antwortet prompt."
+        : state === "degraded"
+          ? "Neon-Postgres antwortet verlangsamt — Neon-Konsole und Connection-Pool pruefen."
+          : state === "down"
+            ? "Neon-Postgres nicht erreichbar — DATABASE_URL und Neon-Konsole pruefen."
+            : "Keine Neon-Postgres-Messwerte.";
     case "workspace":
       return state === "ok"
         ? "Workspace-Service verbunden."
@@ -84,6 +128,22 @@ function messageFor(kind: CheckKind, state: CheckState): string {
           : state === "degraded"
             ? "Workspace-Service eingeschraenkt erreichbar — Health-Endpoint und SERVICE_ACCESS_TOKEN pruefen."
             : "Workspace-Status unklar — Health-Endpoint des Dienstes aufrufen.";
+    case "renderDeploy":
+      return state === "ok"
+        ? "Render-Deploy aktiv (Service live)."
+        : state === "degraded"
+          ? "Render-Deploy laeuft oder pausiert — Deploy-Status beobachten."
+          : state === "down"
+            ? "Render-Deploy fehlgeschlagen oder Dienst inaktiv — Render-Dashboard pruefen."
+            : "Keine Deploy-Daten — RENDER_API_KEY fuer Live-Status konfigurieren.";
+    case "uptimeWatcher":
+      return state === "ok"
+        ? "Uptime-Wächter: kein offener Alarm."
+        : state === "degraded"
+          ? "Uptime-Wächter meldet kuerzlichen Ausfall — Issue-Verlauf pruefen."
+          : state === "down"
+            ? "Offener Uptime-Alarm — Produktiv-URL extern pruefen."
+            : "Uptime-Wächter-Ergebnisse nicht ermittelbar.";
     case "metrics":
       return state === "ok"
         ? "Metriken abrufbar."
@@ -107,7 +167,17 @@ export function evaluateOverall(states: CheckState[]): OpsOverallState {
 }
 
 /** Kerncheck, der den Fokus-Tonality-Satz bestimmt (Reihenfolge = Prioritaet). */
-const FOCUS_ORDER: CheckKind[] = ["apiHealth", "database", "apiReady", "workspace", "chat", "metrics"];
+const FOCUS_ORDER: CheckKind[] = [
+  "apiHealth",
+  "database",
+  "neonPostgres",
+  "apiReady",
+  "workspace",
+  "renderDeploy",
+  "uptimeWatcher",
+  "chat",
+  "metrics",
+];
 
 function focusLine(overview: OpsOverallState, checks: OpsCheckView[]): string | null {
   if (overview === "ok") {
@@ -140,6 +210,9 @@ export function buildOpsOverview(inputs: OpsCheckInput[]): OpsOverview {
       label: input.label ?? DEFAULT_LABELS[input.kind],
       stale,
       message: messageFor(input.kind, state),
+      level: levelForState(state),
+      checkedAt: input.checkedAt ?? null,
+      lastFailure: input.lastFailure ?? null,
     };
   });
 
@@ -154,6 +227,32 @@ export function buildOpsOverview(inputs: OpsCheckInput[]): OpsOverview {
     focus: focusLine(overall, checks),
     recommendations,
   };
+}
+
+/**
+ * Sprint 110: Stufenwechsel zu kritisch — Komponenten, die aus einem
+ * Nicht-Kritisch-Zustand nach "down" gewechselt sind. Der erste Lauf ohne
+ * Vorbildzustand alarmiert bewusst NICHT (kein Boot-Rauschen); ein dauerhaft
+ * kritischer Pfad wird vom externen Uptime-Waechter abgedeckt.
+ */
+export function collectCriticalTransitions(
+  previousStates: Record<string, CheckState>,
+  checks: OpsCheckView[],
+): OpsCheckView[] {
+  return checks.filter((check) => {
+    const previous = previousStates[check.kind];
+    return check.state === "down" && previous !== undefined && previous !== "down";
+  });
+}
+
+/** Sprint 110: Tokenfreie Alarmmeldung fuer den Discord-Webhook. */
+export function buildOpsAlertMessage(overview: OpsOverview, critical: OpsCheckView[]): string {
+  const lines = critical.map((check) => `• ${check.label}: ${check.message}`);
+  return [
+    "🚨 Betriebswacht CyberSarah Control Center: Stufenwechsel zu KRITISCH",
+    ...lines,
+    `Gesamt: ${summarizeOpsOverview(overview)}`,
+  ].join("\n");
 }
 
 /** Kompakte einzeilige Zusammenfassung fuer Protokolle. */

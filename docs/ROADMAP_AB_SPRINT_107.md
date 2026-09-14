@@ -42,7 +42,9 @@ Akzeptanzkriterium je Sprint (unverändert, wie in `NEXT_STEPS.md` festgelegt): 
 ## Phase B — Betrieb, Zuverlässigkeit und Datensicherheit (Sprints 110–112)
 
 ### Sprint 110 — Zentrale Betriebsansicht
-**Ziel:** Strukturierte Healthchecks der PaaS-Betriebspfade (Render/Neon) konsolidieren und Warnstufen in einer zentralen Betriebsansicht zusammenführen (mittelfristiger Punkt aus `NEXT_STEPS.md`).
+**Erledigt (14.09.) — 671 Tests grün:** PaaS-Checks in `ops.overview` (Render-Deploy key-gated, Neon-Roundtrip-Latenz, Uptime-Wächter 24 h keyless via GitHub-Issues, Workspace-Modus), Warnstufen je Komponente mit Zeitstempel und letztem Fehlerbild in der Dashboard-Betriebswacht, Discord-Admin-Alarm bei Stufenwechsel zu kritisch (`server/ops-alerts.ts`, ohne Webhook ehrlich nur im Dashboard sichtbar). Bericht: `docs/SPRINT_110_ZENTRALE_BETRIEBSANSICHT.md`.
+
+**Ursprünglicher Plan:** Strukturierte Healthchecks der PaaS-Betriebspfade (Render/Neon) konsolidieren und Warnstufen in einer zentralen Betriebsansicht zusammenführen (mittelfristiger Punkt aus `NEXT_STEPS.md`).
 **Arbeiten:**
 - `ops.overview` um PaaS-Checks ergänzen (Render-Deploy-Status, Neon-Postgres-Erreichbarkeit, Workspace-Service-Modus, Uptime-Wächter-Ergebnisse der letzten 24 h).
 - Warnstufen (ok / Warnung / kritisch) mit Zeitstempel und letztem Fehlerbild je Komponente.

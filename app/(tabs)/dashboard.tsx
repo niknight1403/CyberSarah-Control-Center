@@ -26,8 +26,27 @@ type DashboardData = {
 type OpsOverview = {
   overall: "unknown" | "ok" | "degraded" | "down";
   focus: string | null;
-  checks: { label: string; state: "unknown" | "ok" | "degraded" | "down"; stale: boolean }[];
+  checks: {
+    label: string;
+    state: "unknown" | "ok" | "degraded" | "down";
+    stale: boolean;
+    /** Sprint 110: Warnstufe je Komponente. */
+    level: "ok" | "warnung" | "kritisch" | "unbekannt";
+    /** Sprint 110: Messzeitpunkt (Epoch-Millisekunden, Serveruhr). */
+    checkedAt: number | null;
+    /** Sprint 110: letztes bekanntes Fehlerbild (ueber Messungen hinweg). */
+    lastFailure: string | null;
+  }[];
 };
+
+/** Sprint 110: relative Zeitangabe fuer den Messzeitpunkt je Komponente. */
+function relativeCheckedAt(checkedAt: number | null): string {
+  if (!checkedAt) return "ungeprüft";
+  const minutes = Math.max(0, Math.round((Date.now() - checkedAt) / 60_000));
+  if (minutes < 1) return "gerade";
+  if (minutes < 60) return `vor ${minutes} min`;
+  return `vor ${Math.round(minutes / 60)} h`;
+}
 
 function Tile({ title, value, detail, tone }: { title: string; value: string; detail: string; tone: "ok" | "warn" }) {
   const colors = useColors();
@@ -45,6 +64,8 @@ function Tile({ title, value, detail, tone }: { title: string; value: string; de
 
 function OpsWatchTile({ overview }: { overview: OpsOverview }) {
   const colors = useColors();
+  // Sprint 110: Stufen je Komponente — ok / Warnung / kritisch / unbekannt.
+  const levelLabel = { ok: "ok", warnung: "Warnung", kritisch: "kritisch", unbekannt: "unbekannt" } as const;
   const stateLabel = { ok: "GRÜN", degraded: "EINGESCHRÄNKT", down: "KRITISCH", unknown: "UNBEKANNT" }[overview.overall];
   const tone = overview.overall === "ok" ? "ok" : "warn";
   return (
@@ -57,12 +78,27 @@ function OpsWatchTile({ overview }: { overview: OpsOverview }) {
       <Text style={[styles.opsFocus, { color: colors.text }]}>{overview.focus ?? "Keine Messwerte vorhanden."}</Text>
       <View style={styles.checkList}>
         {overview.checks.map((check) => (
-          <View key={check.label} style={styles.checkRow}>
-            <View style={[styles.checkDot, { backgroundColor: check.state === "ok" ? colors.tint : colors.warning }]} />
-            <Text style={[styles.checkLabel, { color: colors.muted }]}>{check.label}</Text>
-            <Text style={[styles.checkValue, { color: colors.text }]}>
-              {check.stale ? "veraltet" : check.state === "ok" ? "ok" : check.state === "unknown" ? "unbekannt" : "prüfen"}
-            </Text>
+          <View key={check.label}>
+            <View style={styles.checkRow}>
+              <View
+                style={[
+                  styles.checkDot,
+                  {
+                    backgroundColor:
+                      check.level === "ok" ? colors.tint : check.level === "kritisch" ? colors.error : colors.warning,
+                  },
+                ]}
+              />
+              <Text style={[styles.checkLabel, { color: colors.muted }]}>{check.label}</Text>
+              <Text style={[styles.checkValue, { color: colors.text }]}>
+                {check.stale ? "veraltet" : `${levelLabel[check.level]} · ${relativeCheckedAt(check.checkedAt)}`}
+              </Text>
+            </View>
+            {check.lastFailure && check.level === "ok" ? (
+              <Text style={[styles.checkFailure, { color: colors.muted }]}>
+                Letztes Fehlerbild: {check.lastFailure}
+              </Text>
+            ) : null}
           </View>
         ))}
       </View>
@@ -209,4 +245,5 @@ const styles = StyleSheet.create({
   checkDot: { borderRadius: 4, height: 7, width: 7 },
   checkLabel: { flex: 1, fontSize: 11 },
   checkValue: { fontSize: 11, fontWeight: "700" },
+  checkFailure: { fontSize: 10, paddingLeft: 14, paddingRight: 4 },
 });
