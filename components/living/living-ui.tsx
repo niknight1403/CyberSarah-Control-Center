@@ -160,9 +160,9 @@ export function ScanlineOverlay({ intensity = "subtle" as const }: { intensity?:
 }
 
 const styles = StyleSheet.create({
-  particleRoot: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
+  particleRoot: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 },
   particle: { backgroundColor: PARTICLE_COLOR, position: "absolute" },
   orb: { alignItems: "center", justifyContent: "center" },
   orbCore: { backgroundColor: "rgba(255, 255, 255, 0.85)" },
-  scanlineRoot: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
+  scanlineRoot: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 },
 });
