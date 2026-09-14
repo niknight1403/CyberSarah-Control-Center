@@ -193,7 +193,15 @@ export default function ChatScreen() {
       setAttachments([]);
     } catch (error) {
       setMessages((cur) => cur.filter((m) => !m.id.startsWith("thinking-")));
-      setChatError(error instanceof Error ? error.message : "Anfrage fehlgeschlagen.");
+      // Sprint 108 — Backend-Antwort "Please login (10001)" ist fuer den
+      // Nutzer nicht als Sitzungsproblem erkennbar; hier entsteht Klarheit.
+      const raw = error instanceof Error ? error.message : String(error);
+      const unauthorized = raw.includes("10001") || /please login/i.test(raw);
+      setChatError(
+        unauthorized
+          ? "Sitzung abgelaufen — bitte im Tab „Konto" neu anmelden."
+          : raw || "Anfrage fehlgeschlagen.",
+      );
     } finally {
       setIsThinking(false);
     }

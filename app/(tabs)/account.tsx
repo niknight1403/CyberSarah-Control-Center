@@ -26,9 +26,37 @@ export default function AccountScreen() {
   const cancelMutation = trpc.billing.cancel.useMutation();
   const invoicesQuery = trpc.billing.invoices.useQuery(undefined, { enabled: Boolean(localUser) || Boolean(accountQuery.data), retry: false });
 
+  const [sessionExpired, setSessionExpired] = useState(false);
+
   useEffect(() => {
     void Auth.getUserInfo().then(setLocalUser);
   }, []);
+
+  // Sprint 108 — Ehrliche Session-Anzeige: Lehnt der Server die Sitzung mit
+  // UNAUTHORIZED ("Please login (10001)") ab, waehrend lokal noch ein Profil
+  // liegt, ist der gespeicherte Token ungueltig (z. B. JWT-Rotation oder
+  // abgelaufen). Der Stumpf-Zustand wird entfernt, statt einen aktiven
+  // Administrator-Status aus dem Cache vorzutaeuschen.
+  useEffect(() => {
+    const error = accountQuery.error;
+    if (!error) return;
+    const code = (error as { data?: { code?: string } }).data?.code ?? "";
+    const unauthorized = code === "UNAUTHORIZED" || error.message.includes("10001");
+    if (!unauthorized || !localUser) return;
+    let active = true;
+    void (async () => {
+      await Auth.removeSessionToken();
+      await Auth.clearUserInfo();
+      if (!active) return;
+      setLocalUser(null);
+      setSessionExpired(true);
+      setMode("login");
+      setMessage("Sitzung abgelaufen — bitte mit deinem Zugang neu anmelden.");
+    })();
+    return () => {
+      active = false;
+    };
+  }, [accountQuery.error, localUser]);
 
   const user = accountQuery.data ?? localUser;
   useAdminAutoSetup(user?.role === "admin" ? user : null);
@@ -89,7 +117,7 @@ export default function AccountScreen() {
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <View style={styles.page}>
         <Text style={styles.eyebrow}>CYBERSARAH · KONTO</Text>
-        <Text style={styles.title}>{user ? "Dein Zugang" : mode === "login" ? "Anmelden" : "Konto erstellen"}</Text>
+        <Text style={styles.title}>{sessionExpired && !user ? "Sitzung abgelaufen" : user ? "Dein Zugang" : mode === "login" ? "Anmelden" : "Konto erstellen"}</Text>
         <Text style={styles.lead}>{user ? "Sitzung, Berechtigungen und Verwaltungszugang werden hier sicher verwaltet." : "Melde dich an, um den Entwicklungsraum, KI-Provider und Verwaltungsfunktionen zu nutzen."}</Text>
 
         {user ? <View style={styles.card}>

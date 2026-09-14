@@ -175,6 +175,15 @@ export class RemoteWorkspaceClient {
           typeof payload?.error === "string"
             ? payload.error
             : `Workspace-Service antwortet mit ${response.status}.`;
+        // Sprint 108 — 401 heisst konkret: Der Service-Access-Token fehlt
+        // oder stimmt nicht. Der Hinweis nennt die Loesung (Render-ENV
+        // SERVICE_ACCESS_TOKEN) statt nur "Zugriff verweigert".
+        if (response.status === 401) {
+          throw new WorkspaceRequestError(
+            401,
+            `${message} — Service-Token fehlt oder ist ungültig: Kopiere SERVICE_ACCESS_TOKEN aus dem Render-Dashboard (cybersarah-workspace) in die App-Einstellungen und verbinde erneut.`,
+          );
+        }
         throw new WorkspaceRequestError(response.status, message);
       }
       return parseJsonResponse<T>(response);
