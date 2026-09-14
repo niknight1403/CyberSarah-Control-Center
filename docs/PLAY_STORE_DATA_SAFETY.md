@@ -1,6 +1,6 @@
 # Play Store — Data Safety Formular (Antworten)
 
-Stand: 11.09.2026 — Sprint 83 (Release 1.3.0)
+Stand: 14.09.2026 — Sprint 83 (Release 1.3.5)
 
 Antwortsatz für den Data-Safety-Bereich der Play Console. Grundlage: `docs/SECRETS_AND_RELEASE.md`, SecureStore-Verschlüsselung (`lib/secure-session-store.ts`), Backup-Verschlüsselung (`lib/settings-backup.ts`, `lib/support-backup.ts`) und der externe Audit-Service. Jede Antwort ist als Formularfeld-Antwort formuliert.
 

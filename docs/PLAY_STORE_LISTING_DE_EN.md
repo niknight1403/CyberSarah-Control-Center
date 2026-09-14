@@ -1,6 +1,6 @@
 # Play Store Listing — Texte (DE/EN)
 
-Stand: 11.09.2026 — Sprint 83 (Release 1.3.0, Paket-ID `com.app.customaistudiomobile`)
+Stand: 14.09.2026 — Sprint 83 (Release 1.3.5, Paket-ID `com.app.customaistudiomobile`)
 
 Dieses Dokument enthält die redigierten Store-Listing-Texte für die Play-Console-Einreichung. Deutsch ist die Primärsprache, Englisch als Store-Listing-Sprache zusätzlich hinterlegt. Zeichenlimits sind an den Google-Vorgaben geprüft.
 
@@ -76,6 +76,22 @@ SUBSCRIPTION TIERS
 Free, Pro, Developer Max and Elite — fair quotas per tier; admins can raise them. Manage and inspect your usage in the built-in dashboard.
 
 Note: A self-hosted workspace server (Render deployment described in the project) or compatible endpoint is required for synchronization.
+
+## Versionshinweise 1.3.5 (What's new)
+
+### DE
+Neu in 1.3.5:
+• On-Server-KI sofort nutzbar: kostenloser Anbindungs-Fallback ohne eigene API-Keys
+• Autonome Key-Rotation: Rate-Limits und erschöpfte Keys heilen sich selbst
+• Produktiver Login auf der eigenen Domain (app.cybersarah-ki.com) stabilisiert
+• Zahlreiche Stabilitäts- und Zuverlässigkeitsverbesserungen
+
+### EN
+New in 1.3.5:
+• On-server AI works out of the box: free fallback connectivity, no API keys required
+• Autonomous key rotation: rate limits and exhausted keys heal themselves
+• Production login on the dedicated domain (app.cybersarah-ki.com) stabilized
+• Numerous stability and reliability improvements
 
 ## Versionshinweise 1.3.0 (What's new)
 

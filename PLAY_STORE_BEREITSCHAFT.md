@@ -1,7 +1,7 @@
 # CyberSarah Control Center – Play Store Bereitschaft
 
 ## Status
-Sprint 83: Release 1.3.0 — Listing-Texte, Data-Safety-Antworten und Screenshot-Gerüst liegen vor (siehe unten). Einreichung ist manueller Handoff.
+Sprint 83: Release **1.3.5** — Listing-Texte, Data-Safety-Antworten und Screenshot-Gerüst liegen vor (siehe unten). Einreichung ist manueller Handoff. Release-AAB/APK aus GitHub-Release `v1.3.5-apk` (signiert, `apksigner`-verifiziert).
 
 Die Mobile-App verwendet standardmäßig `https://app.cybersarah-ki.com` als Backend. Ein anderer Endpoint darf nur explizit über `EXPO_PUBLIC_API_BASE_URL` für eine kontrollierte Entwicklungs- oder Staging-Umgebung gesetzt werden.
 
@@ -29,7 +29,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 ### Beschreibungen & Inhalte
 - [x] Kurzbeschreibung (max. 80 Zeichen) — `docs/PLAY_STORE_LISTING_DE_EN.md`
 - [x] Vollständige Beschreibung (max. 4000 Zeichen) — `docs/PLAY_STORE_LISTING_DE_EN.md`
-- [x] Versionshinweise für Version 1.3.0 — `docs/PLAY_STORE_LISTING_DE_EN.md`
+- [x] Versionshinweise für Version 1.3.5 — `docs/PLAY_STORE_LISTING_DE_EN.md`
 
 ### Datenschutz & Rechtliches
 - [x] Datenschutzrichtlinien-URL
@@ -53,7 +53,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 - [x] Zurück-Geste konfiguriert
 
 ### Sicherheitsvalidierung
-- [x] Statische Analyse durchführen (Lint, Typprüfung) — CI `validate` + `release-audit` auf v1.3.0 grün
+- [x] Statische Analyse durchführen (Lint, Typprüfung) — CI `validate` + `release-audit` auf v1.3.5 grün (592 Tests bestanden)
 - [x] Sicherstellen, dass keine hardcodierten Geheimnisse oder API-Schlüssel vorhanden sind (Secret-Scan im Release-Audit)
 - [x] Berechtigungen sind Runtime-angefordert (POST_NOTIFICATIONS via `requestPermissionsAsync`)
 - [ ] SecureStore-Verschlüsselung auf echtem Gerät validieren (Realgerät-Test, siehe `NEXT_STEPS.md` Handoff-Punkte)
@@ -86,7 +86,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 
 ### Funktionales Testing
 - [x] Typprüfung erfolgreich (`pnpm check`)
-- [x] Alle Tests bestanden (`pnpm test` – 115 bestanden)
+- [x] Alle Tests bestanden (`pnpm test` – 592 bestanden)
 - [x] Build erfolgreich (`pnpm build`)
 - [x] Keine Konsolenfehler oder -warnungen auf echtem Gerät
 
@@ -127,7 +127,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 - [x] Release-Build-Konfiguration in eas.json
 - [x] Auto-Inkrement-Version aktiviert
 - [x] Build-Artefakte sicher gespeichert
-- [ ] Überprüfen, dass Release-APK mit produktivem Keystore signiert ist
+- [x] Überprüfen, dass Release-APK mit produktivem Keystore signiert ist (v1.3.5, `apksigner verify` grün)
 - [ ] Signierte APK vor Upload auf Gerät testen
 
 ### Store-Signierung
