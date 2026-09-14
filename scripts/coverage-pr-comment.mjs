@@ -109,17 +109,28 @@ async function main() {
   const existing = comments.find(
     (comment) => typeof comment.body === "string" && comment.body.includes(MARKER),
   );
+  // Sprint-109-Robustheit: Der Coverage-Kommentar ist rein informativ —
+  // ein transienter API-Fehler (z. B. 404 auf ein inzwischen geloeschtes
+  // Kommentar-Objekt, GITHUB_TOKEN-Race bei Dependabot-PRs) darf die CI nie
+  // rot machen. Deshalb: PATCH 404/410 -> Neuanlage; sonstiges Scheitern ->
+  // Warnung + exit 0.
   if (existing) {
     const patchResponse = await fetch(`${api}/${existing.id}`, {
       method: "PATCH",
       headers,
       body: JSON.stringify({ body: markdown }),
     });
-    if (!patchResponse.ok) {
-      fail(`Kommentar nicht aktualisierbar (HTTP ${patchResponse.status}).`);
+    if (patchResponse.ok) {
+      console.log(`Coverage-Kommentar aktualisiert (Comment-ID ${existing.id}).`);
+      return;
     }
-    console.log(`Coverage-Kommentar aktualisiert (Comment-ID ${existing.id}).`);
-    return;
+    if (patchResponse.status !== 404 && patchResponse.status !== 410) {
+      console.warn(
+        `coverage-pr-comment: Kommentar nicht aktualisierbar (HTTP ${patchResponse.status}) — Coverage liegt trotzdem als CI-Artifact bereit. CI bleibt gruen.`,
+      );
+      return;
+    }
+    console.warn("coverage-pr-comment: Alter Kommentar nicht mehr vorhanden (404/410) — lege neu an.");
   }
   const postResponse = await fetch(api, {
     method: "POST",
@@ -127,7 +138,10 @@ async function main() {
     body: JSON.stringify({ body: markdown }),
   });
   if (!postResponse.ok) {
-    fail(`Kommentar nicht anlegbar (HTTP ${postResponse.status}).`);
+    console.warn(
+      `coverage-pr-comment: Kommentar nicht anlegbar (HTTP ${postResponse.status}) — Coverage liegt trotzdem als CI-Artifact bereit. CI bleibt gruen.`,
+    );
+    return;
   }
   console.log("Coverage-Kommentar angelegt.");
 }
