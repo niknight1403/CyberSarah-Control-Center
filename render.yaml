@@ -34,6 +34,12 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false # Managed-LLM-Fallback (Sprint 53)
+      # Sprint 108 (Zero-Cost-Router): Kostenlose LLM-Provider — Keys via
+      # GitHub-Secrets im Render-Deploy-Workflow (nur gesetzt, wenn vorhanden).
+      - key: AI_GROQ_API_KEY
+        sync: false # Groq (ultraschnelle Gratis-Inferenz, llama-3.3-70b-versatile)
+      - key: AI_OPENROUTER_API_KEY
+        sync: false # OpenRouter Free Tiers (openrouter/free)
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
@@ -74,6 +80,11 @@ services:
       - key: ALLOWED_ORIGIN
         sync: false
       - key: PREVIEW_PUBLIC_BASE_URL
+        sync: false
+      # Sprint 108 (Zero-Cost-Router): Provider-Keys fuer das Custom-AI-Studio.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
         sync: false
       # Sprint 85 (Persistent Disk): Die Disk selbst wird im Render-Dashboard
       # gebucht (Disks-Seite, Mount /data). Das Flag WORKSPACE_STORAGE_PERSISTENT

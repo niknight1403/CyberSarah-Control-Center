@@ -280,6 +280,11 @@ function makeAppEnvBuilder(databaseUrl) {
       metricsToken: env("METRICS_TOKEN"),
       openAiApiKey: env("OPENAI_API_KEY"),
       geminiApiKey: env("GEMINI_API_KEY"),
+      // Sprint 108 (Zero-Cost-Router): Kostenlose Provider-Keys — werden
+      // nur gesetzt, wenn das GitHub-Secret existiert (kein Deploy-Fehler
+      // ohne Key, Router ignoriert inaktive Provider einfach).
+      groqApiKey: env("GROQ_API_KEY"),
+      openrouterApiKey: env("OPENROUTER_API_KEY"),
       stripeSecretKey: env("STRIPE_SECRET_KEY"),
       stripeWebhookSecret: env("STRIPE_WEBHOOK_SECRET"),
       oauthServerUrl: env("OAUTH_SERVER_URL"),
@@ -519,6 +524,12 @@ async function deployWorkspace() {
   const workspaceDatabaseUrl = env("WORKSPACE_DATABASE_URL", "").trim();
   const extraEnv = [`WORKSPACE_STORAGE_PERSISTENT=${storagePersistent}`];
   if (workspaceDatabaseUrl) extraEnv.push(`WORKSPACE_DATABASE_URL=${workspaceDatabaseUrl}`);
+  // Sprint 108 (Zero-Cost-Router): Keys nur anhängen, wenn gesetzt — sonst
+  // ueberschreibt das ENV-PUT bestaende Werte aus dem Render-Dashboard.
+  const groqApiKey = env("GROQ_API_KEY", "").trim();
+  if (groqApiKey) extraEnv.push(`GROQ_API_KEY=${groqApiKey}`);
+  const openrouterApiKey = env("OPENROUTER_API_KEY", "").trim();
+  if (openrouterApiKey) extraEnv.push(`OPENROUTER_API_KEY=${openrouterApiKey}`);
   const buildEnv = (allowedOrigin, previewUrl) =>
     buildWorkspaceEnv({
       serviceAccessToken,

@@ -78,6 +78,20 @@ describe("render-deploy-logic: buildServiceEnv", () => {
     expect(withoutOptional.find((l) => l.startsWith("METRICS_TOKEN="))).toBeUndefined();
   });
 
+  it("setzt Zero-Cost-Provider-Keys (Groq/OpenRouter) nur bei vorhandenen Werten", () => {
+    // Sprint 108: Ohne Key bleibt der Provider inaktiv — kein Deploy-Fehler.
+    const withFree = buildServiceEnv({
+      ...base,
+      groqApiKey: "gsk_groq-test-key",
+      openrouterApiKey: "sk-or-test-key",
+    });
+    expect(withFree).toContain("AI_GROQ_API_KEY=gsk_groq-test-key");
+    expect(withFree).toContain("AI_OPENROUTER_API_KEY=sk-or-test-key");
+    const withoutFree = buildServiceEnv(base);
+    expect(withoutFree.find((l) => l.startsWith("AI_GROQ_API_KEY="))).toBeUndefined();
+    expect(withoutFree.find((l) => l.startsWith("AI_OPENROUTER_API_KEY="))).toBeUndefined();
+  });
+
   it("wirft bei fehlender Pflicht-ENV, Newlines und ungueltigen extra-Zeilen", () => {
     expect(() => buildServiceEnv({ ...base, jwtSecret: " " })).toThrow("Pflicht-ENV fehlt: JWT_SECRET");
     expect(() => buildServiceEnv({ ...base, metricsToken: "a\nb" })).toThrow("Zeilenumbrueche");
@@ -92,6 +106,19 @@ describe("render-deploy-logic: buildWorkspaceEnv", () => {
     expect(lines).toContain("PORT=8787");
     expect(lines).toContain("NODE_ENV=production");
     expect(() => buildWorkspaceEnv({ serviceAccessToken: "" })).toThrow("SERVICE_ACCESS_TOKEN");
+  });
+
+  it("reicht Zero-Cost-Provider-Keys (schlichte Namen) nur bei vorhandenen Werten durch", () => {
+    const withFree = buildWorkspaceEnv({
+      serviceAccessToken: "tok",
+      groqApiKey: "gsk_groq-test-key",
+      openrouterApiKey: "sk-or-test-key",
+    });
+    expect(withFree).toContain("GROQ_API_KEY=gsk_groq-test-key");
+    expect(withFree).toContain("OPENROUTER_API_KEY=sk-or-test-key");
+    const withoutFree = buildWorkspaceEnv({ serviceAccessToken: "tok" });
+    expect(withoutFree.find((l) => l.startsWith("GROQ_API_KEY="))).toBeUndefined();
+    expect(withoutFree.find((l) => l.startsWith("OPENROUTER_API_KEY="))).toBeUndefined();
   });
 });
 

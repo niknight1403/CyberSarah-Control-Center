@@ -70,6 +70,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # Sprint 85: Gemini-Key fuer On-Server-Fallback (Forge > Gemini > OpenAI)
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Sprint 108 (Zero-Cost-Router): Kostenlose Provider — fehlende
+          # Secrets bleiben leer, der Router ignoriert inaktive Provider.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
@@ -95,6 +99,10 @@ jobs:
           # (Audit-Log + WIP-Backups, Schema workspace_service). Nutzt das
           # bestehende DATABASE_URL-Secret — kein neuer Account, keine Kosten.
           WORKSPACE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Sprint 108 (Zero-Cost-Router): Provider-Keys fuer den Workspace-
+          # Service (Custom-AI-Studio) — nur gesetzt, wenn Secrets existieren.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: node scripts/render-deploy.mjs --workspace
 
       - name: Custom Domain abschliessen (Phase 5, Sprint 84)
@@ -107,6 +115,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # Sprint 85: Gemini-Key fuer On-Server-Fallback (Forge > Gemini > OpenAI)
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Sprint 108 (Zero-Cost-Router): Kostenlose Provider — fehlende
+          # Secrets bleiben leer, der Router ignoriert inaktive Provider.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}

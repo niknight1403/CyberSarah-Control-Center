@@ -1,0 +1,106 @@
+# Sprint 108 — Zero-Cost-Router: LLM-Provider-Diagnose
+#
+# Prueft alle kostenlosen LLM-Anbindungen (Groq, OpenRouter Free Tiers)
+# mit echten Ping-Requests gegen die Live-Endpunkte:
+#   1. GitHub-Secrets direkt gegen die Provider-APIs (Key-Gueltigkeit)
+#   2. Workspace-Service auf Render (was dort wirklich deployed ist)
+# Keys werden NIE ausgegeben — nur HTTP-Statuscodes und Meldungen.
+# Ein nicht gesetztes Secret ist KEIN Fehler (Provider bleibt inaktiv).
+#
+# Abschlusskriterium des Sprints: Alle gesetzten Provider muessen GRUEN sein.
+
+name: Diagnose LLM-Provider (Zero-Cost-Router)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Taeglich 07:00 UTC (09:00 Berlin) — kontinuierliche Health-Checks
+    - cron: "0 7 * * *"
+
+jobs:
+  llm-provider-health:
+    name: "Kostenlose LLM-Provider: Live-Ping + Server-Status"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Groq: GitHub-Secret gegen Live-API pruefen"
+        id: groq_secret
+        run: |
+          if [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
+            echo "GROQ_API_KEY: NICHT GESETZT (Provider inaktiv — kein Fehler)."
+            echo "result=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CODE=$(curl -s -m 20 -o /tmp/groq.json -w "%{http_code}" \
+            "https://api.groq.com/openai/v1/models" \
+            -H "Authorization: Bearer ${{ secrets.GROQ_API_KEY }}")
+          if [ "$CODE" = "200" ]; then
+            MODELS=$(python3 -c "import json; d=json.load(open('/tmp/groq.json')); print(len(d.get('data',[])))" 2>/dev/null || echo "?")
+            echo "GROQ_API_KEY: GUELTIG (200) — $MODELS Modelle verfuegbar."
+            echo "result=ok" >> "$GITHUB_OUTPUT"
+          elif [ "$CODE" = "401" ]; then
+            echo "GROQ_API_KEY: UNGUELTIG (401) — Key im GitHub-Secret erneuern."
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+          else
+            echo "GROQ_API_KEY: UNERWARTET ($CODE)"; head -c 200 /tmp/groq.json; echo
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "OpenRouter: GitHub-Secret gegen Live-API pruefen"
+        id: openrouter_secret
+        run: |
+          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
+            echo "OPENROUTER_API_KEY: NICHT GESETZT (Provider inaktiv — kein Fehler)."
+            echo "result=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CODE=$(curl -s -m 20 -o /tmp/or.json -w "%{http_code}" \
+            "https://openrouter.ai/api/v1/models" \
+            -H "Authorization: Bearer ${{ secrets.OPENROUTER_API_KEY }}")
+          if [ "$CODE" = "200" ]; then
+            echo "OPENROUTER_API_KEY: GUELTIG (200)."
+            echo "result=ok" >> "$GITHUB_OUTPUT"
+          elif [ "$CODE" = "401" ]; then
+            echo "OPENROUTER_API_KEY: UNGUELTIG (401) — Key im GitHub-Secret erneuern."
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+          else
+            echo "OPENROUTER_API_KEY: UNERWARTET ($CODE)"; head -c 200 /tmp/or.json; echo
+            echo "result=fail" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Workspace-Service (Render): Server-seitige Provider-Health"
+        id: workspace_health
+        run: |
+          URL="${{ secrets.WORKSPACE_SERVICE_URL }}"
+          URL="${URL:-https://cybersarah-workspace.onrender.com}"
+          echo "Workspace-Service: $URL"
+          # Render Free Plan schlaeft nach 15 Min. — Aufwachfenster einplanen.
+          for PROVIDER in groq openrouter; do
+            CODE=$(curl -s -m 90 -o /tmp/ws-$PROVIDER.json -w "%{http_code}" -X POST "$URL/api/v1/providers/cloud/test" \
+              -H "Authorization: Bearer ${{ secrets.SERVICE_ACCESS_TOKEN }}" \
+              -H "Content-Type: application/json" -d "{\"provider\":\"$PROVIDER\"}")
+            if [ "$CODE" = "200" ]; then
+              echo "Workspace/$PROVIDER: GRUEN (200)"; head -c 200 /tmp/ws-$PROVIDER.json; echo
+            elif [ "$CODE" = "401" ]; then
+              echo "Workspace/$PROVIDER: Service-Token abgelehnt (401)."
+            elif echo "$CODE" | grep -q "^5"; then
+              echo "Workspace/$PROVIDER: Server meldet $CODE — vermutlich noch kein Key deployed."
+              head -c 200 /tmp/ws-$PROVIDER.json; echo
+            else
+              echo "Workspace/$PROVIDER: HTTP $CODE"; head -c 200 /tmp/ws-$PROVIDER.json; echo
+            fi
+          done
+
+      - name: "Gesamtergebnis"
+        run: |
+          G="${{ steps.groq_secret.outputs.result }}"
+          O="${{ steps.openrouter_secret.outputs.result }}"
+          echo "=== Zero-Cost-Router Health-Matrix ==="
+          echo "Groq:        $G"
+          echo "OpenRouter:  $O"
+          echo "======================================"
+          if [ "$G" = "fail" ] || [ "$O" = "fail" ]; then
+            echo "FEHLER: Mindestens ein gesetzter Provider-Key ist ungueltig."
+            exit 1
+          fi
+          echo "Alle gesetzten kostenlosen Provider sind GRUEN."
