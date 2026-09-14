@@ -1,4 +1,6 @@
-import type { Express, Request, Response } from "express";
+// Express-Response wird als ExpressResponse aliastiert, damit der globale
+// Fetch-Response-Typ (Response) ohne Namenskollision genutzt werden kann.
+import type { Express, Request, Response as ExpressResponse } from "express";
 
 /**
  * Sprint 73 — Server-seitiger Render-Proxy (/api/render/*).
@@ -71,8 +73,23 @@ function buildUpstreamRequest(req: Request, upstreamBase: string, upstreamPath: 
   };
 }
 
+/**
+ * Sprint 84-Follow-up: Render Free-Services schlafen nach 15 Minuten ein.
+ * Waehrend des Cold-Starts antwortet Render sofort mit einer 502-HTML-Fehlerseite
+ * (kein Timeout!) — der Proxy erkennt das am Status + Fehlen von JSON-Content-Type.
+ */
+function isRenderColdStart(response: Response): boolean {
+  return (
+    response.status === 502 &&
+    !(response.headers.get("content-type") ?? "").includes("application/json")
+  );
+}
+
+/** Wartezeit fuer den Cold-Start-Retry: deckt das Aufwachen (ca. 10-15 s) ab. */
+const COLD_START_RETRY_DELAY_MS = 12_000;
+
 export function registerRenderProxy(app: Express) {
-  app.all("/api/render/*", async (req: Request, res: Response) => {
+  app.all("/api/render/*", async (req: Request, res: ExpressResponse) => {
     const upstreamBase = workspaceServiceUrl();
     if (!upstreamBase) {
       res.status(503).json({
@@ -86,17 +103,6 @@ export function registerRenderProxy(app: Express) {
     // der Proxy-Präfix wird entfernt, der Rest erreicht den Service unverändert.
     const upstreamPath = (req.url.replace(/^\/api\/render/, "") || "/");
     const upstreamUrl = `${upstreamBase}${upstreamPath}`;
-
-    // Sprint 84-Follow-up: Render Free-Services schlafen nach 15 Minuten ein.
-    // Waehrend des Cold-Starts antwortet Render sofort mit einer 502-HTML-Fehlerseite
-    // (kein Timeout!) — diese wird hier erkannt, es folgt EIN verzögerter Retry,
-    // der das Aufwachen (ca. 10-15 s) abwartet. Bleibt der 502, folgt eine
-    // verständliche JSON-Fehlermeldung statt der rohen Render-Seite.
-    const COLD_START_RETRY_DELAY_MS = 12_000;
-    type UpstreamResponse = { status: number; headers: { get(name: string): string | null } };
-    const isRenderColdStart = (response: UpstreamResponse) =>
-      response.status === 502 &&
-      !(response.headers.get("content-type") ?? "").includes("application/json");
 
     try {
       let upstreamResponse = await fetch(
