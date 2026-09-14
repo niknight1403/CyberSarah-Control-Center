@@ -68,7 +68,13 @@ export default function ChatScreen() {
       .slice(-10)
       .map((message) => ({ role: message.role === "agent" ? "assistant" as const : "user" as const, content: message.content }));
     const requestMessages: { role: "user" | "assistant"; content: string }[] = [...conversation, { role: "user" as const, content }].slice(-12);
-    const request = developmentChatMutation.mutateAsync({ provider: settings.provider, messages: requestMessages });
+    const request = developmentChatMutation.mutateAsync({
+      provider: settings.provider,
+      messages: requestMessages,
+      // Sprint 88 — Workspace-ID aktiviert den autonomen Werkzeug-Modus.
+      workspaceId: chatWorkspaceId || undefined,
+      branch: settings.branch,
+    });
     const timeout = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => reject(new Error("Die KI-Anfrage hat das Zeitlimit überschritten. Bitte Provider oder Verbindung prüfen.")), 65_000);
       request.finally(() => clearTimeout(timer)).catch(() => undefined);
@@ -245,8 +251,8 @@ export default function ChatScreen() {
                   <View style={[s.statusCard, readyForChat ? s.statusReady : s.statusWarn]}>
                     <View style={readyForChat ? s.statusGlow : s.statusGlowWarn} />
                     <View style={s.statusCopy}>
-                      <Text style={s.statusTitle}>{readyForChat ? "Chat bereit" : "Verbindung fehlt"}</Text>
-                      <Text style={s.statusText}>{readyForChat ? contextLabel + " · " + providerLabel : "Repository und Workspace in Einstellungen konfigurieren."}</Text>
+                      <Text style={[s.statusTitle, s.statusTitleMono]}>{readyForChat ? "Chat bereit" : "Verbindung fehlt"}</Text>
+                      <Text style={[s.statusText, s.statusTextMono]}>{readyForChat ? contextLabel + " · " + providerLabel : "Repository und Workspace in Einstellungen konfigurieren."}</Text>
                     </View>
                     <StatusBadge label={readyForChat ? "Bereit" : "Fehlt"} tone={readyForChat ? "ready" : "warning"} />
                   </View>
@@ -364,11 +370,14 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingBottom: 28 },
+  mono: { fontFamily: "monospace" },
   tabBar: { backgroundColor: "rgba(13, 21, 32, 0.85)", borderColor: "#1E2F47", borderRadius: 16, borderWidth: 1, flexDirection: "row", marginBottom: 12, padding: 4 },
   tab: { alignItems: "center", borderRadius: 12, flex: 1, flexDirection: "row", gap: 5, justifyContent: "center", paddingVertical: 9 },
   tabActive: { backgroundColor: withAlpha(colors.tint, 0.10), borderColor: withAlpha(colors.tint, 0.35), borderWidth: 1 },
-  tabText: { color: "#6B7D90", fontSize: 12, fontWeight: "700" },
+  tabText: { color: "#6B7D90", fontFamily: "monospace", fontSize: 12, fontWeight: "700" },
   tabTextActive: { color: colors.tint },
+  statusTitleMono: { color: "#FFB000", fontFamily: "monospace", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  statusTextMono: { color: "#8A6D1F", fontFamily: "monospace", fontSize: 11 },
   dot: { backgroundColor: colors.success, borderRadius: 4, height: 6, width: 6 },
   badge: { backgroundColor: withAlpha(colors.tint, 0.14), borderRadius: 8, color: colors.tint, fontSize: 9, fontWeight: "900", overflow: "hidden", paddingHorizontal: 5, paddingVertical: 1 },
   statusCard: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 12, overflow: "hidden", padding: 12 },
@@ -381,7 +390,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   statusText: { color: "#8294A8", fontSize: 11, lineHeight: 16, marginTop: 2 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 14 },
   chip: { backgroundColor: "rgba(19, 31, 46, 0.9)", borderColor: "#2B3E55", borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
-  chipText: { color: "#9FBDD4", fontSize: 12, fontWeight: "700" },
+  chipText: { fontFamily: "monospace", color: "#9FBDD4", fontSize: 12, fontWeight: "700" },
   dayDividerRow: { alignItems: "center", flexDirection: "row", gap: 10, marginBottom: 12, marginTop: 4 },
   dayDividerLine: { backgroundColor: "#1E2F47", flex: 1, height: 1 },
   dayDividerText: { color: "#5D7290", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },

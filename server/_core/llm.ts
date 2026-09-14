@@ -45,6 +45,10 @@ export type Message = {
   content: MessageContent | MessageContent[];
   name?: string;
   tool_call_id?: string;
+  /** Sprint 88 — Tool-Aufrufe einer vorherigen Assistant-Antwort, die im
+   * Multi-Turn-Verlauf mitgesendet werden muessen, damit nachfolgende
+   * "tool"-Rollen-Nachrichten korrekt korreliert werden. */
+  tool_calls?: ToolCall[];
 };
 
 export type Tool = {
@@ -149,7 +153,7 @@ const normalizeContentPart = (part: MessageContent): TextContent | ImageContent 
 };
 
 const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
+  const { role, name, tool_call_id, tool_calls } = message;
 
   if (role === "tool" || role === "function") {
     const content = ensureArray(message.content)
@@ -167,18 +171,28 @@ const normalizeMessage = (message: Message) => {
   const contentParts = ensureArray(message.content).map(normalizeContentPart);
 
   // If there's only text content, collapse to a single string for compatibility
-  if (contentParts.length === 1 && contentParts[0].type === "text") {
+  const collapsedContent = contentParts.length === 1 && contentParts[0].type === "text"
+    ? contentParts[0].text
+    : contentParts;
+
+  // Sprint 88 — eine Assistant-Nachricht mit Tool-Aufrufen muss diese im
+  // Multi-Turn-Verlauf mitfuehren, sonst kann der Provider nachfolgende
+  // "tool"-Rollen-Nachrichten nicht korrelieren (z. B. OpenAI 400 "missing
+  // tool_calls"). content wird bei leerem Text auf null gesetzt, wie von
+  // OpenAI-kompatiblen APIs fuer reine Tool-Call-Antworten erwartet.
+  if (role === "assistant" && tool_calls && tool_calls.length > 0) {
     return {
       role,
       name,
-      content: contentParts[0].text,
+      content: collapsedContent || null,
+      tool_calls,
     };
   }
 
   return {
     role,
     name,
-    content: contentParts,
+    content: collapsedContent,
   };
 };
 

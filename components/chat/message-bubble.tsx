@@ -27,7 +27,7 @@ export function MessageBubble({ message, showTimestamp }: { message: BubbleMessa
         <Text style={[styles.avatarText, isUser && styles.avatarTextUser]}>{initials}</Text>
       </View>
       {isUser ? (
-        <LinearGradient colors={["#0E3E58", "#0B2A44"]} end={{ x: 1, y: 0 }} start={{ x: 0, y: 1 }} style={[styles.bubble, styles.bubbleUser]}>
+        <LinearGradient colors={["#4D3A00", "#241A00"]} end={{ x: 1, y: 0 }} start={{ x: 0, y: 1 }} style={[styles.bubble, styles.bubbleUser]}>
           <View style={styles.bubbleHeader}>
             <Text style={styles.senderUser}>{label}</Text>
             {showTimestamp && message.timestampMs != null ? <Text style={styles.time}>{formatChatClock(message.timestampMs)}</Text> : null}
@@ -49,22 +49,22 @@ export function MessageBubble({ message, showTimestamp }: { message: BubbleMessa
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 9, marginBottom: 12, maxWidth: "88%" },
-  rowUser: { alignSelf: "flex-end", flexDirection: "row-reverse" },
+  row: { flexDirection: "row", gap: 9, marginBottom: 12, maxWidth: "100%" },
+  rowUser: { alignSelf: "flex-end", flexDirection: "row-reverse", maxWidth: "92%" },
   avatar: { alignItems: "center", borderRadius: 13, height: 26, justifyContent: "center", marginTop: 2, width: 26 },
-  avatarAgent: { backgroundColor: "#0A1524", borderColor: "#38E1FF", borderWidth: 1 },
-  avatarUser: { backgroundColor: "#12233A", borderColor: "#2E6F8E", borderWidth: 1 },
-  avatarText: { color: "#9FDFF2", fontSize: 9, fontWeight: "900" },
-  avatarTextUser: { color: "#B8D4E4" },
-  bubble: { borderRadius: 16, flexShrink: 1, paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9 },
-  bubbleUser: { borderTopRightRadius: 5 },
-  bubbleAgent: { backgroundColor: "#0B1522", borderColor: "#1C2C42", borderWidth: 1, borderTopLeftRadius: 5 },
-  agentAccent: { backgroundColor: "#38E1FF", borderRadius: 2, height: 10, left: -1, opacity: 0.55, position: "absolute", top: 12, width: 3 },
+  avatarAgent: { backgroundColor: "#000000", borderColor: "#FFB000", borderWidth: 1 },
+  avatarUser: { backgroundColor: "#1A1400", borderColor: "#8A6D1F", borderWidth: 1 },
+  avatarText: { color: "#FFB000", fontFamily: "monospace", fontSize: 9, fontWeight: "900" },
+  avatarTextUser: { color: "#FFD98A" },
+  bubble: { borderRadius: 6, flex: 1, flexShrink: 1, paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9 },
+  bubbleUser: { borderTopRightRadius: 2 },
+  bubbleAgent: { backgroundColor: "#000000", borderColor: "#4D3A00", borderWidth: 1, borderTopLeftRadius: 2 },
+  agentAccent: { backgroundColor: "#FFB000", borderRadius: 0, height: 10, left: -1, opacity: 0.85, position: "absolute", top: 12, width: 3 },
   bubbleHeader: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 4 },
-  senderAgent: { color: "#38E1FF", flexShrink: 1, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
-  senderUser: { color: "#9FDFF2", flexShrink: 1, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
-  time: { color: "#5D7290", fontSize: 10 },
-  contentAgent: { color: "#DCE9F8", fontSize: 13.5, lineHeight: 21 },
-  contentUser: { color: "#EAF6FF", fontSize: 13.5, lineHeight: 21 },
-  contentThinking: { color: "#6E82A0", fontStyle: "italic" },
+  senderAgent: { color: "#FFB000", flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
+  senderUser: { color: "#FFD98A", flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
+  time: { color: "#8A6D1F", fontFamily: "monospace", fontSize: 10 },
+  contentAgent: { color: "#FFD98A", fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
+  contentUser: { color: "#FFF3D6", fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
+  contentThinking: { color: "#8A6D1F", fontStyle: "italic" },
 });

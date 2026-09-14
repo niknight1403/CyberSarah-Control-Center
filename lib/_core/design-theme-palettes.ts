@@ -207,6 +207,47 @@ export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> 
       },
     },
   },
+  /** Theme E — Retro Cyber-Terminal (Standard seit v1.4.0 / Sprint 88) */
+  retro: {
+    light: {
+      background: "#000000",
+      surface: "#0A0A0A",
+      border: "#4D3A00",
+      foreground: "#FFB000",
+      primary: "#FFB000",
+      muted: "#8A6D1F",
+      success: "#3ADB76",
+      warning: "#FFD24A",
+      error: "#FF4A3A",
+    },
+    dark: {
+      background: "#000000",
+      surface: "#0A0A0A",
+      border: "#4D3A00",
+      foreground: "#FFB000",
+      primary: "#FFB000",
+      muted: "#8A6D1F",
+      success: "#3ADB76",
+      warning: "#FFD24A",
+      error: "#FF4A3A",
+    },
+    effects: {
+      light: {
+        glowPrimary: "0 0 18px rgba(255, 176, 0, 0.35)",
+        glowSoft: "none",
+        blur: "0px",
+        gradientFrom: "#000000",
+        gradientTo: "#0A0800",
+      },
+      dark: {
+        glowPrimary: "0 0 22px rgba(255, 176, 0, 0.42)",
+        glowSoft: "0 0 12px rgba(255, 176, 0, 0.2)",
+        blur: "0px",
+        gradientFrom: "#000000",
+        gradientTo: "#0A0800",
+      },
+    },
+  },
 };
 
 /** Basis-Palette des Schemas mit den Design-Overrides verschmelzen. */

@@ -10,24 +10,25 @@
  * Violett-Teal-Verlauf, Milchglas-Flaechen, sanfte Glows).
  */
 
-export type DesignTheme = "neon" | "slate" | "glass" | "aurora";
+export type DesignTheme = "retro" | "neon" | "slate" | "glass" | "aurora";
 
-export const DESIGN_THEMES: readonly DesignTheme[] = ["aurora", "neon", "slate", "glass"] as const;
+export const DESIGN_THEMES: readonly DesignTheme[] = ["retro", "aurora", "neon", "slate", "glass"] as const;
 
-export const DEFAULT_DESIGN_THEME: DesignTheme = "aurora";
+export const DEFAULT_DESIGN_THEME: DesignTheme = "retro";
 
 /**
  * Storage-Key v2: mit dem Design-Refresh (v1.3.1) wird der Standard auf
  * Aurora Glass gesetzt — Bestandsinstallationen mit v1-Key ("neon") starten
  * einmal frisch mit dem neuen Design.
  */
-export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v2";
+export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v3";
 
 export function normalizeDesignTheme(value: unknown): DesignTheme {
-  return value === "neon" || value === "slate" || value === "glass" || value === "aurora" ? value : DEFAULT_DESIGN_THEME;
+  return value === "retro" || value === "neon" || value === "slate" || value === "glass" || value === "aurora" ? value : DEFAULT_DESIGN_THEME;
 }
 
 export function designThemeLabel(theme: DesignTheme): string {
+  if (theme === "retro") return "Retro Cyber-Terminal";
   if (theme === "slate") return "Enterprise Slate";
   if (theme === "glass") return "Glas-Modern";
   if (theme === "aurora") return "Aurora Glass";
@@ -35,6 +36,9 @@ export function designThemeLabel(theme: DesignTheme): string {
 }
 
 export function designThemeDescription(theme: DesignTheme): string {
+  if (theme === "retro") {
+    return "Echtes Schwarz, scharfes Amber (#FFB000) und harte Kanten im Stil klassischer CRT-Terminals.";
+  }
   if (theme === "slate") {
     return "Professionell, hell und dicht — klare neutrale Flächen für Produktivität.";
   }

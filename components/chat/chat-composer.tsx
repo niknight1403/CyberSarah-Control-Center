@@ -73,8 +73,8 @@ export function ChatComposer(props: ChatComposerProps) {
           autoCapitalize="sentences"
           multiline
           onChangeText={props.onChange}
-          placeholder="Beschreibe eine Änderung, ein Problem oder ein Refactoring …"
-          placeholderTextColor="#5A6C84"
+          placeholder="> CyberSarah@ControlCenter: Befehl eingeben …"
+          placeholderTextColor="#8A6D1F"
           style={styles.input}
           value={props.value}
         />
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   attachChip: { alignItems: "center", backgroundColor: "#0F1C2E", borderColor: "#24405C", borderRadius: 10, borderWidth: 1, flexDirection: "row", gap: 6, maxWidth: 170, paddingHorizontal: 9, paddingVertical: 5 },
   attachChipText: { color: "#9FBDD4", flexShrink: 1, fontSize: 11, fontWeight: "700" },
   inputRow: { alignItems: "flex-end", flexDirection: "row", gap: 9 },
-  input: { backgroundColor: "#0A1420", borderColor: "#1C2C42", borderRadius: 16, borderWidth: 1, color: "#EAF3FF", flex: 1, fontSize: 14, lineHeight: 20, maxHeight: 120, minHeight: 48, paddingHorizontal: 14, paddingVertical: 12 },
+  input: { backgroundColor: "#000000", borderColor: "#4D3A00", borderRadius: 4, borderWidth: 1, color: "#FFB000", flex: 1, fontFamily: "monospace", fontSize: 14, lineHeight: 20, maxHeight: 120, minHeight: 48, paddingHorizontal: 14, paddingVertical: 12 },
   sendWrapper: { borderRadius: 24, overflow: "hidden" },
   sendButton: { alignItems: "center", borderRadius: 24, height: 44, justifyContent: "center", width: 44 },
   sendDisabled: { opacity: 0.35 },

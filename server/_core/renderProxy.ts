@@ -88,6 +88,89 @@ function isRenderColdStart(response: Response): boolean {
 /** Wartezeit fuer den Cold-Start-Retry: deckt das Aufwachen (ca. 10-15 s) ab. */
 const COLD_START_RETRY_DELAY_MS = 12_000;
 
+/**
+ * Sprint 88 — Direkter Server-zu-Workspace-Aufruf fuer den autonomen Chat-
+ * Agenten (server/development-chat.ts). Nutzt dieselbe Cold-Start-Retry-
+ * Logik wie der HTTP-Proxy, aber ohne den Umweg ueber einen eigenen
+ * Express-Request/Response-Zyklus — der Agent-Tool-Aufruf laeuft im
+ * selben Prozess direkt gegen den Workspace-Service.
+ */
+export type WorkspaceServiceCallResult =
+  | { ok: true; status: number; json: unknown }
+  | { ok: false; status: number; error: string };
+
+export async function callWorkspaceService(
+  path: string,
+  init: { method: string; headers?: Record<string, string>; body?: string },
+): Promise<WorkspaceServiceCallResult> {
+  const upstreamBase = workspaceServiceUrl();
+  if (!upstreamBase) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Render-Proxy nicht konfiguriert: Dem Server fehlt WORKSPACE_SERVICE_URL.",
+    };
+  }
+
+  const upstreamPath = path.replace(/^\/api\/render/, "") || "/";
+  const upstreamUrl = `${upstreamBase}${upstreamPath}`;
+  const token = serverServiceToken();
+  const headers: Record<string, string> = { "content-type": "application/json", ...(init.headers ?? {}) };
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const request: RequestInit = {
+    method: init.method,
+    headers,
+    body: init.body,
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+  };
+
+  try {
+    let response = await fetch(upstreamUrl, request);
+    if (isRenderColdStart(response)) {
+      console.warn("[WorkspaceAgentTool] Cold-Start-502 vom Workspace-Service — Retry nach 12 s:", upstreamUrl);
+      await new Promise((resolve) => setTimeout(resolve, COLD_START_RETRY_DELAY_MS));
+      response = await fetch(upstreamUrl, request);
+    }
+    if (isRenderColdStart(response)) {
+      return {
+        ok: false,
+        status: 503,
+        error: "Der Workspace-Service wurde gerade aus dem Ruhemodus aufgeweckt und ist noch nicht bereit. Bitte in wenigen Sekunden erneut versuchen.",
+      };
+    }
+
+    const text = await response.text();
+    let json: unknown = null;
+    if (text) {
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = { raw: text };
+      }
+    }
+
+    if (!response.ok) {
+      const message =
+        json && typeof json === "object" && json !== null && "error" in json && typeof (json as { error?: unknown }).error === "string"
+          ? (json as { error: string }).error
+          : `Workspace-Service antwortet mit ${response.status}.`;
+      return { ok: false, status: response.status, error: message };
+    }
+
+    return { ok: true, status: response.status, json };
+  } catch (error) {
+    const isTimeout = error instanceof Error && error.name === "TimeoutError";
+    return {
+      ok: false,
+      status: 502,
+      error: isTimeout
+        ? "Der Workspace-Service (Render) hat nicht rechtzeitig geantwortet — moeglicherweise Cold-Start."
+        : "Der Workspace-Service (Render) ist nicht erreichbar.",
+    };
+  }
+}
+
 export function registerRenderProxy(app: Express) {
   app.all("/api/render/*", async (req: Request, res: ExpressResponse) => {
     const upstreamBase = workspaceServiceUrl();

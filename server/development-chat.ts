@@ -19,8 +19,21 @@ import {
 import { buildPersistableTurn } from "../lib/chat-history-logic";
 import { compressPersistedChatHistory } from "../lib/chat-compression-logic";
 import { z } from "zod";
-import { invokeLLM, type Message } from "./_core/llm";
+import { invokeLLM, type InvokeResult, type Message, type Tool, type ToolCall } from "./_core/llm";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+import { callWorkspaceService } from "./_core/renderProxy";
+import { resolveAdminGithubToken } from "../lib/admin-integrations-logic";
+import {
+  AGENT_TOOL_DEFINITIONS,
+  MAX_AGENT_TOOL_ITERATIONS,
+  MAX_TOOL_RESULT_CHARS,
+  buildAgentSystemPrompt,
+  buildWorkspaceToolRequest,
+  formatToolResultForModel,
+  isAgentToolName,
+  parseToolArguments,
+  type AgentToolName,
+} from "../lib/dev-agent-tools-logic";
 
 import {
   buildProviderOrder,
@@ -65,6 +78,10 @@ const chatInputSchema = z.object({
   provider: providerSchema.default("managed"),
   model: z.string().trim().min(1).max(160).optional(),
   sessionId: z.string().trim().max(64).optional(),
+  /** Sprint 88 — Workspace-ID aktiviert den autonomen Werkzeug-Modus. */
+  workspaceId: z.string().trim().min(1).max(128).optional(),
+  githubToken: z.string().trim().min(1).max(255).optional(),
+  branch: z.string().trim().min(1).max(160).optional(),
 });
 
 type ProviderId = z.infer<typeof providerSchema>;
@@ -478,6 +495,185 @@ export type DevelopmentChatResult = {
   };
 };
 
+/* ==================================================================
+ * Sprint 88 — Autonomer Werkzeug-Modus (Agent-Tools).
+ *
+ * Ist ein Workspace verbunden, erhaelt der Chat-Agent echte Werkzeuge
+ * (Repository-Dateien lesen/schreiben/listen, Git-Status/Commit/Push/
+ * Pull Request) und arbeitet Prompt-Auftraege selbststaendig ab, statt
+ * den Nutzer nach Code zu fragen. Der Multi-Turn-Loop:
+ *   Modell -> tool_calls -> Ausfuehrung gegen den Workspace-Service
+ *   (renderProxy.callWorkspaceService) -> tool-Ergebnisse -> Modell ...
+ * bis eine finale Textantwort vorliegt oder das Iterationslimit
+ * erreicht ist (dann finale Antwort erzwungen, ohne Tools).
+ * ================================================================== */
+
+/** GitHub-Token fuer Workspace-Git-Operationen: Client-Token oder serverseitiges Admin-Token. */
+function resolveAgentGithubToken(role: string | null | undefined, clientToken?: string): string | undefined {
+  if (clientToken?.trim()) return clientToken.trim();
+  const resolved = resolveAdminGithubToken(
+    { ADMIN_GITHUB_TOKEN: process.env.ADMIN_GITHUB_TOKEN, GITHUB_TOKEN: process.env.GITHUB_TOKEN },
+    role === "admin",
+  );
+  return resolved.available ? resolved.token : undefined;
+}
+
+/** Fuehrt einen einzelnen Agent-Tool-Aufruf gegen den Workspace-Service aus. */
+async function executeAgentTool(
+  tool: AgentToolName,
+  workspaceId: string,
+  args: Record<string, unknown>,
+  githubToken?: string,
+): Promise<string> {
+  const built = buildWorkspaceToolRequest(tool, workspaceId, args);
+  if (!built.ok) return `FEHLER: ${built.error}`;
+  const { method, path, body } = built.request;
+  const result = await callWorkspaceService(path, {
+    method,
+    headers: githubToken ? { "x-github-token": githubToken } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!result.ok) return `FEHLER (${result.status}): ${result.error}`;
+  return formatToolResultForModel(tool, result.json);
+}
+
+/** Roh-Aufruf eines Providers mit Tool-Unterstützung (managed + OpenAI-kompatibel). */
+async function callProviderWithTools(
+  provider: ProviderId,
+  messages: Message[],
+  requestedModel: string | undefined,
+  tools: Tool[] | undefined,
+): Promise<InvokeResult> {
+  if (provider === "managed" || provider === "auto") {
+    return invokeLLM({ messages, tools, model: requestedModel, maxTokens: 1_800 });
+  }
+  if (provider === "anthropic") {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Der autonome Werkzeug-Modus unterstuetzt anthropic derzeit nicht — bitte einen anderen Provider waehlen.",
+    });
+  }
+  const config = getProviderConfig(provider, requestedModel);
+  const response = await fetch(config.endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
+      ...config.headers,
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages,
+      ...(tools && tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
+      temperature: 0.2,
+      max_tokens: 1_800,
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 400);
+    throw new Error(`${provider} antwortet mit ${response.status}${detail ? `: ${detail}` : ""}`);
+  }
+  return (await response.json()) as InvokeResult;
+}
+
+/** Provider-Kandidaten fuer den Agent-Modus bei Provider "auto" (Router-Logik). */
+async function resolveAgentProviderCandidates(lastUserMessage: string): Promise<ProviderId[]> {
+  const classification = classifyPrompt(lastUserMessage);
+  const preferredOrder = await getPreferredProviderOrder();
+  const order = buildProviderOrder({
+    taskType: classification.taskType,
+    complexity: classification.complexity,
+    preferredOrder,
+    health: getRouterHealth(),
+    configuredProviders: getRouterConfiguredProviders(),
+    now: Date.now(),
+  });
+  const candidates = order
+    .filter((entry) => entry.available)
+    .map((entry) => entry.provider as string)
+    .filter((provider): provider is ProviderId => provider !== "anthropic");
+  return candidates.length > 0 ? candidates.slice(0, 4) : ["managed"];
+}
+
+type AgentToolChatInput = {
+  provider: ProviderId;
+  messages: ChatMessage[];
+  model?: string;
+  role?: string | null;
+  workspaceId?: string;
+  githubToken?: string;
+  branch?: string;
+};
+
+/** Ein Agent-Loop-Lauf gegen genau einen Provider. */
+async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput): Promise<DevelopmentChatResult> {
+  const githubToken = resolveAgentGithubToken(input.role, input.githubToken);
+  const conversation: Message[] = [
+    { role: "system", content: buildAgentSystemPrompt(input.branch ?? "main") },
+    ...input.messages.map((message) => ({ role: message.role, content: message.content })),
+  ];
+  const tools = AGENT_TOOL_DEFINITIONS as unknown as Tool[];
+
+  for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
+    const payload = await callProviderWithTools(provider, conversation, input.model, tools);
+    const choice = payload?.choices?.[0];
+    const toolCalls: ToolCall[] = choice?.message?.tool_calls ?? [];
+    if (!toolCalls.length) {
+      const content = extractContent(payload);
+      return { content, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
+    }
+    conversation.push({
+      role: "assistant",
+      content: typeof choice.message.content === "string" ? choice.message.content : "",
+      tool_calls: toolCalls,
+    });
+    for (const call of toolCalls) {
+      const toolName = call.function?.name ?? "";
+      const toolResult = isAgentToolName(toolName)
+        ? await executeAgentTool(toolName, input.workspaceId ?? "", parseToolArguments(call.function?.arguments), githubToken)
+        : `FEHLER: Unbekanntes Werkzeug '${toolName}'.`;
+      conversation.push({ role: "tool", tool_call_id: call.id, content: toolResult.slice(0, MAX_TOOL_RESULT_CHARS) });
+    }
+  }
+
+  // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen.
+  const payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+  return { content: extractContent(payload), model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
+}
+
+/** Agent-Modus mit Provider-Failover (auto) bzw. fixem Provider. */
+async function handleAgentToolChat(input: AgentToolChatInput): Promise<DevelopmentChatResult> {
+  const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+  const providers = input.provider === "auto"
+    ? await resolveAgentProviderCandidates(lastUserMessage)
+    : [input.provider];
+
+  let lastError: unknown = new Error("Kein verfuegbarer KI-Provider fuer die Werkzeug-Route.");
+  for (const provider of providers) {
+    const startedAt = Date.now();
+    try {
+      const reply = await runAgentToolLoop(provider, input);
+      recordRouterOutcome(provider as RouterProviderId, { kind: "success", latencyMs: Date.now() - startedAt }, Date.now());
+      return reply;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof TRPCError) {
+        recordRouterOutcome(provider as RouterProviderId, { kind: "failure", retryable: false, rateLimited: false }, Date.now());
+        throw error;
+      }
+      recordRouterOutcome(provider as RouterProviderId, { kind: "failure", retryable: isTransientChatError(error), rateLimited: /\b429\b/.test(error instanceof Error ? error.message : "") }, Date.now());
+      if (!isTransientChatError(error)) break;
+    }
+  }
+  throw new TRPCError({
+    code: "BAD_GATEWAY",
+    message: lastError instanceof Error
+      ? sanitizeChatError(lastError.message, "Der autonome Chat-Agent konnte keinen KI-Provider erreichen.")
+      : "Der autonome Chat-Agent konnte keinen KI-Provider erreichen.",
+  });
+}
+
 /**
  * Kern des Entwicklungschats: ruft den primären Provider auf und weicht bei
  * transienten Fehlern auf die konfigurierten Fallback-Provider aus. Als
@@ -581,7 +777,7 @@ async function handleAutoRoutedChat(
     } catch (error) {
       lastError = error;
       if (error instanceof TRPCError) {
-        recordRouterOutcome(provider, { kind: "failure", retryable: false, rateLimited: false }, Date.now());
+        recordRouterOutcome(provider as RouterProviderId, { kind: "failure", retryable: false, rateLimited: false }, Date.now());
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -609,7 +805,13 @@ export async function handleDevelopmentChat(input: {
   messages: ChatMessage[];
   model?: string;
   role?: string | null;
+  workspaceId?: string;
+  githubToken?: string;
+  branch?: string;
 }): Promise<DevelopmentChatResult> {
+  if (input.workspaceId) {
+    return handleAgentToolChat(input);
+  }
   if (input.provider === "auto") {
     return handleAutoRoutedChat({ messages: input.messages, model: input.model, role: input.role });
   }
