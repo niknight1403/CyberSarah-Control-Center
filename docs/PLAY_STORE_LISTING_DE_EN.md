@@ -1,8 +1,8 @@
 # Play Store Listing — Texte (DE/EN)
 
-Stand: 14.09.2026 — Sprint 83 (Release 1.3.5, Paket-ID `com.app.customaistudiomobile`)
+Stand: 14.09.2026 — Sprint 109 (Release **v2.0.0**, versionCode 20000, Paket-ID `com.cybersarah.controlcenter`)
 
-Dieses Dokument enthält die redigierten Store-Listing-Texte für die Play-Console-Einreichung. Deutsch ist die Primärsprache, Englisch als Store-Listing-Sprache zusätzlich hinterlegt. Zeichenlimits sind an den Google-Vorgaben geprüft.
+Dieses Dokument enthält die redigierten, einreichungsreifen Store-Listing-Texte für die Play-Console-Einreichung der Version v2.0.0. Deutsch ist die Primärsprache, Englisch als zusätzliche Store-Listing-Sprache hinterlegt. Alle Zeichenlimits entsprechen exakt den Google Play Vorgaben.
 
 ## App-Name (max. 30 Zeichen)
 
@@ -10,113 +10,97 @@ Dieses Dokument enthält die redigierten Store-Listing-Texte für die Play-Conso
 
 ## Kurzbeschreibung (max. 80 Zeichen)
 
-- **DE (79 Zeichen):**
-  `KI-Agenten-Studio: Chats, Projekte, Backups & 3 Designs – Deine Kontrolle.`
-- **EN (76 Zeichen):**
-  `AI agent studio: chats, projects, backups & 3 themes — your control.`
+- **DE (77 Zeichen ✓):**
+  `KI-Agenten-Studio: Streaming, 3 Themes & Zero-Cost Routing – Deine Kontrolle.`
+- **EN (77 Zeichen ✓):**
+  `AI Agent Studio: live streaming, 3 themes & zero-cost routing — your control.`
 
 ## Langbeschreibung (max. 4000 Zeichen)
 
-### Deutsch
+### Deutsch (2259 Zeichen ✓)
 
-CyberSarah Control Center ist die Steuerzentrale für deine persönlichen KI-Agenten — vollständig in deiner Hand, ohne Cloud-Zwang.
+CyberSarah Control Center ist das mobile Studio und die Betriebszentrale für deine KI-Agenten — vollständig in deiner Hand, ohne Cloud-Zwang.
 
-AGENTEN & CHATS
-Entwickle deine KI-Agenten in einem eigenen Entwicklungsfenster mit Live-Streaming, syntax-highlighteten Code-Diffs und Kommando-Vorschau. Verlauf, Verdauung und Ziele bleiben nachvollziehbar.
+KI-AGENTEN-CHAT & DIFF-VIEWER
+Entwickle und steuere KI-Agenten in einem dedicated Entwicklungsfenster mit Echtzeit-Live-Streaming, syntax-highlightetem Diff-Viewer und interaktiver Vorschau. Verläufe und Zwischenergebnisse bleiben transparent nachvollziehbar.
 
 DREI DESIGN-THEMES
-Wechsle jederzeit zwischen drei ausgereiften Oberflächen: „Cyber Neon" (dunkel, futuristisch, Glow-Akzente), „Enterprise Slate" (hell, professionell, dicht) und „Glas-Modern" (Glassmorphismus mit Blur und Gradients).
+Passe die Benutzeroberfläche jederzeit deinem Stil an: „Cyber Neon" (futuristischer Dark-Mode mit Neon-Glow), „Enterprise Slate" (klar, professionell, hochverdichtet) und „Glas-Modern" (Glassmorphismus mit Frosted-Glass-Gradients).
 
-AUTONOME AUSFÜHRUNG
-Agenten zerlegen Ziele in nachvollziehbare Ausführungsschritte, erkennen blockierende Schleifen von selbst und eskalieren kontrolliert. Fehlgeschlagene Schritte wiederholen sich mit kluger Wartestrategie statt Endlosloops.
+AUTONOME ZIEL-ZERLEGUNG
+Agenten zerlegen komplexe Aufgaben selbstständig in strukturierte Ausführungsgraphen. Integrierte Schleifen-Erkennung stoppt Endlosloops automatisch und leitet kontrollierte Eskalations- und Wiederholungsstrategien ein.
 
-KEY-ROTATION & SMART ROUTING (Developer-Funktionen)
-Verwalte mehrere API-Keys pro Anbieter mit automatischer Rotation bei Rate-Limits oder erschöpften Kontingenten — ohne den Ausführungskontext zu verlieren. Aufgaben werden automatisch dem kostengünstigsten passenden Modell-Tier zugewiesen.
+ZERO-COST & FAILOVER ROUTING
+Nutze intelligentes Provider-Routing mit automatischer Key-Rotation: Kostenlose Modelle (Groq, OpenRouter, Gemini-Failover) werden bevorzugt, während Rate-Limits und erschöpfte Kontingente durch automatischen Failover unterbrechungsfrei kompensiert werden.
 
-CONNECTORS & INTEGRATIONEN
-GitHub (Repository-Sync, Pull Requests, Branches), Stripe (Abos, Nutzungsmetering), Web-Suche und weitere Connectors über eine erweiterbare Registry — inklusive Berechtigungs-Gates für jede Tool-Ausführung.
+WORKSPACE & GITHUB-ANBINDUNG
+Verbinde deine GitHub-Repositories direkt mit dem Workspace. Prüfe Datei-Diffs, löse Konflikte visuell und erstelle Commits oder Pull Requests direkt aus der mobilen Zentrale.
 
-PROJEKTE & WORKSPACE
-Lade Projekte hoch, halte Dateien synchron, prüfe Diffs und löse Konflikte sichtbar vor der Anwendung. Offline-Aktionen werden in einer Warteschlange mit Wiederholungsstrategie gesammelt.
+ADMIN-BETRIEBSWACHT & TELEMETRIE
+Die integrierte Dashboard-Betriebswacht überwacht System-Health, Provider-Latenzen, PaaS-Status (Render/Neon) und Ausführungsstatistiken in Echtzeit — maximale Transparenz für Admins.
 
-DATENSCHUTZ VOR ORT
-Zugangsdaten liegen verschlüsselt im sicheren Gerätespeicher (Android Keystore). Backups für Support und Einstellungen sind Ende-zu-Ende verschlüsselt exportierbar. Ein Audit-Export zeigt jederzeit, welche externen Aktionen passiert sind — tokenfrei redigiert.
+SICHERHEIT & VERSCHLÜSSELTE BACKUPS
+Deine API-Schlüssel und Tokens verbleiben sicher verschlüsselt im Android Keystore (SecureStore). Vollständige Support- und Einstellungs-Backups lassen sich Ende-zu-Ende verschlüsselt (PBKDF2/AES) exportieren und wiederherstellen. Redigierte Audit-Protokolle verhindern Secret-Leaks.
 
-ABO-STUFEN
-Free, Pro, Developer Max und Elite — mit fairen Kontingenten je Stufe; Admins können Kontingente anheben. Verwaltung und Transparenz der eigenen Nutzung im integrierten Dashboard.
+RBAC-TIERS & KONTINGENTE
+Fließende Skalierung über klare Rollen- und Abo-Stufen (Free, Pro, Developer Max, Elite). Admins verwalten Kontingente und Nutzungsmetering direkt im integrierten Control Dashboard.
 
-Hinweis: Ein eigener Workspace-Server (Render-Deployment im Projekt beschrieben) oder kompatibler Endpoint wird für die Synchronisation benötigt; alle Secrets gehören in die verschlüsselte Speicherung der App.
+Hinweis: Für die Repository-Synchronisation wird ein kompatibler Workspace-Service (z. B. Render-Deployment) benötigt.
 
-### English
+### English (2015 Zeichen ✓)
 
-CyberSarah Control Center is the control hub for your personal AI agents — fully under your control.
+CyberSarah Control Center is the mobile studio and operational control hub for your AI agents — fully under your control, with zero cloud vendor lock-in.
 
-AGENT CHATS
-Develop AI agents in a dedicated development window with live streaming, syntax-highlighted code diffs and command preview. History, digests and goals stay traceable.
+AI AGENT CHAT & DIFF VIEWER
+Develop and control AI agents in a dedicated workspace window featuring real-time live streaming, syntax-highlighted diff viewer, and interactive preview. Agent execution steps and history remain fully traceable.
 
 THREE DESIGN THEMES
-Switch anytime between three polished looks: "Cyber Neon" (dark, futuristic glow), "Enterprise Slate" (light, professional, dense) and "Glass Modern" (frosted glass, blur, gradients).
+Switch your interface theme on the fly: "Cyber Neon" (futuristic dark mode with neon glow), "Enterprise Slate" (clean, professional, high-density), and "Glass Modern" (glassmorphism with frosted glass and gradients).
 
-AUTONOMOUS EXECUTION
-Agents decompose goals into traceable execution steps, detect blocking loops by themselves and escalate gracefully. Failed steps retry with a smart backoff strategy instead of looping forever.
+AUTONOMOUS GOAL DECOMPOSITION
+Agents break down complex targets into structured execution graphs. Built-in loop detection stops infinite retries automatically and triggers graceful escalation and retry logic.
 
-KEY ROTATION & SMART ROUTING (developer features)
-Manage multiple API keys per provider with automatic rotation on rate limits or exhausted quotas — without losing execution context. Tasks are matched to the most cost-effective model tier automatically.
+ZERO-COST & FAILOVER ROUTING
+Smart provider routing with automated key rotation prefers zero-cost models (Groq, OpenRouter, Gemini failover). Rate limits and depleted quotas heal automatically through seamless failovers.
 
-CONNECTORS & INTEGRATIONS
-GitHub (repo sync, pull requests, branches), Stripe (subscriptions, usage metering), web search and more via an extensible connector registry — with permission gates on every tool execution.
+WORKSPACE & GITHUB INTEGRATION
+Connect your GitHub repositories directly to the workspace. Inspect file diffs, resolve conflicts visually, and submit commits or pull requests right from your mobile device.
 
-PROJECTS & WORKSPACE
-Upload projects, keep files in sync, review diffs and resolve conflicts visibly before applying. Offline actions are queued with a retry strategy.
+ADMIN CONTROL & TELEMETRY
+The integrated Admin Telemetry Dashboard monitors system health, provider latency, PaaS status (Render/Neon), and execution metrics in real time.
 
-PRIVACY FIRST
-Credentials live encrypted in Android Keystore secure storage. Support and settings backups export end-to-end encrypted. An audit export shows which external actions occurred — redacted, token-free.
+SECURITY & ENCRYPTED BACKUPS
+Your API keys and credentials stay encrypted locally in the Android Keystore (SecureStore). Complete support and settings backups export with end-to-end encryption (PBKDF2/AES). Redacted audit logs prevent secret leaks.
 
-SUBSCRIPTION TIERS
-Free, Pro, Developer Max and Elite — fair quotas per tier; admins can raise them. Manage and inspect your usage in the built-in dashboard.
+RBAC TIERS & QUOTAS
+Scale effortlessly across structured subscription tiers (Free, Pro, Developer Max, Elite). Admins manage quotas and usage metering directly in the built-in control dashboard.
 
-Note: A self-hosted workspace server (Render deployment described in the project) or compatible endpoint is required for synchronization.
+Note: A compatible self-hosted workspace service (e.g. Render deployment) is required for full repository synchronization.
 
-## Versionshinweise 1.3.5 (What's new)
-
-### DE
-Neu in 1.3.5:
-• On-Server-KI sofort nutzbar: kostenloser Anbindungs-Fallback ohne eigene API-Keys
-• Autonome Key-Rotation: Rate-Limits und erschöpfte Keys heilen sich selbst
-• Produktiver Login auf der eigenen Domain (app.cybersarah-ki.com) stabilisiert
-• Zahlreiche Stabilitäts- und Zuverlässigkeitsverbesserungen
-
-### EN
-New in 1.3.5:
-• On-server AI works out of the box: free fallback connectivity, no API keys required
-• Autonomous key rotation: rate limits and exhausted keys heal themselves
-• Production login on the dedicated domain (app.cybersarah-ki.com) stabilized
-• Numerous stability and reliability improvements
-
-## Versionshinweise 1.3.0 (What's new)
+## Versionshinweise v2.0.0 (What's new)
 
 ### DE
-Neu in 1.3.0:
-• Drei schaltbare Design-Themes (Cyber Neon, Enterprise Slate, Glas-Modern)
-• Responsive Sidebar für Tablet und Desktop
-• Ziel-Zerlegung mit Ausführungsgraphen und Schleifen-Erkennung
-• Chat-Entwicklungsfenster mit Streaming, Diffs und Prompt-Optimierung
-• Automatische Key-Rotation mit Failover und Modell-Tier-Routing
-• Erweiterbare Connector-Registry mit Berechtigungs-Gates
-• Abo-Stufen Free/Pro/Developer Max/Elite mit Admin-Dashboard
-• Verbesserte Stabilität und Performance
+Neu in v2.0.0:
+• KI-Agenten-Chat mit Live-Streaming, Code-Diff-Viewer und interaktiver Vorschau
+• Drei schaltbare Oberflächen-Themes (Cyber Neon, Enterprise Slate, Glas-Modern)
+• Zero-Cost-Provider-Routing mit Groq, OpenRouter & Gemini-Failover + autonomer Key-Rotation
+• Autonome Ziel-Zerlegung mit Ausführungsgraphen & automatischer Schleifen-Erkennung
+• Workspace-GitHub-Anbindung mit visueller Diff- und Konfliktbehebung
+• Admin-Betriebswacht & PaaS-Telemetry-Dashboard (Render/Neon-Health, Latenzen)
+• Ende-zu-Ende verschlüsselte Support- & Einstellungs-Backups (SecureStore + PBKDF2/AES)
+• RBAC-Tiers (Free, Pro, Developer Max, Elite) mit Kontingentverwaltung
 
 ### EN
-New in 1.3.0:
-• Three switchable design themes (Cyber Neon, Enterprise Slate, Glass Modern)
-• Responsive sidebar for tablet and desktop
-• Goal decomposition with execution graphs and loop detection
-• Agent development window with streaming, diffs and prompt optimization
-• Automatic key rotation with failover and model-tier routing
-• Extensible connector registry with permission gates
-• Subscription tiers Free/Pro/Developer Max/Elite with admin dashboard
-• Stability and performance improvements
+New in v2.0.0:
+• AI Agent Chat with live streaming, code diff viewer and interactive preview
+• Three switchable UI themes (Cyber Neon, Enterprise Slate, Glass Modern)
+• Zero-cost provider routing featuring Groq, OpenRouter & Gemini failover + key rotation
+• Autonomous goal decomposition with execution graphs & loop detection
+• Workspace GitHub integration with visual diff inspection and conflict resolution
+• Admin Telemetry Dashboard monitoring PaaS health (Render/Neon) and model latencies
+• End-to-end encrypted support & settings backups (SecureStore + PBKDF2/AES)
+• RBAC tiers (Free, Pro, Developer Max, Elite) with quota management
 
 ## Keywords (für die interne Suche, max. 100 Zeichen)
 
-`ki agent, künstliche intelligenz, ai assistant, automation, github, stripe, mcp, agent workspace, ki studio`
+`ki agent, künstliche intelligenz, ai assistant, automation, github, groq, openrouter, diff viewer, agent workspace`
