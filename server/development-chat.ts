@@ -34,6 +34,13 @@ import {
   parseToolArguments,
   type AgentToolName,
 } from "../lib/dev-agent-tools-logic";
+import {
+  BUSINESS_TOOL_DESCRIPTIONS,
+  BUSINESS_TOOL_NAMES,
+  formatBusinessResult,
+  isBusinessToolName,
+} from "../lib/data-hub-logic";
+import { executeBusinessSnapshot } from "./data-hub";
 
 import {
   buildProviderOrder,
@@ -613,7 +620,15 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     { role: "system", content: buildAgentSystemPrompt(input.branch ?? "main") },
     ...input.messages.map((message) => ({ role: message.role, content: message.content })),
   ];
-  const tools = AGENT_TOOL_DEFINITIONS as unknown as Tool[];
+  const businessTools = BUSINESS_TOOL_NAMES.map((name) => ({
+    type: "function" as const,
+    function: {
+      name,
+      description: BUSINESS_TOOL_DESCRIPTIONS[name],
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  }));
+  const tools = [...(AGENT_TOOL_DEFINITIONS as unknown as Tool[]), ...(businessTools as unknown as Tool[])];
 
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
     const payload = await callProviderWithTools(provider, conversation, input.model, tools);
@@ -632,7 +647,9 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
       const toolName = call.function?.name ?? "";
       const toolResult = isAgentToolName(toolName)
         ? await executeAgentTool(toolName, input.workspaceId ?? "", parseToolArguments(call.function?.arguments), githubToken)
-        : `FEHLER: Unbekanntes Werkzeug '${toolName}'.`;
+        : isBusinessToolName(toolName)
+          ? formatBusinessResult(toolName, await executeBusinessSnapshot(toolName))
+          : `FEHLER: Unbekanntes Werkzeug '${toolName}'.`;
       conversation.push({ role: "tool", tool_call_id: call.id, content: toolResult.slice(0, MAX_TOOL_RESULT_CHARS) });
     }
   }

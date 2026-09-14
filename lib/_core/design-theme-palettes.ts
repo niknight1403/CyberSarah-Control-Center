@@ -180,7 +180,7 @@ export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> 
       error: "#C2404F",
     },
     dark: {
-      background: "#0A0E1F",
+      background: "#030617",
       surface: "rgba(255, 255, 255, 0.07)",
       border: "rgba(255, 255, 255, 0.14)",
       foreground: "#EEF1FB",
@@ -221,7 +221,7 @@ export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> 
       error: "#FF7B8A",
     },
     dark: {
-      background: "#0A0E1F",
+      background: "#030617",
       surface: "rgba(255, 255, 255, 0.07)",
       border: "rgba(255, 255, 255, 0.14)",
       foreground: "#EEF1FF",

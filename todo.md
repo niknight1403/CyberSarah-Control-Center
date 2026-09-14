@@ -248,3 +248,11 @@
 - [x] Chat als lebendiges Interface: Partikel + Scanlines im Hintergrund, AiOrb pulsiert bei thinking
 - [x] 616/616 Tests gruen, tsc sauber, Doku docs/SPRINT_89_LIVING_AI_INTERFACE.md
 - Offen (Sprint 90+): Orbs/Partikel in weiteren Tabs, KI-Live-Stream-Karte, animierte Charts, 3D-Nodes
+
+## Sprint 90 — Master-Agenten-Daten-Hub & Live-Dashboard (14.09.2026) — erledigt
+- [x] server/data-hub.ts: Revenue-Sub-Agent (Stripe SDK, Balance/24h/Abos), Trading-Sub-Agent (Binance BTC/ETH/SOL, Retry-Backoff), Analytics-Status
+- [x] lib/data-hub-logic.ts: Domain-Routing, Binance-Normalisierung, DE-Formatierung, Retry-Politik (+6 Tests)
+- [x] Chat-Master-Agent: 3 Live-Daten-Tools (get_revenue_metrics/get_crypto_prices/get_analytics_overview) im Agent-Loop
+- [x] Neuer Dashboard-Tab mit Live-Tiles im Living-AI-Look (#030617)
+- [x] 621/621 Tests gruen, tsc sauber
+- Offen: externe API-Keys (HubSpot/Salesforce/GA4/TikTok/Instagram/Kraken/Perplexity/ElevenLabs) durch Owner
