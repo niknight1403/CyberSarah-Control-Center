@@ -4,6 +4,7 @@ import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { DiffConfirmationSheet } from "@/components/studio/diff-confirmation-sheet";
 import { NextStepGuide } from "@/components/studio/next-step-guide";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { resolveAppVariant, showDevSurface } from "@/lib/app-variant-logic";
 import { getDevelopmentGuidance, type DevelopmentGuidanceAction, type DevelopmentGuidanceStep } from "@/lib/development-guidance-logic";
 import { getDetailedFileDiffPreviews, getFileDiffSummaries } from "@/lib/file-diff-logic";
 import { getProtectedBranchWarning, isProtectedBranch } from "@/lib/protected-branch-logic";
@@ -55,6 +56,9 @@ export default function WorkspaceScreen() {
   const detailedDiffPreviews = useMemo(() => getDetailedFileDiffPreviews(changedRemoteFiles.map((file) => ({ path: file.path, before: file.remoteContent ?? "", after: file.content }))), [changedRemoteFiles]);
   const currentBranchIsProtected = isProtectedBranch(settings.branch);
   const syncState = getWorkspaceSyncState(changedRemoteFiles.length, remoteAhead);
+  const appVariant = resolveAppVariant(process.env.EXPO_PUBLIC_APP_VARIANT);
+  const showGuidance = showDevSurface(appVariant, "developmentGuidance");
+  const showDiagnosis = showDevSurface(appVariant, "serviceDiagnosis");
   const guidance = useMemo(() => getDevelopmentGuidance({ hasWorkspaceService, hasRepository: hasAttachedRepository, changedFileCount: changedRemoteFiles.length, hasConflictRisk: syncState.hasConflictRisk, serviceHealthy: healthState === "ready" && serviceHealth?.status === "ready", ciState: qualityState, ciFailed: quality?.ci.failed ?? 0, branch: settings.branch, lastGitAction: gitAction }), [changedRemoteFiles.length, gitAction, hasAttachedRepository, hasWorkspaceService, healthState, quality?.ci.failed, qualityState, serviceHealth?.status, settings.branch, syncState.hasConflictRisk]);
 
   const refreshHealth = useCallback(async () => {
@@ -252,7 +256,7 @@ export default function WorkspaceScreen() {
         ListHeaderComponent={
           <>
             <StudioHeader eyebrow="Custom AI Studio" title="Workspace" actionIcon="gearshape.fill" actionLabel="Workspace-Einstellungen" onAction={() => router.push("/settings" as never)} />
-            <NextStepGuide actionMessage={guidanceFeedback} completion={guidance.completion} guidance={guidance} onAction={requestGuidanceAction} />
+            {showGuidance ? <NextStepGuide actionMessage={guidanceFeedback} completion={guidance.completion} guidance={guidance} onAction={requestGuidanceAction} /> : null}
             <View style={styles.projectCard}>
               <View style={styles.projectTopLine}>
                 <View style={styles.projectIdentity}>
@@ -271,7 +275,7 @@ export default function WorkspaceScreen() {
                 <StatusBadge label={syncState.hasConflictRisk ? "Möglicher Konflikt" : hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={syncState.hasConflictRisk ? "warning" : hasAttachedRepository || hasWorkspaceService ? "ready" : "warning"} />
               </View>
             </View>
-            {hasWorkspaceService ? <View style={[styles.healthPanel, healthState === "error" && styles.healthPanelError]}><View style={styles.healthHeader}><View><Text style={styles.healthEyebrow}>SERVICE-DIAGNOSE</Text><Text style={styles.healthTitle}>{healthState === "checking" ? "Verbindung wird geprüft …" : healthState === "ready" && serviceHealth ? serviceHealth.status === "ready" ? "Workspace-Service erreichbar" : "Workspace-Service beschäftigt" : "Verbindungsstatus ausstehend"}</Text></View><TouchableOpacity accessibilityLabel="Workspace-Service prüfen" activeOpacity={0.75} disabled={healthState === "checking"} onPress={() => void refreshHealth()} style={[styles.refreshButton, healthState === "checking" && styles.healthButtonDisabled]}><Text style={styles.refreshButtonText}>{healthState === "checking" ? "Prüft …" : "Prüfen"}</Text></TouchableOpacity></View><Text style={[styles.healthDetail, healthState === "error" && styles.repositoryError]}>{healthState === "ready" && serviceHealth ? `Version ${serviceHealth.version}${serviceHealth.storage ? ` · ${serviceHealth.storage.mode === "postgres" ? "Persistenter Speicher aktiv (kostenloses Postgres-Backup)" : serviceHealth.storage.persistent ? "Persistenter Speicher aktiv" : "Ephemerer Speicher (Free-Tier)"}` : ""}${serviceHealth.previewUrl ? " · Vorschau verfügbar" : " · Keine Laufzeitvorschau gemeldet"}${healthCheckedAt ? ` · geprüft ${formatCommitDate(healthCheckedAt)}` : ""}` : healthState === "error" ? healthError : "Die Diagnose prüft Service-Erreichbarkeit ohne Repository-Daten zu verändern."}</Text></View> : null}
+            {hasWorkspaceService && showDiagnosis ? <View style={[styles.healthPanel, healthState === "error" && styles.healthPanelError]}><View style={styles.healthHeader}><View><Text style={styles.healthEyebrow}>SERVICE-DIAGNOSE</Text><Text style={styles.healthTitle}>{healthState === "checking" ? "Verbindung wird geprüft …" : healthState === "ready" && serviceHealth ? serviceHealth.status === "ready" ? "Workspace-Service erreichbar" : "Workspace-Service beschäftigt" : "Verbindungsstatus ausstehend"}</Text></View><TouchableOpacity accessibilityLabel="Workspace-Service prüfen" activeOpacity={0.75} disabled={healthState === "checking"} onPress={() => void refreshHealth()} style={[styles.refreshButton, healthState === "checking" && styles.healthButtonDisabled]}><Text style={styles.refreshButtonText}>{healthState === "checking" ? "Prüft …" : "Prüfen"}</Text></TouchableOpacity></View><Text style={[styles.healthDetail, healthState === "error" && styles.repositoryError]}>{healthState === "ready" && serviceHealth ? `Version ${serviceHealth.version}${serviceHealth.storage ? ` · ${serviceHealth.storage.mode === "postgres" ? "Persistenter Speicher aktiv (kostenloses Postgres-Backup)" : serviceHealth.storage.persistent ? "Persistenter Speicher aktiv" : "Ephemerer Speicher (Free-Tier)"}` : ""}${serviceHealth.previewUrl ? " · Vorschau verfügbar" : " · Keine Laufzeitvorschau gemeldet"}${healthCheckedAt ? ` · geprüft ${formatCommitDate(healthCheckedAt)}` : ""}` : healthState === "error" ? healthError : "Die Diagnose prüft Service-Erreichbarkeit ohne Repository-Daten zu verändern."}</Text></View> : null}
             <StudioErrorBoundary section="Repository-Ansicht">{hasAttachedRepository ? (
               <View style={styles.repositoryPanel}>
                 <View style={styles.repositoryHeader}>

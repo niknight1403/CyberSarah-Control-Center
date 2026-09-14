@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build-apk:
-    name: Expo-Web-Export → Capacitor → Gradle-APK
+    name: Expo-Web-Export → Capacitor → Gradle-APK (Entwicklung + Admin)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -46,17 +46,6 @@ jobs:
           mkdir -p node_modules/react-native-css-interop/.cache
           touch node_modules/react-native-css-interop/.cache/web.css
 
-      - name: Expo-Web-Export (web-dist)
-        run: EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo export -p web --output-dir web-dist
-        env:
-          # Sprint 73: API-Basis-URL explizit zur Build-Zzeit einbrennen.
-          # Zuvor leer -> Code fiel auf DEFAULT_API_BASE_URL zurueck; explizit
-          # gesetzt schliesst Tippfehler/Fallback-Probleme kuenftig aus.
-          EXPO_PUBLIC_API_BASE_URL: https://app.cybersarah-ki.com
-
-      - name: Capacitor-Sync (Web-Assets → Android)
-        run: npx cap sync android
-
       - name: JDK 21 einrichten
         uses: actions/setup-java@v6
         with:
@@ -66,16 +55,35 @@ jobs:
       - name: Gradle-Berechtigungen korrigieren
         run: chmod +x android/gradlew
 
-      - name: Debug-APK bauen (Gradle)
+      # ─────────────────────────────────────────────────────────────
+      # Variante 1: ENTWICKLUNG (Debug-APK, alle Entwicklungsanzeigen)
+      # ─────────────────────────────────────────────────────────────
+      - name: Expo-Web-Export — Variante Entwicklung (web-dist)
+        run: EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo export -p web --output-dir web-dist
+        env:
+          # Sprint 73: API-Basis-URL explizit zur Build-Zzeit einbrennen.
+          EXPO_PUBLIC_API_BASE_URL: https://app.cybersarah-ki.com
+          # Sprint 107-Erweiterung: Variante "development" — Service-Diagnose,
+          # Entwicklungs-Guidance und Theme-Lab sichtbar.
+          EXPO_PUBLIC_APP_VARIANT: development
+
+      - name: Capacitor-Sync — Variante Entwicklung
+        run: npx cap sync android
+
+      - name: Entwicklungs-APK bauen (Gradle, Debug)
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: APK verifizieren
+      - name: Entwicklungs-APK verifizieren
         run: |
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK" || { echo "APK fehlt: $APK"; exit 1; }
+          test -s "$APK" || { echo "Entwicklungs-APK fehlt: $APK"; exit 1; }
           ls -lh "$APK"
 
+      # ─────────────────────────────────────────────────────────────
+      # Variante 2: ADMIN (Produktion, Release-signiert, ohne
+      # Entwicklungsanzeigen — voller Funktionsumfang)
+      # ─────────────────────────────────────────────────────────────
       - name: Release-Signing-Keystore aus Secrets dekodieren
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -83,7 +91,18 @@ jobs:
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cybersarah-release.keystore"
           ls -l "$RUNNER_TEMP/cybersarah-release.keystore"
 
-      - name: Signierte Release-APK bauen (Gradle)
+      - name: Expo-Web-Export — Variante Admin (web-dist ueberschreiben)
+        run: EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo export -p web --output-dir web-dist
+        env:
+          EXPO_PUBLIC_API_BASE_URL: https://app.cybersarah-ki.com
+          # Sprint 107-Erweiterung: Variante "admin" — Entwicklungsanzeigen
+          # werden ueber lib/app-variant-logic.ts ausgeblendet.
+          EXPO_PUBLIC_APP_VARIANT: admin
+
+      - name: Capacitor-Sync — Variante Admin
+        run: npx cap sync android
+
+      - name: Admin-APK bauen (Gradle, Release, signiert)
         working-directory: android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -93,16 +112,16 @@ jobs:
           ./gradlew assembleRelease --no-daemon --stacktrace \
             -PcybersarahKeystorePath="$RUNNER_TEMP/cybersarah-release.keystore"
 
-      - name: Release-APK verifizieren (Signatur-Check mit apksigner)
+      - name: Admin-APK verifizieren (Signatur-Check mit apksigner)
         run: |
           APK="android/app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK" || { echo "Release-APK fehlt: $APK"; exit 1; }
+          test -s "$APK" || { echo "Admin-APK fehlt: $APK"; exit 1; }
           ls -lh "$APK"
           SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
           APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort | tail -1)"
           "$APKSIGNER" verify --print-certs "$APK" | head -3
 
-      - name: Signiertes Release-AAB bauen (Google Play)
+      - name: Signiertes Release-AAB bauen (Google Play, = Admin-Variante)
         working-directory: android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -126,28 +145,36 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
-      - name: APK umbenennen und Release veroeffentlichen
+      - name: APKs umbenennen und Release veroeffentlichen
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ github.event.inputs.version_name || '2.0.0' }}
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk \
-            "CyberSarah-ControlCenter-v${VERSION}-debug.apk"
+            "CyberSarah-ControlCenter-v${VERSION}-dev.apk"
           cp android/app/build/outputs/apk/release/app-release.apk \
-            "CyberSarah-ControlCenter-v${VERSION}-release.apk"
+            "CyberSarah-ControlCenter-v${VERSION}-admin.apk"
           cp android/app/build/outputs/bundle/release/app-release.aab \
             "CyberSarah-ControlCenter-v${VERSION}-release.aab"
           TAG="v${VERSION}-apk"
           NOTES="Automatisierter Capacitor-Build aus Commit ${GITHUB_SHA::7}.
+          Zwei Varianten aus einem Codestand (Sprint 107-Erweiterung):
+          - v${VERSION}-dev.apk — ENTWICKLUNG: Debug-Build mit allen
+            Entwicklungsanzeigen (Service-Diagnose, Entwicklungs-Guidance,
+            Theme-Lab).
+          - v${VERSION}-admin.apk — ADMIN: Release-signiert, voller
+            Funktionsumfang ohne Entwicklungsanzeigen (bessere Bedienung
+            und Optik). Empfohlene APK fuer die taegliche Nutzung.
           Web-Export der CyberSarah-App als Android-Wrapper (com.cybersarah.controlcenter).
           Installation (APK): Unbekannte Quellen erlauben und die APK oeffnen.
-          Play-Store-Upload: das signierte AAB (jarsigner-verifiziert) direkt in der
-          Play Console hochladen — siehe docs/PLAY_STORE_SUBMISSION_GUIDE.md."
-          RELEASE_FILES="CyberSarah-ControlCenter-v${VERSION}-debug.apk CyberSarah-ControlCenter-v${VERSION}-release.apk CyberSarah-ControlCenter-v${VERSION}-release.aab"
+          Play-Store-Upload: das signierte AAB (jarsigner-verifiziert, Admin-
+          Variante) direkt in der Play Console hochladen — siehe
+          docs/PLAY_STORE_SUBMISSION_GUIDE.md und docs/APK_VARIANTEN.md."
+          RELEASE_FILES="CyberSarah-ControlCenter-v${VERSION}-dev.apk CyberSarah-ControlCenter-v${VERSION}-admin.apk CyberSarah-ControlCenter-v${VERSION}-release.aab"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" $RELEASE_FILES --clobber
           else
             gh release create "$TAG" $RELEASE_FILES \
-              --title "CyberSarah Control Center v${VERSION} (Android APK + Play-Store-AAB)" \
+              --title "CyberSarah Control Center v${VERSION} (Entwicklungs-APK + Admin-APK + Play-Store-AAB)" \
               --notes "$NOTES"
           fi

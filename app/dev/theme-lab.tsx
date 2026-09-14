@@ -7,6 +7,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { type ColorScheme, resolveDesignPalette, SchemeColors } from "@/constants/theme";
 import { DESIGN_THEMES, designThemeDescription, designThemeIcon, designThemeLabel, type DesignTheme } from "@/lib/design-theme-logic";
 import { useColors } from "@/hooks/use-colors";
+import { resolveAppVariant, showDevSurface } from "@/lib/app-variant-logic";
 import { useThemeContext } from "@/lib/theme-provider";
 
 type PaletteName = keyof typeof SchemeColors.light;
@@ -32,6 +33,18 @@ export default function ThemeLabScreen() {
   const [lastAction, setLastAction] = useState<string>("None yet");
   const { colorScheme, setColorScheme, designTheme, setDesignTheme, palette } = useThemeContext();
   const colors = useColors();
+  const appVariant = resolveAppVariant(process.env.EXPO_PUBLIC_APP_VARIANT);
+
+  if (!showDevSurface(appVariant, "themeLab")) {
+    return (
+      <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
+        <View className="flex-1 items-center justify-center gap-2 px-6">
+          <Text className="text-center text-base font-semibold text-foreground">Theme-Lab ist eine Entwicklungsoberfläche</Text>
+          <Text className="text-center text-sm text-muted">In der Admin-Variante ist dieses Werkzeug ausgeblendet. Nutze die App-Einstellungen für Design-Anpassungen.</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   const swatches = useMemo(
     () =>
