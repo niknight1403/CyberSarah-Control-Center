@@ -4,6 +4,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { integrationFixture } from "@/constants/integration-fixture";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
 import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
+import { useAdminGithubTokenSync } from "@/lib/use-admin-github-token-sync";
 import { trpc } from "@/lib/trpc";
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const isAdmin = accountQuery.data?.role === "admin";
   useAdminAutoRouter(accountQuery.data ?? null);
+  useAdminGithubTokenSync(accountQuery.data ?? null);
   const [provider, setProvider] = useState<ProviderId>("managed");
   const [serviceAccessToken, setServiceAccessToken] = useState("");
   const [githubToken, setGithubToken] = useState("");

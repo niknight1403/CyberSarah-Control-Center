@@ -59,7 +59,7 @@ export default function ChatScreen() {
   const developmentChatMutation = trpc.developmentChat.send.useMutation();
   const chatWorkspaceId = settings.workspaceId;
   const providerLabel = getProviderLabel(settings.provider);
-  const readyForChat = settings.provider === "managed" || settings.hasProviderKey;
+  const readyForChat = settings.provider === "managed" || settings.provider === "auto" || settings.hasProviderKey;
   const contextLabel = useMemo(() => selectedFile.name + " · " + settings.branch, [selectedFile.name, settings.branch]);
 
   const requestDevelopmentChat = async (content: string) => {

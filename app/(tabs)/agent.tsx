@@ -52,6 +52,7 @@ import { parseRepositoryChatIntent } from "@/lib/repository-intent-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
 import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
+import { useAdminGithubTokenSync } from "@/lib/use-admin-github-token-sync";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
@@ -120,6 +121,7 @@ export default function AgentScreen() {
     const styles = useMemo(() => createStyles(colors), [colors]);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   useAdminAutoRouter(accountQuery.data ?? null);
+  useAdminGithubTokenSync(accountQuery.data ?? null);
   const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } =
     useWorkspace();
   const {
@@ -275,7 +277,7 @@ export default function AgentScreen() {
   );
   const readyForChat =
     hasRepository &&
-    (settings.provider === "managed" || settings.hasProviderKey);
+    (settings.provider === "managed" || settings.provider === "auto" || settings.hasProviderKey);
   const contextLabel = useMemo(
     () => `${selectedFile.name} · ${settings.branch}`,
     [selectedFile.name, settings.branch],
