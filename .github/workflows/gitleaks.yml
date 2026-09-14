@@ -1,0 +1,36 @@
+name: Gitleaks Secret Scan
+
+# Sprint 91: Secret-Scanning auf jedem Push und Pull Request mit Gitleaks
+# (OSS, kostenlos). Faengt geleakte Tokens/Keys/Passwoerter, bevor sie
+# im Verlauf landen. Blockiert den CI bei Funden — bewusst streng, da im
+# Projekt produktive Keys (Stripe, Provider-Pool, GitHub) im Spiel sind.
+# Bereits im Verlauf bekannte, verschluesselte Backups (secrets-backup.tar.gz.gpg)
+# sind keine Klartext-Secrets und werden nicht angeschlagen.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, next-development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v5
+        with:
+          # Voller Verlauf, damit auch historisch geleckte Secrets sichtbar werden.
+          fetch-depth: 0
+
+      - name: Gitleaks ausfuehren
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

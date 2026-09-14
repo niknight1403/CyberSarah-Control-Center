@@ -81,3 +81,6 @@ workspace-service/.env
 workspace-service/.env
 web-dist/
 .env
+
+# Sprint 91: Vitest-Coverage-Ausgabe (lokal/CI-Artifact, nicht im Repo)
+coverage/

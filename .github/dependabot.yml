@@ -1,0 +1,64 @@
+# Sprint 91: Dependabot haelt Abhaengigkeiten und GitHub Actions aktuell.
+# Expo-/React-Native-Updates werden bewusst als Pull Requests bereitgestellt
+# (Grundentscheidung: Major-Upgrades als eigene Sprints) — kleine Patch- und
+# Minor-Updates koennen direkt ueber PRs abgewickelt werden.
+version: 2
+updates:
+  # Haupt-App (package.json im Repo-Wurzel-Ordner)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      # Eng verwandte Expo-/Metro-Pakete gemeinsam updaten, um Breaking Changes
+      # in einem Review behandeln zu koennen.
+      expo-and-metro:
+        patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+          - "metro"
+          - "metro-*"
+          - "nativewind"
+      react-native:
+        patterns:
+          - "react-native"
+          - "react-native-*"
+          - "@react-native-*"
+      dev-and-test:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "typescript"
+          - "tsx"
+          - "eslint*"
+          - "prettier"
+    ignore:
+      # Expo-SDK-Major-Spruenge bleiben eigene Sprints (siehe NEXT_STEPS.md,
+      # Sprint 87) — Muster greift nur Major-Versionen der SDK-Metapakete.
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Workspace-Service (eigener package-lock)
+  - package-ecosystem: "npm"
+    directory: "/workspace-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps-workspace-service)"
+
+  # GitHub Actions selbst aktuell halten
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci-deps)"

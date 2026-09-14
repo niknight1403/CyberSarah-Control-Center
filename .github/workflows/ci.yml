@@ -51,8 +51,30 @@ jobs:
           done
           echo "Service nicht healthy nach 20s — Deploy laeuft weiter, Render-Health-Check ist der verbindliche Gate."; pkill -f "node src/index.js" 2>/dev/null; exit 0
 
-      - name: Deterministic test suite
-        run: npm test
+      - name: Deterministic test suite mit Coverage
+        run: npm run test:coverage
+
+      - name: Coverage-Bericht als Artifact hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybersarah-coverage-${{ github.run_id }}
+          path: coverage/
+          if-no-files-found: warn
+
+      - name: Coverage zu Codecov hochladen (optional, ohne Token uebersprungen)
+        if: always()
+        continue-on-error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          if [ -z "$CODECOV_TOKEN" ]; then
+            echo "CODECOV_TOKEN nicht gesetzt — Coverage liegt als Artifact bereit. Konto: https://about.codecov.io (fuer private Repos bis 5 Nutzer kostenlos)."
+            exit 0
+          fi
+          curl -sf https://uploader.codecov.io/latest/linux/codecov-linux -o codecov || { echo "Codecov-Uploader nicht erreichbar"; exit 0; }
+          chmod +x codecov
+          ./codecov -t "$CODECOV_TOKEN" -f coverage/lcov.info -Z || echo "Codecov-Upload fehlgeschlagen — CI bleibt gruen."
 
       - name: Workspace service syntax validation
         run: node --check workspace-service/src/index.js
