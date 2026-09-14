@@ -25,8 +25,17 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install dependencies (striktes Lockfile)
+        if: github.actor != 'dependabot[bot]'
         run: npm ci
+
+      # Dependabot generiert Lockfiles mit seiner eigenen npm-Version; deren
+      # Ideal-Baum-Rekonstruktion kann vom Runner-npm abweichen (z. B. yaml-
+      # Nesting) und npm ci blockieren. npm install versoehnt den Baum und
+      # prueft weiterhin dieselbe Test- und Build-Akzeptanz. Siehe Sprint 93.
+      - name: Install dependencies (Dependabot, Lockfile-Rekonziliation)
+        if: github.actor == 'dependabot[bot]'
+        run: npm install --no-audit --no-fund
 
       - name: Workspace-Service-Abhaengigkeiten installieren
         run: npm install --omit=dev --no-audit --no-fund
