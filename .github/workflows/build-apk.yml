@@ -22,7 +22,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Repository auschecken
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Node.js 22 einrichten
         uses: actions/setup-node@v5
