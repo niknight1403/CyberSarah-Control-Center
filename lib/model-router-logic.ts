@@ -163,6 +163,13 @@ export type BuildOrderInput = {
   /** Provider, deren API-Keys/Endpoints konfiguriert sind. */
   configuredProviders: readonly RouterProviderId[];
   now: number;
+  /**
+   * Sprint 95 — Administrator-Elite-Override:Staerkste Provider (Faehigkeit >= 8
+   * fuer die Task-Art) erhalten einen Prioritaets-Bonus, sodass Admins immer
+   * mit den leistungsstärksten Modellen starten. Kein Entzug fuer andere —
+   * nur einestufige Priorisierung.
+   */
+  adminPriority?: boolean;
 };
 
 /** Prueft Verfuegbarkeit anhand Cooldown-Fenster. */
@@ -199,6 +206,7 @@ export function buildProviderOrder(input: BuildOrderInput): RouteScore[] {
     }
     const preferredRank = preferred.get(provider);
     if (preferredRank != null) score += Math.max(0, 4 - preferredRank); // bevorzugte ReihenfoLge
+    if (input.adminPriority && capabilities[input.taskType] >= 8) score += 2; // Sprint 95: Admin-Elite
     const blockedReason = !configured.has(provider)
       ? "unconfigured"
       : providerBlockedReason(input.health, provider, input.now);

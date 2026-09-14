@@ -93,3 +93,35 @@ export type InsertUser = typeof users.$inferInsert;
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
 export type InsertBillingSubscription =
   typeof billingSubscriptions.$inferInsert;
+
+/* ==================== Sprint 94 — Langzeit-Gedächtnis des Agenten ==================== */
+
+/** Art des Lernings: Build-Optimierung, Fehlerbehebung, Interaktions- oder Entscheidungswissen. */
+export const agentLearningKind = pgEnum("agent_learning_kind", [
+  "build-optimierung",
+  "fehlerbehebung",
+  "interaktion",
+  "entscheidung",
+]);
+
+/**
+ * Langzeit-Gedächtnis: verdichtete Learnings aus vergangenen Turns —
+ * Build-Optimierungen, Fehlerbehebungen und Interaktions-Learnings.
+ * Wird beim Agent-Turn gegen den aktuellen Prompt gerankt und als
+ * kompaktes Kontext-Snippet in den System-Prompt injiziert.
+ */
+export const agentLearnings = pgTable("agentLearnings", {
+  id: serial("id").primaryKey(),
+  userOpenId: varchar("userOpenId", { length: 64 }).notNull(),
+  kind: agentLearningKind("kind").notNull().default("interaktion"),
+  title: varchar("title", { length: 160 }).notNull(),
+  detail: text("detail").notNull(),
+  keywords: varchar("keywords", { length: 400 }).notNull().default(""),
+  sessionId: varchar("sessionId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("agentLearnings_user_idx").on(table.userOpenId, table.createdAt),
+]);
+
+export type AgentLearning = typeof agentLearnings.$inferSelect;
+export type InsertAgentLearning = typeof agentLearnings.$inferInsert;

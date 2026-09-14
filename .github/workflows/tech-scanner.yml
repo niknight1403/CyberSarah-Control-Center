@@ -1,0 +1,65 @@
+# Sprint 95 — Autonomer Tech-Scanner: taeglicher R&D-Scan oeffentlicher
+# Quellen (GitHub Search, Hugging Face, npm Registry). Bewertet und filtert
+# wird in lib/tech-scan-logic.ts; gesammelt wird in scripts/tech-scanner.mjs.
+# Der Report wird als docs/research/LATEST_TECH_SCAN.md committet ([skip ci])
+# und der Tech-Scanner-Issue aktualisiert — kein manueller Zwischenschritt.
+name: tech-scanner
+
+on:
+  schedule:
+    # Taeglich 05:30 UTC = 07:30 MESZ — vor dem Arbeitstag des Admins.
+    - cron: "30 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: tech-scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Node 22 einrichten
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Tech-Scan ausfuehren
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx --yes esbuild@0.25.0 scripts/tech-scanner.mjs --bundle --platform=node --format=esm --external:node:* --outfile=/tmp/tech-scanner.bundle.mjs
+          node /tmp/tech-scanner.bundle.mjs
+
+      - name: Report committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/research/LATEST_TECH_SCAN.md
+          git diff --cached --quiet && echo "Keine Aenderung am Report." && exit 0
+          git commit -m "chore(tech-scanner): Taeglicher Tech-Scan [skip ci]"
+          git push
+
+      - name: Tech-Scanner-Issue aktualisieren
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPORT="docs/research/LATEST_TECH_SCAN.md"
+          LABEL="tech-scan"
+          TITLE_PREFIX="📡 Tech-Scanner: Relevante Funde"
+          gh label create "$LABEL" --color 5319e7 || true
+          ISSUE_NUMBER=$(gh issue list --label "$LABEL" --state open --json number --limit 1 --jq '.[0].number')
+          BODY=$(cat "$REPORT")
+          if [ -n "$ISSUE_NUMBER" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body "Update $(date -u +%F):"$'\n\n'"$BODY"
+          else
+            gh issue create --label "$LABEL" --title "$TITLE_PREFIX" --body "$BODY"
+          fi
