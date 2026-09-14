@@ -19,6 +19,7 @@ export const AGENT_TOOL_NAMES = [
   "commit_changes",
   "push_changes",
   "open_pull_request",
+  "save_learning",
 ] as const;
 
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
@@ -117,6 +118,26 @@ export const AGENT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
           baseBranch: { type: "string", description: "Ziel-Branch, z. B. 'main'." },
         },
         required: ["title", "baseBranch"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_learning",
+      description: "Speichert eine Erkenntnis ins Langzeit-Gedächtnis (Build-Optimierungen, Fehlerbehebungen, Konventionen, Nutzer-Präferenzen), damit spaetere Turns darauf zurueckgreifen koennen. Nutze dies nach abgeschlossenen Fehlerbehebungen, vereinbarten Konventionen und wichtigen Nutzerpraferenzen.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Kurzer Titel der Erkenntnis (max. 160 Zeichen)." },
+          detail: { type: "string", description: "Praegnante Beschreibung: was wurde gemacht und warum?" },
+          kind: {
+            type: "string",
+            description: "Art des Learnings: 'build-optimierung', 'fehlerbehebung', 'interaktion' oder 'entscheidung'.",
+          },
+        },
+        required: ["title", "detail"],
         additionalProperties: false,
       },
     },
@@ -280,12 +301,14 @@ export function formatToolResultForModel(tool: AgentToolName, payload: unknown):
 export function buildAgentSystemPrompt(branch: string): string {
   return `Du bist CyberSarah, eine autonome Entwicklungsassistentin im Control Center mit direktem Werkzeugzugriff auf das verbundene GitHub-Repository (aktueller Branch: ${branch}).
 
-Du hast Werkzeuge, um selbststaendig zu arbeiten: Repository/Git (list_repo_files, read_repo_file, write_repo_file, git_status, commit_changes, push_changes, open_pull_request) sowie Live-Geschaeftsdaten (get_revenue_metrics: Stripe-Einnahmen und Abonnements; get_crypto_prices: BTC/ETH/SOL-Echtzeitkurse; get_analytics_overview: System-Status). Nutze sie proaktiv, statt den Nutzer nach Code oder Zahlen zu fragen — bei Fragen zu Einnahmen, Kursen oder Kennzahlen rufe zuerst das passende Daten-Werkzeug auf.
+Du hast Werkzeuge, um selbststaendig zu arbeiten: Repository/Git (list_repo_files, read_repo_file, write_repo_file, git_status, commit_changes, push_changes, open_pull_request) sowie Live-Geschaeftsdaten (get_revenue_metrics: Stripe-Einnahmen und Abonnements; get_crypto_prices: BTC/ETH/SOL-Echtzeitkurse mit Kraken-Fallback; get_analytics_overview: GA4-Kennzahlen der letzten 7 Tage; get_crm_contacts: HubSpot-Kontakte und Salesforce-Status; get_content_channels_status: TikTok/Instagram-Kanäle; get_ai_services_status: Perplexity/ElevenLabs/Symphony-Verfügbarkeit) und das Langzeit-Gedächtnis (save_learning: Erkenntnisse dauerhaft speichern). Nutze sie proaktiv, statt den Nutzer nach Code oder Zahlen zu fragen — bei Fragen zu Einnahmen, Kursen oder Kennzahlen rufe zuerst das passende Daten-Werkzeug auf.
 
 Regeln:
 - Verschaffe dir bei Unklarheit ueber die Struktur zuerst mit list_repo_files einen Ueberblick, dann lies gezielt relevante Dateien.
 - Aendere Dateien nur mit write_repo_file und beschreibe danach in Textform, was und warum du geaendert hast.
 - Commite und pushe nur, wenn der Nutzer das explizit wollte oder es der offensichtlich naechste Schritt einer bereits vereinbarten Aenderung ist. Nutze pruegnante deutsche Commit-Messages.
 - Erfinde niemals ausgefuehrte Aktionen — nutze fuer jede Behauptung ("ich habe X geaendert") tatsaechlich zuvor das passende Werkzeug.
-- Antworte auf Deutsch, klar und knapp. Nach jeder Werkzeugnutzung fasse das Ergebnis kurz zusammen, bevor du den naechsten Schritt gehst.`;
+- Fasse dich an operationelle Grenzen: Business-Tools sind ausschliesslich Nur-Lese-Werkzeuge; es gibt kein Werkzeug, das fremde Systeme veraendert oder loescht. Zerstoerende Git-Operationen (force-push, Branch-Loeschung) sind nicht Teil deines Werkzeugsets und werden nicht simuliert.
+- Nach abgeschlossenen Fehlerbehebungen und vereinbarten Konventionen speichere die Kern-Erkenntnis mit save_learning ins Langzeit-Gedächtnis.
+- Antworte auf Deutsch, klar und knapp. Nach jeder Werkzeugnutzung fasse das Ergebnis kurz zusammen, bevor du den naechsten Schritt geht.`;
 }
