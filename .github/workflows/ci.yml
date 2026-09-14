@@ -66,7 +66,7 @@ jobs:
 
       - name: Coverage-Bericht als Artifact hochladen
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cybersarah-coverage-${{ github.run_id }}
           path: coverage/
@@ -108,7 +108,7 @@ jobs:
 
       - name: Upload release handoff artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cybersarah-release-handoff-${{ github.run_id }}
           path: release-handoff.json

@@ -115,7 +115,7 @@ jobs:
           rm -f "$RUNNER_TEMP/cybersarah-release.keystore"
 
       - name: AAB als Workflow-Artefakt hochladen
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CyberSarah-ControlCenter-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
