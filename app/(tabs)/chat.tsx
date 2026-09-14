@@ -1,5 +1,6 @@
 import { StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
+import { AiOrb } from "@/components/living/living-ui";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { ChatBackground } from "@/components/chat/chat-background";
 import { ChatComposer } from "@/components/chat/chat-composer";
@@ -249,7 +250,7 @@ export default function ChatScreen() {
                 onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
                 ListHeaderComponent={<>
                   <View style={[s.statusCard, readyForChat ? s.statusReady : s.statusWarn]}>
-                    <View style={readyForChat ? s.statusGlow : s.statusGlowWarn} />
+                    <AiOrb state={!readyForChat ? "error" : isThinking ? "thinking" : "idle"} size={26} />
                     <View style={s.statusCopy}>
                       <Text style={[s.statusTitle, s.statusTitleMono]}>{readyForChat ? "Chat bereit" : "Verbindung fehlt"}</Text>
                       <Text style={[s.statusText, s.statusTextMono]}>{readyForChat ? contextLabel + " · " + providerLabel : "Repository und Workspace in Einstellungen konfigurieren."}</Text>

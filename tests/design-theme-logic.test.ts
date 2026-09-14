@@ -16,14 +16,16 @@ describe("design theme logic", () => {
     expect(normalizeDesignTheme("neon")).toBe("neon");
     expect(normalizeDesignTheme("slate")).toBe("slate");
     expect(normalizeDesignTheme("glass")).toBe("glass");
+    expect(normalizeDesignTheme("living")).toBe("living");
     expect(normalizeDesignTheme("retro")).toBe("retro");
-    expect(normalizeDesignTheme("unexpected")).toBe("retro");
-    expect(normalizeDesignTheme(undefined)).toBe("retro");
+    expect(normalizeDesignTheme("unexpected")).toBe("living");
+    expect(normalizeDesignTheme(undefined)).toBe("living");
   });
 
   it("exposes exactly the four design themes with stable key and German labels", () => {
-    expect(DESIGN_THEMES).toEqual(["retro", "aurora", "neon", "slate", "glass"]);
-    expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v3");
+    expect(DESIGN_THEMES).toEqual(["living", "retro", "aurora", "neon", "slate", "glass"]);
+    expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v4");
+    expect(designThemeLabel("living")).toBe("Living AI Interface");
     expect(designThemeLabel("retro")).toBe("Retro Cyber-Terminal");
     expect(designThemeLabel("neon")).toBe("Cyber Neon");
     expect(designThemeLabel("slate")).toBe("Enterprise Slate");

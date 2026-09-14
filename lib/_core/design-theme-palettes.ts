@@ -207,6 +207,47 @@ export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> 
       },
     },
   },
+  /** Theme F — Living AI Interface (Standard seit v1.4.1 / Sprint 89) */
+  living: {
+    light: {
+      background: "#F5F3FF",
+      surface: "rgba(255, 255, 255, 0.62)",
+      border: "rgba(94, 82, 214, 0.14)",
+      foreground: "#221C46",
+      primary: "#7C5CFF",
+      muted: "#6B7092",
+      success: "#22C9A7",
+      warning: "#FBBE6C",
+      error: "#FF7B8A",
+    },
+    dark: {
+      background: "#0A0E1F",
+      surface: "rgba(255, 255, 255, 0.07)",
+      border: "rgba(255, 255, 255, 0.14)",
+      foreground: "#EEF1FF",
+      primary: "#9D8CFF",
+      muted: "#9AA3C7",
+      success: "#4ADE96",
+      warning: "#FBBE6C",
+      error: "#FF7B8A",
+    },
+    effects: {
+      light: {
+        glowPrimary: "0 0 18px rgba(124, 92, 255, 0.25)",
+        glowSoft: "0 0 12px rgba(56, 209, 255, 0.16)",
+        blur: "16px",
+        gradientFrom: "#EDEBFA",
+        gradientTo: "#E6F2FB",
+      },
+      dark: {
+        glowPrimary: "0 0 24px rgba(157, 140, 255, 0.4)",
+        glowSoft: "0 0 14px rgba(56, 209, 255, 0.26)",
+        blur: "20px",
+        gradientFrom: "#150F38",
+        gradientTo: "#062033",
+      },
+    },
+  },
   /** Theme E — Retro Cyber-Terminal (Standard seit v1.4.0 / Sprint 88) */
   retro: {
     light: {

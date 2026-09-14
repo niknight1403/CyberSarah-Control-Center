@@ -10,24 +10,25 @@
  * Violett-Teal-Verlauf, Milchglas-Flaechen, sanfte Glows).
  */
 
-export type DesignTheme = "retro" | "neon" | "slate" | "glass" | "aurora";
+export type DesignTheme = "living" | "retro" | "neon" | "slate" | "glass" | "aurora";
 
-export const DESIGN_THEMES: readonly DesignTheme[] = ["retro", "aurora", "neon", "slate", "glass"] as const;
+export const DESIGN_THEMES: readonly DesignTheme[] = ["living", "retro", "aurora", "neon", "slate", "glass"] as const;
 
-export const DEFAULT_DESIGN_THEME: DesignTheme = "retro";
+export const DEFAULT_DESIGN_THEME: DesignTheme = "living";
 
 /**
  * Storage-Key v2: mit dem Design-Refresh (v1.3.1) wird der Standard auf
  * Aurora Glass gesetzt — Bestandsinstallationen mit v1-Key ("neon") starten
  * einmal frisch mit dem neuen Design.
  */
-export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v3";
+export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v4";
 
 export function normalizeDesignTheme(value: unknown): DesignTheme {
-  return value === "retro" || value === "neon" || value === "slate" || value === "glass" || value === "aurora" ? value : DEFAULT_DESIGN_THEME;
+  return value === "living" || value === "retro" || value === "neon" || value === "slate" || value === "glass" || value === "aurora" ? value : DEFAULT_DESIGN_THEME;
 }
 
 export function designThemeLabel(theme: DesignTheme): string {
+  if (theme === "living") return "Living AI Interface";
   if (theme === "retro") return "Retro Cyber-Terminal";
   if (theme === "slate") return "Enterprise Slate";
   if (theme === "glass") return "Glas-Modern";
@@ -36,6 +37,9 @@ export function designThemeLabel(theme: DesignTheme): string {
 }
 
 export function designThemeDescription(theme: DesignTheme): string {
+  if (theme === "living") {
+    return "Lebendiges KI-Interface: Purple/Blue/Cyan, Milchglas-Ebenen, AI-Orbs und dezente Hologramm-Overlays.";
+  }
   if (theme === "retro") {
     return "Echtes Schwarz, scharfes Amber (#FFB000) und harte Kanten im Stil klassischer CRT-Terminals.";
   }
@@ -52,6 +56,7 @@ export function designThemeDescription(theme: DesignTheme): string {
 }
 
 export function designThemeIcon(theme: DesignTheme): "bolt.fill" | "chart.bar.fill" | "sparkles" | "wand.and.stars" {
+  if (theme === "living") return "sparkles";
   if (theme === "slate") return "chart.bar.fill";
   if (theme === "glass") return "sparkles";
   if (theme === "aurora") return "wand.and.stars";

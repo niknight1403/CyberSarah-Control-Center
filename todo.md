@@ -240,3 +240,11 @@
 - [x] Server-zu-Workspace-Bridge (callWorkspaceService) mit Cold-Start-Retry
 - [x] 610/610 Tests grün, TypeCheck sauber, Doku docs/SPRINT_88_RETRO_TERMINAL_UND_AUTONOMER_AGENT.md
 - Offen (Sprint 89): ASCII-Dashboards in weiteren Tabs, MCP-Grid, Live-Verifikation Agent-Modus
+
+## Sprint 89 — Living AI Interface (14.09.2026) — erledigt
+- [x] Design-Theme "living" (Purple/Blue/Cyan, Glassmorphism, Glow-Effekte) als neuer Standard (Storage-Key v4)
+- [x] lib/living-interface-logic.ts: Partikel-Feld (seeded, 20-48s-Drift), Orb-Puls, Glow-Ruhe-Regel, Scanlines (+7 Tests)
+- [x] components/living/living-ui.tsx: ParticleField (ein Animated-Loop), AiOrb (4 Zustaende), ScanlineOverlay
+- [x] Chat als lebendiges Interface: Partikel + Scanlines im Hintergrund, AiOrb pulsiert bei thinking
+- [x] 616/616 Tests gruen, tsc sauber, Doku docs/SPRINT_89_LIVING_AI_INTERFACE.md
+- Offen (Sprint 90+): Orbs/Partikel in weiteren Tabs, KI-Live-Stream-Karte, animierte Charts, 3D-Nodes
