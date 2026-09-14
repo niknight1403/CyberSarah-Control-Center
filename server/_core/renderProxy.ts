@@ -87,11 +87,39 @@ export function registerRenderProxy(app: Express) {
     const upstreamPath = (req.url.replace(/^\/api\/render/, "") || "/");
     const upstreamUrl = `${upstreamBase}${upstreamPath}`;
 
+    // Sprint 84-Follow-up: Render Free-Services schlafen nach 15 Minuten ein.
+    // Waehrend des Cold-Starts antwortet Render sofort mit einer 502-HTML-Fehlerseite
+    // (kein Timeout!) — diese wird hier erkannt, es folgt EIN verzögerter Retry,
+    // der das Aufwachen (ca. 10-15 s) abwartet. Bleibt der 502, folgt eine
+    // verständliche JSON-Fehlermeldung statt der rohen Render-Seite.
+    const COLD_START_RETRY_DELAY_MS = 12_000;
+    type UpstreamResponse = { status: number; headers: { get(name: string): string | null } };
+    const isRenderColdStart = (response: UpstreamResponse) =>
+      response.status === 502 &&
+      !(response.headers.get("content-type") ?? "").includes("application/json");
+
     try {
-      const upstreamResponse = await fetch(
+      let upstreamResponse = await fetch(
         upstreamUrl,
         buildUpstreamRequest(req, upstreamBase, upstreamPath),
       );
+
+      if (isRenderColdStart(upstreamResponse)) {
+        console.warn("[RenderProxy] Cold-Start-502 vom Workspace-Service — Retry nach 12 s:", upstreamUrl);
+        await new Promise((resolve) => setTimeout(resolve, COLD_START_RETRY_DELAY_MS));
+        upstreamResponse = await fetch(
+          upstreamUrl,
+          buildUpstreamRequest(req, upstreamBase, upstreamPath),
+        );
+      }
+
+      if (isRenderColdStart(upstreamResponse)) {
+        res.status(503).json({
+          error:
+            "Der Workspace-Service wurde gerade aus dem Ruhemodus aufgeweckt und ist noch nicht bereit. Bitte in wenigen Sekunden erneut versuchen.",
+        });
+        return;
+      }
 
       const contentType = upstreamResponse.headers.get("content-type") ?? "application/json";
       res.status(upstreamResponse.status);
