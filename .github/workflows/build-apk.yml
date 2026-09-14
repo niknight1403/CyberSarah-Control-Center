@@ -98,11 +98,24 @@ jobs:
           "$APKSIGNER" verify --print-certs "$APK" | head -3
           rm -f "$RUNNER_TEMP/cybersarah-release.keystore"
 
-      - name: Release-AAB bauen (Google Play, R8-obfuskiert)
+      - name: Signiertes Release-AAB bauen (Google Play)
         working-directory: android
-        run: ./gradlew bundleRelease --no-daemon --stacktrace
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease --no-daemon --stacktrace             -PcybersarahKeystorePath="$RUNNER_TEMP/cybersarah-release.keystore"
 
-      - name: AAB verifizieren und als Workflow-Artefakt hochladen
+      - name: AAB-Signatur verifizieren (jarsigner) und Keystore entfernen
+        run: |
+          AAB="android/app/build/outputs/bundle/release/app-release.aab"
+          test -s "$AAB" || { echo "Release-AAB fehlt: $AAB"; exit 1; }
+          ls -lh "$AAB"
+          jarsigner -verify "$AAB" 2>&1 | head -5
+          rm -f "$RUNNER_TEMP/cybersarah-release.keystore"
+
+      - name: AAB als Workflow-Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
           name: CyberSarah-ControlCenter-aab
@@ -118,16 +131,19 @@ jobs:
             "CyberSarah-ControlCenter-v${VERSION}-debug.apk"
           cp android/app/build/outputs/apk/release/app-release.apk \
             "CyberSarah-ControlCenter-v${VERSION}-release.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab \
+            "CyberSarah-ControlCenter-v${VERSION}-release.aab"
           TAG="v${VERSION}-apk"
           NOTES="Automatisierter Capacitor-Build aus Commit ${GITHUB_SHA::7}.
           Web-Export der CyberSarah-App als Android-Wrapper (com.cybersarah.controlcenter).
-          Installation: Unbekannte Quellen erlauben und die APK oeffnen.
-          Play-Store-AAB (R8-obfuskiert, unsigniert — Signierung ist Owner-Handoff) liegt als Workflow-Artefakt bereit."
-          APK_FILES="CyberSarah-ControlCenter-v${VERSION}-debug.apk CyberSarah-ControlCenter-v${VERSION}-release.apk"
+          Installation (APK): Unbekannte Quellen erlauben und die APK oeffnen.
+          Play-Store-Upload: das signierte AAB (jarsigner-verifiziert) direkt in der
+          Play Console hochladen — siehe docs/PLAY_STORE_SUBMISSION_GUIDE.md."
+          RELEASE_FILES="CyberSarah-ControlCenter-v${VERSION}-debug.apk CyberSarah-ControlCenter-v${VERSION}-release.apk CyberSarah-ControlCenter-v${VERSION}-release.aab"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" $APK_FILES --clobber
+            gh release upload "$TAG" $RELEASE_FILES --clobber
           else
-            gh release create "$TAG" $APK_FILES \
-              --title "CyberSarah Control Center v${VERSION} (Android APK)" \
+            gh release create "$TAG" $RELEASE_FILES \
+              --title "CyberSarah Control Center v${VERSION} (Android APK + Play-Store-AAB)" \
               --notes "$NOTES"
           fi
