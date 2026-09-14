@@ -1,0 +1,50 @@
+name: PR Agent (Gemini)
+
+# Sprint 92: KI-Code-Review via PR-Agent (Open Source, The-PR-Agent) mit dem
+# im Repo vorhandenen GEMINI_API_KEY (Google AI Studio, Kontingent kostenlos).
+# Ersetzt eine CodeRabbit-Anmeldung: kein externes Konto, keine GitHub App.
+# - Bei neuen PRs laeuft automatisch /describe, /review und /improve.
+# - In jedem PR sind interaktive Kommentare moeglich: /review, /improve,
+#   /ask "...", /describe, /update_changelog.
+# - PRs von Bots (z. B. Dependabot) werden vom Sender-Guard uebersprungen
+#   (github.event.sender.type != 'Bot') — schont das Gemini-Kontingent.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: write
+
+concurrency:
+  group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    name: KI-Review durch PR-Agent
+    steps:
+      - name: PR Agent action step
+        id: pragent
+        uses: the-pr-agent/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Gemini (Google AI Studio) — Key existiert bereits als Repo-Secret.
+          config.model: "gemini/gemini-2.5-flash"
+          config.fallback_models: '["gemini/gemini-2.5-flash"]'
+          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Automatische Werkzeuge bei neuen PRs:
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "review_requested"]'
+          # Projektkonventionen (Deutsch, Repo-Stil):
+          pr_reviewer.extra_instructions: "Das Projekt nutzt deutsche Commit- und PR-Titel ('feat(sprint-XX): ...'). Antworte auf Deutsch. Achte auf: keine Secrets im Code, keine RN-CNG-Annahmen (android/ ist Quelle der Wahrheit), Expo-SDK-Major-Upgrades sind eigene Sprints."
+          pr_description.extra_instructions: "Beschreibe den PR auf Deutsch, klar und sachlich, passend zum Stil der Sprint-Berichte in docs/."
+          pr_description.publish_labels: "false"

@@ -1,0 +1,113 @@
+name: Uptime-Waechter
+
+# Sprint 92: Kostenloser Uptime-Monitor als GitHub-Actions-Cron — ersetzt eine
+# UptimeRobot-Anmeldung. Prueft alle 30 Minuten die Produktiv-Gesundheit von
+# app.cybersarah-ki.com von AUSSEN (GitHub-Runner in Azure, nicht Render-seitig).
+# Verhalten:
+# - Ausfall (kein HTTP 200 nach 3 Versuchen): legt genau EIN offenes Issue mit
+#   Label 'uptime-alert' an (keine Duplikate — Folgefuehler kommentieren das
+#   bestehende Issue) und alarmiert optional den Discord-Webhook.
+# - Erholung: kommentiert und schliesst das offene Alert-Issue automatisch.
+# Kosten: ~1440 Runner-Minuten/Monat, weit unter dem 2000-Minuten-Kontingent
+# privater Repos. Ein manuelles Testen ist jederzeit per workflow_dispatch moeglich.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: uptime-waechter
+  cancel-in-progress: false
+
+jobs:
+  health-check:
+    name: Produktiv-Health pruefen
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEALTH_URL: https://app.cybersarah-ki.com/api/health
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    steps:
+      - name: Health-Check (3 Versuche, 20s Timeout)
+        id: health
+        run: |
+          set +e
+          code=000
+          latency=0
+          for i in 1 2 3; do
+            latency=$(curl -s -o /tmp/health-body.json -w "%{http_code} %{time_total}" --max-time 20 "$HEALTH_URL" 2>/dev/null)
+            code="${latency%% *}"
+            if [ "$code" = "200" ]; then
+              echo "Versuch $i: OK (HTTP $code, ${latency#* }s)"
+              break
+            fi
+            echo "Versuch $i: fehlgeschlagen (HTTP $code)"
+            [ "$i" != "3" ] && sleep 20
+          done
+          if [ "$code" = "200" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "latency=${latency#* }" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "code=$code" >> "$GITHUB_OUTPUT"
+            echo "--- Antwortkoerper ---"
+            head -c 500 /tmp/health-body.json 2>/dev/null || true
+          fi
+
+      - name: Alert-Label sicherstellen
+        if: always()
+        run: |
+          gh label create uptime-alert \
+            --repo "$REPO" \
+            --color d73a4a \
+            --description "Automatischer Uptime-Alarm des Produktiv-Health-Checks" \
+            2>/dev/null || echo "Label existiert bereits."
+
+      - name: Bei Ausfall Issue pflegen und Discord alarmieren
+        if: steps.health.outputs.ok == 'false'
+        run: |
+          TS=$(date -u +"%Y-%m-%d %H:%M UTC")
+          BODY="Der automatische Uptime-Wächter hat **${HEALTH_URL}** als nicht erreichbar erkannt (letzter HTTP-Status: \`${{ steps.health.outputs.code }}\`, ${TS}).
+
+          Das ist der erste Alarm in diesem Zeitraum? Dann reagiert Render evtl. gerade neu — das Issue wird automatisch geschlossen, sobald der Health-Check wieder grün ist.
+
+          Manuelle Prüfung: Render-Dashboard, \`render-diagnose.yml\`-Workflow und \`https://app.cybersarah-ki.com/api/health\` im Browser."
+
+          OPEN=$(gh issue list --repo "$REPO" --label uptime-alert --state open --json number --jq '.[0].number')
+          if [ -z "$OPEN" ]; then
+            gh issue create \
+              --repo "$REPO" \
+              --title "🚨 Produktiv-Ausfall: app.cybersarah-ki.com nicht erreichbar" \
+              --label uptime-alert \
+              --body "$BODY"
+            echo "Neues Alert-Issue angelegt."
+          else
+            gh issue comment "$OPEN" --repo "$REPO" --body "⚠️ Immer noch nicht erreichbar (HTTP \`${{ steps.health.outputs.code }}\`, ${TS})."
+            echo "Bestehendes Alert-Issue #$OPEN kommentiert."
+          fi
+
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -sf -H "Content-Type: application/json" \
+              -d "{\"content\": \"🚨 **CyberSarah Produktiv-Ausfall**: app.cybersarah-ki.com nicht erreichbar (HTTP ${{ steps.health.outputs.code }}) — ${TS}. Details im GitHub-Issue.\"}" \
+              "$DISCORD_WEBHOOK_URL" || echo "Discord-Webhook fehlgeschlagen — GitHub-Issue ist die verbindliche Alarmierung."
+          fi
+
+      - name: Bei Erholung Issue schliessen
+        if: steps.health.outputs.ok == 'true'
+        run: |
+          TS=$(date -u +"%Y-%m-%d %H:%M UTC")
+          OPEN=$(gh issue list --repo "$REPO" --label uptime-alert --state open --json number --jq '.[0].number')
+          if [ -n "$OPEN" ]; then
+            gh issue comment "$OPEN" --repo "$REPO" --body "✅ Produktiv-Health wieder grün (HTTP 200, ${{ steps.health.outputs.latency }}s, ${TS}). Alert wird geschlossen."
+            gh issue close "$OPEN" --repo "$REPO"
+            echo "Alert-Issue #$OPEN geschlossen."
+          else
+            echo "Alles grün, kein offener Alert (HTTP 200, ${{ steps.health.outputs.latency }}s)."
+          fi
