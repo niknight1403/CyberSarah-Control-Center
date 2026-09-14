@@ -67,7 +67,7 @@
     "expo-video": "~57.0.4",
     "expo-web-browser": "~57.0.3",
     "express": "^4.22.1",
-    "jose": "6.1.0",
+    "jose": "6.2.12",
     "nativewind": "^4.2.1",
     "pg": "^8.23.0",
     "react": "19.2.3",
