@@ -1,0 +1,58 @@
+name: Diagnose Workspace-Service-Auth
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: "Service-Health + Secret-Token-Validierung (ohne Secret-Ausgabe)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Workspace-Service Health (ohne Auth)
+        run: |
+          URL="${{ secrets.WORKSPACE_SERVICE_URL }}"
+          URL="${URL:-https://cybersarah-workspace.onrender.com}"
+          echo "Service: $URL"
+          curl -s -m 30 "$URL/api/v1/health" -w "\nHTTP: %{http_code}\n"
+
+      - name: "Kontrolle: absichtlich falscher Token muss 401 liefern"
+        run: |
+          URL="${{ secrets.WORKSPACE_SERVICE_URL }}"
+          URL="${URL:-https://cybersarah-workspace.onrender.com}"
+          CODE=$(curl -s -m 30 -o /tmp/ctrl.json -w "%{http_code}" -X POST "$URL/api/v1/providers/local/test" \
+            -H "Authorization: Bearer definitiv-falscher-token" \
+            -H "Content-Type: application/json" -d '{"provider":"ollama"}')
+          echo "Falscher Token -> HTTP $CODE"; head -c 200 /tmp/ctrl.json; echo
+
+      - name: "Validierung: secrets.SERVICE_ACCESS_TOKEN"
+        run: |
+          URL="${{ secrets.WORKSPACE_SERVICE_URL }}"
+          URL="${URL:-https://cybersarah-workspace.onrender.com}"
+          CODE=$(curl -s -m 30 -o /tmp/t1.json -w "%{http_code}" -X POST "$URL/api/v1/providers/local/test" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" -d '{"provider":"ollama"}')
+          if [ "$CODE" = "401" ]; then RESULT="UNGUELTIG (401)"; elif [ "$CODE" = "200" ]; then RESULT="GUELTIG (200)"; else RESULT="UNERWARTET ($CODE)"; fi
+          echo "SERVICE_ACCESS_TOKEN -> $RESULT"; head -c 200 /tmp/t1.json; echo
+
+      - name: "Validierung: secrets.WORKSPACE_SERVICE_TOKEN"
+        run: |
+          URL="${{ secrets.WORKSPACE_SERVICE_URL }}"
+          URL="${URL:-https://cybersarah-workspace.onrender.com}"
+          CODE=$(curl -s -m 30 -o /tmp/t2.json -w "%{http_code}" -X POST "$URL/api/v1/providers/local/test" \
+            -H "Authorization: Bearer ${{ secrets.WORKSPACE_SERVICE_TOKEN }}" \
+            -H "Content-Type: application/json" -d '{"provider":"ollama"}')
+          if [ "$CODE" = "401" ]; then RESULT="UNGUELTIG (401)"; elif [ "$CODE" = "200" ]; then RESULT="GUELTIG (200)"; else RESULT="UNERWARTET ($CODE)"; fi
+          echo "WORKSPACE_SERVICE_TOKEN -> $RESULT"; head -c 200 /tmp/t2.json; echo
+
+      - name: "Vergleich: SERVICE_ACCESS_TOKEN == WORKSPACE_SERVICE_TOKEN?"
+        run: |
+          if [ -z "${{ secrets.SERVICE_ACCESS_TOKEN }}" ] || [ -z "${{ secrets.WORKSPACE_SERVICE_TOKEN }}" ]; then
+            echo "Mindestens ein Secret ist nicht gesetzt."
+            exit 0
+          fi
+          if [ "${{ secrets.SERVICE_ACCESS_TOKEN }}" = "${{ secrets.WORKSPACE_SERVICE_TOKEN }}" ]; then
+            echo "BEIDE SECRETS SIDENTISCH (gleicher Wert)."
+          else
+            echo "BEIDE SECRETS UNTERSCHIEDEN SICH (Werte weichen ab — nur eines kann zum Render-Service passen)."
+          fi
