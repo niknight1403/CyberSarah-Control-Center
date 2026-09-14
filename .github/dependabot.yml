@@ -37,8 +37,27 @@ updates:
           - "prettier"
     ignore:
       # Expo-SDK-Major-Spruenge bleiben eigene Sprints (siehe NEXT_STEPS.md,
-      # Sprint 87) — Muster greift nur Major-Versionen der SDK-Metapakete.
+      # Sprint 87). Sprint 110: Muster auf das komplette Expo-/Metro- und
+      # React-Native-Umfeld erweitert — ein einzelner SDK-58-Paket-Sprung
+      # (z. B. expo-router@58 gegen gepinntes SDK 57) sprengt sonst die
+      # Lockfile-Rekonziliation (ERESOLVE) und verbrennt CI-Minuten.
       - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@expo/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "metro"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "metro-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "nativewind"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@react-native-*"
         update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
