@@ -96,7 +96,6 @@ jobs:
           SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
           APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort | tail -1)"
           "$APKSIGNER" verify --print-certs "$APK" | head -3
-          rm -f "$RUNNER_TEMP/cybersarah-release.keystore"
 
       - name: Signiertes Release-AAB bauen (Google Play)
         working-directory: android
