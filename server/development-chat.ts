@@ -593,7 +593,7 @@ async function callProviderWithTools(
 }
 
 /** Provider-Kandidaten fuer den Agent-Modus bei Provider "auto" (Router-Logik). */
-async function resolveAgentProviderCandidates(lastUserMessage: string): Promise<ProviderId[]> {
+async function resolveAgentProviderCandidates(lastUserMessage: string, role?: string | null): Promise<ProviderId[]> {
   const classification = classifyPrompt(lastUserMessage);
   const preferredOrder = await getPreferredProviderOrder();
   const order = buildProviderOrder({
@@ -603,6 +603,7 @@ async function resolveAgentProviderCandidates(lastUserMessage: string): Promise<
     health: getRouterHealth(),
     configuredProviders: getRouterConfiguredProviders(),
     now: Date.now(),
+    adminPriority: role === "admin", // Sprint 95: Elite-Override
   });
   const candidates = order
     .filter((entry) => entry.available)
@@ -736,7 +737,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
 async function handleAgentToolChat(input: AgentToolChatInput): Promise<DevelopmentChatResult> {
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const providers = input.provider === "auto"
-    ? await resolveAgentProviderCandidates(lastUserMessage)
+    ? await resolveAgentProviderCandidates(lastUserMessage, input.role)
     : [input.provider];
 
   let lastError: unknown = new Error("Kein verfuegbarer KI-Provider fuer die Werkzeug-Route.");
@@ -822,6 +823,7 @@ async function handleAutoRoutedChat(
   const preferredOrder = await getPreferredProviderOrder();
   const now = Date.now();
   const order = buildProviderOrder({
+    adminPriority: input.role === "admin", // Sprint 95: Elite-Override
     taskType: classification.taskType,
     complexity: classification.complexity,
     preferredOrder,

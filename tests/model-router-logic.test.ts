@@ -160,3 +160,47 @@ describe("model-router-logic — Failover-Zustandsmaschine", () => {
     expect(shouldAutoRoute(null)).toBe(false);
   });
 });
+
+describe("Sprint 95 — Administrator-Elite-Override im Routing", () => {
+  it("hebt die staerksten Provider (Faehigkeit >= 8) fuer Admins um +2", () => {
+    const config = {
+      taskType: "chat" as const,
+      complexity: "light" as const,
+      preferredOrder: ["groq"],
+      health: {},
+      configuredProviders: ["groq", "gemini", "openai", "together"] as never,
+      now: NOW,
+    };
+    const base = buildProviderOrder(config);
+    const elite = buildProviderOrder({ ...config, adminPriority: true });
+
+    // Elite-Bonus: Faehigkeits-Top-Provider (chat >= 8) bekommen exakt +2 ...
+    expect(elite.find((entry) => entry.provider === "openai")?.score).toBe(
+      (base.find((entry) => entry.provider === "openai")?.score ?? 0) + 2,
+    );
+    expect(elite.find((entry) => entry.provider === "gemini")?.score).toBe(
+      (base.find((entry) => entry.provider === "gemini")?.score ?? 0) + 2,
+    );
+    // ... schwache Provider (together, chat: 7) bleiben unveraendert.
+    expect(elite.find((entry) => entry.provider === "together")?.score).toBe(
+      base.find((entry) => entry.provider === "together")?.score,
+    );
+    // Bevorzugter Provider + Elite bleibt vorn; Elite-Provider ordnen sich vor Schwachen.
+    const eliteTop = elite.filter((entry) => entry.available).map((entry) => entry.provider);
+    expect(eliteTop[0]).toBe("groq");
+    expect(eliteTop.indexOf("gemini")).toBeLessThan(eliteTop.indexOf("together"));
+    expect(eliteTop.indexOf("openai")).toBeLessThan(eliteTop.indexOf("together"));
+
+    // Verfuegbarkeit bleibt unangetastet: kein Admin-Drueberweg ueber Cooldowns.
+    const blocked = buildProviderOrder({
+      taskType: "chat",
+      complexity: "light",
+      health: { groq: { status: "cooldown", consecutiveFailures: 3, lastLatencyMs: null, lastCheckedAt: NOW, cooldownUntil: NOW + 60_000 } },
+      configuredProviders: ["groq", "gemini"],
+      now: NOW,
+      adminPriority: true,
+    });
+    expect(blocked.find((entry) => entry.provider === "groq")?.available).toBe(false);
+    expect(blocked.find((entry) => entry.provider === "groq")?.score).toBeLessThan(0);
+  });
+});
