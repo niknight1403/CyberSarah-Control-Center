@@ -2,36 +2,36 @@ import { describe, expect, it } from "vitest";
 import { createEncryptedSupportBackup, getEncryptedSupportBackupPreview, getSupportShareConfirmation, isValidSupportBackupPassword, SUPPORT_BACKUP_FORMAT, verifyEncryptedSupportBackup } from "../lib/support-backup-logic";
 import { serializeDevelopmentChatHistory } from "../lib/development-chat-history-logic";
 // PBKDF2 mit 310k Iterationen ueberschreitet auf ausgelasteten CI-Runnern
-// leicht den 60-s-Standard-Timeout — Datei-Timeout hochsetzen, ohne die
-// Krypto-Parameter (Sicherheitsniveau) abzuschwaechen.
-import { vi } from "vitest";
-
-vi.setConfig({ testTimeout: 180_000, hookTimeout: 180_000 });
-
+// leicht 60 s — die Krypto-lastigen Tests tragen darum explizite 180-s-Timeouts
+// (Krypto-Parameter/Sicherheitsniveau unveraendert).
 
 describe("encrypted support backups", () => {
   const history = serializeDevelopmentChatHistory([{ id: "one", role: "user", content: "Please investigate this deployment issue." }]);
 
-  it("creates an authenticated encrypted envelope without exposing conversation plaintext", () => {
+  it(
+    "creates an authenticated encrypted envelope without exposing conversation plaintext",
+    () => {
     const backup = createEncryptedSupportBackup({ history, passphrase: "a carefully chosen password", salt: new Uint8Array(32).fill(7), iv: new Uint8Array(16).fill(9), createdAt: "2026-08-21T07:00:00.000Z" });
     const serialized = JSON.stringify(backup);
     expect(backup.format).toBe(SUPPORT_BACKUP_FORMAT);
     expect(backup.cipher.mac).toBeTruthy();
     expect(serialized).not.toContain("deployment issue");
     expect(backup.kdf.iterations).toBeGreaterThan(100_000);
-  }, 60_000);
+  }, 180_000);
 
   it("requires a sufficiently long export password", () => {
     expect(isValidSupportBackupPassword("short")).toBe(false);
     expect(isValidSupportBackupPassword("long-enough-password")).toBe(true);
   });
 
-  it("verifies an authenticated envelope before a bounded restore preview and rejects tampering", () => {
+  it(
+    "verifies an authenticated envelope before a bounded restore preview and rejects tampering",
+    () => {
     const backup = createEncryptedSupportBackup({ history, passphrase: "a carefully chosen password", salt: new Uint8Array(32).fill(4), iv: new Uint8Array(16).fill(8), createdAt: "2026-08-21T07:00:00.000Z" });
     expect(verifyEncryptedSupportBackup(backup, "a carefully chosen password")).toEqual({ valid: true });
     expect(getEncryptedSupportBackupPreview(backup, "a carefully chosen password")).toMatchObject({ messageCount: 1, excerpts: ["Please investigate this deployment issue."] });
     expect(verifyEncryptedSupportBackup({ ...backup, cipher: { ...backup.cipher, ciphertext: `${backup.cipher.ciphertext}x` } }, "a carefully chosen password").valid).toBe(false);
-  }, 60_000);
+  }, 180_000);
 
   it("explains the encrypted support-sharing scope before the system share action", () => {
     const confirmation = getSupportShareConfirmation();
