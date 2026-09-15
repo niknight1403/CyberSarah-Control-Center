@@ -70,13 +70,13 @@ describe("Sprint 120: Validierung", () => {
 
   it("falsches Format oder falsche Version wird abgelehnt", () => {
     const backup = buildBackupExport({ label: "x", tableData: {}, generatedAt: new Date(NOW) });
-    expect(validateBackupExport({ ...backup, format: "andere" } as BackupExport).valid).toBe(false);
-    expect(validateBackupExport({ ...backup, version: 99 } as BackupExport).valid).toBe(false);
+    expect(validateBackupExport({ ...backup, format: "andere" } as unknown as BackupExport).valid).toBe(false);
+    expect(validateBackupExport({ ...backup, version: 99 } as unknown as BackupExport).valid).toBe(false);
   });
 
   it("manipulierte Manifest-Pruefsumme fliegt auf", () => {
     const backup = buildBackupExport({ label: "x", tableData: sampleData(), generatedAt: new Date(NOW) });
-    const tampered = { ...backup, manifest: { ...backup.manifest, checksum: "deadbeef" } } as BackupExport;
+    const tampered = { ...backup, manifest: { ...backup.manifest, checksum: "deadbeef" } } as unknown as BackupExport;
     const result = validateBackupExport(tampered);
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.reason).toContain("Pruefsumme");
@@ -84,7 +84,7 @@ describe("Sprint 120: Validierung", () => {
 
   it("fehlende Tabelle in den Daten wird abgelehnt (Manifest ist die Wahrheit)", () => {
     const backup = buildBackupExport({ label: "x", tableData: sampleData(), generatedAt: new Date(NOW) });
-    const broken = { ...backup, data: { ...backup.data, users: [] } } as BackupExport;
+    const broken = { ...backup, data: { ...backup.data, users: [] } } as unknown as BackupExport;
     const result = validateBackupExport(broken);
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.reason).toContain("Zeilenzahl");
@@ -92,7 +92,7 @@ describe("Sprint 120: Validierung", () => {
 
   it("zusaetzliche Tabelle ohne Manifest-Eintrag wird abgelehnt", () => {
     const backup = buildBackupExport({ label: "x", tableData: sampleData(), generatedAt: new Date(NOW) });
-    const extra = { ...backup, data: { ...backup.data, geheim: [{ x: 1 }] } } as BackupExport;
+    const extra = { ...backup, data: { ...backup.data, geheim: [{ x: 1 }] } } as unknown as BackupExport;
     const result = validateBackupExport(extra);
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.reason).toContain("Zusaetzliche Tabelle ohne Manifest-Eintrag");

@@ -22,7 +22,8 @@ export type CheckKind =
   | "renderDeploy"
   | "uptimeWatcher"
   | "metrics"
-  | "chat";
+  | "chat"
+  | "backup";
 
 export interface OpsCheckInput {
   kind: CheckKind;
@@ -87,6 +88,7 @@ const DEFAULT_LABELS: Record<CheckKind, string> = {
   uptimeWatcher: "Uptime-Wächter",
   metrics: "Metriken",
   chat: "KI-Chat",
+  backup: "Backup-Wächter",
 };
 
 const DEFAULT_STALE_MS = 120_000;
@@ -153,7 +155,15 @@ function messageFor(kind: CheckKind, state: CheckState): string {
         ? "KI-Chat einsatzbereit."
         : state === "down"
           ? "Kein KI-Provider verfuegbar — Provider-Keys oder Managed-Fallback pruefen."
-          : "KI-Chat eingeschraenkt — Verbindungstest im Chat ausfuehren.";
+          : "KI-Chat eingeschraenkt — Verbindungstest im Chat ausfuehren.";    case "backup":
+      return state === "ok"
+        ? "Backup im Tagesrhythmus (unter 22 h)."
+        : state === "degraded"
+          ? "Letztes Backup läuft ab (22-26 h) — neues Backup erstellen."
+          : state === "down"
+            ? "Backup überfällig (über 26 h) — sofort Backup erstellen und Datenbank prüfen."
+            : "Noch kein Backup seit Serverstart aufgezeichnet.";
+
   }
 }
 

@@ -25,6 +25,8 @@ import {
   classifyWorkspaceFailure,
 } from "../lib/workspace-coldstart-logic";
 import { evaluateOpsTransitionsAndAlert, getLastFailure } from "./ops-alerts";
+import { buildBackupWatchCheckInput } from "../lib/backup-watch-logic";
+import { getBackupWatchSnapshot as getBackupWatchSnapshotForProbe, recordBackupRun } from "./backup-watch";
 
 const WORKSPACE_PROBE_TIMEOUT_MS = 3_000;
 const RENDER_PROBE_TIMEOUT_MS = 5_000;
@@ -276,6 +278,10 @@ export const opsRouter = router({
       uptimeWatcher,
       probeChat(),
       { kind: "metrics", state: "unknown" },
+      // Sprint 121: Backup-Waechter — Bewertung laeuft bei jeder
+      // Betriebswacht-Auswertung (Dashboard-Polling), Ueberschreitung
+      // alarmiert ueber den bestehenden Sprint-110-Stufenwechsel-Pfad.
+      buildBackupWatchCheckInput(getBackupWatchSnapshotForProbe(), now),
     ];
 
     const overview = buildOpsOverview(withSprint110Fields(inputs, now));
@@ -295,11 +301,14 @@ export const opsRouter = router({
   })),
   backupManifest: adminProcedure.query(async () => {
     const tableCounts = await tableRowCounts();
-    return buildBackupManifest({
+    const manifest = buildBackupManifest({
       label: process.env.DB_LABEL || "production",
       tableCounts,
       generatedAt: new Date(),
     });
+    // Sprint 121: erfolgreicher Lauf verzeichnet den Backup-Rhythmus.
+    recordBackupRun(manifest);
+    return manifest;
   }),
   // Sprint 120: Backup-Selbstbedienung — Admin zieht den vollstaendigen
   // Export (Manifest + alle Tabellendaten) ohne Shell-Zugang selbst.
@@ -314,6 +323,8 @@ export const opsRouter = router({
     if (!validation.valid) {
       throw new Error(`Backup-Export ungueltig: ${validation.reason}`);
     }
+    // Sprint 121: nur gueltige, ausgelieferte Exporte zaehlen als Backup-Lauf.
+    recordBackupRun(backup.manifest);
     return backup;
   }),
 });
