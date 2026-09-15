@@ -1,7 +1,6 @@
 import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import { ForbiddenError } from "../../shared/_core/errors.js";
 import axios, { type AxiosInstance } from "axios";
-import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
@@ -120,12 +119,26 @@ class SDKServer {
   }
 
   private parseCookies(cookieHeader: string | undefined) {
+    const cookies = new Map<string, string>();
     if (!cookieHeader) {
-      return new Map<string, string>();
+      return cookies;
     }
 
-    const parsed = parseCookieHeader(cookieHeader);
-    return new Map(Object.entries(parsed));
+    // Bewusst ohne externe "cookie"-Bibliothek: vermeidet CJS/ESM-Interop-
+    // Stolperfallen im gebuendelten Server-Build (Sprint 123 Session-Bugfix).
+    for (const part of cookieHeader.split(";")) {
+      const eqIndex = part.indexOf("=");
+      if (eqIndex === -1) continue;
+      const rawName = part.slice(0, eqIndex).trim();
+      const rawValue = part.slice(eqIndex + 1).trim();
+      if (!rawName) continue;
+      try {
+        cookies.set(rawName, decodeURIComponent(rawValue));
+      } catch {
+        cookies.set(rawName, rawValue);
+      }
+    }
+    return cookies;
   }
 
   private getSessionSecret() {

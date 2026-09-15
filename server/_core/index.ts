@@ -117,50 +117,6 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
-  // TEMP-DEBUG (wird nach Diagnose entfernt): Cookie-Pfad der Session-Auth diagnosebar machen
-  app.get("/api/debug/cookie-echo", async (req, res) => {
-    const result: Record<string, unknown> = {
-      rawCookieHeader: req.headers.cookie ?? null,
-      authorizationHeader: req.headers.authorization ?? null,
-    };
-    try {
-      // Manuelle Extraktion ohne zusaetzlichen Modul-Import (Bundling-Kollision vermeiden)
-      const cookieHeader = req.headers.cookie ?? "";
-      const match = /(?:^|;\s*)app_session_id=([^;]+)/.exec(cookieHeader);
-      const cookieToken = match ? decodeURIComponent(match[1]) : null;
-      result.cookieTokenFound = Boolean(cookieToken);
-      result.cookieTokenPrefix = cookieToken ? cookieToken.slice(0, 25) : null;
-
-      const authHeader = req.headers.authorization;
-      let bearerToken: string | undefined;
-      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-        bearerToken = authHeader.slice("Bearer ".length).trim();
-      }
-      result.bearerTokenFound = Boolean(bearerToken);
-      result.tokensIdentical = cookieToken && bearerToken ? cookieToken === bearerToken : null;
-
-      try {
-        result.verifySessionViaCookie = cookieToken ? await sdk.verifySession(cookieToken) : "no-cookie-token";
-      } catch (error) {
-        result.verifySessionViaCookieError = error instanceof Error ? error.message : String(error);
-      }
-      try {
-        result.verifySessionViaBearer = bearerToken ? await sdk.verifySession(bearerToken) : "no-bearer-token";
-      } catch (error) {
-        result.verifySessionViaBearerError = error instanceof Error ? error.message : String(error);
-      }
-      try {
-        const user = await sdk.authenticateRequest(req);
-        result.authenticateRequestUser = { id: user.id, openId: user.openId };
-      } catch (error) {
-        result.authenticateRequestError = error instanceof Error ? error.message : String(error);
-      }
-    } catch (error) {
-      result.outerError = error instanceof Error ? error.message : String(error);
-    }
-    res.json(result);
-  });
-
   app.get("/api/ready", async (_req, res) => {
     const database = await checkDatabaseHealth();
     res.status(database ? 200 : 503).json({
