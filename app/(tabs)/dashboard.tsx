@@ -174,6 +174,56 @@ function RevenueOsTile({ data }: { data: RevenueOsData }) {
   );
 }
 
+/** Sprint 115 — Provider-Metering (Admin, tRPC metering.overview). */
+type MeteringOverview = {
+  providers: {
+    source: string;
+    label: string;
+    status: "active" | "cooling" | "exhausted";
+    callsWindow: number;
+    http429Window: number;
+    rate429Window: number;
+    httpAuthWindow: number;
+    failoversWindow: number;
+    avgLatencyMs: number;
+    activePath: string[];
+    cooldownRemainingSec: number | null;
+    remainingCredits: number | null;
+  }[];
+  firedWarnings: string[];
+  windowHours: number;
+  generatedAt: string;
+};
+
+function MeteringTile({ overview }: { overview: MeteringOverview }) {
+  if (overview.providers.length === 0) {
+    return (
+      <Tile
+        title="Provider-Metering (Admin)"
+        tone="warn"
+        value="Keine verwalteten Keys"
+        detail="Sobald LLM-Keys (Forge/Gemini/OpenAI) als Umgebungsvariablen liegen, erscheinen hier Verbrauch, 429-Rate und Fallback-Pfad."
+      />
+    );
+  }
+  const active = overview.providers.filter((provider) => provider.status === "active").length;
+  const worst = overview.providers.reduce((sum, provider) => sum + provider.failoversWindow, 0);
+  return (
+    <Tile
+      title="Provider-Metering (Admin)"
+      tone={active > 0 ? "ok" : "warn"}
+      value={`${active}/${overview.providers.length} Keys aktiv`}
+      detail={overview.providers
+        .slice(0, 3)
+        .map(
+          (provider) =>
+            `${provider.source}: ${provider.callsWindow} Calls · ${Math.round(provider.rate429Window * 100)} % 429${provider.cooldownRemainingSec !== null ? ` · Cooldown ${provider.cooldownRemainingSec}s` : ""}`,
+        )
+        .join(" · ")}
+    />
+  );
+}
+
 function MemoryTile({ overview }: { overview: MemoryOverview }) {
   const colors = useColors();
   const last = overview.lastConsolidation;
@@ -221,6 +271,14 @@ export default function DashboardScreen() {
     retry: false,
     refetchInterval: 120_000,
     staleTime: 60_000,
+  });
+
+  // Sprint 115: Provider-Metering (Admin) — Verbrauch, 429-Rate, Fallback-Pfad.
+  const meteringQuery = trpc.metering.overview.useQuery(undefined, {
+    enabled: isAdmin,
+    retry: false,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
   const revenue = data?.revenue;
@@ -328,6 +386,8 @@ export default function DashboardScreen() {
         ) : null}
 
         {data?.revenueOs ? <RevenueOsTile data={data.revenueOs} /> : null}
+
+        {isAdmin && meteringQuery.data ? <MeteringTile overview={meteringQuery.data} /> : null}
 
         {isAdmin && memoryQuery.data ? <MemoryTile overview={memoryQuery.data} /> : null}
       </ScrollView>

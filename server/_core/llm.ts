@@ -14,6 +14,8 @@ import {
   type KeyObservation,
   type KeyPoolEntry,
 } from "../../lib/key-rotation-logic";
+import { evaluateAndNotifyQuotaWarnings, recordProviderCall, recordProviderFailover } from "../provider-metering";
+import { sendOpsDiscordAlert } from "../ops-alerts";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -281,6 +283,12 @@ const managedPool = new Map<string, KeyPoolEntry>();
 
 const maskKeyLabel = (apiKey: string): string => `…${apiKey.slice(-4)}`;
 
+/** Sprint 115: naechste Quelle in der Kette (fuer Failover-Protokollierung). */
+const nextSource = (ordered: { source: string }[], current: string): string | undefined => {
+  const index = ordered.findIndex((entry) => entry.source === current);
+  return index >= 0 && index + 1 < ordered.length ? ordered[index + 1].source : undefined;
+};
+
 /** Kandidaten-Kette aufloesen und Pool-Zustaende synchronisieren/auffrischen. */
 const resolveManagedCandidates = (): ManagedLlmEndpoint[] => {
   const endpoints = resolveManagedLlmEndpoints(managedLlmEnv());
@@ -317,6 +325,40 @@ export function resetManagedKeyPoolForTests(): void {
   managedEndpoints.clear();
   managedPool.clear();
 };
+
+/** Sprint 115: Quota-Warnschwelle hoechstens einmal pro Minute pruefen (Hot-Pfad-Schutz). */
+let quotaCheckAt = 0;
+const runQuotaWarningCheck = (): void => {
+  const now = Date.now();
+  if (now - quotaCheckAt < 60_000) return;
+  quotaCheckAt = now;
+  // Fire-and-forget: der Aufruf wartet nicht auf den Benachrichtigungsversand.
+  void evaluateAndNotifyQuotaWarnings(getManagedPoolSnapshotForMetering(), sendOpsDiscordAlert).catch(
+    () => undefined,
+  );
+};
+
+/**
+ * Sprint 115 — read-only Pool-Snapshot fuer das Provider-Metering:
+ * maskierte Labels, Status, Restguthaben und Cooldown-Enden — niemals
+ * Voll-Keys. Der Metering-Adapter (server/provider-metering.ts) und der
+ * Admin-Router kombinieren ihn mit dem Aufruf-Ledger.
+ */
+export function getManagedPoolSnapshotForMetering(): {
+  id: string;
+  label: string;
+  status: "active" | "cooling" | "exhausted";
+  remainingCredits: number | null;
+  cooldownUntilMs: number | null;
+}[] {
+  return [...managedPool.values()].map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    status: entry.status,
+    remainingCredits: entry.remainingCredits,
+    cooldownUntilMs: entry.cooldownUntilMs,
+  }));
+}
 
 const normalizeResponseFormat = ({
   responseFormat,
@@ -515,6 +557,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       if (!response.ok) {
         const errorText = await response.text();
         lastError = new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+        // Sprint 115: Aufruf ins Metering-Ledger (429/Auth/sonstige).
+        recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
+        runQuotaWarningCheck();
         // 429 → Cooldown, 401/402/403 → erschöpft (Auth/Guthaben),
         // andere Status bleiben ohne Zustandsänderung (nur Latenz fließt ein).
         if ([401, 402, 403, 429].includes(response.status)) {
@@ -522,12 +567,18 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         } else {
           recordPoolObservation(endpoint.source, { latencyMs });
         }
+        // Sprint 115: Failover auf den naechsten Kandidaten protokollieren.
+        recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
         continue;
       }
       recordPoolObservation(endpoint.source, { latencyMs });
+      recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
+      runQuotaWarningCheck();
       return (await response.json()) as InvokeResult;
     } catch (error) {
       lastError = error;
+      recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
+      recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
       continue;
     }
   }
