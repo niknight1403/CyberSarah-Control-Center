@@ -52,6 +52,20 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="cyber-dashboard"
+          options={{
+            title: "Cyber",
+            tabBarIcon: ({ color }) => <IconSymbol size={25} name="bolt.fill" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="cyber-terminal"
+          options={{
+            title: "Terminal",
+            tabBarIcon: ({ color }) => <IconSymbol size={25} name="chevron.left.forwardslash.chevron.right" color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="index"
           options={{
             title: "Workspace",
