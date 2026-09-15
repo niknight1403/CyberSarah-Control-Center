@@ -1,11 +1,11 @@
 # CyberSarah Control Center – Play Store Bereitschaft
 
 ## Status
-Sprint 109: Release **v2.0.0** (versionCode 20000, Paket-ID `com.cybersarah.controlcenter`) — Listing-Texte, Data-Safety-Antworten und Screenshot-Gerüst auf Version v2.0.0 finalisiert. Einreichung ist vorbereitet als begleiteter Handoff für den Owner. Release-AAB/APK aus GitHub-Release [`v2.0.0-apk`](https://github.com/niknight1403/CyberSarah-Control-Center/releases/tag/v2.0.0-apk) (signiert, `apksigner`-verifiziert, `CyberSarah-ControlCenter-v2.0.0-release.aab` / `.apk`).
+Sprint 109: Release **v2.1.1** (Paket-ID `com.cybersarah.controlcenter`) — Listing-Texte, Data-Safety-Antworten und Screenshot-Gerüst auf Version v2.1.1 finalisiert. Einreichung ist vorbereitet als begleiteter Handoff für den Owner. Release-AAB/APK aus GitHub-Release [`v2.1.1-apk`](https://github.com/niknight1403/CyberSarah-Control-Center/releases/tag/v2.0.0-apk) (signiert, `apksigner`-verifiziert, `CyberSarah-ControlCenter-v2.1.1-release.aab` / `.apk`).
 
 Die Mobile-App verwendet standardmäßig `https://app.cybersarah-ki.com` als Backend. Ein anderer Endpoint darf nur explizit über `EXPO_PUBLIC_API_BASE_URL` für eine kontrollierte Entwicklungs- oder Staging-Umgebung gesetzt werden.
 
-Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiven v2.0.0 Release ab.
+Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiven v2.1.1 Release ab.
 
 ## Store-Listing-Anforderungen
 
@@ -132,7 +132,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 
 ### Store-Signierung
 - [x] Upload-Key generieren / produktiver Keystore konfiguriert
-- [x] Release-AAB (`CyberSarah-ControlCenter-v2.0.0-release.aab`) mit Keystore signiert
+- [x] Release-AAB (`CyberSarah-ControlCenter-v2.1.1-release.aab`) mit Keystore signiert
 - [x] Keystore sicher in GitHub Secrets / Plattform gesichert
 - [ ] Signierte APK auf Realgerät verifizieren
 
@@ -145,7 +145,7 @@ Diese Checkliste deckt alle Google Play Store Anforderungen für einen produktiv
 - [ ] Beta- / Interner Test-Track konfiguriert (empfohlen vor Production-Rollout)
 
 ### App-Release-Workflow
-1. [x] Signiertes AAB (`CyberSarah-ControlCenter-v2.0.0-release.aab`) bereitgestellt
+1. [x] Signiertes AAB (`CyberSarah-ControlCenter-v2.1.1-release.aab`) bereitgestellt
 2. [x] Versionscode (20000) und Versionsnamen (2.0.0) im Release hinterlegt
 3. [x] Versionshinweise vorbereitet (de & en in `docs/PLAY_STORE_LISTING_DE_EN.md`)
 4. [ ] Zielländer/-regionen in Play Console auswählen
@@ -204,7 +204,7 @@ Aktuelle Unterstützung:
    - SecureStore, Push-Notifications, Kamera/Mikrofon & Offline-Sync verifizieren
 
 3. **Google Play Console Upload** (Owner-Aktion)
-   - Signierte `CyberSarah-ControlCenter-v2.0.0-release.aab` hochladen
+   - Signierte `CyberSarah-ControlCenter-v2.1.1-release.aab` hochladen
    - Texte aus `docs/PLAY_STORE_LISTING_DE_EN.md` und Data Safety aus `docs/PLAY_STORE_DATA_SAFETY.md` einpflegen
    - Zur Überprüfung auf dem internen Test-Track einreichen
 

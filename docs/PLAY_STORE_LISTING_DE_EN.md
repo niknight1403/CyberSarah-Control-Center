@@ -1,8 +1,8 @@
 # Play Store Listing — Texte (DE/EN)
 
-Stand: 14.09.2026 — Sprint 109 (Release **v2.0.0**, versionCode 20000, Paket-ID `com.cybersarah.controlcenter`)
+Stand: 16.09.2026 — Sprint 127 (Release **v2.1.1**, Paket-ID `com.cybersarah.controlcenter`)
 
-Dieses Dokument enthält die redigierten, einreichungsreifen Store-Listing-Texte für die Play-Console-Einreichung der Version v2.0.0. Deutsch ist die Primärsprache, Englisch als zusätzliche Store-Listing-Sprache hinterlegt. Alle Zeichenlimits entsprechen exakt den Google Play Vorgaben.
+Dieses Dokument enthält die redigierten, einreichungsreifen Store-Listing-Texte für die Play-Console-Einreichung der Version v2.1.1. Gegenueber v2.0.0: Admin-Autopilot, DevTrace-Entwicklungsfenster, Self-Healing-System, Cyber-Neon-Standard-Design, Freemium-Credit-Packs. Deutsch ist die Primärsprache, Englisch als zusätzliche Store-Listing-Sprache hinterlegt. Alle Zeichenlimits entsprechen exakt den Google Play Vorgaben.
 
 ## App-Name (max. 30 Zeichen)
 
@@ -42,6 +42,12 @@ Die integrierte Dashboard-Betriebswacht überwacht System-Health, Provider-Laten
 SICHERHEIT & VERSCHLÜSSELTE BACKUPS
 Deine API-Schlüssel und Tokens verbleiben sicher verschlüsselt im Android Keystore (SecureStore). Vollständige Support- und Einstellungs-Backups lassen sich Ende-zu-Ende verschlüsselt (PBKDF2/AES) exportieren und wiederherstellen. Redigierte Audit-Protokolle verhindern Secret-Leaks.
 
+ADMIN-AUTOPILOT & ENTWICKLUNGSFENSTER
+Nach dem Login uebernimmt der Admin-Autopilot: GitHub-Token, Cyber-Neon-Design und Repository-Verbindung richten sich automatisch ein. Das DevTrace-Entwicklungsfenster zeigt einklappbar jeden Werkzeugaufruf deiner Agenten — transparent nachvollziehbar, ohne den Chat unuebersichtlich zu machen.
+
+SELF-HEALING & CRASH-MELDUNG
+Ein autonomes Self-Healing-System ueberwacht Logs und Infrastruktur, erkennt Anomalien und protokolliert Vorfaelle im Incident-Ledger. Mobile Abstuerze werden verschluesselt gemeldet und fliessen ins Monitoring ein.
+
 RBAC-TIERS & KONTINGENTE
 Fließende Skalierung über klare Rollen- und Abo-Stufen (Free, Pro, Developer Max, Elite). Admins verwalten Kontingente und Nutzungsmetering direkt im integrierten Control Dashboard.
 
@@ -72,34 +78,36 @@ The integrated Admin Telemetry Dashboard monitors system health, provider latenc
 SECURITY & ENCRYPTED BACKUPS
 Your API keys and credentials stay encrypted locally in the Android Keystore (SecureStore). Complete support and settings backups export with end-to-end encryption (PBKDF2/AES). Redacted audit logs prevent secret leaks.
 
+ADMIN AUTOPILOT & DEV TRACE PANEL
+After login, the admin autopilot takes over: GitHub token, Cyber Neon theme and repository connection set up automatically. The DevTrace panel shows every tool call of your agents in a collapsible view — fully transparent without cluttering the chat.
+
+SELF-HEALING & CRASH REPORTING
+An autonomous self-healing system watches logs and infrastructure, detects anomalies and records incidents in a ledger. Mobile crashes are reported encrypted and feed into monitoring.
+
 RBAC TIERS & QUOTAS
 Scale effortlessly across structured subscription tiers (Free, Pro, Developer Max, Elite). Admins manage quotas and usage metering directly in the built-in control dashboard.
 
 Note: A compatible self-hosted workspace service (e.g. Render deployment) is required for full repository synchronization.
 
-## Versionshinweise v2.0.0 (What's new)
+## Versionshinweise v2.1.1 (What's new)
 
 ### DE
-Neu in v2.0.0:
-• KI-Agenten-Chat mit Live-Streaming, Code-Diff-Viewer und interaktiver Vorschau
-• Drei schaltbare Oberflächen-Themes (Cyber Neon, Enterprise Slate, Glas-Modern)
-• Zero-Cost-Provider-Routing mit Groq, OpenRouter & Gemini-Failover + autonomer Key-Rotation
-• Autonome Ziel-Zerlegung mit Ausführungsgraphen & automatischer Schleifen-Erkennung
-• Workspace-GitHub-Anbindung mit visueller Diff- und Konfliktbehebung
-• Admin-Betriebswacht & PaaS-Telemetry-Dashboard (Render/Neon-Health, Latenzen)
-• Ende-zu-Ende verschlüsselte Support- & Einstellungs-Backups (SecureStore + PBKDF2/AES)
-• RBAC-Tiers (Free, Pro, Developer Max, Elite) mit Kontingentverwaltung
+Neu in v2.1.1:
+• Admin-Autopilot: GitHub-Token, Cyber-Neon-Design und Repository-Verbindung nach dem Login vollautomatisch
+• DevTrace-Entwicklungsfenster: einklappbare Anzeige jedes Agenten-Werkzeugaufrufs direkt im Chat
+• Cyber-Neon-Design als neuer Standard + Onboarding-Auswahl
+• Autonomes Self-Healing: Anomalie-Detektor, Incident-Ledger und verschluesseltes Mobile-Crash-Reporting
+• Google-Play-Billing mit Credit-Packs (Freemium-Quoten)
+• Autonome Ziel-Zerlegung, Zero-Cost-Routing & GitHub-Workspace wie in v2.0.0
 
 ### EN
-New in v2.0.0:
-• AI Agent Chat with live streaming, code diff viewer and interactive preview
-• Three switchable UI themes (Cyber Neon, Enterprise Slate, Glass Modern)
-• Zero-cost provider routing featuring Groq, OpenRouter & Gemini failover + key rotation
-• Autonomous goal decomposition with execution graphs & loop detection
-• Workspace GitHub integration with visual diff inspection and conflict resolution
-• Admin Telemetry Dashboard monitoring PaaS health (Render/Neon) and model latencies
-• End-to-end encrypted support & settings backups (SecureStore + PBKDF2/AES)
-• RBAC tiers (Free, Pro, Developer Max, Elite) with quota management
+New in v2.1.1:
+• Admin autopilot: GitHub token, Cyber Neon theme and repository connection fully automatic after login
+• DevTrace panel: collapsible view of every agent tool call right in the chat
+• Cyber Neon design as the new default + onboarding theme picker
+• Autonomous self-healing: anomaly detector, incident ledger and encrypted mobile crash reporting
+• Google Play billing with credit packs (freemium quotas)
+• Autonomous goal decomposition, zero-cost routing & GitHub workspace as in v2.0.0
 
 ## Keywords (für die interne Suche, max. 100 Zeichen)
 
