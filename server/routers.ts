@@ -13,6 +13,7 @@ import { memoryRouter } from "./memory-router";
 import { meteringRouter } from "./metering-router";
 import { mcpRouter } from "./mcp-router";
 import { orchestratorRouter } from "./orchestrator-router";
+import { monetizationRouter } from "./monetization-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -27,6 +28,7 @@ export const appRouter = router({
   metering: meteringRouter,
   mcp: mcpRouter,
   orchestrator: orchestratorRouter,
+  monetization: monetizationRouter,
   developmentChat: developmentChatRouter,
   account: accountRouter,
   billing: billingRouter,
