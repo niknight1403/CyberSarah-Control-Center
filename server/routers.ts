@@ -14,6 +14,7 @@ import { meteringRouter } from "./metering-router";
 import { mcpRouter } from "./mcp-router";
 import { orchestratorRouter } from "./orchestrator-router";
 import { monetizationRouter } from "./monetization-router";
+import { crashReportingRouter, selfHealingRouter } from "./self-healing-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -29,6 +30,8 @@ export const appRouter = router({
   mcp: mcpRouter,
   orchestrator: orchestratorRouter,
   monetization: monetizationRouter,
+  selfHealing: selfHealingRouter,
+  crashReporting: crashReportingRouter,
   developmentChat: developmentChatRouter,
   account: accountRouter,
   billing: billingRouter,

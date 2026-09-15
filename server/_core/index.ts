@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { attachAnomalyDetector } from "../self-healing";
 import {
   isWebFallbackCandidate,
   mapUrlPathToWebFile,
@@ -130,6 +131,7 @@ async function startServer() {
 
   // Sprint 66 — Live-Runtime-Endpunkte fuer das Preview-Panel (auth-pflichtig).
   installRuntimeLogger();
+  attachAnomalyDetector();
   const requireRuntimeUser = async (
     req: express.Request,
     res: express.Response,
