@@ -39,11 +39,16 @@ jobs:
           npx --yes esbuild@0.25.0 scripts/tech-scanner.mjs --bundle --platform=node --format=esm --external:node:* --outfile=/tmp/tech-scanner.bundle.mjs
           node /tmp/tech-scanner.bundle.mjs
 
-      - name: Report committen
+      - name: Issue-Ableitung fuer Major-Upgrades (Sprint 116)
+        run: |
+          npx --yes esbuild@0.25.0 scripts/tech-issue-deriver.mjs --bundle --platform=node --format=esm --external:node:* --outfile=/tmp/tech-issue-deriver.bundle.mjs
+          node /tmp/tech-issue-deriver.bundle.mjs
+
+      - name: Report und Issue-Vorlagen committen
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/research/LATEST_TECH_SCAN.md
+          git add docs/research/LATEST_TECH_SCAN.md docs/research/tech-issues docs/DEPENDENCY_MATRIX.md
           git diff --cached --quiet && echo "Keine Aenderung am Report." && exit 0
           git commit -m "chore(tech-scanner): Taeglicher Tech-Scan [skip ci]"
           git push
