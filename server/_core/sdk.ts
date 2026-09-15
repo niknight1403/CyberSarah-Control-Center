@@ -199,15 +199,22 @@ class SDKServer {
       });
       const { openId, appId, name } = payload as Record<string, unknown>;
 
-      if (!isNonEmptyString(openId) || !isNonEmptyString(appId) || !isNonEmptyString(name)) {
-        console.warn("[Auth] Session payload missing required fields");
+      // "name" ist rein kosmetisch (Anzeige/Erst-Sync) und wird NICHT fuer
+      // Autorisierung genutzt — die Rolle kommt serverseitig per openId aus
+      // der DB (siehe authenticateRequest). Ein leerer/fehlender Name darf
+      // eine sonst gueltige Session daher nicht verwerfen (Bugfix Sprint 128:
+      // Sessions ohne Namen liessen JEDE protectedProcedure-Abfrage mit
+      // "Invalid session cookie" fehlschlagen -> Dashboard zeigte pauschal
+      // "nicht verfuegbar/nicht konfiguriert", obwohl Keys/Daten vorhanden waren).
+      if (!isNonEmptyString(openId) || !isNonEmptyString(appId)) {
+        console.warn("[Auth] Session payload missing required fields (openId/appId)");
         return null;
       }
 
       return {
         openId,
         appId,
-        name,
+        name: isNonEmptyString(name) ? name : "",
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));

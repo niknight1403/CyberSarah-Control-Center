@@ -69,10 +69,10 @@ describe("Sprint 117: Slides und Schritt-Zustaende", () => {
 });
 
 describe("Sprint 117: kuratierte Theme-Auswahl", () => {
-  it("vier unterscheidbare Designs, alle aus der Registry", () => {
+  it("drei unterscheidbare Designs, alle aus der Registry (Sprint 128 Design-Kuration)", () => {
     const choices = getOnboardingThemeChoices();
-    expect(choices).toHaveLength(4);
-    expect(new Set(choices.map((choice) => choice.theme)).size).toBe(4);
+    expect(choices).toHaveLength(3);
+    expect(new Set(choices.map((choice) => choice.theme)).size).toBe(3);
     for (const choice of choices) {
       expect(DESIGN_THEMES).toContain(choice.theme);
       expect(choice.label.length).toBeGreaterThan(0);
@@ -86,7 +86,7 @@ describe("Sprint 117: kuratierte Theme-Auswahl", () => {
   });
 
   it("unbekannte Design-Waelse faellen auf das Standard-Design zurueck", () => {
-    expect(normalizeOnboardingDesignTheme("aurora", DEFAULT_DESIGN_THEME)).toBe("aurora");
+    expect(normalizeOnboardingDesignTheme("aurora", DEFAULT_DESIGN_THEME)).toBe(DEFAULT_DESIGN_THEME); // Sprint 128: entferntes Theme faellt auf Standard
     expect(normalizeOnboardingDesignTheme("halluzination", DEFAULT_DESIGN_THEME)).toBe(DEFAULT_DESIGN_THEME);
     expect(normalizeOnboardingDesignTheme(42, DEFAULT_DESIGN_THEME)).toBe(DEFAULT_DESIGN_THEME);
   });

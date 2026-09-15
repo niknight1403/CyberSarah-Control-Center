@@ -96,7 +96,7 @@ export function getOnboardingStepState(index: number, slides: readonly Onboardin
  * Konto-Tab. Reihenfolge ist bewusst: Standard-Design zuerst.
  */
 // Sprint 127 — "neon" (Cyber Neon) ist das Standard-Design und steht an erster Stelle.
-export const ONBOARDING_THEME_CHOICES: readonly DesignTheme[] = ["neon", "aurora", "obsidian", "rose"] as const;
+export const ONBOARDING_THEME_CHOICES: readonly DesignTheme[] = ["neon", "slate", "glass"] as const;
 
 export type OnboardingThemeChoice = {
   theme: DesignTheme;
