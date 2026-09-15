@@ -21,8 +21,8 @@ describe("design theme logic", () => {
     expect(normalizeDesignTheme("obsidian")).toBe("obsidian");
     expect(normalizeDesignTheme("borealis")).toBe("borealis");
     expect(normalizeDesignTheme("rose")).toBe("rose");
-    expect(normalizeDesignTheme("unexpected")).toBe("living");
-    expect(normalizeDesignTheme(undefined)).toBe("living");
+    expect(normalizeDesignTheme("unexpected")).toBe("neon");
+    expect(normalizeDesignTheme(undefined)).toBe("neon");
   });
 
   it("exposes exactly the four design themes with stable key and German labels", () => {

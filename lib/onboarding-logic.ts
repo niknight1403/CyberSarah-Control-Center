@@ -95,7 +95,8 @@ export function getOnboardingStepState(index: number, slides: readonly Onboardin
  * aller neun — der Rest bleibt im Theme-Lab (Entwicklungsvariante) bzw.
  * Konto-Tab. Reihenfolge ist bewusst: Standard-Design zuerst.
  */
-export const ONBOARDING_THEME_CHOICES: readonly DesignTheme[] = ["living", "aurora", "obsidian", "rose"] as const;
+// Sprint 127 — "neon" (Cyber Neon) ist das Standard-Design und steht an erster Stelle.
+export const ONBOARDING_THEME_CHOICES: readonly DesignTheme[] = ["neon", "aurora", "obsidian", "rose"] as const;
 
 export type OnboardingThemeChoice = {
   theme: DesignTheme;
