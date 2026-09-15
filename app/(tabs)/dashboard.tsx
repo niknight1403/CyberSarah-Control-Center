@@ -21,7 +21,28 @@ type DashboardData = {
   crm?: { status: string; totalContacts?: number; contactsCreatedLast24h?: number; salesforce?: string };
   content?: { channels: { name: string; status: string; detail?: string }[] };
   aiServices?: { services: { name: string; configured: boolean }[] };
+  /** Sprint 114: read-only-Snapshot aus der Revenue-OS-Datenbank (Schwestersystem). */
+  revenueOs?: RevenueOsData;
 };
+
+/** Sprint 114 — Revenue-OS-Snapshot (read-only, Schwestersystem-Datenbank). */
+type RevenueOsData =
+  | {
+      status: "ok";
+      revenueLast24hEur: number;
+      transactionsLast24h: number;
+      totalRevenueEur: number;
+      topQuelle: string;
+      contentByStatus: Record<string, number>;
+      affiliateClicks: number;
+      affiliateConversions: number;
+      provisionSummeEur: number;
+      activePartners: number;
+      activeSubscriptions: number;
+      fetchedAt: string;
+    }
+  | { status: "not-configured" }
+  | { status: "error"; error: string };
 
 type OpsOverview = {
   overall: "unknown" | "ok" | "degraded" | "down";
@@ -122,6 +143,36 @@ type MemoryOverview = {
   } | null;
   retrieval: { samples: number; hitRatePct: number; avgInjections: number };
 };
+
+function RevenueOsTile({ data }: { data: RevenueOsData }) {
+  if (data.status === "not-configured") {
+    return (
+      <Tile
+        title="Revenue-OS (read-only)"
+        tone="warn"
+        value="Nicht angebunden"
+        detail="REVENUE_OS_DATABASE_URL auf dem Server hinterlegen (getrenntes Secret des Schwestersystems) — dann erscheinen hier Umsatz, Content-Status und Affiliate-Klicks live."
+      />
+    );
+  }
+  if (data.status === "error") {
+    return <Tile title="Revenue-OS (read-only)" tone="warn" value="Nicht abrufbar" detail={data.error} />;
+  }
+  const contentSummary =
+    Object.entries(data.contentByStatus).length > 0
+      ? Object.entries(data.contentByStatus)
+          .map(([status, count]) => `${count} ${status}`)
+          .join(" · ")
+      : "Keine Inhalte";
+  return (
+    <Tile
+      title="Revenue-OS (read-only)"
+      tone="ok"
+      value={`${data.revenueLast24hEur.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / 24 h`}
+      detail={`Affiliate: ${data.affiliateClicks} Klicks · ${data.activePartners} aktive Partner · Content: ${contentSummary}`}
+    />
+  );
+}
 
 function MemoryTile({ overview }: { overview: MemoryOverview }) {
   const colors = useColors();
@@ -275,6 +326,8 @@ export default function DashboardScreen() {
         {isAdmin && (opsQuery.data || opsQuery.isLoading) ? (
           opsQuery.data ? <OpsWatchTile overview={opsQuery.data} /> : <Tile title="Betriebswacht (Admin)" tone="warn" value="Prüfung läuft …" detail="API, Datenbank, Workspace und KI-Chat werden geprüft." />
         ) : null}
+
+        {data?.revenueOs ? <RevenueOsTile data={data.revenueOs} /> : null}
 
         {isAdmin && memoryQuery.data ? <MemoryTile overview={memoryQuery.data} /> : null}
       </ScrollView>

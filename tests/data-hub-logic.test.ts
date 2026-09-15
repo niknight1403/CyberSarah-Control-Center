@@ -60,7 +60,7 @@ describe("data-hub-logic (Sprint 90)", () => {
     expect(isRetryableStatus(401)).toBe(false);
   });
 
-  it("kennt genau die sechs Business-Tools und formatiert deren Ergebnisse", () => {
+  it("kennt genau die sieben Business-Tools und formatiert deren Ergebnisse (Sprint 93 + 114)", () => {
     expect(BUSINESS_TOOL_NAMES).toEqual([
       "get_revenue_metrics",
       "get_crypto_prices",
@@ -68,6 +68,7 @@ describe("data-hub-logic (Sprint 90)", () => {
       "get_crm_contacts",
       "get_content_channels_status",
       "get_ai_services_status",
+      "get_revenue_os_overview",
     ]);
     expect(isBusinessToolName("get_crypto_prices")).toBe(true);
     expect(isBusinessToolName("delete_repo")).toBe(false);

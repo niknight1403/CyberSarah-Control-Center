@@ -11,13 +11,15 @@
  *   - wie Werte deutsch formatiert werden ("1.248,32 €")
  *   - wann selbstheilende Retries sinnvoll sind (Backoff-Politik)
  */
+import { formatRevenueOsSnapshot, type RevenueOsSnapshot } from "./revenue-os-logic";
+
 
 /* ==================== Domänen-Routing ==================== */
 
 export type BusinessDomain = "revenue" | "trading" | "analytics" | "crm" | "content" | "general";
 
 const DOMAIN_KEYWORDS: Record<Exclude<BusinessDomain, "general">, string[]> = {
-  revenue: ["einnahmen", "umsatz", "revenue", "abrechnung", "abonnement", "subscription", "stripe", "mrr", "zahlungen", "euro verdient"],
+  revenue: ["einnahmen", "umsatz", "revenue", "abrechnung", "abonnement", "subscription", "stripe", "mrr", "zahlungen", "euro verdient", "affiliate", "provision", "partnerprogramm", "revenue-os"],
   trading: ["bitcoin", "btc", "ethereum", "eth", "solana", "sol", "kurs", "krypto", "crypto", "trading", "preis von", "binance", "kraken"],
   analytics: ["kampagne", "conversion", "konversion", "analytics", "traffic", "besucher", "ga4", "performance", "reichweite"],
   crm: ["kunden", "crm", "leads", "hubspot", "salesforce", "kontakte", "kundenliste"],
@@ -241,6 +243,7 @@ export const BUSINESS_TOOL_NAMES = [
   "get_crm_contacts",
   "get_content_channels_status",
   "get_ai_services_status",
+  "get_revenue_os_overview",
 ] as const;
 
 export type BusinessToolName = (typeof BUSINESS_TOOL_NAMES)[number];
@@ -263,11 +266,16 @@ export const BUSINESS_TOOL_DESCRIPTIONS: Record<BusinessToolName, string> = {
     "Liefert den Status der Content-Kanaele: TikTok (Content-Posting-API) und Instagram (Profil, Follower). Voraussetzung: TIKTOK-/INSTAGRAM-Zugangsdaten.",
   get_ai_services_status:
     "Liefert den Status der KI-Dienste (Perplexity Recherche, ElevenLabs Sprachausgabe, TikTok Symphony) — verfuegbar, sobald die jeweiligen API-Keys hinterlegt sind.",
+  get_revenue_os_overview:
+    "Liefert einen read-only-Ueberblick ueber das Schwestersystem Revenue-OS: Umsatz und Transaktionen (24 h, gesamt), Content-Status je Eintrag, Affiliate-Klicks/-Konversionen/Provisionen und aktive Subscriptions. Voraussetzung: REVENUE_OS_DATABASE_URL (getrenntes Secret).",
 };
 
 /** Formatiert das Ergebnis eines Business-Tools als kompakte Modell-Antwort. */
 export function formatBusinessResult(tool: BusinessToolName, payload: unknown): string {
   const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  if (tool === "get_revenue_os_overview") {
+    return formatRevenueOsSnapshot(payload as RevenueOsSnapshot);
+  }
   if (tool === "get_crypto_prices") {
     const tickers = Array.isArray(record.tickers) ? (record.tickers as CryptoTicker[]) : [];
     if (tickers.length === 0) return "Krypto-Kurse sind derzeit nicht verfuegbar.";

@@ -17,6 +17,7 @@ import {
 } from "../lib/data-hub-logic";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getRuntimeLogs } from "./runtime-logger";
+import { fetchRevenueOsSnapshot } from "./revenue-os";
 
 /**
  * Sprint 90 — Master-Agenten-Daten-Hub (Sub-Agenten: Revenue & Trading).
@@ -326,16 +327,21 @@ export function fetchAiServicesSnapshot(): AiServicesSnapshot {
   };
 }
 
+/* ==================== Sprint 114 — Revenue-OS (read-only) ==================== */
+
+export type { RevenueOsSnapshot } from "../lib/revenue-os-logic";
+
 export const dataHubRouter = router({
   /** Aggregierter Dashboard-Snapshot: Revenue + Trading + Systemstatus. */
   dashboard: protectedProcedure.query(async () => {
-    const [revenue, trading, analytics, crm, content, aiServices] = await Promise.all([
+    const [revenue, trading, analytics, crm, content, aiServices, revenueOs] = await Promise.all([
       fetchRevenueSnapshot(),
       fetchTradingSnapshot(),
       fetchAnalyticsSnapshot(),
       fetchCrmSnapshot(),
       fetchContentSnapshot(),
       Promise.resolve(fetchAiServicesSnapshot()),
+      fetchRevenueOsSnapshot(),
     ]);
     const recentErrors = getRuntimeLogs()
       .filter((entry) => entry.level === "error")
@@ -348,6 +354,7 @@ export const dataHubRouter = router({
       crm,
       content,
       aiServices,
+      revenueOs,
       system: {
         recentErrors,
         generatedAt: new Date().toISOString(),
@@ -370,7 +377,8 @@ export type BusinessTool =
   | "get_analytics_overview"
   | "get_crm_contacts"
   | "get_content_channels_status"
-  | "get_ai_services_status";
+  | "get_ai_services_status"
+  | "get_revenue_os_overview";
 
 export async function executeBusinessSnapshot(tool: BusinessTool): Promise<unknown> {
   if (tool === "get_revenue_metrics") return fetchRevenueSnapshot();
@@ -378,5 +386,6 @@ export async function executeBusinessSnapshot(tool: BusinessTool): Promise<unkno
   if (tool === "get_analytics_overview") return fetchAnalyticsSnapshot();
   if (tool === "get_crm_contacts") return fetchCrmSnapshot();
   if (tool === "get_content_channels_status") return fetchContentSnapshot();
+  if (tool === "get_revenue_os_overview") return fetchRevenueOsSnapshot();
   return fetchAiServicesSnapshot();
 }
