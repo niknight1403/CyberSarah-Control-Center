@@ -6,10 +6,12 @@ import {
   formatCurrency,
   getBinanceSymbols,
   getKrakenPairs,
+  getCoinGeckoIds,
   isRetryableStatus,
   computeRetryDelayMs,
   normalizeCryptoTicker,
   normalizeKrakenTicker,
+  normalizeCoinGeckoTicker,
   normalizeGa4Report,
   type CryptoTicker,
 } from "../lib/data-hub-logic";
@@ -89,8 +91,19 @@ export async function fetchTradingSnapshot(): Promise<TradingSnapshot> {
       return await fetchTradingSnapshotFromKraken();
     } catch (fallbackError) {
       const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : "Kraken nicht erreichbar.";
-      console.warn(`[DataHub] Kraken-Fallback fehlgeschlagen: ${fallbackMessage}`);
-      return { status: "error", tickers: [], error: "Krypto-Kurse sind derzeit nicht verfuegbar (Binance und Kraken)." };
+      console.warn(`[DataHub] Kraken-Fallback fehlgeschlagen: ${fallbackMessage} — versuche CoinGecko-Fallback.`);
+      try {
+        return await fetchTradingSnapshotFromCoinGecko();
+      } catch (secondFallbackError) {
+        const secondFallbackMessage =
+          secondFallbackError instanceof Error ? secondFallbackError.message : "CoinGecko nicht erreichbar.";
+        console.warn(`[DataHub] CoinGecko-Fallback fehlgeschlagen: ${secondFallbackMessage}`);
+        return {
+          status: "error",
+          tickers: [],
+          error: "Krypto-Kurse sind derzeit nicht verfuegbar (Binance, Kraken und CoinGecko).",
+        };
+      }
     }
   }
 }
@@ -108,6 +121,22 @@ async function fetchTradingSnapshotFromKraken(): Promise<TradingSnapshot> {
     .filter((ticker): ticker is CryptoTicker => ticker !== null);
   if (tickers.length === 0) throw new Error("Kraken lieferte keine gueltigen Kurse.");
   console.log(`[DataHub] Trading-Snapshot (Kraken-Fallback): ${tickers.length} Kurse geladen.`);
+  return { status: "ok", tickers };
+}
+
+const COINGECKO_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price";
+
+/** Selbstheilender Zweit-Fallback: CoinGecko oeffentliche API (kein Key), wenn Binance und Kraken ausfallen. */
+async function fetchTradingSnapshotFromCoinGecko(): Promise<TradingSnapshot> {
+  const ids = getCoinGeckoIds();
+  const idsParam = ids.map((entry) => entry.id).join(",");
+  const url = `${COINGECKO_PRICE_URL}?ids=${encodeURIComponent(idsParam)}&vs_currencies=usd&include_24hr_change=true`;
+  const raw = await fetchWithRetry(url, 1);
+  const tickers = ids
+    .map((entry) => normalizeCoinGeckoTicker(entry, raw))
+    .filter((ticker): ticker is CryptoTicker => ticker !== null);
+  if (tickers.length === 0) throw new Error("CoinGecko lieferte keine gueltigen Kurse.");
+  console.log(`[DataHub] Trading-Snapshot (CoinGecko-Fallback): ${tickers.length} Kurse geladen.`);
   return { status: "ok", tickers };
 }
 

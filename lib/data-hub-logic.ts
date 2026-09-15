@@ -119,6 +119,43 @@ export function normalizeKrakenTicker(pair: KrakenPair, raw: unknown): CryptoTic
   };
 }
 
+
+/* ==================== CoinGecko-Fallback (Trading) ==================== */
+
+const COINGECKO_IDS = [
+  { id: "bitcoin", symbol: "BTCUSDT" },
+  { id: "ethereum", symbol: "ETHUSDT" },
+  { id: "solana", symbol: "SOLUSDT" },
+] as const;
+
+export type CoinGeckoId = (typeof COINGECKO_IDS)[number];
+
+export function getCoinGeckoIds(): CoinGeckoId[] {
+  return [...COINGECKO_IDS];
+}
+
+/**
+ * Normalisiert eine CoinGecko-"simple/price"-Antwort
+ * ({ bitcoin: { usd: 61234.5, usd_24h_change: 1.23 }, ... }) in ein
+ * typsicheres CryptoTicker-Objekt. Letzter Fallback nach Binance und
+ * Kraken — CoinGecko benoetigt keinen API-Key und ist selten geo-blockiert.
+ */
+export function normalizeCoinGeckoTicker(entry: CoinGeckoId, raw: unknown): CryptoTicker | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = (raw as Record<string, unknown>)[entry.id];
+  if (!record || typeof record !== "object") return null;
+  const coin = record as Record<string, unknown>;
+  const priceUsd = Number(coin.usd);
+  const changePercent = Number(coin.usd_24h_change);
+  if (!Number.isFinite(priceUsd) || priceUsd <= 0) return null;
+  return {
+    symbol: entry.symbol,
+    priceUsd: Number(priceUsd.toFixed(2)),
+    changePercent: Number.isFinite(changePercent) ? Number(changePercent.toFixed(2)) : 0,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 /* ==================== Formatierung ==================== */
 
 /** Deutsch formatierte Ganzzahl mit Tausenderpunkten: 1248 -> "1.248". */

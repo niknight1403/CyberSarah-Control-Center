@@ -9,11 +9,13 @@ import {
   formatCurrency,
   getBinanceSymbols,
   getKrakenPairs,
+  getCoinGeckoIds,
   isBusinessToolName,
   isRetryableStatus,
   normalizeCryptoTicker,
   normalizeGa4Report,
   normalizeKrakenTicker,
+  normalizeCoinGeckoTicker,
 } from "../lib/data-hub-logic";
 
 describe("data-hub-logic (Sprint 90)", () => {
@@ -127,6 +129,13 @@ describe("data-hub-logic (Sprint 90)", () => {
     expect(kraken).toMatchObject({ symbol: "BTCUSDT", priceUsd: 61200.5, changePercent: 1.16 });
     expect(normalizeKrakenTicker(pairs[0], { error: ["EQuery:Unknown pair"], result: {} })).toBeNull();
     expect(normalizeKrakenTicker(pairs[0], null)).toBeNull();
+
+    const coinGeckoIds = getCoinGeckoIds();
+    expect(coinGeckoIds).toHaveLength(3);
+    const coinGecko = normalizeCoinGeckoTicker(coinGeckoIds[0], { bitcoin: { usd: 61234.5, usd_24h_change: 1.234 } });
+    expect(coinGecko).toMatchObject({ symbol: "BTCUSDT", priceUsd: 61234.5, changePercent: 1.23 });
+    expect(normalizeCoinGeckoTicker(coinGeckoIds[0], { bitcoin: { usd: 0 } })).toBeNull();
+    expect(normalizeCoinGeckoTicker(coinGeckoIds[0], null)).toBeNull();
 
     const ga4 = normalizeGa4Report({
       rows: [
