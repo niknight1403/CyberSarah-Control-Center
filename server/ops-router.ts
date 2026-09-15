@@ -11,7 +11,12 @@ import {
   classifyRenderDeployState,
   classifyUptimeWatcherState,
 } from "../lib/ops-paas-logic";
-import { checkDatabaseHealth, tableRowCounts } from "./db";
+import { checkDatabaseHealth, dumpProjectTables, tableRowCounts } from "./db";
+import {
+  BACKUP_MAX_ROWS_PER_TABLE,
+  buildBackupExport,
+  validateBackupExport,
+} from "../lib/backup-self-service-logic";
 import { adminProcedure, router } from "./_core/trpc";
 import { resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
 import { buildBackupManifest } from "../lib/db-backup-manifest-logic";
@@ -295,5 +300,20 @@ export const opsRouter = router({
       tableCounts,
       generatedAt: new Date(),
     });
+  }),
+  // Sprint 120: Backup-Selbstbedienung — Admin zieht den vollstaendigen
+  // Export (Manifest + alle Tabellendaten) ohne Shell-Zugang selbst.
+  backupExport: adminProcedure.mutation(async () => {
+    const tableData = await dumpProjectTables(BACKUP_MAX_ROWS_PER_TABLE);
+    const backup = buildBackupExport({
+      label: process.env.DB_LABEL || "production",
+      tableData,
+      generatedAt: new Date(),
+    });
+    const validation = validateBackupExport(backup);
+    if (!validation.valid) {
+      throw new Error(`Backup-Export ungueltig: ${validation.reason}`);
+    }
+    return backup;
   }),
 });

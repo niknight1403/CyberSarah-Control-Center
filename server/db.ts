@@ -394,6 +394,44 @@ export async function tableRowCounts(): Promise<Record<string, number>> {
   return result;
 }
 
+/** Vollstaendiger Zeilen-Dump aller Projekttabellen (Sprint 120) —
+ * Backup-Selbstbedienung. Gleiches sicheres Muster wie tableRowCounts:
+ * Identifier kommen ausschliesslich aus information_schema und werden per
+ * Regex gegen Injection geprueft; Zeilen-Grenze schuetzt vor Missbrauch. */
+export async function dumpProjectTables(maxRowsPerTable = 50_000): Promise<Record<string, unknown[]>> {
+  const db = await getDb();
+  if (!db) return {};
+  const rows = await db.execute(sql`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+    ORDER BY table_name
+  `);
+  const result: Record<string, unknown[]> = {};
+  for (const row of rows.rows ?? []) {
+    const tableName = String(row.table_name);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tableName)) continue;
+    const limit = Math.max(1, Math.min(50_000, maxRowsPerTable));
+    const dumped = await db.execute(sql.raw(`SELECT * FROM "${tableName}" LIMIT ${limit}`));
+    result[tableName] = (dumped.rows ?? []).map((record) => {
+      const normalized: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(record as Record<string, unknown>)) {
+        if (value instanceof Date) {
+          normalized[key] = value.toISOString();
+        } else if (value === null || value === undefined) {
+          normalized[key] = null;
+        } else if (typeof value === "object" && value !== null && "data" in (value as Record<string, unknown>) && Array.isArray((value as Record<string, unknown>).data)) {
+          normalized[key] = { base64: Buffer.from((value as { data: number[] }).data).toString("base64") };
+        } else {
+          normalized[key] = value;
+        }
+      }
+      return normalized;
+    });
+  }
+  return result;
+}
+
 /** Sitzungsuebersicht eines Nutzers (Sprint 57) — Logik in lib/chat-session-logic.ts. */
 export async function listChatSessions(userOpenId: string, limit = 500) {
   const messages = await listChatMessages(userOpenId, limit);

@@ -1,8 +1,10 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useState } from "react";
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { AiOrb, ParticleField } from "@/components/living/living-ui";
 import { trpc } from "@/lib/trpc";
 import { useOfflineDashboard } from "@/hooks/use-offline-dashboard";
+import { summarizeBackupExport, type BackupExport } from "@/lib/backup-self-service-logic";
 import { useColors } from "@/hooks/use-colors";
 
 /**
@@ -283,6 +285,27 @@ export default function DashboardScreen() {
     staleTime: 30_000,
   });
 
+  // Sprint 120: Backup-Selbstbedienung — Admin zieht den vollstaendigen Export selbst.
+  const backupExport = trpc.ops.backupExport.useMutation();
+  const [backupSummary, setBackupSummary] = useState<ReturnType<typeof summarizeBackupExport> | null>(null);
+
+  const triggerBackup = useCallback(() => {
+    backupExport.mutate(undefined, {
+      onSuccess: (backup: BackupExport) => {
+        setBackupSummary(summarizeBackupExport(backup, Date.now()));
+        if (Platform.OS === "web" && typeof document !== "undefined") {
+          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = backup.manifest.filename;
+          anchor.click();
+          URL.revokeObjectURL(url);
+        }
+      },
+    });
+  }, [backupExport]);
+
   const revenue = data?.revenue;
   const trading = data?.trading;
   const cryptoLine = (trading?.tickers ?? [])
@@ -400,6 +423,39 @@ export default function DashboardScreen() {
 
         {isAdmin && meteringQuery.data ? <MeteringTile overview={meteringQuery.data} /> : null}
 
+        {isAdmin ? (
+          <View style={styles.backupTile}>
+            <Text style={[styles.tileTitle, { color: colors.text }]}>BACKUP-SELBSTBEDIENUNG</Text>
+            <Text style={[styles.backupValue, { color: colors.text }]}>
+              {backupSummary
+                ? `${backupSummary.totalRows} Zeilen · ${backupSummary.tableCount} Tabellen · ${backupSummary.sizeLabel}`
+                : "Vollständiger Datenbank-Export auf Abruf"}
+            </Text>
+            <Text style={[styles.tileDetail, { color: colors.muted }]}>
+              {backupExport.isPending
+                ? "Export läuft — Daten werden gelesen und geprüft …"
+                : backupSummary
+                  ? `${backupSummary.filename} (${backupSummary.ageLabel})`
+                  : "Manifest mit Prüfsumme + alle Tabellendaten, ohne Shell-Zugang."}
+            </Text>
+            {backupExport.isError ? (
+              <Text style={[styles.tileDetail, { color: colors.error }]}>
+                {backupExport.error instanceof Error ? backupExport.error.message : "Backup fehlgeschlagen."}
+              </Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.backupButton, { borderColor: colors.tint }]}
+              onPress={triggerBackup}
+              disabled={backupExport.isPending}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.backupButtonLabel, { color: colors.tint }]}>
+                {backupExport.isPending ? "Export läuft …" : "Backup jetzt erstellen"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {isAdmin && memoryQuery.data ? <MemoryTile overview={memoryQuery.data} /> : null}
       </ScrollView>
     </ScreenContainer>
@@ -417,6 +473,10 @@ const styles = StyleSheet.create({
   tileTitle: { fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   tileValue: { fontSize: 20, fontWeight: "800" },
   tileDetail: { fontSize: 12 },
+  backupTile: { backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.12)", borderRadius: 14, borderWidth: 1, gap: 8, padding: 16 },
+  backupValue: { fontSize: 16, fontWeight: "800" },
+  backupButton: { alignItems: "center", borderRadius: 10, borderWidth: 1, marginTop: 4, paddingVertical: 10 },
+  backupButtonLabel: { fontSize: 13, fontWeight: "700" },
   opsTile: { backgroundColor: "rgba(0, 190, 160, 0.08)", borderColor: "rgba(0, 190, 160, 0.28)", borderRadius: 14, borderWidth: 1, gap: 10, padding: 16 },
   opsState: { fontSize: 10, fontWeight: "800", marginLeft: "auto" },
   opsFocus: { fontSize: 13, fontWeight: "700", lineHeight: 19 },
