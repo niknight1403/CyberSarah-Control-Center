@@ -1,6 +1,8 @@
-import { Tabs } from "expo-router";
+import { router, Tabs } from "expo-router";
+import { useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useOnboarding } from "@/hooks/use-onboarding";
 import { HapticTab } from "@/components/haptic-tab";
 import { AppSidebar } from "@/components/responsive/app-sidebar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -11,6 +13,13 @@ import { isWideViewport } from "@/lib/viewport-logic";
 export default function TabLayout() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  // Sprint 117: erster Start → Willkommensflow mit Theme-Auswahl, einmalig.
+  const { status: onboardingStatus } = useOnboarding();
+  useEffect(() => {
+    if (onboardingStatus === "incomplete") {
+      router.replace("/onboarding");
+    }
+  }, [onboardingStatus]);
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
