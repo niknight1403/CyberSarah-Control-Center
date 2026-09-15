@@ -285,6 +285,13 @@ export default function DashboardScreen() {
     staleTime: 30_000,
   });
 
+  // Sprint 122: MCP-Transporte — verfuegbare Transportschicht (Streamable HTTP + SSE-Fallback).
+  const mcpQuery = trpc.mcp.transports.useQuery(undefined, {
+    enabled: isAdmin,
+    retry: false,
+    staleTime: 60_000,
+  });
+
   // Sprint 120: Backup-Selbstbedienung — Admin zieht den vollstaendigen Export selbst.
   const backupExport = trpc.ops.backupExport.useMutation();
   const [backupSummary, setBackupSummary] = useState<ReturnType<typeof summarizeBackupExport> | null>(null);
@@ -453,6 +460,21 @@ export default function DashboardScreen() {
                 {backupExport.isPending ? "Export läuft …" : "Backup jetzt erstellen"}
               </Text>
             </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {isAdmin && mcpQuery.data ? (
+          <View style={styles.backupTile}>
+            <Text style={[styles.tileTitle, { color: colors.text }]}>MCP-TRANSPORTE</Text>
+            <Text style={[styles.backupValue, { color: colors.text }]}>
+              {mcpQuery.data.baseUrl ? `${mcpQuery.data.transports.length} Transporte verfügbar` : "Kein MCP-Server konfiguriert"}
+            </Text>
+            {mcpQuery.data.transports.map((transport) => (
+              <Text key={transport.kind} style={[styles.tileDetail, { color: colors.muted }]}>
+                {transport.label}: {transport.configured ? "angeschlossen" : transport.invalidReason ?? "nicht angeschlossen"}
+                {transport.preferred ? " (Standard)" : ""}
+              </Text>
+            ))}
           </View>
         ) : null}
 
