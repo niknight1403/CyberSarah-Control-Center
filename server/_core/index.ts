@@ -117,14 +117,55 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
-  // TEMP-DEBUG (wird nach Diagnose entfernt): rohe Cookie/Auth-Header sichtbar machen
-  app.get("/api/debug/cookie-echo", (req, res) => {
-    res.json({
+  // TEMP-DEBUG (wird nach Diagnose entfernt): Cookie-Pfad der Session-Auth diagnosebar machen
+  app.get("/api/debug/cookie-echo", async (req, res) => {
+    const result: Record<string, unknown> = {
       rawCookieHeader: req.headers.cookie ?? null,
       rawCookieHeaderType: Array.isArray(req.headers.cookie) ? "array" : typeof req.headers.cookie,
       authorizationHeader: req.headers.authorization ?? null,
-      allHeaderKeys: Object.keys(req.headers),
-    });
+    };
+    try {
+      // GLEICHER Codepfad wie sdk.authenticateRequest — Schritt fuer Schritt:
+      const { parse: parseCookieHeader } = await import("cookie");
+      const parsedCookieHeader = req.headers.cookie;
+      const parsedCookies = parsedCookieHeader
+        ? new Map(Object.entries(parseCookieHeader(parsedCookieHeader)))
+        : new Map<string, string>();
+      result.parsedCookieKeys = [...parsedCookies.keys()];
+      const cookieToken = parsedCookies.get("app_session_id") ?? null;
+      result.cookieTokenPrefix = cookieToken ? cookieToken.slice(0, 30) : null;
+      result.cookieTokenLength = cookieToken?.length ?? null;
+      const authHeader = req.headers.authorization || (req.headers as Record<string, unknown>).Authorization;
+      result.authHeaderPresent = typeof authHeader === "string";
+      let bearerToken: string | undefined;
+      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+        bearerToken = authHeader.slice("Bearer ".length).trim();
+      }
+      result.bearerTokenLength = bearerToken?.length ?? null;
+      // verifySession fuer beide Pfade mit GLEICHEM Code
+      try {
+        const viaCookie = cookieToken ? await sdk.verifySession(cookieToken) : null;
+        result.verifySessionViaCookie = viaCookie;
+      } catch (error) {
+        result.verifySessionViaCookieError = String(error);
+      }
+      try {
+        const viaBearer = bearerToken ? await sdk.verifySession(bearerToken) : null;
+        result.verifySessionViaBearer = viaBearer;
+      } catch (error) {
+        result.verifySessionViaBearerError = String(error);
+      }
+      // Voller authenticateRequest-Versuch mit Fehlerdetail
+      try {
+        const user = await sdk.authenticateRequest(req);
+        result.authenticateRequestUser = { id: user.id, openId: user.openId, email: user.email };
+      } catch (error) {
+        result.authenticateRequestError = error instanceof Error ? error.message : String(error);
+      }
+    } catch (error) {
+      result.outerError = String(error);
+    }
+    res.json(result);
   });
 
   app.get("/api/ready", async (_req, res) => {
