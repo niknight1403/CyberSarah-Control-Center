@@ -117,6 +117,15 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
+  // TEMP-DEBUG (wird nach Diagnose entfernt): rohe Cookie/Auth-Header sichtbar machen
+  app.get("/api/debug/cookie-echo", (req, res) => {
+    res.json({
+      rawCookieHeader: req.headers.cookie ?? null,
+      rawCookieHeaderType: Array.isArray(req.headers.cookie) ? "array" : typeof req.headers.cookie,
+      authorizationHeader: req.headers.authorization ?? null,
+      allHeaderKeys: Object.keys(req.headers),
+    });
+  });
 
   app.get("/api/ready", async (_req, res) => {
     const database = await checkDatabaseHealth();
