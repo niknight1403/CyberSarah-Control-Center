@@ -125,3 +125,28 @@ export const agentLearnings = pgTable("agentLearnings", {
 
 export type AgentLearning = typeof agentLearnings.$inferSelect;
 export type InsertAgentLearning = typeof agentLearnings.$inferInsert;
+
+/**
+ * Sprint 113 — Memory-Konsolidierung: eine Zeile je Konsolidierungslauf
+ * (naechtlicher Workflow oder Admin-Trigger). Traegt die Metriken des
+ * Laufs und die aggregierten Retrieval-Metriken zum Laufzeitpunkt —
+ * Grundlage der Admin-Sicht auf den Learning-Bestand.
+ */
+export const agentMemoryConsolidations = pgTable("agentMemoryConsolidations", {
+  id: serial("id").primaryKey(),
+  trigger: varchar("trigger", { length: 16 }).notNull().default("cron"),
+  inputCount: integer("inputCount").notNull(),
+  survivorCount: integer("survivorCount").notNull(),
+  mergedAway: integer("mergedAway").notNull(),
+  invalidated: integer("invalidated").notNull(),
+  contradictionCount: integer("contradictionCount").notNull(),
+  retrievalSamples: integer("retrievalSamples").notNull().default(0),
+  retrievalHitRatePct: integer("retrievalHitRatePct").notNull().default(0),
+  summary: text("summary").notNull().default(""),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("agentMemoryConsolidations_created_idx").on(table.createdAt),
+]);
+
+export type AgentMemoryConsolidation = typeof agentMemoryConsolidations.$inferSelect;
+export type InsertAgentMemoryConsolidation = typeof agentMemoryConsolidations.$inferInsert;

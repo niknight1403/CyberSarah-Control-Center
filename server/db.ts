@@ -9,6 +9,8 @@ import {
   users,
   InsertAgentLearning,
   agentLearnings,
+  agentMemoryConsolidations,
+  InsertAgentMemoryConsolidation,
 } from "../drizzle/schema";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
@@ -443,4 +445,72 @@ export async function listRecentAgentLearnings(userOpenId: string, limit = 50) {
     .where(eq(agentLearnings.userOpenId, userOpenId))
     .orderBy(desc(agentLearnings.createdAt), desc(agentLearnings.id))
     .limit(Math.max(1, Math.min(limit, 200)));
+}
+
+
+/* ============================================================
+ * Sprint 113 — Memory-Konsolidierung (Datenbankzugriff).
+ * Reine Regeln liegen in lib/agent-memory-consolidation-logic.ts.
+ * ============================================================ */
+
+/** Gesamten Learning-Bestand fuer die Konsolidierung laden (Neueste zuerst). */
+export async function listAllAgentLearningsForConsolidation(limit = 5000) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Konsolidierung nicht moeglich.");
+  return db
+    .select()
+    .from(agentLearnings)
+    .orderBy(desc(agentLearnings.createdAt), desc(agentLearnings.id))
+    .limit(Math.max(1, Math.min(limit, 20_000)));
+}
+
+/** Letzten Konsolidierungslauf liefern (oder null, wenn noch keiner lief). */
+export async function getLastMemoryConsolidation() {
+  const db = await getDb();
+  if (!db) return null;
+  const [last] = await db
+    .select()
+    .from(agentMemoryConsolidations)
+    .orderBy(desc(agentMemoryConsolidations.createdAt), desc(agentMemoryConsolidations.id))
+    .limit(1);
+  return last ?? null;
+}
+
+/** Konsolidierungslauf protokollieren. */
+export async function insertMemoryConsolidationRecord(input: InsertAgentMemoryConsolidation) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Lauf nicht protokollierbar.");
+  const [saved] = await db.insert(agentMemoryConsolidations).values(input).returning();
+  return saved;
+}
+
+/**
+ * Konsolidierungslauf auf die Learnings anwenden: Traeger-Keywords
+ * aktualisieren, wegfallende Learnings loeschen. Einzelne Statements
+ * pro Plan-Eintrag — idempotent (bereits entfernte IDs schaden nicht).
+ */
+export async function applyConsolidationPlanWrites(plan: {
+  merges: { keepId: number; mergedIds: number[]; mergedKeywords: string }[];
+  invalidations: { id: number; reason: string }[];
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Plan nicht anwendbar.");
+  let keywordUpdates = 0;
+  let deletions = 0;
+  for (const merge of plan.merges) {
+    const result = await db
+      .update(agentLearnings)
+      .set({ keywords: merge.mergedKeywords })
+      .where(eq(agentLearnings.id, merge.keepId));
+    keywordUpdates += 1;
+    for (const id of merge.mergedIds) {
+      await db.delete(agentLearnings).where(eq(agentLearnings.id, id));
+      deletions += 1;
+    }
+  }
+  for (const invalidation of plan.invalidations) {
+    await db.delete(agentLearnings).where(eq(agentLearnings.id, invalidation.id));
+    deletions += 1;
+  }
+  return { keywordUpdates, deletions };
 }

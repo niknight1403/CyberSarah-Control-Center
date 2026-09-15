@@ -9,6 +9,7 @@ import { featuresRouter } from "./features-router";
 import { appStatusRouter } from "./app-status-router";
 import { adminRouter } from "./admin-router";
 import { dataHubRouter } from "./data-hub";
+import { memoryRouter } from "./memory-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -19,6 +20,7 @@ export const appRouter = router({
   appStatus: appStatusRouter,
   admin: adminRouter,
   dataHub: dataHubRouter,
+  memory: memoryRouter,
   developmentChat: developmentChatRouter,
   account: accountRouter,
   billing: billingRouter,

@@ -1,0 +1,34 @@
+# Sprint 113 — Naechtliche Memory-Konsolidierung (Sleep-Time): pflegt das
+# Langzeit-Gedaechtnis (agentLearnings, Sprint 94) — aehnliche Learnings
+# zusammenfuehren, veraltetes Rauschen entfernen, Widersprueche markieren.
+# Laeuft ohne externe Keys: nur DATABASE_URL aus den Repo-Secrets und die
+# reinen Regeln aus lib/agent-memory-consolidation-logic.ts.
+name: memory-consolidation
+
+on:
+  schedule:
+    # Taeglich 03:30 UTC = 05:30 MESZ — ruhige Betriebszeit, vor dem Tech-Scan.
+    - cron: "30 3 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: memory-consolidation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Abhaengigkeiten installieren
+        run: npm ci --no-audit --no-fund
+      - name: Konsolidierung ausfuehren
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx tsx scripts/memory-consolidation.ts

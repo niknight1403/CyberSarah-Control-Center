@@ -106,6 +106,54 @@ function OpsWatchTile({ overview }: { overview: OpsOverview }) {
   );
 }
 
+/** Sprint 113 — Daten der Memory-Kachel (tRPC memory.overview, Admin). */
+type MemoryOverview = {
+  dbAvailable: boolean;
+  totalLearnings: number;
+  lastConsolidation: {
+    trigger: string;
+    summary: string;
+    inputCount: number;
+    survivorCount: number;
+    mergedAway: number;
+    invalidated: number;
+    contradictionCount: number;
+    createdAt: string;
+  } | null;
+  retrieval: { samples: number; hitRatePct: number; avgInjections: number };
+};
+
+function MemoryTile({ overview }: { overview: MemoryOverview }) {
+  const colors = useColors();
+  const last = overview.lastConsolidation;
+  const lines = last
+    ? [
+        `Letzter Lauf (${last.trigger}): ${last.survivorCount} behalten · ${last.mergedAway} zusammengeführt · ${last.invalidated} entfernt · ${last.contradictionCount} Widersprüche`,
+      ]
+    : ["Noch kein Konsolidierungslauf — der tägliche Workflow startet um 05:30 MESZ."];
+  if (overview.retrieval.samples > 0) {
+    lines.push(
+      `Retrieval: ${overview.retrieval.samples} Stichproben · ${overview.retrieval.hitRatePct} % Trefferquote · Ø ${overview.retrieval.avgInjections} Injektionen je Turn`,
+    );
+  } else {
+    lines.push("Retrieval-Metriken sammeln sich im Chat-Betrieb.");
+  }
+  return (
+    <View style={styles.opsTile}>
+      <View style={styles.tileHeader}>
+        <AiOrb state={overview.dbAvailable ? "idle" : "error"} size={18} />
+        <Text style={[styles.tileTitle, { color: colors.muted }]}>Agenten-Gedächtnis (Admin)</Text>
+      </View>
+      <Text style={[styles.opsFocus, { color: colors.text }]}>{overview.totalLearnings} Learnings im Bestand</Text>
+      {lines.map((line) => (
+        <Text key={line} style={[styles.tileDetail, { color: colors.muted }]}>
+          {line}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const colors = useColors();
   const { data, isLoading, error } = trpc.dataHub.dashboard.useQuery();
@@ -116,6 +164,12 @@ export default function DashboardScreen() {
     retry: false,
     refetchInterval: 60_000,
     staleTime: 30_000,
+  });
+  const memoryQuery = trpc.memory.overview.useQuery(undefined, {
+    enabled: isAdmin,
+    retry: false,
+    refetchInterval: 120_000,
+    staleTime: 60_000,
   });
 
   const revenue = data?.revenue;
@@ -221,6 +275,8 @@ export default function DashboardScreen() {
         {isAdmin && (opsQuery.data || opsQuery.isLoading) ? (
           opsQuery.data ? <OpsWatchTile overview={opsQuery.data} /> : <Tile title="Betriebswacht (Admin)" tone="warn" value="Prüfung läuft …" detail="API, Datenbank, Workspace und KI-Chat werden geprüft." />
         ) : null}
+
+        {isAdmin && memoryQuery.data ? <MemoryTile overview={memoryQuery.data} /> : null}
       </ScrollView>
     </ScreenContainer>
   );

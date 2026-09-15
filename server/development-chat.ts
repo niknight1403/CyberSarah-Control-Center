@@ -8,6 +8,7 @@ import {
   selectRelevantLearnings,
   turnDeservesLearning,
 } from "../lib/agent-memory-logic";
+import { measureRetrievalOnUserMessage, recordLearningInjection } from "./retrieval-metrics";
 import { sanitizeSessionId } from "../lib/chat-session-logic";
 import {
   DEFAULT_DAILY_CHAT_LIMIT,
@@ -383,6 +384,11 @@ export const developmentChatRouter = router({
           console.warn("[developmentChat] Quotenpruefung uebersprungen:", error);
         }
       }
+      // Sprint 113: Nutzer-Nachricht gegen die letzte Learning-Injektion
+      // derselben Session messen (Trefferquote der Top-3-Injektion).
+      if (input.sessionId) {
+        measureRetrievalOnUserMessage(input.sessionId, input.messages.at(-1)?.content ?? "");
+      }
       const result = await handleDevelopmentChat({ ...input, role: ctx.user.role, userOpenId: ctx.user.openId });
       // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
       // Persistenzfehler brechen die Chat-Antwort nicht ab).
@@ -652,13 +658,14 @@ type AgentToolChatInput = {
   githubToken?: string;
   branch?: string;
   userOpenId?: string;
+  sessionId?: string;
 };
 
 /**
  * Sprint 94 — Langzeit-Gedächtnis: Top-Learnings zum aktuellen Prompt laden
  * (Best-Effort — bei Datenbankproblemen bleibt der Prompt unveraendert).
  */
-async function loadLearningContext(userOpenId: string | undefined, prompt: string): Promise<string> {
+async function loadLearningContext(userOpenId: string | undefined, prompt: string, sessionId?: string): Promise<string> {
   if (!userOpenId) return "";
   try {
     const learnings = await listRecentAgentLearnings(userOpenId, 50);
@@ -669,7 +676,13 @@ async function loadLearningContext(userOpenId: string | undefined, prompt: strin
       keywords: learning.keywords,
       createdAt: learning.createdAt.toISOString(),
     }));
-    return formatLearningsForContext(selectRelevantLearnings(ranked, prompt));
+    const selected = selectRelevantLearnings(ranked, prompt);
+    // Sprint 113: Injektion fuer die Retrieval-Trefferquote registrieren.
+    recordLearningInjection(
+      sessionId ?? "",
+      selected.map((learning) => learning.keywords.split(",").map((word) => word.trim()).filter(Boolean)),
+    );
+    return formatLearningsForContext(selected);
   } catch (error) {
     console.warn("[agentMemory] Learnings nicht geladen:", error instanceof Error ? error.message.slice(0, 120) : error);
     return "";
@@ -713,7 +726,7 @@ async function storeAutoLearning(input: AgentToolChatInput, userMessage: string,
 async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput): Promise<DevelopmentChatResult> {
   const githubToken = resolveAgentGithubToken(input.role, input.githubToken);
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
-  const learningContext = await loadLearningContext(input.userOpenId, lastUserMessage);
+  const learningContext = await loadLearningContext(input.userOpenId, lastUserMessage, input.sessionId);
   const conversation: Message[] = [
     { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main")}${learningContext}` },
     ...input.messages.map((message) => ({ role: message.role, content: message.content })),
@@ -932,6 +945,7 @@ export async function handleDevelopmentChat(input: {
   githubToken?: string;
   branch?: string;
   userOpenId?: string;
+  sessionId?: string;
 }): Promise<DevelopmentChatResult> {
   if (input.workspaceId) {
     return handleAgentToolChat(input);
