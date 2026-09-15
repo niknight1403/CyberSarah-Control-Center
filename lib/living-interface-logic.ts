@@ -35,8 +35,8 @@ export const PARTICLE_MAX_COUNT = 40;
 export const PARTICLE_MIN_DURATION_MS = 20_000;
 export const PARTICLE_MAX_DURATION_MS = 48_000;
 
-/** Deterministischer PRNG (mulberry32) — gleiches Seed => gleiches Feld. */
-function mulberry32(seed: number): () => number {
+/** Deterministischer PRNG (mulberry32) — gleiches Seed => gleiches Feld (auch Avatar-Geometrie, Sprint 118). */
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a |= 0;

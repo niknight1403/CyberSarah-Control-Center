@@ -4,6 +4,8 @@ import {
   StudioHeader,
   StudioSection,
 } from "@/components/studio/primitives";
+import { AgentAvatar } from "@/components/living/agent-avatar";
+import { resolveAvatarMood } from "@/lib/agent-avatar-logic";
 import { ScreenContainer } from "@/components/screen-container";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -833,9 +835,15 @@ export default function AgentScreen() {
                   title="Chat"
                 />
                 <View style={styles.chatHero}>
-                  <View style={styles.chatHeroIcon}>
-                    <IconSymbol name="sparkles" size={19} color={lighten(colors.tint, 0.3)} />
-                  </View>
+                  <AgentAvatar
+                    name="CyberSarah"
+                    mood={resolveAvatarMood({
+                      isThinking,
+                      hasError: chatError.length > 0,
+                      isSuccess: false,
+                    })}
+                    size={64}
+                  />
                   <View style={styles.chatHeroCopy}>
                     <Text style={styles.chatHeroTitle}>
                       Was möchtest du weiterentwickeln?
