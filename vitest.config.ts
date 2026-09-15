@@ -39,6 +39,13 @@ export default defineConfig({
   esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
+    // Sprint 112: PBKDF2-Iterationen der Settings-Backup-Tests reduzieren,
+    // sonst dauert eine einzelne Schluesselableitung auf langsamen CI-Runnern
+    // ~20 s und die Suite scheitert am 60-s-Timeout (Flake). Produktion bleibt
+    // bei 310.000 (lib/settings-backup-logic.ts, Guard: NODE_ENV=test + >=1000).
+    env: {
+      SETTINGS_BACKUP_TEST_KDF_ITERATIONS: "10000",
+    },
     include: ["tests/**/*.test.{ts,tsx}"],
     watch: false,
     coverage: {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEncryptedSettingsBackup, decryptEncryptedSettingsBackup, getEncryptedSettingsBackupPreview, getSettingsBackupRestoreConfirmation, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, verifyEncryptedSettingsBackup } from "../lib/settings-backup-logic";
+import { createEncryptedSettingsBackup, decryptEncryptedSettingsBackup, getEncryptedSettingsBackupPreview, getSettingsBackupRestoreConfirmation, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, verifyEncryptedSettingsBackup, SETTINGS_BACKUP_ITERATIONS } from "../lib/settings-backup-logic";
 
 const input = {
   providerKeys: { openai: "sk-test-secret", gemini: "AIza-test-secret" },
@@ -11,6 +11,11 @@ const input = {
 };
 
 describe("settings backup logic", () => {
+  it("pinnt den Produktions-KDF-Parameter (Sprint 112: keine unabsichtliche Absenkung)", () => {
+    expect(SETTINGS_BACKUP_ITERATIONS).toBe(310_000);
+    expect(Number.parseInt(process.env.SETTINGS_BACKUP_TEST_KDF_ITERATIONS ?? "", 10)).toBeGreaterThanOrEqual(1_000);
+  });
+
   it("requires a long export password", () => {
     expect(isValidSettingsBackupPassword("short")).toBe(false);
     expect(isValidSettingsBackupPassword(input.passphrase)).toBe(true);

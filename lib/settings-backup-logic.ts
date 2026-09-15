@@ -5,6 +5,23 @@ import { validateLocalProviderEndpoint } from "./settings-validation";
 export const SETTINGS_BACKUP_FORMAT = "cybersarah-control-center.encrypted-settings-backup";
 export const SETTINGS_BACKUP_VERSION = 1;
 export const SETTINGS_BACKUP_ITERATIONS = 310_000;
+
+/**
+ * Sprint 112: Effektive KDF-Iterationszahl. In der Produktion immer 310.000.
+ * Nur unter Vitest (NODE_ENV=test) darf die deterministische Suite eine
+ * schnellere Iterationszahl setzen (SETTINGS_BACKUP_TEST_KDF_ITERATIONS),
+ * damit die PBKDF2-Tests nicht am 60-s-Timeout langsamer CI-Runner scheitern.
+ * Die Iterationszahl steht im Envelope (kdf.iterations) und wird bei
+ * Verifikation/Entschluesselung aus dem Backup gelesen — Backups bleiben
+ * damit unabhaengig vom Laufzeit-Kontext lesbar.
+ */
+function getEffectiveKdfIterations(): number {
+  if (process.env.NODE_ENV === "test") {
+    const override = Number.parseInt(process.env.SETTINGS_BACKUP_TEST_KDF_ITERATIONS ?? "", 10);
+    if (Number.isFinite(override) && override >= 1_000) return override;
+  }
+  return SETTINGS_BACKUP_ITERATIONS;
+}
 export const SETTINGS_BACKUP_MAX_PROVIDER_KEY_LENGTH = 512;
 export const SETTINGS_BACKUP_MAX_ENDPOINT_LENGTH = 2048;
 export const SETTINGS_BACKUP_MAX_PROVIDER_COUNT = 16;
@@ -51,8 +68,8 @@ function wordArrayToBase64(value: CryptoJS.lib.WordArray) {
   return CryptoJS.enc.Base64.stringify(value);
 }
 
-function deriveKeys(passphrase: string, salt: CryptoJS.lib.WordArray) {
-  const material = CryptoJS.PBKDF2(passphrase, salt, { keySize: 16, iterations: SETTINGS_BACKUP_ITERATIONS, hasher: CryptoJS.algo.SHA256 });
+function deriveKeys(passphrase: string, salt: CryptoJS.lib.WordArray, iterations: number) {
+  const material = CryptoJS.PBKDF2(passphrase, salt, { keySize: 16, iterations, hasher: CryptoJS.algo.SHA256 });
   return {
     encryptionKey: CryptoJS.lib.WordArray.create(material.words.slice(0, 8), 32),
     macKey: CryptoJS.lib.WordArray.create(material.words.slice(8, 16), 32),
@@ -73,7 +90,7 @@ function getVerifiedBackup(backup: unknown, passphrase: string) {
   if (!isSupportedEncryptedSettingsBackup(backup) || !isValidSettingsBackupPassword(passphrase)) return null;
   try {
     const salt = CryptoJS.enc.Base64.parse(backup.kdf.salt);
-    const { macKey } = deriveKeys(passphrase, salt);
+    const { macKey } = deriveKeys(passphrase, salt, backup.kdf.iterations);
     const unsignedBackup = { format: backup.format, version: backup.version, createdAt: backup.createdAt, kdf: backup.kdf, cipher: { name: backup.cipher.name, iv: backup.cipher.iv, ciphertext: backup.cipher.ciphertext } };
     const expectedMac = CryptoJS.HmacSHA256(createMacPayload(unsignedBackup), macKey).toString(CryptoJS.enc.Base64);
     return expectedMac === backup.cipher.mac ? backup : null;
@@ -115,13 +132,14 @@ export function createEncryptedSettingsBackup(input: { providerKeys: Record<stri
   const plainPayload = JSON.stringify(payload);
   const salt = bytesToWordArray(input.salt);
   const iv = bytesToWordArray(input.iv);
-  const { encryptionKey, macKey } = deriveKeys(input.passphrase, salt);
+  const kdfIterations = getEffectiveKdfIterations();
+  const { encryptionKey, macKey } = deriveKeys(input.passphrase, salt, kdfIterations);
   const ciphertext = CryptoJS.AES.encrypt(plainPayload, encryptionKey, { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }).ciphertext;
   const unsignedBackup: Omit<EncryptedSettingsBackup, "cipher"> & { cipher: Omit<EncryptedSettingsBackup["cipher"], "mac"> } = {
     format: SETTINGS_BACKUP_FORMAT,
     version: SETTINGS_BACKUP_VERSION,
     createdAt: input.createdAt,
-    kdf: { name: "PBKDF2-SHA256", iterations: SETTINGS_BACKUP_ITERATIONS, salt: wordArrayToBase64(salt) },
+    kdf: { name: "PBKDF2-SHA256", iterations: kdfIterations, salt: wordArrayToBase64(salt) },
     cipher: { name: "AES-256-CBC+HMAC-SHA256", iv: wordArrayToBase64(iv), ciphertext: wordArrayToBase64(ciphertext) },
   };
   const mac = CryptoJS.HmacSHA256(createMacPayload(unsignedBackup), macKey).toString(CryptoJS.enc.Base64);
@@ -138,7 +156,7 @@ function decryptVerifiedBackupPayload(verifiedBackup: EncryptedSettingsBackup, p
   const salt = CryptoJS.enc.Base64.parse(verifiedBackup.kdf.salt);
   const iv = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.iv);
   const ciphertext = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.ciphertext);
-  const { encryptionKey } = deriveKeys(passphrase, salt);
+  const { encryptionKey } = deriveKeys(passphrase, salt, verifiedBackup.kdf.iterations);
   const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext });
   const plaintext = CryptoJS.AES.decrypt(cipherParams, encryptionKey, { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }).toString(CryptoJS.enc.Utf8);
   const payload = JSON.parse(plaintext) as Partial<SettingsBackupPayload>;
