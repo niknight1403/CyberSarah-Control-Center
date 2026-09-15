@@ -1,7 +1,8 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { AiOrb, ParticleField } from "@/components/living/living-ui";
 import { trpc } from "@/lib/trpc";
+import { useOfflineDashboard } from "@/hooks/use-offline-dashboard";
 import { useColors } from "@/hooks/use-colors";
 
 /**
@@ -257,7 +258,8 @@ function MemoryTile({ overview }: { overview: MemoryOverview }) {
 
 export default function DashboardScreen() {
   const colors = useColors();
-  const { data, isLoading, error } = trpc.dataHub.dashboard.useQuery();
+  // Sprint 119: Offline-Puffer — Live-Daten schlagen immer, bei Fehler transparenter Cache.
+  const { data, isLoading, error, source, cacheAgeLabel, refresh } = useOfflineDashboard();
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const isAdmin = accountQuery.data?.role === "admin";
   const opsQuery = trpc.ops.overview.useQuery(undefined, {
@@ -305,12 +307,21 @@ export default function DashboardScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <AiOrb state={isLoading ? "thinking" : error ? "error" : "idle"} size={34} />
-          <View style={styles.headerCopy}>
+          <TouchableOpacity
+            style={styles.headerCopy}
+            disabled={source !== "cache"}
+            onPress={refresh}
+            accessibilityHint={source === "cache" ? "Offline-Daten aktualisieren" : undefined}
+          >
             <Text style={[styles.title, { color: colors.text }]}>Dashboard</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>
-              {isLoading ? "CyberSarah synchronisiert Live-Daten …" : "Master-Agent · Live-Geschaeftsdaten"}
+              {source === "cache"
+                ? `Offline · Daten von ${cacheAgeLabel} · tippen zum Aktualisieren`
+                : isLoading
+                  ? "CyberSarah synchronisiert Live-Daten …"
+                  : "Master-Agent · Live-Geschaeftsdaten"}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <Tile
