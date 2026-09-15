@@ -5,6 +5,8 @@ import { integrationFixture } from "@/constants/integration-fixture";
 import { providerOptions, type ProviderId, useStudioSettings } from "@/lib/studio-settings";
 import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
 import { useAdminGithubTokenSync } from "@/lib/use-admin-github-token-sync";
+import { useAdminDesignThemeSync } from "@/lib/use-admin-design-theme-sync";
+import { useAdminRepositoryAutoConnect } from "@/lib/use-admin-repository-autoconnect";
 import { trpc } from "@/lib/trpc";
 import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
@@ -31,6 +33,8 @@ export default function SettingsScreen() {
   const isAdmin = accountQuery.data?.role === "admin";
   useAdminAutoRouter(accountQuery.data ?? null);
   useAdminGithubTokenSync(accountQuery.data ?? null);
+  useAdminDesignThemeSync(accountQuery.data ?? null);
+  useAdminRepositoryAutoConnect(accountQuery.data ?? null);
   const [provider, setProvider] = useState<ProviderId>("managed");
   const [serviceAccessToken, setServiceAccessToken] = useState("");
   const [githubToken, setGithubToken] = useState("");

@@ -18,6 +18,10 @@ import { RepositoryConnectCard } from "@/components/studio/repository-connect-ca
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
 import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
+import { useAdminGithubTokenSync } from "@/lib/use-admin-github-token-sync";
+import { useAdminDesignThemeSync } from "@/lib/use-admin-design-theme-sync";
+import { useAdminRepositoryAutoConnect } from "@/lib/use-admin-repository-autoconnect";
+import { DevTracePanel } from "@/components/chat/dev-trace-panel";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
@@ -55,6 +59,15 @@ export default function ChatScreen() {
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [latencyScores, setLatencyScores] = useState<ProviderScore[]>([]);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
+  // Sprint 127 — Autonomer Administrator-Autopilot: GitHub-Token, Standard-
+  // Router, Cyber-Neon-Design und Repository-Verbindung werden automatisch
+  // hergestellt, sobald ein Administrator angemeldet ist — kein manueller
+  // Klick in den Einstellungen mehr noetig.
+  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  useAdminAutoRouter(accountQuery.data ?? null);
+  useAdminGithubTokenSync(accountQuery.data ?? null);
+  useAdminDesignThemeSync(accountQuery.data ?? null);
+  useAdminRepositoryAutoConnect(accountQuery.data ?? null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const { busy: mediaPickerBusy, pickFiles: pickFilesFromDevice, pickPhotos, pickVideos } = useMediaPicker();
   const developmentChatMutation = trpc.developmentChat.send.useMutation();
@@ -184,7 +197,7 @@ export default function ChatScreen() {
     try {
       const fileContext = attachments.length ? formatProjectContext((await readProjectContext(attachments)).files) : "";
       const result = await requestDevelopmentChat(fileContext ? text + "\n\n" + fileContext : text);
-      const agentMsg: ChatMessage = { id: "agent-" + Date.now(), role: "agent", content: result.content + "\n\nAntwort von " + result.providerUsed + " · " + result.model, state: "ready", timestampMs: Date.now() };
+      const agentMsg: ChatMessage = { id: "agent-" + Date.now(), role: "agent", content: result.content + "\n\nAntwort von " + result.providerUsed + " · " + result.model, state: "ready", timestampMs: Date.now(), devTrace: result.devTrace };
       setMessages((cur) => {
         const next = [...cur.filter((m) => !m.id.startsWith("thinking-")), agentMsg];
         void saveDevelopmentChatHistory(serializeDevelopmentChatHistory(next), settings.protectChatContent, chatWorkspaceId).catch(() => undefined);
@@ -227,6 +240,7 @@ export default function ChatScreen() {
           </View>
         ) : null}
         <MessageBubble message={{ id: msg.id, role: msg.role, content: msg.content, timestampMs: msg.timestampMs }} showTimestamp={shouldShowTimestamp(previous, { role: msg.role, timestampMs: msg.timestampMs })} />
+        {msg.role === "agent" && msg.devTrace?.length ? <DevTracePanel trace={msg.devTrace} /> : null}
       </>
     );
   };

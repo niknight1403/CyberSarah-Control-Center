@@ -3,12 +3,21 @@ export type PersistedProposalPreview = {
   changes: Array<{ path: string; explanation: string }>;
 };
 
+/** Sprint 127 — ein Werkzeugaufruf des autonomen Agenten (Entwicklungsfenster). */
+export type DevTraceEntry = {
+  tool: string;
+  args: string;
+  resultSummary: string;
+};
+
 export type DevelopmentChatHistoryMessage = {
   id: string;
   role: "user" | "agent";
   content: string;
   state?: "ready" | "applying" | "applied" | "reverting" | "reverted" | "error" | "restored";
   proposalPreview?: PersistedProposalPreview;
+  /** Sprint 127 — Werkzeugaufrufe dieser Antwort (Superagent-Entwicklungsfenster). */
+  devTrace?: DevTraceEntry[];
 };
 
 export const DEVELOPMENT_CHAT_HISTORY_KEY = "custom-ai-studio.development-chat.v1";
@@ -36,7 +45,21 @@ function cleanPreview(value: unknown): PersistedProposalPreview | undefined {
   return affectedFiles.length || changes.length ? { affectedFiles, changes } : undefined;
 }
 
-type UnknownHistoryMessage = { id: unknown; role: unknown; content: unknown; state?: unknown; proposalPreview?: unknown };
+function cleanDevTrace(value: unknown): DevTraceEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const entries = value
+    .filter((entry): entry is { tool: unknown; args: unknown; resultSummary: unknown } => Boolean(entry) && typeof entry === "object")
+    .filter((entry) => typeof entry.tool === "string" && typeof entry.args === "string" && typeof entry.resultSummary === "string")
+    .slice(0, 12)
+    .map((entry) => ({
+      tool: (entry.tool as string).slice(0, 80),
+      args: (entry.args as string).slice(0, 240),
+      resultSummary: (entry.resultSummary as string).slice(0, 320),
+    }));
+  return entries.length ? entries : undefined;
+}
+
+type UnknownHistoryMessage = { id: unknown; role: unknown; content: unknown; state?: unknown; proposalPreview?: unknown; devTrace?: unknown };
 
 function isHistoryMessage(value: unknown): value is UnknownHistoryMessage & { id: string; role: DevelopmentChatHistoryMessage["role"]; content: string } {
   if (!value || typeof value !== "object") return false;
@@ -45,7 +68,7 @@ function isHistoryMessage(value: unknown): value is UnknownHistoryMessage & { id
 }
 
 export function serializeDevelopmentChatHistory(messages: DevelopmentChatHistoryMessage[]): string {
-  return JSON.stringify({ version: 1, messages: messages.slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT).map((message) => ({ id: message.id.slice(0, 100), role: message.role, content: message.content.slice(0, 900), state: message.state === "applying" || message.state === "reverting" ? "ready" : message.state, proposalPreview: cleanPreview(message.proposalPreview) })) });
+  return JSON.stringify({ version: 1, messages: messages.slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT).map((message) => ({ id: message.id.slice(0, 100), role: message.role, content: message.content.slice(0, 900), state: message.state === "applying" || message.state === "reverting" ? "ready" : message.state, proposalPreview: cleanPreview(message.proposalPreview), devTrace: cleanDevTrace(message.devTrace) })) });
 }
 
 export function parseDevelopmentChatHistory(raw: string | null): DevelopmentChatHistoryMessage[] {
@@ -53,7 +76,7 @@ export function parseDevelopmentChatHistory(raw: string | null): DevelopmentChat
   try {
     const parsed = JSON.parse(raw) as { version?: unknown; messages?: unknown };
     if (parsed.version !== 1 || !Array.isArray(parsed.messages)) return [];
-    return parsed.messages.filter(isHistoryMessage).slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT).map((message) => ({ id: message.id.slice(0, 100), role: message.role, content: message.content.slice(0, 900), state: message.proposalPreview ? "restored" : message.state === "applied" ? "applied" : undefined, proposalPreview: cleanPreview(message.proposalPreview) }));
+    return parsed.messages.filter(isHistoryMessage).slice(-DEVELOPMENT_CHAT_HISTORY_LIMIT).map((message) => ({ id: message.id.slice(0, 100), role: message.role, content: message.content.slice(0, 900), state: message.proposalPreview ? "restored" : message.state === "applied" ? "applied" : undefined, proposalPreview: cleanPreview(message.proposalPreview), devTrace: cleanDevTrace(message.devTrace) }));
   } catch {
     return [];
   }

@@ -545,6 +545,8 @@ export type DevelopmentChatResult = {
     attemptedProviders: RouterProviderId[];
     reasons: string[];
   };
+  /** Sprint 127 — Werkzeugaufrufe dieser Antwort (Superagent-Entwicklungsfenster). */
+  devTrace?: { tool: string; args: string; resultSummary: string }[];
 };
 
 /* ==================================================================
@@ -741,6 +743,11 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   }));
   const tools = [...(AGENT_TOOL_DEFINITIONS as unknown as Tool[]), ...(businessTools as unknown as Tool[])];
   const toolsUsedInTurn = new Set<string>();
+  // Sprint 127 — Werkzeugaufrufe fuer das mobile Entwicklungsfenster mitschneiden
+  // (Tool-Name, kurze Argumentzusammenfassung, kurzes Ergebnis). Bewusst separat
+  // vom Konversationsverlauf (der volle Tool-Content bleibt fuer den naechsten
+  // Provider-Call erhalten) und laengenbegrenzt fuer die Persistenz.
+  const devTrace: { tool: string; args: string; resultSummary: string }[] = [];
 
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
     const payload = await callProviderWithTools(provider, conversation, input.model, tools);
@@ -749,7 +756,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     if (!toolCalls.length) {
       const content = extractContent(payload);
       await storeAutoLearning(input, lastUserMessage, content, [...toolsUsedInTurn]);
-      return { content, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
+      return { content, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString(), devTrace: devTrace.length ? devTrace : undefined };
     }
     conversation.push({
       role: "assistant",
@@ -759,13 +766,19 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     for (const call of toolCalls) {
       const toolName = call.function?.name ?? "";
       toolsUsedInTurn.add(toolName);
+      const toolArgs = parseToolArguments(call.function?.arguments);
       const toolResult = toolName === "save_learning"
-        ? await executeSaveLearningTool(input.userOpenId, parseToolArguments(call.function?.arguments))
+        ? await executeSaveLearningTool(input.userOpenId, toolArgs)
         : isAgentToolName(toolName)
-          ? await executeAgentTool(toolName, input.workspaceId ?? "", parseToolArguments(call.function?.arguments), githubToken)
+          ? await executeAgentTool(toolName, input.workspaceId ?? "", toolArgs, githubToken)
           : isBusinessToolName(toolName)
             ? formatBusinessResult(toolName, await executeBusinessSnapshot(toolName))
             : `FEHLER: Unbekanntes Werkzeug '${toolName}'.`;
+      devTrace.push({
+        tool: toolName || "unbekannt",
+        args: JSON.stringify(toolArgs ?? {}).slice(0, 240),
+        resultSummary: toolResult.slice(0, 320),
+      });
       conversation.push({ role: "tool", tool_call_id: call.id, content: toolResult.slice(0, MAX_TOOL_RESULT_CHARS) });
     }
   }
@@ -774,7 +787,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   const payload = await callProviderWithTools(provider, conversation, input.model, undefined);
   const finalContent = extractContent(payload);
   await storeAutoLearning(input, lastUserMessage, finalContent, [...toolsUsedInTurn]);
-  return { content: finalContent, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
+  return { content: finalContent, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString(), devTrace: devTrace.length ? devTrace : undefined };
 }
 
 /** Agent-Modus mit Provider-Failover (auto) bzw. fixem Provider. */

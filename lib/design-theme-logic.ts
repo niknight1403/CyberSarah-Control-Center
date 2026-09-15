@@ -33,7 +33,7 @@ export const DESIGN_THEMES: readonly DesignTheme[] = [
   "glass",
 ] as const;
 
-export const DEFAULT_DESIGN_THEME: DesignTheme = "living";
+export const DEFAULT_DESIGN_THEME: DesignTheme = "neon";
 
 /**
  * Storage-Key v2: mit dem Design-Refresh (v1.3.1) wird der Standard auf
