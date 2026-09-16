@@ -25,6 +25,18 @@ let installed = false;
 let entryCounter = 0;
 let busy = false;
 
+/**
+ * Sprint 129 — Warnungs-Klassifizierung: console.warn schreibt in Node auf
+ * stderr, genau wie console.error. Der Stream-Patch kann beide nicht
+ * unterscheiden und stufte JEDE Warnung (z. B. abgelaufene Session-Cookies,
+ * harmlose LLM-Retry-Hinweise) als "error" ein — appStatus.status meldete
+ * daraufhin bis zu 60 Sekunden "error", obwohl das System laeuft, und das
+ * Dashboard zeigte alle abgeleiteten Kacheln rot. Ab jetzt protokolliert
+ * der Logger console.warn-Ausgaben direkt als "warn" und schreibt sie am
+ * gepatchten Stream vorbei (kein Doppel-Eintrag); echte Fehler (console.error,
+ * Exceptions, Stack-Traces auf stderr) bleiben "error".
+ */
+
 function emit(level: LogLevel, source: string, message: string) {
   if (busy) return; // Rekursionsschutz
   busy = true;
@@ -61,12 +73,37 @@ function patchStream(stream: NodeJS.WriteStream, level: LogLevel) {
   };
 }
 
-/** Installiert den Logger (idempotent) — stdout=info, stderr=error. */
+/** Formatiert console-Argumente wie Node selbst (util.format-Semantik). */
+function formatConsoleArgs(args: unknown[]): string {
+  return args
+    .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+    .join(" ")
+    .replace(/\n$/, "");
+}
+
+/** Installiert den Logger (idempotent) — stdout=info, stderr=error, console.warn=warn. */
 export function installRuntimeLogger() {
   if (installed) return;
   installed = true;
+
+  // stderr-Patch mit konserviertem Original-Write fuer console.warn-Bypass.
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
   patchStream(process.stdout, "info");
   patchStream(process.stderr, "error");
+
+  // Sprint 129: console.warn als "warn" protokollieren und den gepatchten
+  // stderr bewusst umgehen, damit keine zweite Zeile als "error" landet.
+  // Der originale stderr-Write bleibt erhalten — Render-Logs unveraendert.
+  const originalWarn = console.warn.bind(console);
+  console.warn = (...args: unknown[]) => {
+    const text = formatConsoleArgs(args);
+    if (text !== "") {
+      emit("warn", "console", text);
+    }
+    originalStderrWrite(`${args.length > 0 ? text : ""}\n`);
+  };
+  void originalWarn; // Referenz bewusst gehalten (Debuggbarkeit)
+
   emit("success", "runtime", "Live-Log-Streaming aktiviert (Ringpuffer 500).");
 }
 
