@@ -108,8 +108,10 @@ jobs:
               print("ownerId-Lookup-Fehler:", e)
           print("ownerId:", owner_id)
           attempts2 = [
-              f"/logs?limit=100&ownerId={owner_id}&name=cybersarah-control-center&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
-              f"/logs?limit=100&ownerId={owner_id}&name=cybersarah-control-center",
+              f"/logs?limit=100&ownerId={owner_id}&serviceId={app_sid}&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
+              f"/logs?limit=100&ownerId={owner_id}&serviceId={app_sid}",
+              f"/logs?limit=100&ownerId={owner_id}&resourceId={app_sid}",
+              f"/logs?limit=100&ownerId={owner_id}&service={app_sid}",
               f"/logs?limit=100&ownerId={owner_id}",
           ]
           for path in attempts2:
