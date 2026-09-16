@@ -9,18 +9,35 @@
  * Der letzte Schritt (Design-Auswahl) schreibt Design-Theme und
  * Hell/Dunkel-Praeferenz ueber den ThemeProvider und setzt das
  * Abschluss-Flag — danach replace zu den Tabs (kein Zurueck).
+ *
+ * Sprint 130:
+ *  - Willkommens-Schritt bekommt dezente, schwebende Glow-Orbs im
+ *    Hintergrund ("spacige Animationen") — reine transform/opacity-
+ *    Animationen ueber Reanimated, GPU-billig, kein Layout-Thrashing.
+ *  - Design-Auswahl bekommt eine Live-Vorschau (Mini-Mockup), die beim
+ *    Antippen einer Karte sofort die echten Farben/Effekte des Designs
+ *    zeigt, statt nur Beschreibungstext — "wie fuehlt sich das an".
  */
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import Animated, {
+  Easing,
+  FadeInDown,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { DEFAULT_DESIGN_THEME, type DesignTheme } from "@/lib/design-theme-logic";
+import { DesignThemeDefinitions, resolveDesignPalette } from "@/lib/_core/design-theme-palettes";
 import {
   getOnboardingStepState,
   getOnboardingThemeChoices,
@@ -34,6 +51,92 @@ import { withAlpha } from "@/lib/theme-color-utils";
 
 const PREFERENCE_CHOICES: readonly ThemePreference[] = ["system", "light", "dark"] as const;
 
+/** Schwebende Glow-Orbs fuer den Willkommens-Schritt — rein dekorativ. */
+function DriftingOrb({
+  size,
+  color,
+  top,
+  left,
+  duration,
+  delay,
+}: {
+  size: number;
+  color: string;
+  top: number;
+  left: number;
+  duration: number;
+  delay: number;
+}) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withRepeat(
+      withTiming(1, { duration, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [duration, progress]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: (progress.value - 0.5) * 26 },
+      { translateX: (progress.value - 0.5) * 18 },
+      { scale: 0.92 + progress.value * 0.16 },
+    ],
+    opacity: 0.18 + progress.value * 0.22,
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      entering={FadeInUp.duration(600).delay(delay)}
+      style={[
+        {
+          position: "absolute",
+          top,
+          left,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color,
+        },
+        Platform.OS === "web" ? ({ filter: "blur(18px)" } as never) : null,
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+/** Mini-Mockup, das die echten Farben/Effekte eines Designs live zeigt. */
+function DesignPreview({ theme, colors }: { theme: DesignTheme; colors: Colors }) {
+  const scheme = colors.background === "#FFFFFF" || colors.background === "#F2F5F8" ? "light" : "dark";
+  const palette = resolveDesignPalette(theme, scheme);
+  const effects = DesignThemeDefinitions[theme].effects[scheme];
+  const hasGlow = effects.glowPrimary !== "none";
+
+  return (
+    <View style={[previewStyles.frame, { backgroundColor: palette.background, borderColor: withAlpha(palette.border, 0.7) }]}>
+      <View
+        style={[
+          previewStyles.card,
+          {
+            backgroundColor: palette.surface,
+            borderColor: palette.border,
+          },
+          Platform.OS === "web"
+            ? ({ boxShadow: hasGlow ? effects.glowPrimary : "none", backdropFilter: effects.blur !== "0px" ? `blur(${effects.blur})` : undefined } as never)
+            : null,
+        ]}
+      >
+        <View style={[previewStyles.pill, { backgroundColor: palette.primary }]} />
+        <View style={[previewStyles.line, { backgroundColor: withAlpha(palette.foreground, 0.85), width: "70%" }]} />
+        <View style={[previewStyles.line, { backgroundColor: withAlpha(palette.muted, 0.7), width: "45%" }]} />
+        <View style={[previewStyles.button, { backgroundColor: palette.primary }]} />
+      </View>
+    </View>
+  );
+}
+
 export default function OnboardingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -43,6 +146,7 @@ export default function OnboardingScreen() {
 
   const [stepIndex, setStepIndex] = useState(0);
   const [designChoice, setDesignChoice] = useState<DesignTheme | null>(null);
+  const [previewTheme, setPreviewTheme] = useState<DesignTheme>(DEFAULT_DESIGN_THEME);
   const [preferenceChoice, setPreferenceChoice] = useState<ThemePreference>("system");
 
   const step = useMemo(() => getOnboardingStepState(stepIndex, ONBOARDING_SLIDES), [stepIndex]);
@@ -57,12 +161,8 @@ export default function OnboardingScreen() {
     router.replace("/(tabs)");
   }, [completeOnboarding, designChoice, preferenceChoice, setDesignTheme, setThemePreference, step.isLast]);
 
-  // Abschluss sofort nach Design-Wahl ermoeglichen: letzter Schritt + Wahl = fertig.
-  useEffect(() => {
-    // nichts zu tun — der Finish-Button triggert finish() explizit.
-  }, []);
-
   const isWide = width >= 640;
+  const isWelcome = step.slide.id === "welcome";
 
   return (
     <View style={styles.root}>
@@ -72,6 +172,15 @@ export default function OnboardingScreen() {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
+
+      {isWelcome ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <DriftingOrb size={140} color={withAlpha(colors.tint, 0.55)} top={40} left={-30} duration={5200} delay={80} />
+          <DriftingOrb size={90} color={withAlpha("#FF3DAD", 0.45)} top={220} left={width - 90} duration={4200} delay={220} />
+          <DriftingOrb size={60} color={withAlpha(colors.tint, 0.4)} top={420} left={30} duration={3600} delay={360} />
+        </View>
+      ) : null}
+
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
@@ -98,14 +207,22 @@ export default function OnboardingScreen() {
         {/* Theme-Auswahl erst auf dem letzten Schritt */}
         {step.slide.id === "theme" ? (
           <Animated.View entering={FadeInUp.duration(320).delay(120)} style={[styles.glassCard, isWide && styles.glassCardWide]}>
-            <Text style={styles.sectionTitle}>Design w\u00e4hlen</Text>
+            <Text style={styles.sectionTitle}>Design wählen</Text>
+
+            <DesignPreview theme={previewTheme} colors={colors} />
+            <Text style={styles.previewHint}>Live-Vorschau — tippe eine Karte an, um Farben und Effekte direkt zu sehen.</Text>
+
             <View style={styles.choiceGrid}>
               {themeChoices.map((choice) => {
                 const selected = designChoice === choice.theme;
                 return (
                   <Pressable
                     key={choice.theme}
-                    onPress={() => setDesignChoice(choice.theme)}
+                    onPress={() => {
+                      setDesignChoice(choice.theme);
+                      setPreviewTheme(choice.theme);
+                    }}
+                    onHoverIn={Platform.OS === "web" ? () => setPreviewTheme(choice.theme) : undefined}
                     style={[styles.choiceCard, selected && styles.choiceCardSelected]}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
@@ -149,7 +266,7 @@ export default function OnboardingScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         {step.isFirst ? null : (
           <Pressable style={styles.backButton} onPress={() => setStepIndex((current) => Math.max(0, current - 1))}>
-            <Text style={styles.backLabel}>Zur\u00fcck</Text>
+            <Text style={styles.backLabel}>Zurück</Text>
           </Pressable>
         )}
         <Pressable
@@ -171,6 +288,24 @@ export default function OnboardingScreen() {
 }
 
 type Colors = ReturnType<typeof useColors>;
+
+const previewStyles = StyleSheet.create({
+  frame: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 4,
+  },
+  card: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 8,
+  },
+  pill: { width: 28, height: 28, borderRadius: 8 },
+  line: { height: 8, borderRadius: 4 },
+  button: { height: 22, borderRadius: 8, marginTop: 4, width: "40%" },
+});
 
 function createStyles(colors: Colors) {
   return StyleSheet.create({
@@ -205,6 +340,7 @@ function createStyles(colors: Colors) {
     title: { fontSize: 26, fontWeight: "700", color: colors.text, marginBottom: 8 },
     text: { fontSize: 15, lineHeight: 22, color: colors.text },
     sectionTitle: { fontSize: 16, fontWeight: "600", color: colors.text, marginTop: 20, marginBottom: 12 },
+    previewHint: { fontSize: 11, color: colors.icon, marginBottom: 14, marginTop: -2 },
     choiceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
     choiceCard: {
       flexBasis: "47%",
