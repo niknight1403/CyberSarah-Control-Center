@@ -89,8 +89,16 @@ jobs:
 
           print()
           print("--- Logs des App-Services (Zeitfenster des fehlgeschlagenen Deploys) ---")
-          import urllib.error, datetime as dt
-          import time as _time
+          import urllib.error, datetime as dt, time as _time
+          owner_id = None
+          try:
+              for entry in api("/services?limit=20"):
+                  svc_o = entry.get("service", entry)
+                  if svc_o.get("id") == app_sid:
+                      owner_id = svc_o.get("ownerId")
+          except Exception as e:
+              print("ownerId-Lookup-Fehler:", e)
+          print("ownerId:", owner_id)
           _now = int(_time.time())
           start = str(_now - 14400)
           end = str(_now)
