@@ -54,6 +54,13 @@ export const CREDIT_PACKS: readonly CreditPack[] = [
 
 export interface MonetizationAccountState {
   plan: MonetizationPlan;
+  /**
+   * Sprint 144 — Dauerhafte Admin-Elite-Garantie: Der Administrator-Zugang
+   * hat unabhaengig von Billing-Zyklen dauerhaft das Elite-Paket mit
+   * unbegrenzter Quota. Das Flag wird serverseitig gesetzt und ueberlebt
+   * Plan- und Periodenwechsel.
+   */
+  adminGuaranteed?: boolean;
   /** Tages-Zaehler (YYYY-MM-DD). */
   dayKey: string;
   dayCloudTokens: number;
@@ -118,11 +125,28 @@ export function rollPeriods(state: MonetizationAccountState, now = new Date()): 
  * Reihenfolge: Tageslimit -> Monatslimit -> Guthaben (Credits).
  * Eigene Provider-Keys / Ollama laufen NIE durch diese Pruefung.
  */
+/** Sprint 144 — Admin-Konto dauerhaft auf Elite (expert) heben. */
+export function ensureAdminElitePlan(state: MonetizationAccountState): MonetizationAccountState {
+  if (state.adminGuaranteed === true && state.plan === "expert") return state;
+  return { ...state, plan: "expert", adminGuaranteed: true };
+}
+
 export function checkQuota(
   state: MonetizationAccountState,
   estimatedTokens: number,
   now = new Date(),
 ): QuotaCheck {
+  // Admin-Elite-Garantie: nie blockieren, unbegrenzt — auch nicht im
+  // enforce-Modus. Verbrauch wird nur noch gezaehlt (Metering), nie gedrosselt.
+  if (state.adminGuaranteed === true) {
+    return {
+      allowed: true,
+      limitKind: "none",
+      usesCredits: false,
+      remainingToday: Number.MAX_SAFE_INTEGER,
+      remainingThisMonth: Number.MAX_SAFE_INTEGER,
+    };
+  }
   const limits = PLAN_LIMITS[state.plan];
   const rolled = rollPeriods(state, now);
   const remainingToday = Math.max(0, limits.dailyCloudTokens - rolled.dayCloudTokens);

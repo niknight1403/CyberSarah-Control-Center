@@ -18,6 +18,7 @@ import * as db from "./db";
 import {
   checkQuota,
   consumeQuota,
+  ensureAdminElitePlan,
   freshAccountState,
   rollPeriods,
   type MonetizationAccountState,
@@ -32,16 +33,32 @@ function accountKey(openId: string): string {
 }
 
 /** Account-State laden (auto-initialisiert, nie null). */
-export async function getMonetizationAccount(openId: string): Promise<MonetizationAccountState> {
+export async function getMonetizationAccount(
+  openId: string,
+  options?: { isAdmin?: boolean },
+): Promise<MonetizationAccountState> {
+  let state: MonetizationAccountState;
   try {
     const stored = await db.getModelRouterSetting<MonetizationAccountState>(accountKey(openId));
     if (stored && typeof stored === "object" && stored.plan) {
-      return rollPeriods(stored);
+      state = rollPeriods(stored);
+    } else {
+      state = freshAccountState();
     }
   } catch {
     // Fehlgeschlagener Lesezugriff -> lokaler Default, nie blockieren.
+    state = freshAccountState();
   }
-  return freshAccountState();
+  // Sprint 144 — Dauerhafte Admin-Elite-Garantie: Admin-Konten haben
+  // immer das Expert-Paket mit unbegrenzter Quota (einmalig persistiert).
+  if (options?.isAdmin === true) {
+    const elite = ensureAdminElitePlan(state);
+    if (elite !== state) {
+      await saveMonetizationAccount(openId, elite);
+    }
+    return elite;
+  }
+  return state;
 }
 
 async function saveMonetizationAccount(openId: string, state: MonetizationAccountState): Promise<void> {
@@ -84,10 +101,10 @@ export interface QuotaDecision extends QuotaCheck {
  * passiert erst, nachdem QUOTA_ENFORCEMENT=enforce gesetzt wurde.
  */
 export async function enforceCloudQuotaForUser(
-  user: { id: number; openId: string },
+  user: { id: number; openId: string; role?: string },
   estimatedTokens: number,
 ): Promise<QuotaDecision> {
-  const account = await getMonetizationAccount(user.openId);
+  const account = await getMonetizationAccount(user.openId, { isAdmin: user.role === "admin" });
   const decision = checkQuota(account, Math.max(1, Math.ceil(estimatedTokens)));
   const enforcement = ENFORCEMENT_MODE();
 
@@ -108,8 +125,9 @@ export async function enforceCloudQuotaForUser(
 export async function recordCloudTokenUsage(
   openId: string,
   actualTokens: number,
+  options?: { isAdmin?: boolean },
 ): Promise<MonetizationAccountState> {
-  const account = await getMonetizationAccount(openId);
+  const account = await getMonetizationAccount(openId, options);
   const updated = consumeQuota(account, Math.max(0, Math.ceil(actualTokens)));
   await saveMonetizationAccount(openId, updated);
   return updated;
