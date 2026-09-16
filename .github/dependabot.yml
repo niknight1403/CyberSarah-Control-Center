@@ -53,12 +53,18 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "nativewind"
         update-types: ["version-update:semver-major"]
+      # Sprint-134-Follow-up (16.09.): Auch RN-MINOR-Sprünge ignorieren —
+      # React-Native-Minor-Versionen folgen der Expo-SDK-Linie (SDK 57 =>
+      # RN 0.86.x). Dependabot schlug RN 0.87 mit kaputtem Lockfile vor
+      # (npm ci: EUSAGE), obwohl SDK 58 noch nicht erschienen ist. RN- und
+      # RN-Modul-Sprünge werden im SDK-58-Sprint gemeinsam gehoben.
+      # Patch-Updates innerhalb der gepinnten Version bleiben erlaubt.
       - dependency-name: "react-native"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "react-native-*"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "@react-native-*"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     commit-message:
       prefix: "chore(deps)"
 
