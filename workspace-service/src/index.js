@@ -127,6 +127,17 @@ const pullRequestSchema = z.object({
   title: z.string().trim().min(3).max(140),
   body: z.string().trim().max(10_000).default(""),
 });
+const issueStateSchema = z.enum(["open", "closed", "all"]).catch("open");
+const issueLimitSchema = z.coerce.number().int().min(1).max(30).default(15);
+const issueCreateSchema = z.object({
+  title: z.string().trim().min(3).max(280),
+  body: z.string().max(20_000).default(""),
+  labels: z.array(z.string().trim().min(1).max(60)).max(6).default([]),
+});
+const issueCloseSchema = z.object({
+  number: z.coerce.number().int().positive(),
+  comment: z.string().max(10_000).default(""),
+});
 const agentSchema = z.object({
   workspaceId: workspaceIdSchema,
   prompt: z.string().min(1).max(8_000),
@@ -134,7 +145,7 @@ const agentSchema = z.object({
 });
 const auditEventSchema = z.object({
   eventId: z.string().min(1).max(160),
-  action: z.enum(["build", "test", "commit", "push", "pull_request", "ci", "release"]),
+  action: z.enum(["build", "test", "commit", "push", "pull_request", "ci", "release", "issue"]),
   status: z.enum(["started", "passed", "failed", "cancelled"]),
   repository: z.string().max(300).optional(),
   branch: z.string().max(120).optional(),
@@ -254,6 +265,33 @@ async function createGitHubPullRequest(repositoryUrl, token, input) {
     throw new Error(`Pull Request konnte nicht erstellt werden (${response.status}): ${message}`);
   }
   return { number: payload.number, url: payload.html_url, state: payload.state, title: payload.title };
+}
+
+/** Liest owner/repository aus dem Origin-Remote des Workspace (wie Pull-Request-Route). */
+async function getRepositoryInfo(workspacePath, token) {
+  const { stdout } = await git(["remote", "get-url", "origin"], workspacePath, token);
+  return assertRepositoryUrl(stdout.trim());
+}
+
+/** Fuehrt eine schreibende GitHub-REST-Aktion aus (POST/PATCH mit JSON-Body). */
+async function githubMutation(pathname, token, body, method = "POST") {
+  if (!token) throw new Error("Fuer diese Aktion ist ein GitHub-Zugriffstoken erforderlich.");
+  const response = await fetch(`https://api.github.com${pathname}`, {
+    method,
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = typeof payload.message === "string" ? payload.message : "Unbekannter GitHub-Fehler";
+    throw new Error(`GitHub-Aktion fehlgeschlagen (${response.status}): ${message}`);
+  }
+  return payload;
 }
 
 async function githubJson(pathname, token) {
@@ -714,10 +752,17 @@ app.post("/api/v1/workspaces/:workspaceId/git/checkout", requireServiceAuthoriza
     const { branch } = checkoutSchema.parse(request.body);
     const workspacePath = getWorkspacePath(request.params.workspaceId);
     const token = getGitHubToken(request);
-    await git(["fetch", "origin", `refs/heads/${branch}:refs/remotes/origin/${branch}`], workspacePath, token);
-    await git(["checkout", "-B", branch, `origin/${branch}`], workspacePath, token);
+    let branchOrigin = "remote";
+    try {
+      await git(["fetch", "origin", `refs/heads/${branch}:refs/remotes/origin/${branch}`], workspacePath, token);
+      await git(["checkout", "-B", branch, `origin/${branch}`], workspacePath, token);
+    } catch {
+      // Remote-Branch existiert nicht: neuen lokalen Feature-Branch vom aktuellen Stand anlegen
+      await git(["checkout", "-B", branch], workspacePath, token);
+      branchOrigin = "local";
+    }
     const files = await listFiles(workspacePath);
-    response.json({ branch, files });
+    response.json({ branch, branchOrigin, files });
   } catch (error) {
     next(error);
   }
@@ -784,6 +829,64 @@ app.post("/api/v1/workspaces/:workspaceId/git/pull-request", requireServiceAutho
     });
     await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "pull_request", status: "passed", branch: headBranch, message: `Pull Request #${pullRequest.number} erstellt.` });
     response.status(201).json({ ...pullRequest, headBranch, baseBranch: input.baseBranch });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/v1/workspaces/:workspaceId/github/issues", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const state = issueStateSchema.parse(request.query.state);
+    const limit = issueLimitSchema.parse(request.query.limit);
+    const token = getGitHubToken(request);
+    if (!token) throw new Error("Fuer GitHub-Issues ist ein GitHub-Zugriffstoken erforderlich.");
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const { owner, repository } = await getRepositoryInfo(workspacePath, token);
+    const payload = await githubJson(`/repos/${owner}/${repository}/issues?state=${state}&per_page=${limit}`, token);
+    const issues = (Array.isArray(payload) ? payload : [])
+      .filter((issue) => !issue.pull_request)
+      .map((issue) => ({
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        url: issue.html_url,
+        labels: (issue.labels ?? []).map((label) => label.name),
+        createdAt: issue.created_at,
+      }));
+    response.json({ state, issues });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/v1/workspaces/:workspaceId/github/issues", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const input = issueCreateSchema.parse(request.body);
+    const token = getGitHubToken(request);
+    if (!token) throw new Error("Fuer GitHub-Issues ist ein GitHub-Zugriffstoken erforderlich.");
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const { owner, repository } = await getRepositoryInfo(workspacePath, token);
+    const issue = await githubMutation(`/repos/${owner}/${repository}/issues`, token, { title: input.title, body: input.body, labels: input.labels });
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "issue", status: "passed", message: `Issue #${issue.number} erstellt: ${input.title}` });
+    response.status(201).json({ number: issue.number, url: issue.html_url, title: issue.title, state: issue.state });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/v1/workspaces/:workspaceId/github/issues/close", requireServiceAuthorization, async (request, response, next) => {
+  try {
+    const input = issueCloseSchema.parse(request.body);
+    const token = getGitHubToken(request);
+    if (!token) throw new Error("Fuer GitHub-Issues ist ein GitHub-Zugriffstoken erforderlich.");
+    const workspacePath = getWorkspacePath(request.params.workspaceId);
+    const { owner, repository } = await getRepositoryInfo(workspacePath, token);
+    if (input.comment) {
+      await githubMutation(`/repos/${owner}/${repository}/issues/${input.number}/comments`, token, { body: input.comment });
+    }
+    const issue = await githubMutation(`/repos/${owner}/${repository}/issues/${input.number}`, token, { state: "closed" }, "PATCH");
+    await externalActionAuditService.record({ eventId: crypto.randomUUID(), action: "issue", status: "passed", message: `Issue #${input.number} geschlossen.` });
+    response.json({ number: issue.number, state: issue.state, url: issue.html_url, closed: issue.state === "closed" });
   } catch (error) {
     next(error);
   }

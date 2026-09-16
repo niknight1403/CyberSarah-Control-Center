@@ -110,6 +110,75 @@ describe("dev-agent-tools-logic (Sprint 88)", () => {
       expect(prompt).toContain(name);
     }
     expect(prompt).toContain("get_provider_status");
+    expect(prompt).toContain("voller Autoritaet");
+    expect(prompt).toContain("list_github_issues");
+    expect(prompt).toContain("create_github_issue");
+    expect(prompt).toContain("checkout_branch");
+  });
+
+  it("baut Branch- und Issue-Werkzeug-Anfragen deterministisch (Sprint 140)", () => {
+    expect(buildWorkspaceToolRequest("list_branches", "ws1", {})).toEqual({
+      ok: true,
+      request: { method: "GET", path: "/api/render/api/v1/workspaces/ws1/git/branches" },
+    });
+    expect(buildWorkspaceToolRequest("checkout_branch", "ws1", { branch: "feature/chat-fix" })).toEqual({
+      ok: true,
+      request: { method: "POST", path: "/api/render/api/v1/workspaces/ws1/git/checkout", body: { branch: "feature/chat-fix" } },
+    });
+    expect(buildWorkspaceToolRequest("checkout_branch", "ws1", {})).toEqual({ ok: false, error: "Das Argument 'branch' fehlt oder ist leer." });
+
+    expect(buildWorkspaceToolRequest("list_github_issues", "ws1", {})).toEqual({
+      ok: true,
+      request: { method: "GET", path: "/api/render/api/v1/workspaces/ws1/github/issues?state=open&limit=15" },
+    });
+    expect(buildWorkspaceToolRequest("list_github_issues", "ws1", { state: "CLOSED", limit: 99 })).toEqual({
+      ok: true,
+      request: { method: "GET", path: "/api/render/api/v1/workspaces/ws1/github/issues?state=closed&limit=30" },
+    });
+    expect(buildWorkspaceToolRequest("list_github_issues", "ws1", { state: "unsinn", limit: "viele" })).toEqual({
+      ok: true,
+      request: { method: "GET", path: "/api/render/api/v1/workspaces/ws1/github/issues?state=open&limit=15" },
+    });
+
+    expect(buildWorkspaceToolRequest("create_github_issue", "ws1", { title: "Bug: Y", labels: ["bug", 5, " "] })).toEqual({
+      ok: true,
+      request: { method: "POST", path: "/api/render/api/v1/workspaces/ws1/github/issues", body: { title: "Bug: Y", body: "", labels: ["bug"] } },
+    });
+    expect(buildWorkspaceToolRequest("create_github_issue", "ws1", { title: "ab" })).toEqual({
+      ok: false,
+      error: "Das Argument 'title' muss mindestens 3 Zeichen lang sein.",
+    });
+
+    expect(buildWorkspaceToolRequest("close_github_issue", "ws1", { number: 42, comment: "Erledigt." })).toEqual({
+      ok: true,
+      request: { method: "POST", path: "/api/render/api/v1/workspaces/ws1/github/issues/close", body: { number: 42, comment: "Erledigt." } },
+    });
+    expect(buildWorkspaceToolRequest("close_github_issue", "ws1", { number: 42 })).toEqual({
+      ok: true,
+      request: { method: "POST", path: "/api/render/api/v1/workspaces/ws1/github/issues/close", body: { number: 42, comment: "" } },
+    });
+    expect(buildWorkspaceToolRequest("close_github_issue", "ws1", { number: 0 })).toEqual({
+      ok: false,
+      error: "Das Argument 'number' fehlt oder ist keine gueltige Issue-Nummer.",
+    });
+  });
+
+  it("formatiert Branch- und Issue-Ergebnisse fuer das Modell (Sprint 140)", () => {
+    expect(formatToolResultForModel("list_branches", { currentBranch: "main", branches: ["main", "dev"] })).toBe(
+      "Aktuell: main\nRemote-Branches (2):\nmain\ndev",
+    );
+    expect(formatToolResultForModel("checkout_branch", { branch: "feature/x", branchOrigin: "local" })).toContain("neuer lokaler Branch");
+    expect(formatToolResultForModel("checkout_branch", { branch: "main", branchOrigin: "remote" })).not.toContain("neuer lokaler Branch");
+
+    const issueList = formatToolResultForModel("list_github_issues", {
+      issues: [{ number: 7, title: "Deploy bricht", state: "open", labels: ["bug"], url: "https://github.com/x/y/issues/7" }],
+    });
+    expect(issueList).toContain("#7 (open) [bug] Deploy bricht");
+
+    expect(formatToolResultForModel("list_github_issues", { issues: [] })).toBe("Keine Issues gefunden.");
+    expect(formatToolResultForModel("create_github_issue", { number: 12, url: "https://github.com/x/y/issues/12" })).toContain("Issue #12 erstellt");
+    expect(formatToolResultForModel("close_github_issue", { number: 12, state: "closed", closed: true })).toContain("Issue #12 geschlossen");
+    expect(formatToolResultForModel("close_github_issue", { number: 12, state: "open", closed: false })).toContain("konnte nicht geschlossen werden");
   });
 
   it("buildAgentSystemPrompt nennt den aktiven Provider, wenn uebergeben (Sprint 138)", () => {

@@ -19,6 +19,11 @@ export const AGENT_TOOL_NAMES = [
   "commit_changes",
   "push_changes",
   "open_pull_request",
+  "list_branches",
+  "checkout_branch",
+  "list_github_issues",
+  "create_github_issue",
+  "close_github_issue",
   "save_learning",
 ] as const;
 
@@ -118,6 +123,75 @@ export const AGENT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
           baseBranch: { type: "string", description: "Ziel-Branch, z. B. 'main'." },
         },
         required: ["title", "baseBranch"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_branches",
+      description: "Listet alle Remote-Branches des verbundenen GitHub-Repositorys inklusive des aktuell ausgecheckten Branchs.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "checkout_branch",
+      description: "Wechselt im Workspace auf einen Branch. Existiert der Remote-Branch, wird er ausgecheckt; existiert er nicht, wird ein neuer lokaler Feature-Branch vom aktuellen Stand angelegt (branchOrigin im Ergebnis: 'remote' oder 'local').",
+      parameters: {
+        type: "object",
+        properties: { branch: { type: "string", description: "Branch-Name, z. B. 'feature/chat-fix'." } },
+        required: ["branch"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_github_issues",
+      description: "Listet GitHub-Issues des verbundenen Repositorys mit Nummer, Titel, Zustand, Labels und URL. Nuetzlich, um offene Aufgaben und Bugs autonom zu priorisieren.",
+      parameters: {
+        type: "object",
+        properties: {
+          state: { type: "string", description: "'open' (Standard), 'closed' oder 'all'." },
+          limit: { type: "number", description: "Maximale Anzahl Issues (1-30, Standard 15)." },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_github_issue",
+      description: "Erstellt ein neues GitHub-Issue im verbundenen Repository. Nutze dies, um erkannte Bugs, fehlende Features oder Entwicklungsschritte (z. B. fehlende Integrationen) nachvollziehbar zu dokumentieren.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Kurzer, praegnanter Issue-Titel (3-280 Zeichen)." },
+          body: { type: "string", description: "Beschreibung: Problem, Kontext, Akzeptanzkriterien." },
+          labels: { type: "array", items: { type: "string" }, description: "Bis zu 6 Labels, z. B. ['bug'] oder ['enhancement', 'autonomy']." },
+        },
+        required: ["title"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "close_github_issue",
+      description: "Schliesst ein GitHub-Issue per Nummer mit optionalem Abschlusskommentar. Schliesse nur Issues, deren Arbeit tatsaechlich abgeschlossen und verifiziert ist.",
+      parameters: {
+        type: "object",
+        properties: {
+          number: { type: "number", description: "Issue-Nummer, z. B. 42." },
+          comment: { type: "string", description: "Optionales Abschlusskommentar mit Begruendung." },
+        },
+        required: ["number"],
         additionalProperties: false,
       },
     },
@@ -233,6 +307,42 @@ export function buildWorkspaceToolRequest(
       return { ok: true, request: { method: "POST", path: `${base}/git/pull-request`, body: { title, baseBranch, body } } };
     }
 
+    case "list_branches":
+      return { ok: true, request: { method: "GET", path: `${base}/git/branches` } };
+
+    case "checkout_branch": {
+      const branch = requireStringArg(args, "branch", 120);
+      if (typeof branch !== "string") return { ok: false, error: branch.error };
+      return { ok: true, request: { method: "POST", path: `${base}/git/checkout`, body: { branch } } };
+    }
+
+    case "list_github_issues": {
+      const stateRaw = typeof args.state === "string" ? args.state.trim().toLowerCase() : "open";
+      const state = ["open", "closed", "all"].includes(stateRaw) ? stateRaw : "open";
+      const limit = typeof args.limit === "number" && Number.isFinite(args.limit) ? Math.min(Math.max(Math.trunc(args.limit), 1), 30) : 15;
+      return { ok: true, request: { method: "GET", path: `${base}/github/issues?state=${state}&limit=${limit}` } };
+    }
+
+    case "create_github_issue": {
+      const title = requireStringArg(args, "title", 280);
+      if (typeof title !== "string") return { ok: false, error: title.error };
+      if (title.length < 3) return { ok: false, error: "Das Argument 'title' muss mindestens 3 Zeichen lang sein." };
+      const body = typeof args.body === "string" ? args.body.slice(0, 20_000) : "";
+      const labels = Array.isArray(args.labels)
+        ? args.labels.filter((label): label is string => typeof label === "string" && label.trim().length > 0).map((label) => label.trim().slice(0, 60)).slice(0, 6)
+        : [];
+      return { ok: true, request: { method: "POST", path: `${base}/github/issues`, body: { title, body, labels } } };
+    }
+
+    case "close_github_issue": {
+      const issueNumber = args.number;
+      if (typeof issueNumber !== "number" || !Number.isInteger(issueNumber) || issueNumber < 1) {
+        return { ok: false, error: "Das Argument 'number' fehlt oder ist keine gueltige Issue-Nummer." };
+      }
+      const comment = typeof args.comment === "string" ? args.comment.slice(0, 10_000) : "";
+      return { ok: true, request: { method: "POST", path: `${base}/github/issues/close`, body: { number: issueNumber, comment } } };
+    }
+
     default:
       return { ok: false, error: `Unbekanntes Werkzeug: ${tool}` };
   }
@@ -288,6 +398,38 @@ export function formatToolResultForModel(tool: AgentToolName, payload: unknown):
         ? `Pull Request #${String(record.number)} erstellt: ${String(record.html_url ?? record.url ?? "")}`
         : "Pull Request konnte nicht erstellt werden.";
 
+    case "list_branches": {
+      const branches = Array.isArray(record.branches) ? record.branches.filter((b): b is string => typeof b === "string") : [];
+      const current = typeof record.currentBranch === "string" ? record.currentBranch : "";
+      return `Aktuell: ${current || "unbekannt"}\nRemote-Branches (${branches.length}):\n${branches.join("\n") || "keine"}`;
+    }
+
+    case "checkout_branch": {
+      const origin = record.branchOrigin === "local" ? " (neuer lokaler Branch — Remote hatte ihn noch nicht)" : "";
+      return `Auf Branch '${String(record.branch ?? "")}' gewechselt${origin}.`;
+    }
+
+    case "list_github_issues": {
+      const issues = Array.isArray(record.issues) ? record.issues as Array<Record<string, unknown>> : [];
+      if (!issues.length) return "Keine Issues gefunden.";
+      const lines = issues.map((issue) => {
+        const labels = Array.isArray(issue.labels) ? (issue.labels as unknown[]).filter((l): l is string => typeof l === "string").join(", ") : "";
+        const labelSuffix = labels ? ` [${labels}]` : "";
+        return `#${String(issue.number ?? "")} (${String(issue.state ?? "")})${labelSuffix} ${String(issue.title ?? "")} — ${String(issue.url ?? "")}`;
+      });
+      return truncate(lines.join("\n"), MAX_TOOL_RESULT_CHARS);
+    }
+
+    case "create_github_issue":
+      return record.number
+        ? `Issue #${String(record.number)} erstellt: ${String(record.url ?? "")}`
+        : "Issue konnte nicht erstellt werden.";
+
+    case "close_github_issue":
+      return record.closed
+        ? `Issue #${String(record.number ?? "")} geschlossen.`
+        : `Issue #${String(record.number ?? "")} konnte nicht geschlossen werden (Zustand: ${String(record.state ?? "unbekannt")}).`;
+
     default:
       return truncate(JSON.stringify(record), MAX_TOOL_RESULT_CHARS);
   }
@@ -304,7 +446,7 @@ export function buildAgentSystemPrompt(branch: string, currentProvider?: string)
     : "";
   return `Du bist CyberSarah, eine autonome Entwicklungsassistentin im Control Center mit direktem Werkzeugzugriff auf das verbundene GitHub-Repository (aktueller Branch: ${branch}).${providerNotice}
 
-Du hast Werkzeuge, um selbststaendig zu arbeiten: Repository/Git (list_repo_files, read_repo_file, write_repo_file, git_status, commit_changes, push_changes, open_pull_request) sowie Live-Geschaeftsdaten (get_revenue_metrics: Stripe-Einnahmen und Abonnements; get_crypto_prices: BTC/ETH/SOL-Echtzeitkurse mit Kraken-Fallback; get_analytics_overview: GA4-Kennzahlen der letzten 7 Tage; get_crm_contacts: HubSpot-Kontakte und Salesforce-Status; get_content_channels_status: TikTok/Instagram-Kanäle; get_ai_services_status: Perplexity/ElevenLabs/Symphony-Verfügbarkeit; get_provider_status: verbindlicher Live-Status aller KI-Provider — On-Server-LLM/managed inkl. Key-Pool, Cloud-Provider, lokale Endpoints, bevorzugte Reihenfolge) und das Langzeit-Gedächtnis (save_learning: Erkenntnisse dauerhaft speichern). Nutze sie proaktiv, statt den Nutzer nach Code oder Zahlen zu fragen — bei Fragen zu Einnahmen, Kursen, Kennzahlen oder dem Provider-/On-Server-Status rufe zuerst das passende Daten-Werkzeug auf.
+Du hast Werkzeuge, um selbststaendig zu arbeiten: Repository/Git (list_repo_files, read_repo_file, write_repo_file, git_status, commit_changes, push_changes, open_pull_request, list_branches, checkout_branch), GitHub-Issue-Management (list_github_issues, create_github_issue, close_github_issue) sowie Live-Geschaeftsdaten (get_revenue_metrics: Stripe-Einnahmen und Abonnements; get_crypto_prices: BTC/ETH/SOL-Echtzeitkurse mit Kraken-Fallback; get_analytics_overview: GA4-Kennzahlen der letzten 7 Tage; get_crm_contacts: HubSpot-Kontakte und Salesforce-Status; get_content_channels_status: TikTok/Instagram-Kanäle; get_ai_services_status: Perplexity/ElevenLabs/Symphony-Verfügbarkeit; get_provider_status: verbindlicher Live-Status aller KI-Provider — On-Server-LLM/managed inkl. Key-Pool, Cloud-Provider, lokale Endpoints, bevorzugte Reihenfolge) und das Langzeit-Gedächtnis (save_learning: Erkenntnisse dauerhaft speichern). Nutze sie proaktiv, statt den Nutzer nach Code oder Zahlen zu fragen — bei Fragen zu Einnahmen, Kursen, Kennzahlen oder dem Provider-/On-Server-Status rufe zuerst das passende Daten-Werkzeug auf.
 
 Regeln:
 - Verschaffe dir bei Unklarheit ueber die Struktur zuerst mit list_repo_files einen Ueberblick, dann lies gezielt relevante Dateien.
@@ -313,5 +455,8 @@ Regeln:
 - Erfinde niemals ausgefuehrte Aktionen — nutze fuer jede Behauptung ("ich habe X geaendert") tatsaechlich zuvor das passende Werkzeug.
 - Fasse dich an operationelle Grenzen: Business-Tools sind ausschliesslich Nur-Lese-Werkzeuge; es gibt kein Werkzeug, das fremde Systeme veraendert oder loescht. Zerstoerende Git-Operationen (force-push, Branch-Loeschung) sind nicht Teil deines Werkzeugsets und werden nicht simuliert.
 - Nach abgeschlossenen Fehlerbehebungen und vereinbarten Konventionen speichere die Kern-Erkenntnis mit save_learning ins Langzeit-Gedächtnis.
+- Du arbeitest autonom und mit voller Autoritaet ueber alle dir gegebenen Werkzeuge. Pruefe mit list_github_issues proaktiv offene Aufgaben und arbeite sie eigenstaendig ab; dokumentiere erkannte Bugs und fehlende Features sofort mit create_github_issue und schliesse mit close_github_issue nur verifiziert abgeschlossene Issues.
+- Fehlt fuer eine Aufgabe ein Werkzeug oder ein Connector (MCP, Skills, Integrationen), erfinde nichts — sage klar, was fehlt, und lege den Bedarf als Issue an, damit die Luecke autonom geschlossen werden kann.
+- Nutze checkout_branch fuer eigenstaendige Feature-Branches, statt direkt auf main zu arbeiten.
 - Antworte auf Deutsch, klar und knapp. Nach jeder Werkzeugnutzung fasse das Ergebnis kurz zusammen, bevor du den naechsten Schritt geht.`;
 }
