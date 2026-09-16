@@ -244,6 +244,7 @@ export const BUSINESS_TOOL_NAMES = [
   "get_content_channels_status",
   "get_ai_services_status",
   "get_revenue_os_overview",
+  "get_provider_status",
 ] as const;
 
 export type BusinessToolName = (typeof BUSINESS_TOOL_NAMES)[number];
@@ -268,6 +269,8 @@ export const BUSINESS_TOOL_DESCRIPTIONS: Record<BusinessToolName, string> = {
     "Liefert den Status der KI-Dienste (Perplexity Recherche, ElevenLabs Sprachausgabe, TikTok Symphony) — verfuegbar, sobald die jeweiligen API-Keys hinterlegt sind.",
   get_revenue_os_overview:
     "Liefert einen read-only-Ueberblick ueber das Schwestersystem Revenue-OS: Umsatz und Transaktionen (24 h, gesamt), Content-Status je Eintrag, Affiliate-Klicks/-Konversionen/Provisionen und aktive Subscriptions. Voraussetzung: REVENUE_OS_DATABASE_URL (getrenntes Secret).",
+  get_provider_status:
+    "Liefert den verbindlichen Live-Status aller KI-Provider: On-Server-LLM (managed, inkl. Key-Pool-Zustand), konfigurierte Cloud-Provider (openai/gemini/openrouter/groq/...), lokale Endpoints (ollama/lmstudio, aktiv angepingt) und die bevorzugte Routing-Reihenfolge. Nutze dieses Werkzeug immer, bevor du eine Frage zum Provider-/On-Server-Status beantwortest — rate niemals, pruefe den echten Status.",
 };
 
 /** Formatiert das Ergebnis eines Business-Tools als kompakte Modell-Antwort. */
@@ -317,11 +320,71 @@ export function formatBusinessResult(tool: BusinessToolName, payload: unknown): 
       : [];
     return `Content-Kanaele — ${channels.length > 0 ? channels.join("; ") : "keine Kanaele konfiguriert"}.`;
   }
-  // get_ai_services_status
-  const services = Array.isArray(record.services)
-    ? (record.services as { name: string; configured: boolean }[]).map(
-        (service) => `${service.name}: ${service.configured ? "verfuegbar" : "Key fehlt"}`,
-      )
+  if (tool === "get_ai_services_status") {
+    const services = Array.isArray(record.services)
+      ? (record.services as { name: string; configured: boolean }[]).map(
+          (service) => `${service.name}: ${service.configured ? "verfuegbar" : "Key fehlt"}`,
+        )
+      : [];
+    return `KI-Dienste — ${services.length > 0 ? services.join("; ") : "keine Dienste registriert"}.`;
+  }
+  // get_provider_status
+  return formatProviderStatusSnapshot(record);
+}
+
+/** Provider-Health-Eintrag aus dem Router-Snapshot (Sprint-71-Registry). */
+type ProviderStatusHealthEntry = {
+  provider: string;
+  status: "unknown" | "ready" | "degraded" | "cooldown" | "unconfigured";
+  consecutiveFailures: number;
+  lastLatencyMs: number | null;
+};
+
+type ManagedKeyPoolEntry = {
+  id: string;
+  label: string;
+  status: "active" | "cooling" | "exhausted";
+  remainingCredits: number | null;
+};
+
+const PROVIDER_STATUS_LABEL: Record<string, string> = {
+  managed: "On-Server-LLM (managed)",
+  unknown: "unbekannt (noch kein Aufruf)",
+  ready: "einsatzbereit",
+  degraded: "beeintraechtigt",
+  cooldown: "im Cooldown (temporaer pausiert)",
+  unconfigured: "nicht konfiguriert",
+};
+
+/** Sprint 138 — Formatiert den Live-Provider-/On-Server-Status verbindlich fuer das Modell. */
+function formatProviderStatusSnapshot(record: Record<string, unknown>): string {
+  const configured = Array.isArray(record.configured) ? (record.configured as string[]) : [];
+  const health = Array.isArray(record.health) ? (record.health as ProviderStatusHealthEntry[]) : [];
+  const preferredOrder = Array.isArray(record.preferredOrder) ? (record.preferredOrder as string[]) : [];
+  const managedPool = Array.isArray(record.managedPool) ? (record.managedPool as ManagedKeyPoolEntry[]) : [];
+  const localProbe = Array.isArray(record.localProbe)
+    ? (record.localProbe as { provider: string; reachable: boolean }[])
     : [];
-  return `KI-Dienste — ${services.length > 0 ? services.join("; ") : "keine Dienste registriert"}.`;
+
+  const managedHealth = health.find((entry) => entry.provider === "managed");
+  const managedStatusLabel = managedPool.length > 0
+    ? `${managedPool.filter((key) => key.status === "active").length}/${managedPool.length} Keys aktiv`
+    : managedHealth
+      ? PROVIDER_STATUS_LABEL[managedHealth.status] ?? managedHealth.status
+      : "Status unbekannt";
+  const managedLine = `On-Server-LLM (managed): ${managedStatusLabel}${configured.includes("managed") ? "" : " — ACHTUNG: nicht in der konfigurierten Liste"}.`;
+
+  const cloudLines = health
+    .filter((entry) => entry.provider !== "managed" && entry.status !== "unconfigured")
+    .map((entry) => `${entry.provider}: ${PROVIDER_STATUS_LABEL[entry.status] ?? entry.status}`);
+
+  const localLines = localProbe.map(
+    (entry) => `${entry.provider}: ${entry.reachable ? "erreichbar" : "nicht erreichbar"}`,
+  );
+
+  const parts = [managedLine];
+  if (cloudLines.length > 0) parts.push(`Cloud-Provider — ${cloudLines.join("; ")}.`);
+  if (localLines.length > 0) parts.push(`Lokale Endpoints (aktiv geprueft) — ${localLines.join("; ")}.`);
+  if (preferredOrder.length > 0) parts.push(`Bevorzugte Reihenfolge: ${preferredOrder.join(" > ")}.`);
+  return parts.join(" ");
 }

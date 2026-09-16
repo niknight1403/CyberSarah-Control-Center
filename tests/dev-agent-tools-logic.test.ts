@@ -109,5 +109,13 @@ describe("dev-agent-tools-logic (Sprint 88)", () => {
     for (const name of AGENT_TOOL_NAMES) {
       expect(prompt).toContain(name);
     }
+    expect(prompt).toContain("get_provider_status");
+  });
+
+  it("buildAgentSystemPrompt nennt den aktiven Provider, wenn uebergeben (Sprint 138)", () => {
+    const prompt = buildAgentSystemPrompt("main", "managed");
+    expect(prompt).toContain("Provider 'managed'");
+    expect(prompt).toContain("On-Server-LLM");
+    expect(buildAgentSystemPrompt("main")).not.toContain("System-Hinweis:");
   });
 });

@@ -730,7 +730,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const learningContext = await loadLearningContext(input.userOpenId, lastUserMessage, input.sessionId);
   const conversation: Message[] = [
-    { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main")}${learningContext}` },
+    { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main", provider)}${learningContext}` },
     ...input.messages.map((message) => ({ role: message.role, content: message.content })),
   ];
   const businessTools = BUSINESS_TOOL_NAMES.map((name) => ({

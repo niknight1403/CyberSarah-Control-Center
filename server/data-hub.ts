@@ -17,6 +17,8 @@ import {
 import { protectedProcedure, router } from "./_core/trpc";
 import { getRuntimeLogs } from "./runtime-logger";
 import { fetchRevenueOsSnapshot } from "./revenue-os";
+import { getManagedPoolSnapshotForMetering } from "./_core/llm";
+import { getRouterSnapshot, probeLocalProviders } from "./model-router";
 
 /**
  * Sprint 90 — Master-Agenten-Daten-Hub (Sub-Agenten: Revenue & Trading).
@@ -379,7 +381,33 @@ export type BusinessTool =
   | "get_crm_contacts"
   | "get_content_channels_status"
   | "get_ai_services_status"
-  | "get_revenue_os_overview";
+  | "get_revenue_os_overview"
+  | "get_provider_status";
+
+/**
+ * Sprint 138 — Live-Provider-/On-Server-Status fuer den Chat-Agenten
+ * (Owner-Feedback 16.09.2026: der Chat konnte auf "funktioniert der
+ * On-Server-Provider?" keine verbindliche Antwort geben, obwohl das
+ * Dashboard den Status laengst kennt). Kombiniert die Router-Health-
+ * Registry (server/model-router.ts) mit dem maskierten Managed-Key-Pool
+ * (server/_core/llm.ts) und einer aktiven Erreichbarkeitspruefung lokaler
+ * Endpoints — dieselben Quellen, aus denen sich das Admin-Dashboard
+ * ("Provider-Metering") speist. Reiner Nur-Lese-Zugriff, niemals Voll-Keys.
+ */
+async function fetchProviderStatusSnapshot(): Promise<unknown> {
+  const [snapshot, localProbe] = await Promise.all([
+    getRouterSnapshot(),
+    probeLocalProviders().catch(() => []),
+  ]);
+  return {
+    generatedAt: snapshot.now,
+    configured: snapshot.configured,
+    preferredOrder: snapshot.preferredOrder,
+    health: snapshot.health,
+    managedPool: getManagedPoolSnapshotForMetering(),
+    localProbe,
+  };
+}
 
 export async function executeBusinessSnapshot(tool: BusinessTool): Promise<unknown> {
   if (tool === "get_revenue_metrics") return fetchRevenueSnapshot();
@@ -388,5 +416,6 @@ export async function executeBusinessSnapshot(tool: BusinessTool): Promise<unkno
   if (tool === "get_crm_contacts") return fetchCrmSnapshot();
   if (tool === "get_content_channels_status") return fetchContentSnapshot();
   if (tool === "get_revenue_os_overview") return fetchRevenueOsSnapshot();
+  if (tool === "get_provider_status") return fetchProviderStatusSnapshot();
   return fetchAiServicesSnapshot();
 }

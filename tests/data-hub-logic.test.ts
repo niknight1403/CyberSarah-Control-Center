@@ -60,7 +60,7 @@ describe("data-hub-logic (Sprint 90)", () => {
     expect(isRetryableStatus(401)).toBe(false);
   });
 
-  it("kennt genau die sieben Business-Tools und formatiert deren Ergebnisse (Sprint 93 + 114)", () => {
+  it("kennt genau die acht Business-Tools und formatiert deren Ergebnisse (Sprint 93 + 114 + 138)", () => {
     expect(BUSINESS_TOOL_NAMES).toEqual([
       "get_revenue_metrics",
       "get_crypto_prices",
@@ -69,6 +69,7 @@ describe("data-hub-logic (Sprint 90)", () => {
       "get_content_channels_status",
       "get_ai_services_status",
       "get_revenue_os_overview",
+      "get_provider_status",
     ]);
     expect(isBusinessToolName("get_crypto_prices")).toBe(true);
     expect(isBusinessToolName("delete_repo")).toBe(false);
@@ -118,6 +119,41 @@ describe("data-hub-logic (Sprint 90)", () => {
         ],
       }),
     ).toContain("Perplexity (Recherche): verfuegbar");
+  });
+
+  it("formatiert den Provider-/On-Server-Status verbindlich (Sprint 138 — Owner-Feedback 16.09.2026)", () => {
+    const result = formatBusinessResult("get_provider_status", {
+      configured: ["managed", "groq", "openrouter"],
+      preferredOrder: ["managed", "groq"],
+      health: [
+        { provider: "managed", status: "ready", consecutiveFailures: 0, lastLatencyMs: 400 },
+        { provider: "groq", status: "ready", consecutiveFailures: 0, lastLatencyMs: 220 },
+        { provider: "openrouter", status: "unconfigured", consecutiveFailures: 0, lastLatencyMs: null },
+        { provider: "ollama", status: "unconfigured", consecutiveFailures: 0, lastLatencyMs: null },
+      ],
+      managedPool: [
+        { id: "k1", label: "…ab12", status: "active", remainingCredits: 100 },
+        { id: "k2", label: "…cd34", status: "active", remainingCredits: 90 },
+        { id: "k3", label: "…ef56", status: "active", remainingCredits: 80 },
+      ],
+      localProbe: [
+        { provider: "ollama", reachable: false },
+        { provider: "lmstudio", reachable: false },
+      ],
+    });
+    expect(result).toContain("On-Server-LLM (managed): 3/3 Keys aktiv");
+    expect(result).toContain("groq: einsatzbereit");
+    expect(result).toContain("ollama: nicht erreichbar");
+    expect(result).toContain("Bevorzugte Reihenfolge: managed > groq");
+
+    const withoutPool = formatBusinessResult("get_provider_status", {
+      configured: ["managed"],
+      preferredOrder: [],
+      health: [{ provider: "managed", status: "cooldown", consecutiveFailures: 2, lastLatencyMs: null }],
+      managedPool: [],
+      localProbe: [],
+    });
+    expect(withoutPool).toContain("On-Server-LLM (managed): im Cooldown");
   });
 
   it("normalisiert Kraken-Ticker (Fallback-Quelle) und GA4-Reports deterministisch", () => {
