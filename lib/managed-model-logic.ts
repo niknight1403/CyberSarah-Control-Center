@@ -4,7 +4,7 @@
  * deterministisch und ohne ENV-Zugriff testbar.
  *
  * Sprint 108 — Zero-Cost-Routing: Groq- und OpenRouter-Endpoints bekommen
- * eigene Gratis-Defaults (llama-3.3-70b-versatile / Free-Instruct-Modell),
+ * eigene Gratis-Defaults (openai/gpt-oss-20b / Free-Instruct-Modell),
  * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
  * KOSTENFREIES Modell pro Source waehlt.
  */
@@ -23,7 +23,7 @@ export function resolveManagedModel(
   }
 
   if (source === "groq") {
-    return env.AI_GROQ_MODEL?.trim() || "llama-3.3-70b-versatile";
+    return env.AI_GROQ_MODEL?.trim() || "openai/gpt-oss-20b";
   }
 
   if (source === "openrouter") {

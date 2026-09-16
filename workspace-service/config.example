@@ -11,7 +11,7 @@ MANAGED_LLM_MODEL=gpt-4o-mini
 
 # Optional model overrides for user-supplied provider keys.
 OPENAI_MODEL=gpt-4o-mini
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-20b
 TOGETHER_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
 ANTHROPIC_MODEL=claude-3-5-haiku-latest
 

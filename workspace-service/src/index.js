@@ -504,7 +504,7 @@ async function invokeProvider(request, messages) {
     openai: { baseUrl: "https://api.openai.com/v1/chat/completions", key: boundProviderKey, model: process.env.OPENAI_MODEL ?? "gpt-4o-mini" },
     gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta/models", key: boundProviderKey, model: process.env.GEMINI_MODEL ?? "gemini-3.6-flash" },
     openrouter: { baseUrl: "https://openrouter.ai/api/v1/chat/completions", key: boundProviderKey, model: process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free" },
-    groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: boundProviderKey, model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile" },
+    groq: { baseUrl: "https://api.groq.com/openai/v1/chat/completions", key: boundProviderKey, model: process.env.GROQ_MODEL ?? "openai/gpt-oss-20b" },
     together: { baseUrl: "https://api.together.xyz/v1/chat/completions", key: boundProviderKey, model: process.env.TOGETHER_MODEL ?? "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
     anthropic: { baseUrl: "https://api.anthropic.com/v1/messages", key: boundProviderKey, model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest" },
     ollama: { baseUrl: `${process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434/v1"}/chat/completions`, key: suppliedKey || "local", model: process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b" },

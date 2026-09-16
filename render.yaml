@@ -37,7 +37,7 @@ services:
       # Sprint 108 (Zero-Cost-Router): Kostenlose LLM-Provider — Keys via
       # GitHub-Secrets im Render-Deploy-Workflow (nur gesetzt, wenn vorhanden).
       - key: AI_GROQ_API_KEY
-        sync: false # Groq (ultraschnelle Gratis-Inferenz, llama-3.3-70b-versatile)
+        sync: false # Groq (ultraschnelle guenstige Inferenz, openai/gpt-oss-20b)
       - key: AI_OPENROUTER_API_KEY
         sync: false # OpenRouter Free Tiers (openrouter/free)
       - key: STRIPE_SECRET_KEY

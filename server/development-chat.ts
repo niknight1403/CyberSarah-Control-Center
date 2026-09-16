@@ -141,7 +141,7 @@ function getProviderConfig(provider: Exclude<ProviderId, "managed" | "anthropic"
     groq: {
       endpoint: getEnv("AI_GROQ_BASE_URL") ?? "https://api.groq.com/openai/v1/chat/completions",
       apiKey: getEnv("AI_GROQ_API_KEY") ?? getEnv("GROQ_API_KEY"),
-      defaultModel: getEnv("AI_GROQ_MODEL") ?? "llama-3.3-70b-versatile",
+      defaultModel: getEnv("AI_GROQ_MODEL") ?? "openai/gpt-oss-20b",
     },
     together: {
       endpoint: getEnv("AI_TOGETHER_BASE_URL") ?? "https://api.together.xyz/v1/chat/completions",

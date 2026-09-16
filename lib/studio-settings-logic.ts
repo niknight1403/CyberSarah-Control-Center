@@ -18,7 +18,7 @@ export const providerDefaults: Record<ProviderId, { model: string; freeTierNote:
   openai: { model: "gpt-4o-mini", freeTierNote: "Kosten und Limits hängen vom OpenAI-Konto ab." },
   gemini: { model: "gemini-3.6-flash", freeTierNote: "Kostenlose Nutzung hängt von Region, Konto und aktuellem Google-AI-Studio-Limit ab." },
   openrouter: { model: "openrouter/free", freeTierNote: "Verwendet den OpenRouter-Free-Router, sofern verfügbar; Limits können sich ändern." },
-  groq: { model: "llama-3.3-70b-versatile", freeTierNote: "Kosten und Limits hängen vom Groq-Konto ab." },
+  groq: { model: "openai/gpt-oss-20b", freeTierNote: "Kosten und Limits hängen vom Groq-Konto ab." },
   together: { model: "meta-llama/Llama-3.3-70B-Instruct-Turbo", freeTierNote: "Kosten und Limits hängen vom Together-Konto ab." },
   anthropic: { model: "claude-3-5-haiku-latest", freeTierNote: "Kosten und Limits hängen vom Anthropic-Konto ab." },
   ollama: { model: "qwen2.5-coder:7b", freeTierNote: "Kostenlos lokal; benötigt einen erreichbaren Ollama-Server." },
