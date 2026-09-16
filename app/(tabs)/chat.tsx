@@ -24,7 +24,7 @@ import { useAdminDesignThemeSync } from "@/lib/use-admin-design-theme-sync";
 import { useAdminRepositoryAutoConnect } from "@/lib/use-admin-repository-autoconnect";
 import { DevTracePanel } from "@/components/chat/dev-trace-panel";
 import { useWorkspace } from "@/lib/workspace-context";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -81,6 +81,24 @@ export default function ChatScreen() {
   useAdminDesignThemeSync(accountQuery.data ?? null);
   useAdminRepositoryAutoConnect(accountQuery.data ?? null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  // Sprint 139 — Robustes Auto-Scroll (Owner-Feedback 16.09.2026): Die Antwort
+  // muss nach dem Senden sofort im sichtbaren Bereich erscheinen, wie in jedem
+  // Messenger. onContentSizeChange allein war auf Android unzuverlaessig —
+  // deshalb doppelt abgesichert: Effect auf jede Nachrichten-Aenderung (nach
+  // dem Layout, via doppeltem requestAnimationFrame + Timer-Fallback) plus der
+  // bestehende Content-Size-Hook.
+  const scrollChatToEnd = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated });
+      });
+    });
+  }, []);
+  useEffect(() => {
+    if (activeTab !== "chat") return;
+    const timer = setTimeout(() => scrollChatToEnd(true), 40);
+    return () => clearTimeout(timer);
+  }, [messages, isThinking, activeTab, scrollChatToEnd]);
   const { busy: mediaPickerBusy, pickFiles: pickFilesFromDevice, pickPhotos, pickVideos } = useMediaPicker();
   const developmentChatMutation = trpc.developmentChat.send.useMutation();
   const chatWorkspaceId = settings.workspaceId;
@@ -485,8 +503,8 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   tabActive: { backgroundColor: withAlpha(colors.tint, 0.10), borderColor: withAlpha(colors.tint, 0.35), borderWidth: 1 },
   tabText: { color: "#6B7D90", fontFamily: "monospace", fontSize: 12, fontWeight: "700" },
   tabTextActive: { color: colors.tint },
-  statusTitleMono: { color: "#FFB000", fontFamily: "monospace", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
-  statusTextMono: { color: "#8A6D1F", fontFamily: "monospace", fontSize: 11 },
+  statusTitleMono: { color: "#38E1FF", fontFamily: "monospace", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  statusTextMono: { color: "#7FA3BD", fontFamily: "monospace", fontSize: 11 },
   dot: { backgroundColor: colors.success, borderRadius: 4, height: 6, width: 6 },
   badge: { backgroundColor: withAlpha(colors.tint, 0.14), borderRadius: 8, color: colors.tint, fontSize: 9, fontWeight: "900", overflow: "hidden", paddingHorizontal: 5, paddingVertical: 1 },
   statusCard: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 12, overflow: "hidden", padding: 12 },
