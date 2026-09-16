@@ -75,7 +75,14 @@ function createStyles(colors: Palette) {
     avatarText: { color: colors.tint, fontFamily: "monospace", fontSize: 9, fontWeight: "900" },
     avatarTextUser: { color: colors.foreground },
     bubble: { borderRadius: 6, flex: 1, flexShrink: 1, paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9 },
-    bubbleUser: { borderTopRightRadius: 2 },
+    // Sprint 143 — CyberSarah-Akzent: User-Bubbles mit subtiler
+    // Cyan-Flaeche + Akzent-Border, klar vom Agent-Oberflaechen-Style.
+    bubbleUser: {
+      backgroundColor: withAlpha(colors.tint, 0.10),
+      borderColor: withAlpha(colors.tint, 0.30),
+      borderWidth: 1,
+      borderTopRightRadius: 2,
+    },
     bubbleAgent: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderTopLeftRadius: 2 },
     agentAccent: { backgroundColor: colors.tint, borderRadius: 0, height: 10, left: -1, opacity: 0.9, position: "absolute", top: 12, width: 3 },
     bubbleHeader: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 4 },

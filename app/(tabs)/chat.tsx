@@ -94,6 +94,10 @@ export default function ChatScreen() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         listRef.current?.scrollToEnd({ animated });
+        // Late-Layout-Retry: Android streamt Layout-Aenderungen teils
+        // erst nach dem Frame — ein zweiter Versuch nach 120 ms fängt
+        // alle verspaeteten Frames zuverlaessig ein.
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
       });
     });
   }, []);
@@ -347,6 +351,7 @@ export default function ChatScreen() {
                 keyExtractor={(m) => m.id}
                 keyboardShouldPersistTaps="handled"
                 onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+                onLayout={() => scrollChatToEnd(false)}
                 ListHeaderComponent={isChatEmpty ? <>
                   <TouchableOpacity
                     accessibilityRole="button"
@@ -528,14 +533,14 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   statusGlow: { backgroundColor: colors.success, borderRadius: 3, height: 8, shadowColor: colors.success, shadowOpacity: 0.8, shadowRadius: 6, width: 8 },
   statusGlowWarn: { backgroundColor: colors.warning, borderRadius: 3, height: 8, width: 8 },
   statusCopy: { flex: 1 },
-  statusTitle: { color: "#DDE8F4", fontSize: 13, fontWeight: "800" },
-  statusText: { color: "#8294A8", fontSize: 11, lineHeight: 16, marginTop: 2 },
+    statusTitle: { color: colors.foreground, fontSize: 13, fontWeight: "800" },
+    statusText: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 14 },
-  chip: { backgroundColor: "rgba(19, 31, 46, 0.9)", borderColor: "#2B3E55", borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+    chip: { backgroundColor: withAlpha(colors.surface, 0.92), borderColor: withAlpha(colors.tint, 0.35), borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
   chipText: { fontFamily: "monospace", color: "#9FBDD4", fontSize: 12, fontWeight: "700" },
   dayDividerRow: { alignItems: "center", flexDirection: "row", gap: 10, marginBottom: 12, marginTop: 4 },
-  dayDividerLine: { backgroundColor: "#1E2F47", flex: 1, height: 1 },
-  dayDividerText: { color: "#5D7290", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
+    dayDividerLine: { backgroundColor: withAlpha(colors.tint, 0.25), flex: 1, height: 1 },
+    dayDividerText: { color: colors.muted, fontFamily: "monospace", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
   errorRow: { alignItems: "center", backgroundColor: withAlpha(colors.error, 0.12), borderColor: darken(colors.error, 0.6), borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 7, marginBottom: 8, paddingHorizontal: 11, paddingVertical: 9 },
   error: { color: colors.error, flex: 1, fontSize: 11, lineHeight: 16 },
   connCard: { backgroundColor: "rgba(15, 22, 31, 0.9)", borderColor: "#243347", borderRadius: 16, borderWidth: 1, marginBottom: 12, padding: 14 },

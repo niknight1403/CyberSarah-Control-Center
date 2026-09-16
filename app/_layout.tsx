@@ -23,6 +23,7 @@ import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-run
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { initCrashReporter } from "@/components/crash-reporting/crash-reporter";
 import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
+import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -149,5 +150,8 @@ export default function RootLayout() {
 function AdminAutonomyBootstrap() {
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   useAdminAutoSetup(accountQuery.data ?? null);
+  // Sprint 142: Autonomer System-Agent — scannt, analysiert und behebt
+  // nach dem Admin-Login selbststaendig, bis das System wieder gruen ist.
+  useAdminAutonomousAgent(accountQuery.data ?? null);
   return null;
 }

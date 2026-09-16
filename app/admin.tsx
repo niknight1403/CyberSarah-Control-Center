@@ -6,6 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { useColors } from "@/hooks/use-colors";
+import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 import { trpc } from "@/lib/trpc";
 import {
   canAccess,
@@ -25,6 +26,7 @@ import {
 export default function AdminDashboardScreen() {
   const colors = useColors();
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  const agentState = useAdminAutonomousAgent(accountQuery.data ?? null);
   const role = accountQuery.data?.role ?? null;
   const subscriptionTier = (accountQuery.data as { tier?: "lite" | "pro" | "expert" | null } | undefined)?.tier ?? null;
   const isAdmin = role === "admin";
@@ -84,6 +86,39 @@ export default function AdminDashboardScreen() {
     <ScreenContainer>
       <StudioHeader eyebrow="Verwaltung" title="Admin-Dashboard" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <StudioSection label="Autonomie" title="Autonomer System-Agent" />
+        <View style={[styles.agentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.agentStatusRow}>
+            <View
+              accessibilityLabel={`Systemstatus: ${agentState.status}`}
+              style={[
+                styles.agentStatusDot,
+                { backgroundColor: agentState.status === "red" ? "#FF007F" : agentState.status === "healing" ? "#F5A623" : "#00F2FE" },
+              ]}
+            />
+            <Text style={[styles.agentStatusText, { color: colors.text }]}>
+              {agentState.status === "red"
+                ? "Kritisch — Agent arbeitet autonom an der Behebung"
+                : agentState.status === "healing"
+                  ? "Heilung läuft — Agent führt Maßnahmen aus"
+                  : "Alles grün — keine offenen Incidents"}
+            </Text>
+          </View>
+          <Text style={[styles.agentMeta, { color: colors.muted }]}>
+            Offen: {agentState.openCount} · Kritisch: {agentState.criticalCount} · Auto-Redeploy:{" "}
+            {agentState.autoRedeployEnabled ? "aktiv" : "inaktiv"} · Letzter Scan:{" "}
+            {agentState.lastScanAt != null ? new Date(agentState.lastScanAt).toLocaleTimeString("de-DE") : "—"}
+          </Text>
+          {agentState.log.slice(0, 3).map((entry) => (
+            <Text key={`${entry.at}-${entry.kind}`} style={[styles.agentLog, { color: colors.muted }]} numberOfLines={1}>
+              · [{entry.kind}] {entry.reason}
+            </Text>
+          ))}
+          <Text style={[styles.agentMeta, { color: colors.muted }]}>
+            Der Agent scannt alle 60 s, analysiert Fehler, behebt autonom und bringt das System selbst auf grün — manuelle Einstellungen sind nicht nötig.
+          </Text>
+        </View>
+
         <StudioSection label="Abo" title="Subscription-Verwaltung" />
         <View style={[styles.tierCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.tierName, { color: colors.tint }]}>{ROLE_TIER_LABELS[tier]}</Text>
@@ -150,6 +185,12 @@ function formatCap(value: number): string {
 const styles = StyleSheet.create({
   content: { gap: 14, paddingBottom: 40 },
   lockCard: { alignItems: "center", borderRadius: 12, borderWidth: 1, gap: 8, padding: 24 },
+  agentCard: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 14 },
+  agentStatusRow: { alignItems: "center", flexDirection: "row", gap: 8 },
+  agentStatusDot: { borderRadius: 5, height: 10, width: 10 },
+  agentStatusText: { fontSize: 14, fontWeight: "700" },
+  agentMeta: { fontSize: 12 },
+  agentLog: { fontSize: 11, opacity: 0.9 },
   lockText: { fontSize: 13, textAlign: "center" },
   tierCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   tierName: { fontSize: 18, fontWeight: "800" },
