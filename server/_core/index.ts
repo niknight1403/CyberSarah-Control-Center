@@ -219,7 +219,7 @@ async function startServer() {
   if (webDistDir) {
     // Catch-all NACH allen /api-Routen: Datei aus dem Web-Export liefern,
     // sonst index.html (Static-Site-Export, client-seitiges Routing).
-    app.get("*", (req, res) => {
+    app.get("/{*splat}", (req, res) => {
       if (!isWebFallbackCandidate(req.method, req.path)) {
         res.status(404).json({ error: "Not found" });
         return;
