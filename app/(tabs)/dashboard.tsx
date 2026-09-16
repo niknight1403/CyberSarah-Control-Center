@@ -5,6 +5,7 @@ import { AiOrb, ParticleField } from "@/components/living/living-ui";
 import { trpc } from "@/lib/trpc";
 import { useOfflineDashboard } from "@/hooks/use-offline-dashboard";
 import { summarizeBackupExport, type BackupExport } from "@/lib/backup-self-service-logic";
+import { summarizeMcpDiscovery, type McpConnectReport } from "@/lib/mcp-client-logic";
 import { useColors } from "@/hooks/use-colors";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
@@ -292,6 +293,24 @@ export default function DashboardScreen() {
     staleTime: 60_000,
   });
 
+  // Sprint 135: Echter Discovery-Lauf gegen den konfigurierten MCP-Server —
+  // connect liefert Tools + Server-Info oder den ehrlichen Grund (kein Werfen).
+  const mcpConnect = trpc.mcp.connect.useMutation();
+  const [mcpSummary, setMcpSummary] = useState<ReturnType<typeof summarizeMcpDiscovery> | null>(null);
+
+  const triggerMcpConnect = useCallback(() => {
+    mcpConnect.mutate(undefined, {
+      onSuccess: (report: McpConnectReport) => {
+        setMcpSummary(summarizeMcpDiscovery(report));
+        if (report.connected) {
+          mcpQuery.refetch().catch(() => {
+            // Nur die Anzeige — der Discovery-Lauf selbst war erfolgreich.
+          });
+        }
+      },
+    });
+  }, [mcpConnect, mcpQuery]);
+
   // Sprint 120: Backup-Selbstbedienung — Admin zieht den vollstaendigen Export selbst.
   const backupExport = trpc.ops.backupExport.useMutation();
   const [backupSummary, setBackupSummary] = useState<ReturnType<typeof summarizeBackupExport> | null>(null);
@@ -478,6 +497,35 @@ export default function DashboardScreen() {
                 {transport.preferred ? " (Standard)" : ""}
               </Text>
             ))}
+            {mcpSummary ? (
+              <>
+                <Text style={[styles.backupValue, { color: colors.text }]}>{mcpSummary.statusLabel}</Text>
+                {mcpSummary.serverLabel ? (
+                  <Text style={[styles.tileDetail, { color: colors.muted }]}>Server: {mcpSummary.serverLabel}</Text>
+                ) : null}
+                {mcpSummary.toolNames.length > 0 ? (
+                  <Text style={[styles.tileDetail, { color: colors.muted }]}>
+                    {mcpSummary.toolNames.join(" · ")}
+                    {mcpSummary.moreCount > 0 ? ` · +${mcpSummary.moreCount} weitere` : ""}
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
+            {mcpConnect.isError ? (
+              <Text style={[styles.tileDetail, { color: colors.error }]}>
+                {mcpConnect.error instanceof Error ? mcpConnect.error.message : "Discovery fehlgeschlagen."}
+              </Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.backupButton, { borderColor: colors.tint }]}
+              onPress={triggerMcpConnect}
+              disabled={mcpConnect.isPending}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.backupButtonLabel, { color: colors.tint }]}>
+                {mcpConnect.isPending ? "Verbinde mit MCP-Server …" : "Verbinden & Tools entdecken"}
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : null}
 

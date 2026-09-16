@@ -228,3 +228,55 @@ export async function runMcpDiscovery(input: {
     tools: mapDiscoveredTools(serverName, parsedList.result),
   };
 }
+
+/* ==================== Anzeige (Sprint 135) ==================== */
+
+/** Ergebnis von `mcp.connect` (Server-Router) fuer die Kachel-Aufbereitung. */
+export type McpConnectReport = {
+  connected: boolean;
+  reason: string;
+  tools: McpToolDescriptor[];
+  serverInfo: unknown;
+};
+
+export type McpDiscoverySummary = {
+  /** Kopfzeile: Tool-Anzahl oder der ehrliche Scheiter-Grund. */
+  statusLabel: string;
+  /** "Server-Name v1.0" aus serverInfo (null, wenn der Server nichts meldet). */
+  serverLabel: string | null;
+  /** Maximal drei Tool-Kurznamen als Vorschau. */
+  toolNames: string[];
+  /** Anzahl weiterer Tools jenseits der Vorschau. */
+  moreCount: number;
+};
+
+function formatServerInfo(serverInfo: unknown): string | null {
+  if (typeof serverInfo !== "object" || serverInfo === null) return null;
+  const info = serverInfo as { name?: unknown; version?: unknown };
+  const name = typeof info.name === "string" && info.name.length > 0 ? info.name : null;
+  const version = typeof info.version === "string" && info.version.length > 0 ? info.version : null;
+  if (name && version) return `${name} v${version}`;
+  return name;
+}
+
+/**
+ * Bereitet ein `mcp.connect`-Ergebnis fuer die Dashboard-Kachel auf:
+ * verbunden → Tool-Anzahl, Server-Label und Namens-Vorschau; getrennt oder
+ * nie konfiguriert → der ehrliche Grund als Kopfzeile (Sprint-122-Stil).
+ */
+export function summarizeMcpDiscovery(report: McpConnectReport): McpDiscoverySummary {
+  if (!report.connected) {
+    return { statusLabel: report.reason, serverLabel: null, toolNames: [], moreCount: 0 };
+  }
+  const count = report.tools.length;
+  const statusLabel = count === 0
+    ? "Verbunden — der Server meldet keine Tools."
+    : `Verbunden — ${count} Tool${count === 1 ? "" : "s"} entdeckt.`;
+  const names = report.tools.map((tool) => tool.name);
+  return {
+    statusLabel,
+    serverLabel: formatServerInfo(report.serverInfo),
+    toolNames: names.slice(0, 3),
+    moreCount: Math.max(0, names.length - 3),
+  };
+}

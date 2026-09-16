@@ -21,6 +21,7 @@ import {
   parseJsonRpcResponse,
   parseToolInputSchema,
   runMcpDiscovery,
+  summarizeMcpDiscovery,
   type JsonRpcRequest,
 } from "@/lib/mcp-client-logic";
 
@@ -253,5 +254,60 @@ describe("Sprint 134: Discovery-Orchestrierung mit injiziertem Transport", () =>
     });
     const init = log[0].params as { clientInfo: { name: string } };
     expect(init.clientInfo.name).toBe(MCP_CLIENT_NAME);
+  });
+});
+
+describe("Sprint 135: Kachel-Aufbereitung (summarizeMcpDiscovery)", () => {
+  it("zeigt Tool-Anzahl, Server-Label und Namens-Vorschau bei Erfolg", () => {
+    const summary = summarizeMcpDiscovery({
+      connected: true,
+      reason: "ok",
+      serverInfo: { name: "Fachwerk", version: "2.1.0" },
+      tools: [
+        { id: "remote::alpha", server: "remote", name: "alpha", description: "", inputSchema: {}, permissions: ["read"] },
+        { id: "remote::bravo", server: "remote", name: "bravo", description: "", inputSchema: {}, permissions: ["read"] },
+        { id: "remote::charlie", server: "remote", name: "charlie", description: "", inputSchema: {}, permissions: ["read"] },
+        { id: "remote::delta", server: "remote", name: "delta", description: "", inputSchema: {}, permissions: ["read"] },
+        { id: "remote::echo", server: "remote", name: "echo", description: "", inputSchema: {}, permissions: ["read"] },
+      ],
+    });
+    expect(summary.statusLabel).toBe("Verbunden — 5 Tools entdeckt.");
+    expect(summary.serverLabel).toBe("Fachwerk v2.1.0");
+    expect(summary.toolNames).toEqual(["alpha", "bravo", "charlie"]);
+    expect(summary.moreCount).toBe(2);
+  });
+
+  it(" Singular bei genau einem Tool, Server-Label ohne Version", () => {
+    const summary = summarizeMcpDiscovery({
+      connected: true,
+      reason: "ok",
+      serverInfo: { name: "Solo" },
+      tools: [{ id: "remote::eins", server: "remote", name: "eins", description: "", inputSchema: {}, permissions: ["read"] }],
+    });
+    expect(summary.statusLabel).toBe("Verbunden — 1 Tool entdeckt.");
+    expect(summary.serverLabel).toBe("Solo");
+  });
+
+  it("meldet ehrlich, wenn der Server keine Tools hat", () => {
+    const summary = summarizeMcpDiscovery({ connected: true, reason: "ok", tools: [], serverInfo: null });
+    expect(summary.statusLabel).toContain("keine Tools");
+    expect(summary.serverLabel).toBeNull();
+  });
+
+  it("uebersetzt einen Fehlschlag in den Grund als Kopfzeile", () => {
+    const summary = summarizeMcpDiscovery({
+      connected: false,
+      reason: "Kein MCP-Server konfiguriert (MCP_SERVER_URL nicht gesetzt).",
+      tools: [],
+      serverInfo: null,
+    });
+    expect(summary.statusLabel).toContain("MCP_SERVER_URL");
+    expect(summary.toolNames).toEqual([]);
+  });
+
+  it("toleriert unvollstaendige serverInfo (keine Strings, leere Objekte)", () => {
+    expect(summarizeMcpDiscovery({ connected: true, reason: "ok", tools: [], serverInfo: { name: 42 } }).serverLabel).toBeNull();
+    expect(summarizeMcpDiscovery({ connected: true, reason: "ok", tools: [], serverInfo: "kein objekt" }).serverLabel).toBeNull();
+    expect(summarizeMcpDiscovery({ connected: true, reason: "ok", tools: [], serverInfo: { name: "X", version: "1.2.3" } }).serverLabel).toBe("X v1.2.3");
   });
 });
