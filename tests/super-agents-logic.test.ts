@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertSuperAgentRemovable,
   SUPER_AGENT_COLORS,
   defaultSeedSuperAgent,
   generateSuperAgentSessionId,
@@ -61,5 +62,25 @@ describe("Sprint 137 — super-agents-logic", () => {
     expect(nextSuperAgentColor(1)).toBe(SUPER_AGENT_COLORS[1]);
     expect(nextSuperAgentColor(SUPER_AGENT_COLORS.length)).toBe(SUPER_AGENT_COLORS[0]);
     expect(generateSuperAgentSessionId("abc-123")).toBe("agent-abc-123");
+  });
+});
+
+describe("Sprint-137-Fix — assertSuperAgentRemovable", () => {
+  const owned = [
+    { id: 1, isDefault: true },
+    { id: 2, isDefault: false },
+  ];
+
+  it("laesst das Loeschen eines eigenen, nicht-Standard-Agenten zu", () => {
+    expect(() => assertSuperAgentRemovable(owned, 2)).not.toThrow();
+  });
+
+  it("lehnt den Standard-Agent ab", () => {
+    expect(() => assertSuperAgentRemovable(owned, 1)).toThrow(/Standard-Agent/);
+  });
+
+  it("wirft 'nicht gefunden', wenn der Agent dem Nutzer nicht gehoert (statt success ohne Loeschung)", () => {
+    expect(() => assertSuperAgentRemovable(owned, 99)).toThrow("Superagent nicht gefunden.");
+    expect(() => assertSuperAgentRemovable([], 1)).toThrow("Superagent nicht gefunden.");
   });
 });

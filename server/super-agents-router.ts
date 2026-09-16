@@ -16,6 +16,7 @@ import {
   updateSuperAgentRecord,
 } from "./db";
 import {
+  assertSuperAgentRemovable,
   defaultSeedSuperAgent,
   generateSuperAgentSessionId,
   nextSuperAgentColor,
@@ -88,8 +89,7 @@ export const superAgentsRouter = router({
   /** Loescht einen Superagenten dauerhaft. Der Standard-Agent kann nicht geloescht werden. */
   remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const rows = await listSuperAgentsForUser(ctx.user.openId);
-    const target = rows.find((row) => row.id === input.id);
-    if (target?.isDefault) throw new Error("Der Standard-Agent kann nicht gelöscht werden — archiviere ihn stattdessen.");
+    assertSuperAgentRemovable(rows, input.id);
     await deleteSuperAgentRecord(input.id, ctx.user.openId);
     return { success: true } as const;
   }),

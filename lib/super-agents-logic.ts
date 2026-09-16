@@ -132,3 +132,21 @@ export function sortSuperAgentsByActivity<T extends SuperAgentLike>(agents: T[])
 export function generateSuperAgentSessionId(randomSuffix: string): string {
   return sanitizeSessionId(`agent-${randomSuffix}`);
 }
+
+/**
+ * Sprint-137-Fix: Entfernen-Route wirft jetzt auch dann sauber, wenn der
+ * Agent dem anfragenden Nutzer gar nicht (mehr) gehoert — zuvor antwortete
+ * die Route in dem Fall mit success:true, obwohl nichts geloescht wurde.
+ */
+export function assertSuperAgentRemovable<T extends { id: number; isDefault: boolean }>(
+  agents: T[],
+  id: number,
+): void {
+  const target = agents.find((agent) => agent.id === id);
+  if (!target) {
+    throw new Error("Superagent nicht gefunden.");
+  }
+  if (target.isDefault) {
+    throw new Error("Der Standard-Agent kann nicht gelöscht werden — archiviere ihn stattdessen.");
+  }
+}
