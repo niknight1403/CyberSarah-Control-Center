@@ -182,3 +182,38 @@ export const projects = pgTable("projects", {
 
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
+
+/* ==================== Sprint 137 — Mehrere Superagenten ==================== */
+
+/** Lebenszyklus eines Superagenten: aktiv im Einsatz, pausiert oder archiviert (ausgeblendet, aber nicht geloescht). */
+export const superAgentStatus = pgEnum("super_agent_status", [
+  "aktiv",
+  "pausiert",
+  "archiviert",
+]);
+
+/**
+ * Mehrere benannte Superagenten pro Nutzer — jeder mit eigener Aufgabe/Ziel
+ * und eigenem, isoliertem Chatverlauf (sessionId verweist auf chatMessages.
+ * sessionId, dessen Isolation bereits seit Sprint 57 besteht). Der
+ * Default-Agent nutzt bewusst die feste sessionId "default", damit
+ * bestehende Chatverlaeufe vor dieser Funktion erhalten bleiben.
+ */
+export const superAgents = pgTable("superAgents", {
+  id: serial("id").primaryKey(),
+  userOpenId: varchar("userOpenId", { length: 64 }).notNull(),
+  name: varchar("name", { length: 80 }).notNull(),
+  purpose: text("purpose").notNull().default(""),
+  color: varchar("color", { length: 16 }).notNull().default("#FFB000"),
+  sessionId: varchar("sessionId", { length: 64 }).notNull(),
+  status: superAgentStatus("status").notNull().default("aktiv"),
+  isDefault: boolean("isDefault").notNull().default(false),
+  lastActiveAt: timestamp("lastActiveAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("superAgents_user_idx").on(table.userOpenId, table.lastActiveAt),
+  index("superAgents_session_idx").on(table.userOpenId, table.sessionId),
+]);
+
+export type SuperAgentRow = typeof superAgents.$inferSelect;
+export type InsertSuperAgentRow = typeof superAgents.$inferInsert;

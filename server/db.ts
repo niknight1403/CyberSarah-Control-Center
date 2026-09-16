@@ -13,6 +13,8 @@ import {
   InsertAgentMemoryConsolidation,
   projects,
   InsertProject,
+  superAgents,
+  InsertSuperAgentRow,
 } from "../drizzle/schema";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
@@ -606,4 +608,73 @@ export async function deleteProjectRecord(id: number, userOpenId: string) {
   const db = await getDb();
   if (!db) throw new Error("Datenbank nicht verfuegbar — Projekt nicht loeschbar.");
   await db.delete(projects).where(and(eq(projects.id, id), eq(projects.userOpenId, userOpenId)));
+}
+
+/* ============================================================
+ * Sprint 137 — Mehrere Superagenten (Datenbankzugriff).
+ * Reine Validierung/Seed-Daten liegen in lib/super-agents-logic.ts.
+ * Chatverlauf-Isolation je Agent nutzt die bestehende sessionId-Spalte
+ * von chatMessages (siehe listChatMessages/insertChatTurn oben).
+ * ============================================================ */
+
+/** Alle Superagenten eines Nutzers, zuletzt aktiv zuerst. */
+export async function listSuperAgentsForUser(userOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagenten nicht lesbar.");
+  return db
+    .select()
+    .from(superAgents)
+    .where(eq(superAgents.userOpenId, userOpenId))
+    .orderBy(desc(superAgents.lastActiveAt), desc(superAgents.id));
+}
+
+export async function insertSuperAgentRecord(input: InsertSuperAgentRow) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagent nicht speicherbar.");
+  const [saved] = await db.insert(superAgents).values(input).returning();
+  return saved;
+}
+
+/** Mehrere Superagenten in einem Zug anlegen (Erststart-Seed des Default-Agenten). */
+export async function insertSuperAgentRecords(inputs: InsertSuperAgentRow[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagenten nicht speicherbar.");
+  if (inputs.length === 0) return [];
+  return db.insert(superAgents).values(inputs).returning();
+}
+
+export async function updateSuperAgentRecord(
+  id: number,
+  userOpenId: string,
+  changes: Partial<Pick<InsertSuperAgentRow, "name" | "purpose" | "color" | "status">>,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagent nicht aktualisierbar.");
+  const [saved] = await db
+    .update(superAgents)
+    .set(changes)
+    .where(and(eq(superAgents.id, id), eq(superAgents.userOpenId, userOpenId)))
+    .returning();
+  return saved;
+}
+
+/** Setzt einen Agenten als zuletzt verwendet (fuer "Zuletzt verwendete Agenten"). */
+export async function touchSuperAgentLastActive(id: number, userOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagent nicht aktualisierbar.");
+  const [saved] = await db
+    .update(superAgents)
+    .set({ lastActiveAt: new Date() })
+    .where(and(eq(superAgents.id, id), eq(superAgents.userOpenId, userOpenId)))
+    .returning();
+  return saved;
+}
+
+/** Loescht einen Superagenten dauerhaft. Der Chatverlauf (chatMessages der
+ * verknuepften sessionId) bleibt bewusst erhalten — er kann so bei Bedarf
+ * einem neuen Agenten erneut zugeordnet werden statt verloren zu gehen. */
+export async function deleteSuperAgentRecord(id: number, userOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagent nicht loeschbar.");
+  await db.delete(superAgents).where(and(eq(superAgents.id, id), eq(superAgents.userOpenId, userOpenId)));
 }

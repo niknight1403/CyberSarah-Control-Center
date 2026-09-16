@@ -43,6 +43,13 @@
       "when": 1789486027280,
       "tag": "0005_open_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789576625575,
+      "tag": "0006_quick_synch",
+      "breakpoints": true
     }
   ]
 }

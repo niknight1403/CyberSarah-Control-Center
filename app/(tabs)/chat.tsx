@@ -3,6 +3,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { AiOrb } from "@/components/living/living-ui";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { ChatBackground } from "@/components/chat/chat-background";
+import { AgentManagerModal, AgentSwitcher, type SuperAgentView } from "@/components/chat/agent-switcher";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
@@ -40,6 +41,8 @@ type ConnectorTestStatus = "idle" | "testing" | "success" | "error";
 type ConnectorTestState = { status: ConnectorTestStatus; message?: string };
 type InnerTab = "chat" | "github" | "skills";
 
+const ACTIVE_AGENT_STORAGE_KEY = "custom-ai-studio.superagents.active.v1";
+
 const initialMessages: ChatMessage[] = [{ id: "agent-intro", role: "agent", content: "Willkommen im KI-Operations-Chat. Beschreibe eine Änderung, ein Problem oder ein Refactoring — ich kümmere mich darum." }];
 
 export default function ChatScreen() {
@@ -56,6 +59,15 @@ export default function ChatScreen() {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showRepositoryCard, setShowRepositoryCard] = useState(false);
   const [skillPreferences, setSkillPreferences] = useState<SkillPreferences>(DEFAULT_SKILL_PREFERENCES);
+  // Sprint 137 — Mehrere Superagenten: Verwaltung + aktiver Agent.
+  const superAgentsQuery = trpc.superAgents.list.useQuery(undefined, { retry: false });
+  const createAgentMutation = trpc.superAgents.create.useMutation();
+  const updateAgentMutation = trpc.superAgents.update.useMutation();
+  const setActiveAgentMutation = trpc.superAgents.setActive.useMutation();
+  const removeAgentMutation = trpc.superAgents.remove.useMutation();
+  const [agents, setAgents] = useState<SuperAgentView[]>([]);
+  const [activeAgentId, setActiveAgentId] = useState<number | null>(null);
+  const [managerVisible, setManagerVisible] = useState(false);
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [latencyScores, setLatencyScores] = useState<ProviderScore[]>([]);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
@@ -75,6 +87,9 @@ export default function ChatScreen() {
   const providerLabel = getProviderLabel(settings.provider);
   const readyForChat = settings.provider === "managed" || settings.provider === "auto" || settings.hasProviderKey;
   const contextLabel = useMemo(() => selectedFile.name + " · " + settings.branch, [selectedFile.name, settings.branch]);
+  const activeAgent = useMemo(() => agents.find((agent) => agent.id === activeAgentId) ?? null, [agents, activeAgentId]);
+  const activeSessionId = activeAgent?.sessionId ?? "default";
+  const isChatEmpty = useMemo(() => !messages.some((message) => message.role === "user"), [messages]);
 
   const requestDevelopmentChat = async (content: string) => {
     const conversation: { role: "user" | "assistant"; content: string }[] = messages
@@ -88,6 +103,7 @@ export default function ChatScreen() {
       // Sprint 88 — Workspace-ID aktiviert den autonomen Werkzeug-Modus.
       workspaceId: chatWorkspaceId || undefined,
       branch: settings.branch,
+      sessionId: activeSessionId,
     });
     const timeout = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => reject(new Error("Die KI-Anfrage hat das Zeitlimit überschritten. Bitte Provider oder Verbindung prüfen.")), 65_000);
@@ -115,7 +131,24 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    if (!chatWorkspaceId) return;
+    const rows = superAgentsQuery.data;
+    if (!rows?.length) return;
+    setAgents(rows as SuperAgentView[]);
+    setActiveAgentId((current) => (current != null && rows.some((agent) => agent.id === current) ? current : rows[0]?.id ?? null));
+  }, [superAgentsQuery.data]);
+
+  useEffect(() => {
+    let restoreActive = true;
+    void AsyncStorage.getItem(ACTIVE_AGENT_STORAGE_KEY).then((stored) => {
+      if (!restoreActive || !stored) return;
+      const parsed = Number.parseInt(stored, 10);
+      if (Number.isInteger(parsed)) setActiveAgentId(parsed);
+    }).catch(() => undefined);
+    return () => { restoreActive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!chatWorkspaceId || activeSessionId !== "default") return;
     let active = true;
     void loadDevelopmentChatHistory(settings.protectChatContent, chatWorkspaceId).then((raw) => {
       if (!active) return;
@@ -123,12 +156,12 @@ export default function ChatScreen() {
       if (parsed.length) setMessages(parsed);
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [chatWorkspaceId, settings.protectChatContent]);
+  }, [chatWorkspaceId, settings.protectChatContent, activeSessionId]);
 
   // Sprint 54: Serverseitig persistierte Historie (PostgreSQL) laden —
   // nur als Hydration, wenn lokal keine Konversation existiert.
   const serverHistoryQuery = trpc.developmentChat.history.useQuery(
-    { limit: 100 },
+    { limit: 100, sessionId: activeSessionId },
     { retry: false },
   );
   useEffect(() => {
@@ -139,6 +172,19 @@ export default function ChatScreen() {
       return [...initialMessages, ...serverHistoryToChatRows(rows)];
     });
   }, [serverHistoryQuery.data]);
+
+  // Sprint 137 — Agentenwechsel: Auswahl persistieren, Agent als "zuletzt
+  // verwendet" markieren und den Chat auf den isolierten Verlauf des
+  // Agenten zuruecksetzen (Server-Historie hydratisiert danach).
+  const selectAgent = (agent: SuperAgentView) => {
+    setActiveAgentId(agent.id);
+    void AsyncStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, String(agent.id)).catch(() => undefined);
+    setActiveAgentMutation.mutate({ id: agent.id }, { onSuccess: () => void superAgentsQuery.refetch() });
+    setPrompt("");
+    setChatError("");
+    setAttachments([]);
+    setMessages([{ id: "agent-intro-" + agent.id, role: "agent", content: `Hallo, ich bin ${agent.name}.${agent.purpose ? ` ${agent.purpose}` : ""} Beschreibe eine Änderung, ein Problem oder ein Refactoring — ich kümmere mich darum.` }]);
+  };
 
   const updateConnectorPreference = (connector: ConnectorId) => {
     setConnectorPreferences((current) => {
@@ -197,13 +243,16 @@ export default function ChatScreen() {
     try {
       const fileContext = attachments.length ? formatProjectContext((await readProjectContext(attachments)).files) : "";
       const result = await requestDevelopmentChat(fileContext ? text + "\n\n" + fileContext : text);
-      const agentMsg: ChatMessage = { id: "agent-" + Date.now(), role: "agent", content: result.content + "\n\nAntwort von " + result.providerUsed + " · " + result.model, state: "ready", timestampMs: Date.now(), devTrace: result.devTrace };
+      const agentMsg: ChatMessage = { id: "agent-" + Date.now(), role: "agent", content: result.content, state: "ready", timestampMs: Date.now(), devTrace: result.devTrace };
       setMessages((cur) => {
         const next = [...cur.filter((m) => !m.id.startsWith("thinking-")), agentMsg];
-        void saveDevelopmentChatHistory(serializeDevelopmentChatHistory(next), settings.protectChatContent, chatWorkspaceId).catch(() => undefined);
+        if (activeSessionId === "default") {
+          void saveDevelopmentChatHistory(serializeDevelopmentChatHistory(next), settings.protectChatContent, chatWorkspaceId).catch(() => undefined);
+        }
         return next;
       });
       setAttachments([]);
+      if (activeAgentId != null) setActiveAgentMutation.mutate({ id: activeAgentId }, { onSuccess: () => void superAgentsQuery.refetch() });
     } catch (error) {
       setMessages((cur) => cur.filter((m) => !m.id.startsWith("thinking-")));
       // Sprint 108 — Backend-Antwort "Please login (10001)" ist fuer den
@@ -263,6 +312,13 @@ export default function ChatScreen() {
             </View>
 
             {activeTab === "chat" && (
+              <>
+              <AgentSwitcher
+                activeAgent={activeAgent}
+                agents={agents}
+                onSelect={selectAgent}
+                onOpenManager={() => setManagerVisible(true)}
+              />
               <FlatList
                 ref={listRef}
                 contentContainerStyle={s.content}
@@ -270,7 +326,7 @@ export default function ChatScreen() {
                 keyExtractor={(m) => m.id}
                 keyboardShouldPersistTaps="handled"
                 onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-                ListHeaderComponent={<>
+                ListHeaderComponent={isChatEmpty ? <>
                   <View style={[s.statusCard, readyForChat ? s.statusReady : s.statusWarn]}>
                     <AiOrb state={!readyForChat ? "error" : isThinking ? "thinking" : "idle"} size={26} />
                     <View style={s.statusCopy}>
@@ -294,7 +350,7 @@ export default function ChatScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                </>}
+                </> : null}
                 renderItem={renderMessage}
                 ListFooterComponent={<>
                   {chatError ? (
@@ -322,6 +378,7 @@ export default function ChatScreen() {
                   />
                 </>}
               />
+              </>
             )}
 
             {activeTab === "github" && (
@@ -383,6 +440,34 @@ export default function ChatScreen() {
                 </TouchableOpacity>
               </ScrollView>
             )}
+            <AgentManagerModal
+              activeAgentId={activeAgentId}
+              agents={agents}
+              onClose={() => setManagerVisible(false)}
+              onCreate={async (input) => {
+                const created = await createAgentMutation.mutateAsync(input);
+                await superAgentsQuery.refetch();
+                selectAgent(created as SuperAgentView);
+                setManagerVisible(false);
+              }}
+              onRemove={async (id) => {
+                await removeAgentMutation.mutateAsync({ id });
+                const refreshed = await superAgentsQuery.refetch();
+                if (activeAgentId === id) {
+                  const fallback = (refreshed.data ?? [])[0];
+                  if (fallback) selectAgent(fallback as SuperAgentView);
+                }
+              }}
+              onSelect={(agent) => {
+                selectAgent(agent);
+                setManagerVisible(false);
+              }}
+              onUpdate={async (id, patch) => {
+                await updateAgentMutation.mutateAsync({ id, ...patch });
+                await superAgentsQuery.refetch();
+              }}
+              visible={managerVisible}
+            />
           </KeyboardAvoidingView>
         </StudioErrorBoundary>
       </ChatBackground>
