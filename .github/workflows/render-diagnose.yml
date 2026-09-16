@@ -90,29 +90,14 @@ jobs:
           print()
           print("--- Logs des App-Services (Zeitfenster des fehlgeschlagenen Deploys) ---")
           import urllib.error, datetime as dt
-          start = "2026-09-16T06:41:00Z"
-          end = "2026-09-16T06:47:00Z"
-          attempts = [
-              f"/logs?limit=100&service={app_sid}&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
-              f"/logs?limit=100&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
-              f"/logs?limit=100&service={app_sid}",
-          ]
-          logs = None
-          owner_id = None
-          try:
-              for entry in api("/services?limit=20"):
-                  svc_o = entry.get("service", entry)
-                  if svc_o.get("id") == app_sid:
-                      owner_id = svc_o.get("ownerId")
-          except Exception as e:
-              print("ownerId-Lookup-Fehler:", e)
-          print("ownerId:", owner_id)
+          import time as _time
+          _now = int(_time.time())
+          start = str(_now - 14400)
+          end = str(_now)
           attempts2 = [
-              f"/logs?limit=100&ownerId={owner_id}&serviceId={app_sid}&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
-              f"/logs?limit=100&ownerId={owner_id}&serviceId={app_sid}",
-              f"/logs?limit=100&ownerId={owner_id}&resourceId={app_sid}",
-              f"/logs?limit=100&ownerId={owner_id}&service={app_sid}",
-              f"/logs?limit=100&ownerId={owner_id}",
+              f"/logs?limit=100&ownerId={owner_id}&resource={app_sid}&startTime={start}&endTime={end}&direction=backward",
+              f"/logs?limit=100&ownerId={owner_id}&resource={app_sid}&startTime={start}&endTime={end}",
+              f"/logs?limit=100&ownerId={owner_id}&resource={app_sid}",
           ]
           for path in attempts2:
               try:
