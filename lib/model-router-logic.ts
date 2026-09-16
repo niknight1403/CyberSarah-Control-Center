@@ -276,7 +276,7 @@ export function healthSnapshot(
   health: ProviderHealthMap,
   configured: readonly RouterProviderId[],
   now: number,
-): Array<ProviderHealth & { provider: RouterProviderId }> {
+): (ProviderHealth & { provider: RouterProviderId })[] {
   return ROUTER_PROVIDER_IDS.map((provider) => {
     const state = health[provider] ?? emptyProviderHealth();
     const blockedReason = providerBlockedReason(health, provider, now);

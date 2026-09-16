@@ -1,3 +1,12 @@
+import {
+  createRotatingAuditStore,
+  exportStoreAudit,
+  recordAuditEvent,
+  type AuditRecordOutcome,
+  type ExternalAuditStore,
+} from "./external-audit-store-logic";
+import type { AuditExport, RotationConfig } from "./audit-rotation-logic";
+
 export type AuditEvent = {
   eventId: string;
   action: "build" | "test" | "push" | "pull_request" | "ci" | "release";
@@ -27,15 +36,6 @@ export function createAuditEvent(input: Omit<AuditEvent, "occurredAt" | "metadat
 }
 
 export type AuditTransport = (event: AuditEvent) => Promise<void>;
-
-import {
-  createRotatingAuditStore,
-  exportStoreAudit,
-  recordAuditEvent,
-  type AuditRecordOutcome,
-  type ExternalAuditStore,
-} from "./external-audit-store-logic";
-import type { AuditExport, RotationConfig } from "./audit-rotation-logic";
 
 export const externalActionAuditService = {
   create: createAuditEvent,

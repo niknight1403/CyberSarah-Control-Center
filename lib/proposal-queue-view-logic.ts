@@ -16,7 +16,7 @@ import {
 export type ProposalSource = {
   messageId: string;
   summary: string;
-  changes: Array<{ path: string; content: string }>;
+  changes: { path: string; content: string }[];
   createdAtMs: number;
   state: "ready" | "applying" | "applied" | "error" | "reverting" | "reverted";
   /**

@@ -17,6 +17,9 @@ import {
   InsertSuperAgentRow,
 } from "../drizzle/schema";
 
+import { ENV } from "./_core/env";
+import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
+
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
   .trim()
   .toLowerCase();
@@ -28,9 +31,6 @@ function normalizeEmail(email: string) {
 function isAdministratorEmail(email: string | null | undefined) {
   return Boolean(email && normalizeEmail(email) === ADMIN_EMAIL);
 }
-
-import { ENV } from "./_core/env";
-import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 

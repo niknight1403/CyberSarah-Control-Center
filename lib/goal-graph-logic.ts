@@ -26,7 +26,7 @@ export type GoalGraph = {
   steps: GoalStep[];
 };
 
-const PIPELINE: ReadonlyArray<{ kind: GoalStepKind; title: string }> = [
+const PIPELINE: readonly { kind: GoalStepKind; title: string }[] = [
   { kind: "plan", title: "Ziel analysieren und Plan festlegen" },
   { kind: "code", title: "Umsetzung implementieren" },
   { kind: "test", title: "Tests ergänzen und ausführen" },

@@ -45,7 +45,7 @@ export interface OptimizerCycleRecord {
   /** LLM-Kurzbewertung des Zyklus. */
   summary: string | null;
   /** Erkannte Findings (Severity-sortiert). */
-  findings: Array<{ key: string; severity: string; detail: string }>;
+  findings: { key: string; severity: string; detail: string }[];
   /** Gestarteter Orchestrator-Task (falls Optimierung ausgeloest wurde). */
   taskId: string | null;
   trigger: "loop" | "manual";
@@ -229,7 +229,7 @@ async function executeCycle(trigger: "loop" | "manual", startedAt: string): Prom
 
   const summary = typeof analysis?.summary === "string" ? analysis.summary : "Analyse abgeschlossen.";
   const recommendations = Array.isArray(analysis?.recommendations)
-    ? (analysis?.recommendations as Array<Record<string, unknown>>)
+    ? (analysis?.recommendations as Record<string, unknown>[])
     : [];
 
   // 2) Optimierungsziel auswaehlen und echten Orchestrator-Task starten.

@@ -17,7 +17,7 @@
  * Ausgerichtet auf den Stack: Expo/React-Native + Capacitor-Android,
  * eigener Node-Server, Agenten/MCP, Billing, DevOps.
  */
-export const RELEVANCE_SIGNALS: ReadonlyArray<{ keyword: string; weight: number; area: string }> = [
+export const RELEVANCE_SIGNALS: readonly { keyword: string; weight: number; area: string }[] = [
   { keyword: "expo", weight: 3, area: "Mobile-Stack" },
   { keyword: "react-native", weight: 3, area: "Mobile-Stack" },
   { keyword: "capacitor", weight: 3, area: "Mobile-Stack" },

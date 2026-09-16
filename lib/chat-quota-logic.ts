@@ -68,7 +68,7 @@ export function nextUtcMidnight(from: Date | string): Date {
 
 /** Zaehlt die Nutzer-Nachrichten des aktuellen UTC-Tages aus der Historie. */
 export function countMessagesToday(
-  messages: Array<{ role: string; createdAt: Date | string }>,
+  messages: { role: string; createdAt: Date | string }[],
   now: Date | string,
 ): number {
   const todayKey = utcDayKey(now);

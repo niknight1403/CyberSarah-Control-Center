@@ -10,7 +10,7 @@ export type PromptOptimizationResult = {
   removedChars: number;
 };
 
-const FILLER_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
+const FILLER_PATTERNS: readonly { pattern: RegExp; label: string }[] = [
   { pattern: /\b(kannst du|könntest du|bitte|vielleicht|mir|mal|doch|halt|einfach)\b/gi, label: "Füllwörter entfernt" },
   { pattern: /\b(hey|hallo|hi)\b[!,.]?\s*/gi, label: "Begrüßung entfernt" },
 ];

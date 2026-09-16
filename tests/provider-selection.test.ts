@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildWorkspaceHeaders } from "../lib/remote-workspace-client";
 import { getDefaultFreeProvider, isFreeTierProvider, providerDefaults, type ProviderId } from "../lib/studio-settings-logic";
 
+import { getProviderKeyStatusLabel, hasProviderKey, providerKeyStorageKey, updateProviderKeyStatus } from "../lib/provider-key-logic";
+
 describe("AI provider selection", () => {
   it("contains the optional provider defaults", () => {
     const providers: ProviderId[] = ["managed", "openai", "gemini", "openrouter", "groq", "together", "anthropic", "ollama", "lmstudio", "custom", "huggingface"];
@@ -23,8 +25,6 @@ describe("AI provider selection", () => {
     expect(JSON.stringify(headers)).not.toContain("workspace.example");
   });
 });
-
-import { getProviderKeyStatusLabel, hasProviderKey, providerKeyStorageKey, updateProviderKeyStatus } from "../lib/provider-key-logic";
 
 describe("Provider API key management", () => {
   it("creates a distinct secure storage slot for every provider", () => {

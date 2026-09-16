@@ -17,6 +17,8 @@
  * und zusaetzliche Akzent-Faelle zur Verfuegung.
  */
 
+import { Platform } from "react-native";
+
 export const cyber = {
   /** Indigo-Schwarz-Grundflaeche — dunkel genug fuer OLED-Ersparnis, mit
    * leichtem Blau-/Violett-Unterton statt reinem Neutral-Schwarz. */
@@ -59,5 +61,3 @@ export const cyberTypography = {
   caption: { fontSize: 11, fontWeight: "600", letterSpacing: 1 } as const,
   mono: { fontSize: 12, fontWeight: "500", fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }) } as const,
 } as const;
-
-import { Platform } from "react-native";

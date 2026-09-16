@@ -13,7 +13,7 @@ export interface MigrationWarning {
 }
 
 export interface MigrationPlan {
-  tables: Array<{ name: string; createStatement: string }>;
+  tables: { name: string; createStatement: string }[];
   insertStatements: string[];
   expectedRowCounts: Record<string, number>;
   warnings: MigrationWarning[];
@@ -196,9 +196,9 @@ export function extractCreateStatements(dump: string): string[] {
 }
 
 /** Findet INSERT-Statements inklusive Tabellenname. */
-export function extractInsertStatements(dump: string): Array<{ table: string; statement: string }> {
+export function extractInsertStatements(dump: string): { table: string; statement: string }[] {
   const normalized = normalizeDump(dump);
-  const statements: Array<{ table: string; statement: string }> = [];
+  const statements: { table: string; statement: string }[] = [];
   const pattern = /INSERT\s+INTO\s+`([^`]+)`\s+VALUES[\s\S]*?;\s*(?=INSERT|CREATE|$)/gi;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(normalized)) !== null) {
@@ -308,7 +308,7 @@ export function convertCreateTable(statement: string): {
 /** Baut den vollstaendigen Migrationsplan aus einem Dump-Text. */
 export function planMigration(dump: string): MigrationPlan {
   const warnings: MigrationWarning[] = [];
-  const tables: Array<{ name: string; createStatement: string }> = [];
+  const tables: { name: string; createStatement: string }[] = [];
   const expectedRowCounts: Record<string, number> = {};
 
   const columnsByTable = new Map<string, ConvertedColumn[]>();

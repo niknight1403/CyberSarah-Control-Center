@@ -103,13 +103,13 @@ export function historyToPromptMessages(
  * UI-Darstellung der Historie: robust gegen kaputte Zeilen,
  * chronologisch (aelteste zuerst) mit Zeitstempel als ISO-String.
  */
-export function toDisplayHistory(rows: PersistedChatMessage[]): Array<{
+export function toDisplayHistory(rows: PersistedChatMessage[]): {
   id: number;
   role: ChatHistoryRole;
   content: string;
   provider: string | null;
   createdAt: string;
-}> {
+}[] {
   return (Array.isArray(rows) ? rows : [])
     .filter((row) => normalizeHistoryRole(row?.role) !== null)
     .filter((row) => typeof row?.content === "string" && row.content.trim() !== "")
@@ -132,19 +132,19 @@ export function toDisplayHistory(rows: PersistedChatMessage[]): Array<{
  * Deterministisch und damit ohne React testbar.
  */
 export function serverHistoryToChatRows(
-  rows: Array<{
+  rows: {
     id: number;
     role: string;
     content: string;
     provider?: string | null;
     createdAt: string | Date;
-  }>,
-): Array<{
+  }[],
+): {
   id: string;
   role: "user" | "agent";
   content: string;
   timestampMs?: number;
-}> {
+}[] {
   return toDisplayHistory(rows as PersistedChatMessage[])
     .map((entry) => ({
       id: `server-${entry.id}`,

@@ -1,6 +1,6 @@
 export type PersistedProposalPreview = {
   affectedFiles: string[];
-  changes: Array<{ path: string; explanation: string }>;
+  changes: { path: string; explanation: string }[];
 };
 
 /** Sprint 127 — ein Werkzeugaufruf des autonomen Agenten (Entwicklungsfenster). */

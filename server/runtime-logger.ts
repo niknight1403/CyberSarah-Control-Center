@@ -67,7 +67,7 @@ function patchStream(stream: NodeJS.WriteStream, level: LogLevel) {
     if (typeof chunk === "string" && chunk.trim() !== "") {
       emit(level, "server", chunk.replace(/\n$/, ""));
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     return (originalWrite as any)(chunk, ...(rest as any[]));
   };
 }

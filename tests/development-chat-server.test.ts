@@ -3,16 +3,16 @@ import type { AddressInfo } from "node:net";
 import { TRPCError } from "@trpc/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../server/_core/llm", () => ({
-  invokeLLM: vi.fn(),
-}));
-
 import { invokeLLM } from "../server/_core/llm";
 import {
   handleDevelopmentChat,
   sanitizeChatError,
   testDevelopmentChatConnection,
 } from "../server/development-chat";
+
+vi.mock("../server/_core/llm", () => ({
+  invokeLLM: vi.fn(),
+}));
 
 const ENV_KEYS = [
   "AI_CUSTOM_BASE_URL",
@@ -30,7 +30,7 @@ let originalEnv: Record<string, string | undefined> = {};
 
 type MockServer = {
   port: number;
-  requests: Array<{ body: Record<string, unknown> | null }>;
+  requests: { body: Record<string, unknown> | null }[];
   close: () => Promise<void>;
 };
 
@@ -106,7 +106,7 @@ afterEach(async () => {
 describe("development chat server chain", () => {
   it("liefert die Antwort des primären Providers ohne Fallback", async () => {
     const server = await startMockServer((body, res) => {
-      const messages = (body?.messages ?? []) as Array<{ role: string; content: string }>;
+      const messages = (body?.messages ?? []) as { role: string; content: string }[];
       expect(messages[0]?.role).toBe("system");
       expect(messages.at(-1)?.content).toBe("Status?");
       replyWithContent(res, "Alles grün.");

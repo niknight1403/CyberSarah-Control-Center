@@ -9,8 +9,7 @@ import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
 import { runMemoryConsolidation } from "./memory-consolidation";
 import { getRetrievalMetrics } from "./retrieval-metrics";
-import { getLastMemoryConsolidation } from "./db";
-import { listAllAgentLearningsForConsolidation } from "./db";
+import { getLastMemoryConsolidation , listAllAgentLearningsForConsolidation } from "./db";
 
 export const memoryRouter = router({
   /** Bestands- und Lauf-Metriken fuer die Admin-Kachel. */

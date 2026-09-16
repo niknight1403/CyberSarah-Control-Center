@@ -34,7 +34,7 @@ function hangingQuery(): FakeQuery {
 }
 
 /** PoolImpl-Substitut: Instanz traegt die Query-Mock — wie pg.Pool, nur ohne Netz. */
-function fakePoolClass(options: { query?: FakeQuery; capture?: Array<Record<string, unknown>> } = {}) {
+function fakePoolClass(options: { query?: FakeQuery; capture?: Record<string, unknown>[] } = {}) {
   return class {
     query: QueryFn;
     constructor(constructorOptions?: Record<string, unknown>) {
@@ -75,7 +75,7 @@ describe("createPersistence (Sprint-85-Follow-up)", () => {
   });
 
   it("baut SSL nur fuer entfernte Hosts — lokale Test-DBs bleiben ohne SSL", () => {
-    const captured: Array<Record<string, unknown>> = [];
+    const captured: Record<string, unknown>[] = [];
     const remote = mustCreate({
       env: { WORKSPACE_DATABASE_URL: "postgresql://u:p@ep-1.neon.tech/db" },
       PoolImpl: fakePoolClass({ capture: captured }),
@@ -145,7 +145,7 @@ describe("createPersistence (Sprint-85-Follow-up)", () => {
       env: { WORKSPACE_DATABASE_URL: "postgresql://u:p@localhost/db" },
       PoolImpl: fakePoolClass({ query }),
     });
-    const applied: Array<[string, string]> = [];
+    const applied: [string, string][] = [];
     const count = await persistence.restoreFileBackups("owner-repo", async (filePath, content) => {
       applied.push([filePath, content]);
     });

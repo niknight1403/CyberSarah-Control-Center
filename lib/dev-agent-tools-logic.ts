@@ -410,7 +410,7 @@ export function formatToolResultForModel(tool: AgentToolName, payload: unknown):
     }
 
     case "list_github_issues": {
-      const issues = Array.isArray(record.issues) ? record.issues as Array<Record<string, unknown>> : [];
+      const issues = Array.isArray(record.issues) ? record.issues as Record<string, unknown>[] : [];
       if (!issues.length) return "Keine Issues gefunden.";
       const lines = issues.map((issue) => {
         const labels = Array.isArray(issue.labels) ? (issue.labels as unknown[]).filter((l): l is string => typeof l === "string").join(", ") : "";

@@ -290,7 +290,7 @@ const tools: ToolSpec[] = [
 const registry = new Map<string, ToolSpec>(tools.map((tool) => [tool.name, tool]));
 
 /** Alle Tools im OpenAI function-calling Format. */
-export function getToolDefinitions(): Array<{ type: "function"; function: Record<string, unknown> }> {
+export function getToolDefinitions(): { type: "function"; function: Record<string, unknown> }[] {
   return [...registry.values()].map((tool) => ({
     type: "function" as const,
     function: {

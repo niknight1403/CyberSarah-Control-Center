@@ -11,9 +11,6 @@ import httpProxy from "http-proxy";
 import { z } from "zod";
 import { resolveStorageStatus } from "./storage-status.js";
 import { connectPersistence, createPersistence } from "./db-persistence.js";
-
-const execFileAsync = promisify(execFile);
-const port = Number(process.env.PORT ?? 8787);
 // WORKSPACES_DIR mit Ephemeralfallback (Render Free hat keine persistenten
 // Disks): Ist der konfigurierte Pfad nicht beschreibbar, faellt der Service
 // auf ein beschreibbares lokales Verzeichnis zurueck und warnt beim Start.
@@ -28,6 +25,9 @@ const port = Number(process.env.PORT ?? 8787);
 // deterministisch durchlaufen (max. ~2s pro Kandidat).
 import os from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
+
+const execFileAsync = promisify(execFile);
+const port = Number(process.env.PORT ?? 8787);
 
 async function ensureDirectoryUsable(candidate) {
   try {

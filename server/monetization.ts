@@ -15,12 +15,12 @@
  */
 
 import * as db from "./db";
-import type { MonetizationAccountState } from "../lib/monetization-logic";
 import {
   checkQuota,
   consumeQuota,
   freshAccountState,
   rollPeriods,
+  type MonetizationAccountState,
   type QuotaCheck,
 } from "../lib/monetization-logic";
 

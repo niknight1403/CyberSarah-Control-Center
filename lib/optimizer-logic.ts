@@ -30,7 +30,7 @@ export interface OptimizerSnapshot {
   /** Uptime des Prozesses in Minuten. */
   uptimeMinutes: number;
   /** Letzte erfolgreiche Optimierungs-Zyklen (Objekte mit statusAt/title). */
-  lastCycles: Array<{ status: string; finishedAt: string; title: string }>;
+  lastCycles: { status: string; finishedAt: string; title: string }[];
 }
 
 export const OPTIMIZER_SYSTEM_PROMPT = `Du bist der autonome Engineering-Optimizer des "CyberSarah Control Centers".
@@ -155,7 +155,7 @@ export function buildOptimizerAnalysisPrompt(snapshot: OptimizerSnapshot, findin
  * (keine sinnvolle Arbeit → kein Orchestrator-Task verschwenden).
  */
 export function pickObjective(
-  recommendations: Array<{ title?: unknown; impact?: unknown; objective?: unknown }>,
+  recommendations: { title?: unknown; impact?: unknown; objective?: unknown }[],
 ): { title: string; objective: string } | null {
   const clean = recommendations.filter(
     (r): r is { title: string; impact: string; objective: string } =>

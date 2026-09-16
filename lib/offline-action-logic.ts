@@ -1,3 +1,7 @@
+// --- Sprint 48: Exponential-Backoff-Integration ---
+
+import { planQueueRetries, type QueueRetryPlan, type RetryPolicy } from "./retry-backoff-logic";
+
 export type OfflineActionStatus = "queued" | "retrying" | "failed" | "completed";
 
 export type OfflineAction = {
@@ -33,10 +37,6 @@ export function getNextOfflineAction(actions: OfflineAction[], repositoryId: str
 export function canApplyOfflineAction(action: OfflineAction, isOnline: boolean) {
   return isOnline && action.status !== "completed" && !action.hasConflictRisk;
 }
-
-// --- Sprint 48: Exponential-Backoff-Integration ---
-
-import { planQueueRetries, type QueueRetryPlan, type RetryPolicy } from "./retry-backoff-logic";
 
 export type { QueueRetryPlan, RetryPolicy } from "./retry-backoff-logic";
 

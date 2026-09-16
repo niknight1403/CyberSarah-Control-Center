@@ -1,6 +1,21 @@
 import Stripe from "stripe";
 import * as db from "./db";
 
+// ---------------------------------------------------------------------------
+// Sprint 70 — Abonnement-Stufen (Lite, Pro, Expert), Webhooks, Verwaltung
+// ---------------------------------------------------------------------------
+
+import {
+  evaluateTierChange,
+  isSubscriptionTier,
+  tierFromPriceId,
+  tierPriceId,
+  entitlementsForTier,
+  entitlementsForRole,
+  type SubscriptionTier,
+} from "../lib/subscription-tiers-logic";
+import { normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-webhook-logic";
+
 // Sekretaere und Restricted Keys sind beide gueltig: Restricted Keys
 // (rk_live_/rk_test_) sind das empfohlene Least-Privilege-Setup fuer
 // Produktionsumgebungen und duerfen deshalb nicht abgewiesen werden.
@@ -344,21 +359,6 @@ export async function processStripeWebhook(
   }
   return { received: true, eventType: event.type };
 }
-
-// ---------------------------------------------------------------------------
-// Sprint 70 — Abonnement-Stufen (Lite, Pro, Expert), Webhooks, Verwaltung
-// ---------------------------------------------------------------------------
-
-import {
-  evaluateTierChange,
-  isSubscriptionTier,
-  tierFromPriceId,
-  tierPriceId,
-  entitlementsForTier,
-  entitlementsForRole,
-  type SubscriptionTier,
-} from "../lib/subscription-tiers-logic";
-import { normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-webhook-logic";
 
 export type BillingUser = {
   id: number;

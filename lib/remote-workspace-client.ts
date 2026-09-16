@@ -55,7 +55,7 @@ export type AgentRequest = {
 export type AgentProposal = {
   summary: string;
   rationale: string;
-  changes: Array<{ path: string; content: string; explanation: string }>;
+  changes: { path: string; content: string; explanation: string }[];
   affectedFiles: string[];
   providerUsed?: ProviderId;
   fallbackUsed?: boolean;
@@ -85,12 +85,12 @@ export type RepositoryQuality = {
     passed: number;
     failed: number;
     pending: number;
-    checks: Array<{
+    checks: {
       name: string;
       status: string;
       conclusion: string | null;
       url: string | null;
-    }>;
+    }[];
   };
   reviews: {
     reviewerCount: number;

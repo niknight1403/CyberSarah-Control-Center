@@ -101,8 +101,8 @@ export async function getRouterSnapshot() {
  * werden bewusst nicht aktiv angepingt (Kosten, Rate-Limits); ihr Zustand
  * ergibt sich aus den realen Chat-Aufrufen (Erfolg/Fehler/Timeout).
  */
-export async function probeLocalProviders(): Promise<Array<{ provider: RouterProviderId; reachable: boolean }>> {
-  const targets: Array<{ provider: RouterProviderId; baseUrl: string }> = [
+export async function probeLocalProviders(): Promise<{ provider: RouterProviderId; reachable: boolean }[]> {
+  const targets: { provider: RouterProviderId; baseUrl: string }[] = [
     {
       provider: "ollama",
       baseUrl: (process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434/v1").replace(/\/+$/, ""),

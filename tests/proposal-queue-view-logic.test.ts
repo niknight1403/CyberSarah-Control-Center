@@ -33,7 +33,7 @@ function config(overrides: Partial<Parameters<typeof buildProposalQueueView>[1]>
 
 describe("proposal queue view logic", () => {
   it("maps chat states onto the sprint 35 state machine", () => {
-    const cases: Array<[ProposalSource["state"], string]> = [
+    const cases: [ProposalSource["state"], string][] = [
       ["ready", "pending"],
       ["error", "pending"],
       ["applying", "review"],

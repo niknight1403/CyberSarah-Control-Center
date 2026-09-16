@@ -188,7 +188,7 @@ function toProviderMessages(messages: ChatMessage[]) {
 }
 
 function extractContent(payload: unknown): string {
-  const content = (payload as { choices?: Array<{ message?: { content?: unknown } }> })?.choices?.[0]?.message?.content;
+  const content = (payload as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]?.message?.content;
   if (typeof content === "string" && content.trim()) return content.trim();
   if (Array.isArray(content)) {
     const joined = content
@@ -230,7 +230,7 @@ async function callAnthropic(messages: ChatMessage[], requestedModel?: string) {
     signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) throw new Error(`anthropic antwortet mit ${response.status}: ${(await response.text()).slice(0, 400)}`);
-  const payload = await response.json() as { content?: Array<{ type?: string; text?: string }>; model?: string };
+  const payload = await response.json() as { content?: { type?: string; text?: string }[]; model?: string };
   const content = payload.content?.filter((part) => part.type === "text").map((part) => part.text ?? "").join("\n").trim();
   if (!content) throw new Error("anthropic hat keine Textantwort zurückgegeben.");
   return { content, model: payload.model ?? requestedModel ?? "claude-3-5-haiku-latest" };
@@ -269,7 +269,7 @@ function getFallbackProviders(provider: ProviderId) {
     .split(",")
     .map((value: string) => value.trim())
     .filter(Boolean);
-  const parsed: Array<{ success: boolean; data?: ProviderId }> = configured.map((value: string) => {
+  const parsed: { success: boolean; data?: ProviderId }[] = configured.map((value: string) => {
     const result = providerSchema.safeParse(value);
     return result.success ? { success: true, data: result.data } : { success: false };
   });

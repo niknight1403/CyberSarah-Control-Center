@@ -249,7 +249,7 @@ async function startServer() {
   app.use((req, res) => {
     res.status(404).json({ error: "Not found", path: req.path, method: req.method });
   });
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
     console.error("[api] unhandled error:", req.method, req.path, error);
     const status = typeof (error as { status?: number })?.status === "number" ? (error as { status: number }).status : 500;

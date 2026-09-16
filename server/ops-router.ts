@@ -117,11 +117,11 @@ async function probeRenderDeploy(): Promise<OpsCheckInput> {
         detail: `Render-API antwortete mit HTTP ${servicesResponse.status}`,
       };
     }
-    const services = (await servicesResponse.json()) as Array<{
+    const services = (await servicesResponse.json()) as {
       id: string;
       type: string;
       name?: string;
-    }>;
+    }[];
     const wantedId = process.env.RENDER_SERVICE_ID?.trim();
     const service = wantedId
       ? services.find((entry) => entry.id === wantedId)
@@ -144,7 +144,7 @@ async function probeRenderDeploy(): Promise<OpsCheckInput> {
         detail: `Deploy-Abfrage antwortete mit HTTP ${deploysResponse.status}`,
       };
     }
-    const deploys = (await deploysResponse.json()) as Array<{ status?: string }>;
+    const deploys = (await deploysResponse.json()) as { status?: string }[];
     const status = deploys[0]?.status ?? null;
     const result = classifyRenderDeployStatusFallback(status);
     return { kind: "renderDeploy", state: result.state, detail: result.detail };
@@ -175,7 +175,7 @@ async function probeUptimeWatcher(): Promise<OpsCheckInput> {
       signal: AbortSignal.timeout(UPTIME_PROBE_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    return (await response.json()) as Array<{ updated_at?: string }>;
+    return (await response.json()) as { updated_at?: string }[];
   };
   try {
     const openIssues = await fetchIssues("open");

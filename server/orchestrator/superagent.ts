@@ -48,7 +48,7 @@ const ESCALATION_THRESHOLD = 3;
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string | null;
-  tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+  tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[];
   tool_call_id?: string;
   name?: string;
 }
