@@ -59,6 +59,32 @@ services:
       - key: WORKSPACE_SERVICE_TOKEN
         sync: false # Service-Token serverseitig (statt in der App hinterlegt)
 
+  # FastAPI-Backend: Task-Ledger, Agenten-State, Logs, Chat-Streaming
+  # (SSE) + WebSocket-Handler fuer die Expo-App. Autonomous Executor bei
+  # SUPERAGENT_MODE=autonomous; Emergency Stop via POST /api/agent/stop.
+  - type: web
+    name: cybersarah-backend
+    runtime: python
+    plan: standard # Dauerbetrieb fuer WS/Executor; free wuerde nach 15 Min schlafen.
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9" # 3.10 ist seit Okt 2026 EOL; lokal wird auf 3.11 getestet.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cybersarah-db
+          property: connectionString
+      - key: SUPERAGENT_MODE
+        value: "autonomous"
+      - key: APP_ALLOWED_ORIGINS
+        sync: false # Expo-Web-Export + Native-App-Urspruenge
+      - key: OPENAI_API_KEY
+        sync: false # Optional: Managed-LLM (sonst laeuft der Offline-Executor)
+
   # Workspace-Service (Custom-AI-Studio): token-geschützt, Port 8787.
   # WORKSPACES_DIR liegt auf Render Free auf ephemeraler Disk — bei
   # Bedarf Persistent Disk hinzufügen (bezahlter Owner-Schritt).
@@ -106,3 +132,12 @@ services:
       #   name: cybersarah-workspace-data
       #   mountPath: /data
       #   sizeGB: 1
+
+databases:
+  # Render-PostgreSQL fuer das FastAPI-Backend (Task-Ledger, State, Logs).
+  # Free-Plan: 30 Tage Aktivitaet — danach im Dashboard verlaengern.
+  - name: cybersarah-db
+    plan: free
+    region: frankfurt
+    databaseName: cybersarah
+    user: cybersarah_admin

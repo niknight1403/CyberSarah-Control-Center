@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests/backend"]
+addopts = "-q"
+markers = ["backend: Python-Backend-Tests (FastAPI/SQLAlchemy)"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+explicit_package_bases = true
+mypy_path = "."
+files = ["backend", "main.py"]

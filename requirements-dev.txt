@@ -1,0 +1,6 @@
+# Dev/CI-Abhaengigkeiten des Python-Backends (nicht in Production-Deploy).
+-r requirements.txt
+pytest>=8.0
+pytest-asyncio>=0.23
+flake8>=7.0
+mypy>=1.10
