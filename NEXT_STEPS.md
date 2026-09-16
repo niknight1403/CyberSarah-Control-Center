@@ -48,4 +48,4 @@ Akzeptanzkriterium je Sprint: TypeScript sauber, volle Vitest-Suite gruen (Ausna
 - Betriebserfahrung aus dem Realgeraet-Test in die Provider-Routing- und Key-Rotationslogik zurueckfliessen lassen (Messwerte, Timeouts, Fallback-Schwellen).
 - Strukturierte Healthchecks der PaaS-Betriebspfade (Render/Neon) konsolidieren und Warnstufen in einer zentralen Betriebsansicht zusammenfuehren.
 - Verschluesselte Support- und Settings-Backups um die neuen Zustaende (Metering-Ledger, RBAC-Overrides, Design-Theme-Auswahl) erweitern, sobald diese persistiert werden.
-- Transportschicht fuer die MCP-Registry (SSE/HTTP-Anbindung an `lib/mcp-registry-logic.ts`) sobald echte MCP-Server angebunden werden sollen.
+- ~~Transportschicht fuer die MCP-Registry~~ **Erledigt (16.09., Sprint 134):** Transport-Logik (Sprint 122) + echter JSON-RPC-Netzwerk-Client (`lib/mcp-client-logic.ts`, `mcp.connect`/`mcp.callTool` im Router, Berechtigungs-Gate) — siehe `docs/SPRINT_134_MCP_NETZWERK_CLIENT.md`. Offen: Dashboard-Kachel an echte Discovery-Ergebnisse anbinden; Sitzungs-Cache sobald ein echter Server LAST zeigt.
