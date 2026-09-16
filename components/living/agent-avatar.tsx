@@ -46,7 +46,7 @@ export function AgentAvatar({
   const geometry = useMemo(
     () => createAvatarGeometry(avatarSeedFromName(name)),
     // Geometrie ist identitaetsstabil: bewusst nur von name abhaengig.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [name],
   );
   const accent = useMemo(

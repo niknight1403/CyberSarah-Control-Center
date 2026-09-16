@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View , useWindowDimensions } from "react-native";
 import { usePathname, useRouter } from "expo-router";
-import { useWindowDimensions } from "react-native";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";

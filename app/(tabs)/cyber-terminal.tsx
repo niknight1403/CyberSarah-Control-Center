@@ -100,7 +100,7 @@ export default function CyberTerminalScreen() {
         <ScrollView style={styles.terminal} contentContainerStyle={styles.terminalContent} showsVerticalScrollIndicator={false}>
           {stopped ? (
             <Text style={[styles.systemLine, { color: cyber.pink }]}>
-              ⛔ EMERGENCY STOP AKTIV — Live-Aktivitaeten pausiert. Zum Fortsetzen "RESUME" druecken.
+              ⛔ EMERGENCY STOP AKTIV — Live-Aktivitaeten pausiert. Zum Fortsetzen &quot;RESUME&quot; druecken.
             </Text>
           ) : entries.length === 0 ? (
             <Text style={styles.systemLine}>Warte auf Agenten-Aktivitaet…</Text>
