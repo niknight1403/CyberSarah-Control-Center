@@ -172,7 +172,7 @@ export async function callWorkspaceService(
 }
 
 export function registerRenderProxy(app: Express) {
-  app.all("/api/render/*", async (req: Request, res: ExpressResponse) => {
+  app.all("/api/render/*splat", async (req: Request, res: ExpressResponse) => {
     const upstreamBase = workspaceServiceUrl();
     if (!upstreamBase) {
       res.status(503).json({
