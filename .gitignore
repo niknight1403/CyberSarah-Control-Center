@@ -84,3 +84,9 @@ web-dist/
 
 # Sprint 91: Vitest-Coverage-Ausgabe (lokal/CI-Artifact, nicht im Repo)
 coverage/
+
+# Python-Bytecode (Sprint 131: FastAPI-Backend)
+__pycache__/
+*.pyc
+.cybersarah*.db
+debug.db

@@ -1,5 +1,4 @@
 import {
-  MAX_RUNTIME_LOG_ENTRIES,
   type LogLevel,
   type RuntimeLogEntry,
   normalizeRuntimeLogEntry,

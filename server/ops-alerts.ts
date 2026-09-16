@@ -13,8 +13,7 @@ import {
   collectCriticalTransitions,
   summarizeOpsOverview,
   type CheckState,
-  type OpsCheckView,
-  type OpsOverview,
+    type OpsOverview,
 } from "../lib/ops-overview-logic";
 import { buildOpsDiscordPayload } from "../lib/ops-paas-logic";
 

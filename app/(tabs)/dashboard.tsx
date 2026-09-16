@@ -210,7 +210,6 @@ function MeteringTile({ overview }: { overview: MeteringOverview }) {
     );
   }
   const active = overview.providers.filter((provider) => provider.status === "active").length;
-  const worst = overview.providers.reduce((sum, provider) => sum + provider.failoversWindow, 0);
   return (
     <Tile
       title="Provider-Metering (Admin)"

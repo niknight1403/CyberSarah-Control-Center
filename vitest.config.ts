@@ -27,8 +27,9 @@ const rnStub = path.resolve(projektWurzel, "tests/stubs/react-native-stub.mjs");
 export default defineConfig({
   resolve: {
     alias: [
-      // 1. TS-Pfad-Alias (tsconfig.json: "@/*" -> "./*")
+      // 1. TS-Pfad-Alias (tsconfig.json: "@/*" -> "./*", "@shared/*" -> "./shared/*")
       { find: /^@\/(.*)$/, replacement: path.resolve(projektWurzel, "$1") },
+      { find: /^@shared\/(.*)$/, replacement: path.resolve(projektWurzel, "shared/$1") },
       // 2. React-Native-Ökosystem → Stub
       { find: /^react-native$/, replacement: rnStub },
       { find: /^react-native-safe-area-context$/, replacement: rnStub },

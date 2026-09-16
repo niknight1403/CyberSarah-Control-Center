@@ -33,7 +33,6 @@ import {
 } from "../lib/self-healing-logic";
 
 const INDEX_KEY = "selfHealing.incidentIndex";
-const INCIDENT_KEY_PREFIX = "selfHealing.incident.";
 const LAST_REMEDY_KEY = "selfHealing.lastAutoRemedyAt";
 const MAX_INCIDENTS = 200;
 

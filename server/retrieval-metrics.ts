@@ -23,6 +23,14 @@ let samples: RetrievalSample[] = [];
 /** Turn mit injizierten Learnings registrieren (vor der Antwort des Agenten). */
 export function recordLearningInjection(sessionId: string, injectedKeywords: string[][]): void {
   if (!sessionId || injectedKeywords.length === 0) return;
+  // Speicher-Hygiene: verfallene Fremd-Sessions gleich mit entfernen,
+  // damit die Map nicht unendlich waechst (Memory-Leak-Guard).
+  if (pendingInjections.size > 200) {
+    const nowMs = Date.now();
+    for (const [sid, record] of pendingInjections) {
+      if (nowMs - record.recordedAt > MAX_AGE_MS) pendingInjections.delete(sid);
+    }
+  }
   pendingInjections.set(sessionId, {
     keywords: injectedKeywords.map((keywords) => keywords.slice(0, 8)),
     recordedAt: Date.now(),

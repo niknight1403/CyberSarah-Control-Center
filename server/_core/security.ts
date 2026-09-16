@@ -55,6 +55,13 @@ export function createSecurityMiddleware() {
     }
 
     const now = Date.now();
+    // Speicher-Hygiene: abgelaufene IP-Eintraege rauswerfen, damit die
+    // Map nicht unendlich waechst (Memory-Leak-Guard, O(n) nur bei Bedarf).
+    if (requests.size > 1_000) {
+      for (const [staleKey, stale] of requests) {
+        if (stale.resetAt <= now) requests.delete(staleKey);
+      }
+    }
     const key = req.ip || req.socket.remoteAddress || "unknown";
     const entry = requests.get(key);
     if (!entry || entry.resetAt <= now) {

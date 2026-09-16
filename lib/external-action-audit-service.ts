@@ -35,7 +35,7 @@ import {
   type AuditRecordOutcome,
   type ExternalAuditStore,
 } from "./external-audit-store-logic";
-import type { AuditEntry, AuditExport, RotationConfig } from "./audit-rotation-logic";
+import type { AuditExport, RotationConfig } from "./audit-rotation-logic";
 
 export const externalActionAuditService = {
   create: createAuditEvent,

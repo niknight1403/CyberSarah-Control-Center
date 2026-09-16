@@ -3,7 +3,6 @@ import Stripe from "stripe";
 
 import {
   classifyBusinessDomain,
-  formatCurrency,
   getBinanceSymbols,
   getKrakenPairs,
   getCoinGeckoIds,

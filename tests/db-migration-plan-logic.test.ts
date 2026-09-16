@@ -8,9 +8,6 @@ import {
   extractCreateStatements,
   extractInsertStatements,
   normalizeDump,
-  normalizeBooleanDefaults,
-  splitTupleValues,
-  convertTupleValues,
   planMigration,
   stripMysqlSuffixes,
 } from "../lib/db-migration-plan-logic";

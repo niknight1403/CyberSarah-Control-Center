@@ -2,13 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { EmptySurface, PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { useLiveRuntimeLogs, useLiveRuntimeStatus, useClearRuntimeLogs, usePreviewTargetUrl } from "@/lib/live-runtime-client";
 import { buildPreviewViewModel } from "@/lib/live-runtime-view-logic";
 import { formatLogTime, type LiveRuntimeLogEntry } from "@/lib/live-runtime-sse-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { withAlpha } from "@/lib/theme-color-utils";
 import { useColors } from "@/hooks/use-colors";
 

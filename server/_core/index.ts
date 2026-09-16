@@ -27,7 +27,6 @@ import { restoreRouterState } from "../model-router";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
-  classifyRuntimeState,
   filterRuntimeLogs,
 } from "../../lib/live-status-logic";
 import {
