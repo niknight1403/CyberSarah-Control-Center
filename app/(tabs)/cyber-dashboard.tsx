@@ -4,6 +4,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LiveWidget, WidgetMetric } from "@/components/cyber/live-widget";
 import { CyberAgentCard } from "@/components/cyber/agent-card";
+import {
+  backendReachable,
+  getAgentStatus,
+  listTasks,
+  type BackendTask,
+} from "@/lib/cybersarah-backend-client";
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
 import { trpc } from "@/lib/trpc";
 
@@ -22,7 +28,53 @@ function formatUptime(ms: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+interface BackendState {
+  online: boolean;
+  mode: string;
+  stopped: boolean;
+  tasks: BackendTask[];
+}
+
+const BACKEND_OFFLINE: BackendState = { online: false, mode: "…", stopped: false, tasks: [] };
+
 export default function CyberDashboardScreen() {
+  const [backendState, setBackendState] = React.useState<BackendState>(BACKEND_OFFLINE);
+
+  // Autonomes FastAPI-Backend (Sprint 131): 8-s-Polling nur, wenn erreichbar
+  // und die App im Vordergrund ist. Offline-Zustand ist der harmlose Default.
+  React.useEffect(() => {
+    let cancelled = false;
+    const sync = (): void => {
+      if (cancelled) return;
+      Promise.all([getAgentStatus(), listTasks()])
+        .then(([status, tasks]) => {
+          if (cancelled) return;
+          setBackendState({
+            online: true,
+            mode: status.mode,
+            stopped: status.stopped,
+            tasks,
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setBackendState(BACKEND_OFFLINE);
+        });
+    };
+    void backendReachable(2_500).then((online) => {
+      if (cancelled) return;
+      if (!online) {
+        setBackendState(BACKEND_OFFLINE);
+        return;
+      }
+      sync();
+    });
+    const timer = setInterval(sync, 8_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
   const systemStatus = trpc.appStatus.status.useQuery(undefined, {
     refetchInterval: 4_000,
     refetchIntervalInBackground: false,
@@ -88,6 +140,32 @@ export default function CyberDashboardScreen() {
             status={systemOnline ? "running" : "error"}
             metric="Multi-Provider"
           />
+        </LiveWidget>
+
+        <LiveWidget
+          title="Autonomes Backend"
+          badge={backendState.online ? (backendState.stopped ? "GESTOPPT" : "LIVE") : "OFFLINE"}
+          accent={backendState.online ? (backendState.stopped ? cyber.pink : cyber.green) : cyber.textDim}
+        >
+          {backendState.online ? (
+            <>
+              <WidgetMetric label="Executor-Modus" value={backendState.mode.toUpperCase()} accent={cyber.green} />
+              <WidgetMetric label="Tasks im Ledger" value={`${backendState.tasks.length}`} accent={backendState.tasks.length > 0 ? cyber.cyan : undefined} />
+              <WidgetMetric
+                label="Laufend"
+                value={`${backendState.tasks.filter((task) => task.status === "running").length}`}
+              />
+              <WidgetMetric
+                label="Emergency Stop"
+                value={backendState.stopped ? "AKTIV" : "inaktiv"}
+                accent={backendState.stopped ? cyber.pink : cyber.green}
+              />
+            </>
+          ) : (
+            <Text style={styles.emptyText}>
+              Autonomes Backend offline — Terminal zeigt Studio-Logs, Ledger nutzt Orchestrator-Daten.
+            </Text>
+          )}
         </LiveWidget>
 
         <LiveWidget

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -14,6 +14,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  backendReachable,
+  listLogs,
+  releaseEmergencyStop,
+  triggerEmergencyStop,
+  type BackendAgentLog,
+} from "@/lib/cybersarah-backend-client";
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
 import { trpc } from "@/lib/trpc";
 
@@ -22,12 +29,18 @@ import { trpc } from "@/lib/trpc";
  * hervorgehobenen Log-Leveln (Info=Cyan, Warn=Amber, Error=Pink,
  * Success=Gruen) und Emergency-Stop.
  *
+ * Sprint 131 — Backend-Kopplung: Ist das autonome FastAPI-Backend
+ * (cybersarah-backend) erreichbar, werden dessen Agenten-Logs in den
+ * Stream gemischt und der Emergency Stop stoppt und
+ * startet auch den Remote-Executor. Ist das Backend offline, laeuft das Terminal
+ * wie gehabt nur auf den Studio-tRPC-Daten weiter.
+ *
  * Performance: Bewusst effizientes Polling (3 s, nur im Vordergrund)
  * statt WebSocket-Dauerverbindung — schont den Akku und funktioniert
  * auf allen Plattformen ohne native SSE-Abhaengigkeit. Der Emergency
  * Stop pausiert alle Live-Aktivitaeten dieser Ansicht sofort (Polling,
- * Agenten-Monitoring) und haelt sie so lange blockiert, bis aktiv
- * fortgesetzt wird.
+ * Agenten-Monitoring, Backend-Sync) und haelt sie so lange blockiert,
+ * bis aktiv fortgesetzt wird.
  */
 
 type LogLevelKey = "info" | "warn" | "error" | "success";
@@ -51,8 +64,24 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("de-DE", { hour12: false });
 }
 
+/** Backend-Log-Zeile ins Terminal-Format uebersetzen. */
+function backendLogToEntry(log: BackendAgentLog): LogEntry {
+  const level: LogLevelKey =
+    log.level === "warn" || log.level === "error" || log.level === "success" ? log.level : "info";
+  return {
+    id: `backend-${log.id}`,
+    level,
+    source: "autonomer-executor",
+    message: log.message,
+    atMs: new Date(log.created_at).getTime() || 0,
+  };
+}
+
 export default function CyberTerminalScreen() {
   const [stopped, setStopped] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [backendStopped, setBackendStopped] = useState(false);
+  const [backendLogs, setBackendLogs] = useState<LogEntry[]>([]);
 
   const logsQuery = trpc.appStatus.recentLogs.useQuery(
     { limit: 120 },
@@ -63,7 +92,49 @@ export default function CyberTerminalScreen() {
     },
   );
 
-  const entries: LogEntry[] = (logsQuery.data?.entries ?? []) as unknown as LogEntry[];
+  // Backend-Erreichbarkeit einmalig pruefen (3 s Timeout, kein Throw).
+  useEffect(() => {
+    let cancelled = false;
+    void backendReachable(2_500).then((online) => {
+      if (!cancelled) setBackendOnline(online);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Backend-Logs nur syncen, wenn Backend online und Ansicht nicht gestoppt.
+  useEffect(() => {
+    if (!backendOnline) return;
+    let cancelled = false;
+    const sync = (): void => {
+      if (cancelled || stopped) return;
+      listLogs(120)
+        .then((logs) => {
+          if (!cancelled) setBackendLogs(logs.map(backendLogToEntry));
+        })
+        .catch(() => {
+          // Offline-Fallback: letzte Daten behalten, kein Crash.
+        });
+    };
+    sync();
+    const timer = setInterval(sync, 5_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [backendOnline, stopped]);
+
+  const studioEntries = (logsQuery.data?.entries ?? []) as unknown as LogEntry[];
+  const merged = React.useMemo(() => {
+    if (!backendOnline || backendLogs.length === 0) return studioEntries;
+    const byId = new Map<string, LogEntry>();
+    for (const entry of [...studioEntries, ...backendLogs]) byId.set(entry.id, entry);
+    return Array.from(byId.values())
+      .sort((a, b) => a.atMs - b.atMs)
+      .slice(-120);
+  }, [backendOnline, backendLogs, studioEntries]);
+  const entries = stopped ? [] : merged;
 
   const stopScale = useSharedValue(1);
   const stopAnimated = useAnimatedStyle(() => ({ transform: [{ scale: stopScale.value }] }));
@@ -75,6 +146,27 @@ export default function CyberTerminalScreen() {
   const handleStopOut = useCallback(() => {
     stopScale.value = withSpring(1, { damping: 14 });
   }, [stopScale]);
+
+  /** Emergency Stop: lokal pausieren + Remote-Executor anhalten. */
+  const handleStop = useCallback(() => {
+    setStopped(true);
+    if (!backendOnline) return;
+    triggerEmergencyStop()
+      .then((result) => setBackendStopped(result.stopped))
+      .catch(() => {
+        // Remote-Stop fehlgeschlagen — lokaler Stop bleibt aktiv.
+      });
+  }, [backendOnline]);
+
+  /** Resume: lokale Ansicht fortsetzen + Remote-Executor reaktivieren. */
+  const handleResume = useCallback(() => {
+    setStopped(false);
+    setBackendStopped(false);
+    if (!backendOnline) return;
+    releaseEmergencyStop().catch(() => {
+      // Remote-Resume fehlgeschlagen — lokale Ansicht laeuft weiter.
+    });
+  }, [backendOnline]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -100,7 +192,9 @@ export default function CyberTerminalScreen() {
         <ScrollView style={styles.terminal} contentContainerStyle={styles.terminalContent} showsVerticalScrollIndicator={false}>
           {stopped ? (
             <Text style={[styles.systemLine, { color: cyber.pink }]}>
-              ⛔ EMERGENCY STOP AKTIV — Live-Aktivitaeten pausiert. Zum Fortsetzen &quot;RESUME&quot; druecken.
+              ⛔ EMERGENCY STOP AKTIV — Live-Aktivitaeten pausiert.
+              {backendStopped ? " Remote-Executor gestoppt." : ""}
+              Zum Fortsetzen &quot;RESUME&quot; druecken.
             </Text>
           ) : entries.length === 0 ? (
             <Text style={styles.systemLine}>Warte auf Agenten-Aktivitaet…</Text>
@@ -124,10 +218,17 @@ export default function CyberTerminalScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
+          {backendOnline ? (
+            <Text style={styles.backendHint}>
+              {stopped
+                ? "Autonomes Backend: gestoppt"
+                : "Autonomes Backend: live — Stop greift auch remote"}
+            </Text>
+          ) : null}
           {stopped ? (
             <Pressable
               style={({ pressed }) => [styles.resumeButton, pressed && styles.buttonPressed]}
-              onPress={() => setStopped(false)}
+              onPress={handleResume}
               accessibilityRole="button"
             >
               <Text style={styles.resumeText}>▶ RESUME</Text>
@@ -137,7 +238,7 @@ export default function CyberTerminalScreen() {
               <Pressable
                 onPressIn={handleStopIn}
                 onPressOut={handleStopOut}
-                onPress={() => setStopped(true)}
+                onPress={handleStop}
                 style={({ pressed }) => [styles.stopButton, pressed && styles.buttonPressed]}
                 accessibilityRole="button"
               >
@@ -176,6 +277,7 @@ const styles = StyleSheet.create({
   sourceText: { color: cyber.textMuted },
   messageText: { color: cyber.text },
   footer: { padding: 14, paddingBottom: 18, borderTopWidth: 1, borderTopColor: cyber.border, backgroundColor: cyber.bg },
+  backendHint: { ...cyberTypography.mono, fontSize: 10, color: cyber.textDim, textAlign: "center", marginBottom: 10 },
   stopButton: {
     backgroundColor: cyber.pink,
     borderRadius: 14,
