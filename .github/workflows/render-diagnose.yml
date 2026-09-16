@@ -58,3 +58,42 @@ jobs:
               if item.get("key") == "WORKSPACE_SERVICE_URL":
                   print("WORKSPACE_SERVICE_URL =", item.get("value"))
           PY
+
+      - name: Render-Logs + healthCheckPath des App-Services (Render-API)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.parse
+
+          key = os.environ["RENDER_API_KEY"]
+
+          def api(path):
+              req = urllib.request.Request(
+                  "https://api.render.com/v1" + path,
+                  headers={"Authorization": "Bearer " + key},
+              )
+              with urllib.request.urlopen(req, timeout=60) as response:
+                  return json.load(response)
+
+          app_sid = "srv-dahjgllg1s2s73bf9u4g"
+
+          print("--- Service-Details (healthCheckPath etc.) ---")
+          try:
+              svc = api(f"/services/{app_sid}")
+              if isinstance(svc, dict) and "service" in svc:
+                  svc = svc["service"]
+              print(json.dumps({k: svc.get(k) for k in ("name", "healthCheckPath", "autoDeploy", "suspend", "runtime", "dockerfilePath", "dockerContext", "buildFilter", "repo")}, indent=1))
+          except Exception as e:
+              print("Service-Details-Fehler:", e)
+
+          print()
+          print("--- Logs des App-Services (letzte 250 Zeilen) ---")
+          try:
+              logs = api(f"/logs?limit=250&service={app_sid}")
+              for entry in logs:
+                  line = entry.get("logs", entry)
+                  print(line.get("timestamp", ""), "|", line.get("level", "?"), "|", line.get("message", "")[:400])
+          except Exception as e:
+              print("Logs-Fehler:", e)
+          PY
