@@ -1,4 +1,4 @@
-# 📡 Tech-Scan 2026-09-15
+# 📡 Tech-Scan 2026-09-16
 
 9 relevante Funde (Mindest-Relevanz 3, max. 4 je Bereich):
 
@@ -11,20 +11,20 @@
 - **[GitHub] [bnymnDev/shopware-mcp](https://github.com/bnymnDev/shopware-mcp)** (57★) — Relevanz 9, Bereich: Agenten-Kern/DevOps
   MCP server for Shopware 6. Products, orders, customers, stock, documents, a one-call health audit and sales reports for CODEX, Claude Desktop, Cursor and any MCP host. Read-only by default, guarded writes with dry runs. 
 
+- **[GitHub] [MingyiSecLab/Atlas](https://github.com/MingyiSecLab/Atlas)** (5★) — Relevanz 9, Bereich: Agenten-Kern/DevOps
+  Open-source local AI Agent desktop app for authorized security assessment — Electron + Mastra-powered runtime, visual pentest workflow, Kali sandbox, multi-provider LLM routing. 本地 AI 安全评估智能体桌面应用 Topics: ai-agent, ai-sec
+
 - **[GitHub] [Appllama/liquid-glass-screens](https://github.com/Appllama/liquid-glass-screens)** (288★) — Relevanz 8, Bereich: Mobile-Stack/DevOps
   Explore liquid-glass welcome screens with floating stickers and interactive swipe animations. Topics: animation, expo, expo-router, glassmorphism, ios, liquid-glass, mobile-development, mobile-ui, onboarding, react, reac
 
-- **[GitHub] [Innei/lody-ios](https://github.com/Innei/lody-ios)** (123★) — Relevanz 8, Bereich: Mobile-Stack/Agenten-Kern
+- **[GitHub] [Innei/lody-ios](https://github.com/Innei/lody-ios)** (134★) — Relevanz 8, Bereich: Mobile-Stack/Agenten-Kern
   Independent iOS client for Lody — native chat, sessions, and coding-agent collaboration on iPhone Topics: agent, coding-agent, collaboration, expo, ios, iphone, local-first, react-native, swift
 
-- **[GitHub] [kagantemizkan/expo-android-glass-view](https://github.com/kagantemizkan/expo-android-glass-view)** (12★) — Relevanz 8, Bereich: Mobile-Stack
-  Real-time glassmorphism for React Native Android. Features GPU-accelerated blur, refraction, and native Jetpack Compose UI components built on the New Architecture. Topics: agsl, android, blur, expo, expo-modules, glassm
+- **[GitHub] [JassiSingh08/adb-nearby](https://github.com/JassiSingh08/adb-nearby)** (5★) — Relevanz 8, Bereich: Mobile-Stack
+  Find Android devices on your network and connect adb in one step — with QR pairing, so you never type a six-digit code again. Topics: adb, adb-connect, android, cli, developer-tools, expo, react-native, wireless-debuggin
 
 - **[GitHub] [Albertchamberlain/Awesome-OKF](https://github.com/Albertchamberlain/Awesome-OKF)** (100★) — Relevanz 7, Bereich: Agenten-Kern
   OKF (Open Knowledge Format) — curated catalog of tools, plugins, skills, proposals, and docs for agent-friendly knowledge. YAML-driven, agent-searchable, MCP-ready. Topics: agent-memory, agent-skills, ai-agents, ai-memor
-
-- **[GitHub] [CTRLRun/ctrlrun](https://github.com/CTRLRun/ctrlrun)** (22★) — Relevanz 7, Bereich: Agenten-Kern
-  The execution safety layer for AI agents. Topics: agent-control-standard, agent-security, agentic-ai, ai-agents, ai-safety, audit-log, human-in-the-loop, langgraph, llm, llm-security, mcp, mcp-server, model-context-proto
 
 - **[npm] [drizzle-orm 0.45.2](https://www.npmjs.com/package/drizzle-orm)** (v0.45.2) — Relevanz 6, Bereich: Backend
   Aktuellste npm-Version. Lokal installiert: ^0.45.2. Drizzle ORM package for SQL databases
