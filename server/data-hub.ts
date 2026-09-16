@@ -155,8 +155,10 @@ function getStripeClient(): Stripe | null {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   const mode = (process.env.STRIPE_MODE ?? "live").trim().toLowerCase();
   if (!key) return null;
-  if (mode === "test" && !key.startsWith("sk_test_")) return null;
-  if (mode === "live" && !key.startsWith("sk_live_")) return null;
+  // Restricted Keys (rk_live_/rk_test_) sind gueltige produktive Keys
+  // (Least-Privilege) und werden wie Sekretaere akzeptiert.
+  if (mode === "test" && !key.startsWith("sk_test_") && !key.startsWith("rk_test_")) return null;
+  if (mode === "live" && !key.startsWith("sk_live_") && !key.startsWith("rk_live_")) return null;
   return new Stripe(key);
 }
 

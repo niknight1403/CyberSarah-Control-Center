@@ -1,8 +1,11 @@
 import Stripe from "stripe";
 import * as db from "./db";
 
-const LIVE_KEY_PREFIX = "sk_live_";
-const TEST_KEY_PREFIX = "sk_test_";
+// Sekretaere und Restricted Keys sind beide gueltig: Restricted Keys
+// (rk_live_/rk_test_) sind das empfohlene Least-Privilege-Setup fuer
+// Produktionsumgebungen und duerfen deshalb nicht abgewiesen werden.
+const LIVE_KEY_PREFIXES = ["sk_live_", "rk_live_"];
+const TEST_KEY_PREFIXES = ["sk_test_", "rk_test_"];
 export type StripeMode = "live" | "test";
 
 function requiredEnvironment(name: string) {
@@ -22,10 +25,10 @@ export function getStripeMode(): StripeMode {
 }
 
 export function validateStripeSecretKey(key: string, mode: StripeMode) {
-  const expectedPrefix = mode === "live" ? LIVE_KEY_PREFIX : TEST_KEY_PREFIX;
-  if (!key.startsWith(expectedPrefix))
+  const expectedPrefixes = mode === "live" ? LIVE_KEY_PREFIXES : TEST_KEY_PREFIXES;
+  if (!expectedPrefixes.some((prefix) => key.startsWith(prefix)))
     throw new Error(
-      `Der Stripe-Secret-Key passt nicht zu STRIPE_MODE=${mode}. Erwartet wird ${expectedPrefix}…`,
+      `Der Stripe-Secret-Key passt nicht zu STRIPE_MODE=${mode}. Erwartet wird ${expectedPrefixes[0]}… oder ${expectedPrefixes[1]}…`,
     );
   return key;
 }

@@ -17,6 +17,7 @@ describe("Stripe configuration", () => {
     expect(getStripeMode()).toBe("live");
     expect(() =>
       validateStripeSecretKey("sk_live_example", "live"),
+      validateStripeSecretKey("rk_live_example", "live"),
     ).not.toThrow();
     expect(() => validateStripeSecretKey("sk_test_example", "live")).toThrow(
       /passt nicht/,
@@ -28,6 +29,7 @@ describe("Stripe configuration", () => {
     expect(getStripeMode()).toBe("test");
     expect(() =>
       validateStripeSecretKey("sk_test_example", "test"),
+      validateStripeSecretKey("rk_test_example", "test"),
     ).not.toThrow();
     expect(() => validateStripeSecretKey("sk_live_example", "test")).toThrow(
       /passt nicht/,
