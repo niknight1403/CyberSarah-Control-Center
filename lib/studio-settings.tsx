@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AgentContextFile, type AgentProposal, type RemoteCommit, type RemoteHealth, type RepositoryQuality, RemoteWorkspaceClient } from "@/lib/remote-workspace-client";
-import { defaultLocalProviderEndpoints, getDefaultFreeProvider, normalizeLocalProviderEndpoints, providerDefaults, toPersistedStudioSettings, type CloudProviderId, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
+import { defaultLocalProviderEndpoints, normalizeLocalProviderEndpoints, providerDefaults, toPersistedStudioSettings, type CloudProviderId, type LocalProviderEndpoints, type ProviderId } from "@/lib/studio-settings-logic";
 import { secureSessionStore } from "@/lib/secure-session-store";
 import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
 import { exportEncryptedSettingsBackup, restoreEncryptedSettingsBackup, type SettingsBackupExportResult, type SettingsBackupRestoreResult } from "@/lib/settings-backup";
@@ -64,7 +64,15 @@ const defaultSettings: StudioSettings = {
   workspaceUrl: DEFAULT_WORKSPACE_URL,
   repositoryUrl: "",
   branch: "main",
-  provider: getDefaultFreeProvider(),
+  // Sprint 84-Follow-up (Zero-Touch-Fix): Frueher getDefaultFreeProvider()
+  // ("gemini") — das erfordert einen selbst hinterlegten API-Key, ohne den
+  // readyForChat NIE erfuellt wird. "managed" (On-Server-KI, Sprint 53) setzt
+  // genau das um, was das Admin-Autosetup (lib/admin-autosetup-logic.ts)
+  // bereits fuer Admins vorsieht — jetzt gilt es fuer JEDEN frischen
+  // Geraete-Zustand, ganz ohne manuelle Provider-Konfiguration. Nutzer mit
+  // eigenem Provider-Wunsch koennen ihn weiterhin frei in den Einstellungen
+  // waehlen; das ist nur der Startwert.
+  provider: "managed",
   localProviderEndpoints: defaultLocalProviderEndpoints,
   hasServiceAccessToken: false,
   hasGitHubToken: false,

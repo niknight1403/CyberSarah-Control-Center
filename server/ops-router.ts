@@ -17,7 +17,7 @@ import {
   buildBackupExport,
   validateBackupExport,
 } from "../lib/backup-self-service-logic";
-import { adminProcedure, router } from "./_core/trpc";
+import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
 import { buildBackupManifest } from "../lib/db-backup-manifest-logic";
 import {
@@ -294,8 +294,22 @@ export const opsRouter = router({
   }),
   // Sprint 69: Workspace-Service-URL fuer das Admin-Autosetup — der Client
   // kann die Service-Adresse selbst nicht kennen; der Server kennt sie aus ENV.
-  workspaceServiceUrl: adminProcedure.query(() => ({
-    url: process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "") ?? null,
+  //
+  // Sprint 84-Follow-up (Root-Cause-Fix): War bisher adminProcedure — ohne
+  // eingeloggten Admin auf dem Geraet blieb proxyUrl im Client leer, wodurch
+  // "Repository verbinden" den Workspace-Service DIREKT mit dem lokal auf dem
+  // Geraet gespeicherten (potenziell veralteten) Service-Token ansprach → 401
+  // "Workspace-Service-Zugriff verweigert", obwohl Server und Workspace-Service
+  // laengst synchron waren. proxyUrl selbst ist unkritisch (nur ein Pfad-Praefix,
+  // kein Secret — das Token bleibt serverseitig in WORKSPACE_SERVICE_TOKEN) und
+  // wird daher jetzt oeffentlich ausgeliefert, damit die App den Proxy IMMER
+  // nutzt, ganz ohne Admin-Login auf dem Geraet. Die direkte Service-Adresse
+  // (url) bleibt aus Vorsicht admin-only.
+  workspaceServiceUrl: publicProcedure.query(({ ctx }) => ({
+    url:
+      ctx.user?.role === "admin"
+        ? process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "") ?? null
+        : null,
     // Sprint 73: Render-Proxy aktiv, sobald der Server die Service-Adresse kennt.
     proxyUrl: process.env.WORKSPACE_SERVICE_URL?.trim() ? "/api/render" : null,
   })),
