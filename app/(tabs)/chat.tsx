@@ -58,6 +58,9 @@ export default function ChatScreen() {
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showRepositoryCard, setShowRepositoryCard] = useState(false);
+  // Sprint 133 — Einklappbarer Chat-Kopf: Status-Karte und Schnellstart-
+  // Chips lassen sich zusammenklappen, damit der Verlauf den Platz kriegt.
+  const [statusCollapsed, setStatusCollapsed] = useState(false);
   const [skillPreferences, setSkillPreferences] = useState<SkillPreferences>(DEFAULT_SKILL_PREFERENCES);
   // Sprint 137 — Mehrere Superagenten: Verwaltung + aktiver Agent.
   const superAgentsQuery = trpc.superAgents.list.useQuery(undefined, { retry: false });
@@ -345,14 +348,23 @@ export default function ChatScreen() {
                 keyboardShouldPersistTaps="handled"
                 onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
                 ListHeaderComponent={isChatEmpty ? <>
-                  <View style={[s.statusCard, readyForChat ? s.statusReady : s.statusWarn]}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={statusCollapsed ? "Chat-Status aufklappen" : "Chat-Status einklappen"}
+                    activeOpacity={0.85}
+                    onPress={() => setStatusCollapsed((value) => !value)}
+                    style={[s.statusCard, readyForChat ? s.statusReady : s.statusWarn]}
+                  >
                     <AiOrb state={!readyForChat ? "error" : isThinking ? "thinking" : "idle"} size={26} />
                     <View style={s.statusCopy}>
                       <Text style={[s.statusTitle, s.statusTitleMono]}>{readyForChat ? "Chat bereit" : "Verbindung fehlt"}</Text>
-                      <Text style={[s.statusText, s.statusTextMono]}>{readyForChat ? contextLabel + " · " + providerLabel : "Repository und Workspace in Einstellungen konfigurieren."}</Text>
+                      {!statusCollapsed ? (
+                        <Text style={[s.statusText, s.statusTextMono]}>{readyForChat ? contextLabel + " · " + providerLabel : "Repository und Workspace in Einstellungen konfigurieren."}</Text>
+                      ) : null}
                     </View>
                     <StatusBadge label={readyForChat ? "Bereit" : "Fehlt"} tone={readyForChat ? "ready" : "warning"} />
-                  </View>
+                    <Ionicons name={statusCollapsed ? "chevron-down" : "chevron-up"} size={16} color={colors.muted} style={s.statusChevron} />
+                  </TouchableOpacity>
                   {showRepositoryCard && (
                     <RepositoryConnectCard
                       onClose={() => setShowRepositoryCard(false)}
@@ -361,13 +373,15 @@ export default function ChatScreen() {
                       onListRepositories={settings.hasGitHubToken ? listGithubRepositories : undefined}
                     />
                   )}
-                  <View style={s.chips}>
-                    {["CyberSarah-revenue-os verbinden", "Analysiere die Architektur", "Verbessere die mobile UX"].map((t) => (
-                      <TouchableOpacity key={t} onPress={() => { setPrompt(t); if (t.startsWith("Cyber")) setShowRepositoryCard(true); }} style={s.chip}>
-                        <Text style={s.chipText}>{t}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  {!statusCollapsed ? (
+                    <View style={s.chips}>
+                      {["CyberSarah-revenue-os verbinden", "Analysiere die Architektur", "Verbessere die mobile UX"].map((t) => (
+                        <TouchableOpacity key={t} onPress={() => { setPrompt(t); if (t.startsWith("Cyber")) setShowRepositoryCard(true); }} style={s.chip}>
+                          <Text style={s.chipText}>{t}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : null}
                 </> : null}
                 renderItem={renderMessage}
                 ListFooterComponent={<>
@@ -503,11 +517,12 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   tabActive: { backgroundColor: withAlpha(colors.tint, 0.10), borderColor: withAlpha(colors.tint, 0.35), borderWidth: 1 },
   tabText: { color: "#6B7D90", fontFamily: "monospace", fontSize: 12, fontWeight: "700" },
   tabTextActive: { color: colors.tint },
-  statusTitleMono: { color: "#38E1FF", fontFamily: "monospace", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
-  statusTextMono: { color: "#7FA3BD", fontFamily: "monospace", fontSize: 11 },
+  statusTitleMono: { color: colors.tint, fontFamily: "monospace", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  statusTextMono: { color: colors.muted, fontFamily: "monospace", fontSize: 11 },
   dot: { backgroundColor: colors.success, borderRadius: 4, height: 6, width: 6 },
   badge: { backgroundColor: withAlpha(colors.tint, 0.14), borderRadius: 8, color: colors.tint, fontSize: 9, fontWeight: "900", overflow: "hidden", paddingHorizontal: 5, paddingVertical: 1 },
   statusCard: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 12, overflow: "hidden", padding: 12 },
+  statusChevron: { marginLeft: 4 },
   statusReady: { backgroundColor: withAlpha(colors.success, 0.1), borderColor: darken(colors.success, 0.6) },
   statusWarn: { backgroundColor: withAlpha(colors.warning, 0.12), borderColor: darken(colors.warning, 0.68) },
   statusGlow: { backgroundColor: colors.success, borderRadius: 3, height: 8, shadowColor: colors.success, shadowOpacity: 0.8, shadowRadius: 6, width: 8 },
