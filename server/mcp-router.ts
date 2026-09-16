@@ -10,17 +10,16 @@
  * (MCP_SERVER_URL, Streamable HTTP) — mit Session-Header, Timeout und
  * ehrlicher Nicht-konfiguriert-Antwort. Die Protokolllogik liegt rein
  * und getestet in lib/mcp-client-logic.ts.
+ *
+ * Sprint 136 — Sitzungs-Cache: `connect` und `callTool` verwendenden gemeinsamen
+ * prozesslokalen Sitzungs-Cache (lib/mcp-session-logic.ts). callTool nutzt die
+ * Sitzung aus dem Cache (kein Handshake); laeuft sie serverseitig ab (HTTP 404),
+ * gibt es genau einen frischen Handshake mit Wiederholung.
  */
 import { z } from "zod";
 
 import {
-  buildToolsCallRequest,
-  buildInitializeRequest,
-  buildInitializedNotification,
   DEFAULT_DISCOVERED_TOOL_PERMISSIONS,
-  extractToolCallResult,
-  MCP_CLIENT_NAME,
-  parseJsonRpcResponse,
   runMcpDiscovery,
   type JsonRpcNotification,
   type JsonRpcRequest,
@@ -31,6 +30,7 @@ import {
   negotiateTransport,
 } from "../lib/mcp-transport-logic";
 import { assertToolAllowed } from "../lib/mcp-registry-logic";
+import { createMcpSessionStore, runMcpToolCall } from "../lib/mcp-session-logic";
 import { adminProcedure, router } from "./_core/trpc";
 
 /** Request-Timeout fuer MCP-Gespraeche (Sandbox-Ports wuerden haengen). */
@@ -48,14 +48,18 @@ function grantedToolPermissions() {
 
 type StreamableHttpSend = (request: JsonRpcRequest | JsonRpcNotification) => Promise<unknown>;
 
+/** Prozesslokaler Sitzungs-Cache (Sprint 136): je Server-URL eine Sitzung. */
+const mcpSessionStore = createMcpSessionStore();
+
 /**
- * Baut die send-Funktion fuer Streamable HTTP: POST mit JSON-RPC-Body,
- * Accept fuer JSON und Event-Stream, Session-Header wird aus der ersten
- * Antwort uebernommen, SSE-Antworten werden auf data:-Zeilen reduziert.
+ * Baut den Kanal fuer Streamable HTTP: POST mit JSON-RPC-Body, Accept fuer
+ * JSON und Event-Stream, Session-Header wird uebernommen (Startwert optional,
+ * Sprint 136), SSE-Antworten werden auf data:-Zeilen reduziert. fetch-Fehler
+ * tragen den HTTP-Status, damit abgelaufene Sitzungen (404) erkannt werden.
  */
-function createStreamableHttpSend(rpcUrl: string): StreamableHttpSend {
-  let sessionId: string | null = null;
-  return async (request) => {
+function createStreamableHttpSend(rpcUrl: string, initialSessionId: string | null = null) {
+  let sessionId: string | null = initialSessionId;
+  const send: StreamableHttpSend = async (request) => {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
@@ -70,7 +74,7 @@ function createStreamableHttpSend(rpcUrl: string): StreamableHttpSend {
     const newSession = response.headers.get("mcp-session-id");
     if (newSession) sessionId = newSession;
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
     }
     // Notifications beantwortet der Server mit 202 ohne Body.
     if (response.status === 202) return undefined;
@@ -88,6 +92,7 @@ function createStreamableHttpSend(rpcUrl: string): StreamableHttpSend {
     if (!body) return undefined;
     return JSON.parse(body);
   };
+  return { send, getSessionId: () => sessionId };
 }
 
 /** Liest MCP_SERVER_URL und validiert die Streamable-HTTP-Endpunkte. */
@@ -152,14 +157,19 @@ export const mcpRouter = router({
     const endpoint = resolveConfiguredEndpoint();
     if (!endpoint.ok) return { connected: false, reason: endpoint.reason, tools: [], serverInfo: null };
     try {
+      const channel = createStreamableHttpSend(endpoint.rpcUrl);
       const discovery = await runMcpDiscovery({
         serverName: "remote",
         clientVersion: process.env.APP_VERSION ?? "0.0.0",
-        send: createStreamableHttpSend(endpoint.rpcUrl),
+        send: channel.send,
       });
       if (!discovery.ok) {
         return { connected: false, reason: discovery.reason, tools: [], serverInfo: null };
       }
+      // Sprint 136: Etablierte Sitzung cachen — der erste callTool danach
+      // spart sich den Handshake.
+      const sessionId = channel.getSessionId();
+      if (sessionId) mcpSessionStore.set(endpoint.rpcUrl, sessionId, Date.now());
       return {
         connected: true,
         reason: `Verbunden über Streamable HTTP — ${discovery.tools.length} Tools entdeckt.`,
@@ -176,9 +186,10 @@ export const mcpRouter = router({
     }
   }),
   /**
-   * Sprint 134 — Fuehrt ein Remote-Tool aus (Berechtigungs-Gate vor dem
+   * Sprint 134/136 — Fuehrt ein Remote-Tool aus (Berechtigungs-Gate vor dem
    * Netzwerkaufruf; alle Tools duerfen nur die via MCP_TOOL_PERMISSIONS
-   * verliehenen Berechtigungen nutzen).
+   * verliehenen Berechtigungen nutzen). Die Sitzungs-Orchestrierung (Cache,
+   * Erneuerung nach Ablauf) liegt rein in lib/mcp-session-logic.ts.
    */
   callTool: adminProcedure
     .input(
@@ -207,28 +218,17 @@ export const mcpRouter = router({
         return { ok: false as const, reason: permissionCheck.reason };
       }
 
-      const send = createStreamableHttpSend(endpoint.rpcUrl);
-      try {
-        const initResponse = await send(buildInitializeRequest(MCP_CLIENT_NAME, process.env.APP_VERSION ?? "0.0.0", 1));
-        const parsedInit = parseJsonRpcResponse(initResponse, 1);
-        if (!parsedInit.ok) return { ok: false as const, reason: `initialize fehlgeschlagen: ${parsedInit.reason}` };
-        try {
-          await send(buildInitializedNotification());
-        } catch {
-          // Notification ist best effort.
-        }
-        const callResponse = await send(buildToolsCallRequest(2, input.toolName, input.args));
-        const parsedCall = parseJsonRpcResponse(callResponse, 2);
-        if (!parsedCall.ok) return { ok: false as const, reason: `tools/call fehlgeschlagen: ${parsedCall.reason}` };
-        const outcome = extractToolCallResult(parsedCall.result);
-        return outcome.ok
-          ? { ok: true as const, text: outcome.text }
-          : { ok: false as const, reason: outcome.reason };
-      } catch (error) {
-        return {
-          ok: false as const,
-          reason: `Aufruf fehlgeschlagen: ${error instanceof Error ? error.message : "unbekannter Fehler"}`,
-        };
-      }
+      // Sprint 136: Orchestrierung mit Sitzungs-Cache liegt rein und
+      // getestet in lib/mcp-session-logic.ts (Handshake nur ohne frische
+      // Sitzung; HTTP 404 => ein frischer Handshake mit Wiederholung).
+      return runMcpToolCall({
+        toolName: input.toolName,
+        args: input.args,
+        serverUrl: endpoint.rpcUrl,
+        store: mcpSessionStore,
+        nowMs: () => Date.now(),
+        clientVersion: process.env.APP_VERSION ?? "0.0.0",
+        openSession: (sessionId) => createStreamableHttpSend(endpoint.rpcUrl, sessionId),
+      });
     }),
 });
