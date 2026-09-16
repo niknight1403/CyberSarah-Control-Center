@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: "VersionName für die APK (z. B. 2.0.0)"
+        description: "VersionName für die APK (z. B. 2.1.9). Leer = automatisch: letzte Release-Version +1 Patch"
         required: false
-        default: "2.0.0"
 
 permissions:
   contents: write
@@ -30,12 +29,21 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Naechste APK-Version ermitteln (Auto-Increment, kein 2.0.0-Rückfall)
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(node --experimental-strip-types scripts/next-release-version.mjs "${{ github.event.inputs.version_name || '' }}")"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Naechste APK-Version: $VERSION"
+
       - name: Abhaengigkeiten installieren (inkl. devDependencies)
         run: npm ci --no-audit --no-fund
 
       - name: Release-Version setzen und validieren
         env:
-          VERSION_NAME: ${{ github.event.inputs.version_name || '2.0.0' }}
+          VERSION_NAME: ${{ steps.version.outputs.VERSION }}
         run: node scripts/set-release-version.mjs "$VERSION_NAME"
 
       - name: TypeScript-Check
@@ -148,7 +156,7 @@ jobs:
       - name: APKs umbenennen und Release veroeffentlichen
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ github.event.inputs.version_name || '2.0.0' }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk \
             "CyberSarah-ControlCenter-v${VERSION}-dev.apk"
