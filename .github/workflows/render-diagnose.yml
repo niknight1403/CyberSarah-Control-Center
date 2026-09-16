@@ -88,12 +88,25 @@ jobs:
               print("Service-Details-Fehler:", e)
 
           print()
-          print("--- Logs des App-Services (letzte 250 Zeilen) ---")
-          try:
-              logs = api(f"/logs?limit=250&service={app_sid}")
+          print("--- Logs des App-Services (Zeitfenster des fehlgeschlagenen Deploys) ---")
+          import urllib.error, datetime as dt
+          start = "2026-09-16T06:41:00Z"
+          end = "2026-09-16T06:47:00Z"
+          attempts = [
+              f"/logs?limit=100&service={app_sid}&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
+              f"/logs?limit=100&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
+              f"/logs?limit=100&service={app_sid}",
+          ]
+          logs = None
+          for path in attempts:
+              try:
+                  logs = api(path)
+                  print("OK mit:", path[:80])
+                  break
+              except urllib.error.HTTPError as e:
+                  print("Versuch fehlgeschlagen:", path[:80], "->", e.code, e.read()[:200])
+          if logs:
               for entry in logs:
                   line = entry.get("logs", entry)
-                  print(line.get("timestamp", ""), "|", line.get("level", "?"), "|", line.get("message", "")[:400])
-          except Exception as e:
-              print("Logs-Fehler:", e)
+                  print(line.get("timestamp", ""), "|", line.get("level", "?"), "|", str(line.get("message", ""))[:400])
           PY
