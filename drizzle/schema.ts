@@ -150,3 +150,35 @@ export const agentMemoryConsolidations = pgTable("agentMemoryConsolidations", {
 
 export type AgentMemoryConsolidation = typeof agentMemoryConsolidations.$inferSelect;
 export type InsertAgentMemoryConsolidation = typeof agentMemoryConsolidations.$inferInsert;
+
+/* ==================== Sprint 132 — Projekte-Gedaechtnis ==================== */
+
+/** Status eines vom Nutzer verfolgten Projekts (Repo, Sub-App, Vorhaben). */
+export const projectStatus = pgEnum("project_status", [
+  "idee",
+  "in-arbeit",
+  "pausiert",
+  "live",
+  "archiviert",
+]);
+
+/**
+ * Dauerhaftes Gedaechtnis der laufenden Projekte eines Nutzers — taucht im
+ * "Gedaechtnis"-Tab und als Kachel im Cyber-Dashboard auf, damit begonnene
+ * Vorhaben (Repos, Sub-Apps) nicht mehr manuell nachgehalten werden muessen.
+ */
+export const projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
+  userOpenId: varchar("userOpenId", { length: 64 }).notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description").notNull().default(""),
+  repositoryUrl: varchar("repositoryUrl", { length: 300 }).notNull().default(""),
+  status: projectStatus("status").notNull().default("in-arbeit"),
+  lastActivityAt: timestamp("lastActivityAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("projects_user_idx").on(table.userOpenId, table.lastActivityAt),
+]);
+
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = typeof projects.$inferInsert;

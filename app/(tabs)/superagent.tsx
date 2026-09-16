@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
 import { trpc } from "@/lib/trpc";
+import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
 /**
  * Sprint 129 — Superagent-Tab: Vollautonome Ausfuehrung von Zielen ueber
@@ -138,6 +139,7 @@ export default function SuperagentScreen() {
 
   const detailTask = (activeTask && activeTask.id === expandedId ? activeTask : undefined) ?? ledger.find((t) => t.id === expandedId);
 
+  const navDrawer = useNavDrawer();
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
@@ -153,6 +155,10 @@ export default function SuperagentScreen() {
         }
       >
         <View style={styles.header}>
+          <View style={styles.menuRow}>
+            <NavDrawer {...navDrawer.drawerProps} />
+            <NavDrawerButton {...navDrawer.hamburgerProps} />
+          </View>
           <Text style={styles.headerKicker}>AUTONOME AUSFÜHRUNG</Text>
           <Text style={styles.headerTitle}>
             SUPER<Text style={{ color: cyber.cyan }}>AGENT</Text>
@@ -295,6 +301,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: cyber.bg },
   screen: { flex: 1 },
   content: { padding: 16, paddingBottom: 48, gap: 16 },
+  menuRow: { marginBottom: 4 },
   header: { gap: 4 },
   headerKicker: { ...cyberTypography.caption, color: cyber.textDim, letterSpacing: 3, fontSize: 11 },
   headerTitle: { ...cyberTypography.display, color: cyber.text },

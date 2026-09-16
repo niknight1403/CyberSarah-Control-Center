@@ -5,6 +5,8 @@ import { secureSessionStore } from "@/lib/secure-session-store";
 import { providerKeyStorageKey, updateProviderKeyStatus, type ProviderKeyStatus } from "@/lib/provider-key-logic";
 import { exportEncryptedSettingsBackup, restoreEncryptedSettingsBackup, type SettingsBackupExportResult, type SettingsBackupRestoreResult } from "@/lib/settings-backup";
 import { getApiBaseUrl } from "@/constants/oauth";
+import { fetchGithubRepositories } from "@/lib/github-api-client";
+import type { GithubRepositorySummary } from "@/lib/github-repository-picker-logic";
 import { trpc } from "@/lib/trpc";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -124,6 +126,9 @@ type StudioSettingsContextValue = {
   restoreSettingsBackup: (backup: unknown, passphrase: string) => Promise<SettingsBackupRestoreResult>;
   requestDevelopmentProposal: (input: { prompt: string; activeFile?: string; contextFiles?: AgentContextFile[] }) => Promise<AgentProposal>;
   setProtectedChatContent: (enabled: boolean) => Promise<void>;
+  /** Sprint 132: eigene GitHub-Repos ueber das hinterlegte Token auflisten —
+   * Grundlage des Repository-Pickers (Token rein, Workspace-Auswahl frei). */
+  listGithubRepositories: () => Promise<GithubRepositorySummary[]>;
 };
 
 const StudioSettingsContext = createContext<StudioSettingsContextValue | undefined>(undefined);
@@ -221,6 +226,14 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     await deleteSecureValue(PROVIDER_KEY_KEY);
     setSettings((current) => ({ ...current, hasProviderKey: false, providerKeyStatus: updateProviderKeyStatus(current.providerKeyStatus, current.provider, false) }));
   }, [settings.provider]);
+
+  /** Sprint 132: Repos ueber das gespeicherte Token laden — Grundlage des
+   * autonomen Repository-Pickers ("nur Token, Workspace frei waehlen"). */
+  const listGithubRepositories = useCallback(async () => {
+    const storedGitHubToken = await readSecureValue(GITHUB_TOKEN_KEY);
+    if (!storedGitHubToken) throw new Error("Hinterlege zuerst einen GitHub-Token in den Einstellungen.");
+    return fetchGithubRepositories(storedGitHubToken);
+  }, []);
 
   const attachRepository = useCallback(async (input: StudioSettingsInput) => {
     // Sprint 84: Guard — ohne Basis-URL (weder Admin-Proxy noch hinterlegte
@@ -405,8 +418,8 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [createConnectedClient, settings.workspaceId]);
 
   const value = useMemo(
-    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, testLocalProviderEndpoint, testCloudProvider, exportSettingsBackup, restoreSettingsBackup, requestDevelopmentProposal, setProtectedChatContent }),
-    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, exportSettingsBackup, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, restoreSettingsBackup, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges, testCloudProvider, testLocalProviderEndpoint],
+    () => ({ settings, loading, saveSettings, clearServiceAccessToken, clearGitHubToken, clearProviderKey, attachRepository, readAttachedFile, loadRepositoryDetails, switchRepositoryBranch, syncRemoteChanges, commitRepository, pushRepository, createRepositoryPullRequest, loadRepositoryQuality, loadWorkspaceHealth, testLocalProviderEndpoint, testCloudProvider, exportSettingsBackup, restoreSettingsBackup, requestDevelopmentProposal, setProtectedChatContent, listGithubRepositories }),
+    [attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, commitRepository, createRepositoryPullRequest, exportSettingsBackup, listGithubRepositories, loading, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, requestDevelopmentProposal, restoreSettingsBackup, saveSettings, setProtectedChatContent, settings, switchRepositoryBranch, syncRemoteChanges, testCloudProvider, testLocalProviderEndpoint],
   );
 
   return <StudioSettingsContext.Provider value={value}>{children}</StudioSettingsContext.Provider>;

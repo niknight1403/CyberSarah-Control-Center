@@ -46,7 +46,7 @@ export default function ChatScreen() {
     const colors = useColors();
     const s = useMemo(() => createStyles(colors), [colors]);
   const { loadRemoteFiles, selectedFile } = useWorkspace();
-  const { attachRepository, loadRepositoryDetails, loadWorkspaceHealth, settings } = useStudioSettings();
+  const { attachRepository, listGithubRepositories, loadRepositoryDetails, loadWorkspaceHealth, settings } = useStudioSettings();
   const [activeTab, setActiveTab] = useState<InnerTab>("chat");
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [prompt, setPrompt] = useState("");
@@ -284,6 +284,7 @@ export default function ChatScreen() {
                       onClose={() => setShowRepositoryCard(false)}
                       onConnect={(input) => attachRepository({ workspaceUrl: settings.workspaceUrl, repositoryUrl: input.repositoryUrl, branch: input.branch, provider: settings.provider, localProviderEndpoints: settings.localProviderEndpoints, protectChatContent: settings.protectChatContent })
                         .then((result) => { loadRemoteFiles(result.files); setMessages((cur) => [...cur, { id: "repo-" + Date.now(), role: "agent", content: "Repository verbunden. " + result.files.length + " Dateien bereit." }]); return result; })}
+                      onListRepositories={settings.hasGitHubToken ? listGithubRepositories : undefined}
                     />
                   )}
                   <View style={s.chips}>

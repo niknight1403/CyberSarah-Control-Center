@@ -11,6 +11,8 @@ import {
   agentLearnings,
   agentMemoryConsolidations,
   InsertAgentMemoryConsolidation,
+  projects,
+  InsertProject,
 } from "../drizzle/schema";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
@@ -551,4 +553,57 @@ export async function applyConsolidationPlanWrites(plan: {
     deletions += 1;
   }
   return { keywordUpdates, deletions };
+}
+
+
+/* ============================================================
+ * Sprint 132 — Projekte-Gedaechtnis (Datenbankzugriff).
+ * Reine Validierung/Seed-Daten liegen in lib/projects-logic.ts.
+ * ============================================================ */
+
+/** Alle Projekte eines Nutzers, neueste Aktivitaet zuerst. */
+export async function listProjectsForUser(userOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Projekte nicht lesbar.");
+  return db
+    .select()
+    .from(projects)
+    .where(eq(projects.userOpenId, userOpenId))
+    .orderBy(desc(projects.lastActivityAt), desc(projects.id));
+}
+
+export async function insertProjectRecord(input: InsertProject) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Projekt nicht speicherbar.");
+  const [saved] = await db.insert(projects).values(input).returning();
+  return saved;
+}
+
+/** Mehrere Projekte in einem Zug anlegen (Erststart-Seed). */
+export async function insertProjectRecords(inputs: InsertProject[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Projekte nicht speicherbar.");
+  if (inputs.length === 0) return [];
+  return db.insert(projects).values(inputs).returning();
+}
+
+export async function updateProjectRecord(
+  id: number,
+  userOpenId: string,
+  changes: Partial<Pick<InsertProject, "name" | "description" | "repositoryUrl" | "status">>,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Projekt nicht aktualisierbar.");
+  const [saved] = await db
+    .update(projects)
+    .set({ ...changes, lastActivityAt: new Date() })
+    .where(and(eq(projects.id, id), eq(projects.userOpenId, userOpenId)))
+    .returning();
+  return saved;
+}
+
+export async function deleteProjectRecord(id: number, userOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Projekt nicht loeschbar.");
+  await db.delete(projects).where(and(eq(projects.id, id), eq(projects.userOpenId, userOpenId)));
 }

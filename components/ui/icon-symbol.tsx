@@ -43,6 +43,12 @@ const MAPPING = {
   "doc.fill": "description",
   "trash": "delete",
   "hourglass": "hourglass-empty",
+  "puzzlepiece.fill": "extension",
+  "video.fill": "videocam",
+  "brain.head.profile": "psychology",
+  "tablecells.fill": "table-chart",
+  "xmark": "close",
+  "line.3.horizontal": "menu",
 } as const satisfies Record<string, ComponentProps<typeof MaterialIcons>["name"]>;
 
 /**

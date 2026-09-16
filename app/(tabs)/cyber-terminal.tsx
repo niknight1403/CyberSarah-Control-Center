@@ -23,6 +23,7 @@ import {
 } from "@/lib/cybersarah-backend-client";
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
 import { trpc } from "@/lib/trpc";
+import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
 /**
  * Sprint 126 — Cyber-Terminal: Echtzeit-Log-Viewer mit farblich
@@ -168,10 +169,13 @@ export default function CyberTerminalScreen() {
     });
   }, [backendOnline]);
 
+  const navDrawer = useNavDrawer();
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.screen}>
         <View style={styles.header}>
+          <NavDrawer {...navDrawer.drawerProps} />
+          <NavDrawerButton {...navDrawer.hamburgerProps} />
           <View>
             <Text style={styles.headerKicker}>ORCHESTRATOR</Text>
             <Text style={styles.headerTitle}>LIVE TERMINAL</Text>

@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { useOfflineDashboard } from "@/hooks/use-offline-dashboard";
 import { summarizeBackupExport, type BackupExport } from "@/lib/backup-self-service-logic";
 import { useColors } from "@/hooks/use-colors";
+import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
 /**
  * Sprint 90 — Dashboard: Live-Geschaeftsdaten des Master-Agenten.
@@ -330,11 +331,14 @@ export default function DashboardScreen() {
       .slice(0, 2)
       .join(" · ");
 
+  const navDrawer = useNavDrawer();
   return (
     <ScreenContainer>
       <ParticleField seed={11} count={16} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
+          <NavDrawer {...navDrawer.drawerProps} />
+          <NavDrawerButton {...navDrawer.hamburgerProps} />
           <AiOrb state={isLoading ? "thinking" : error ? "error" : "idle"} size={34} />
           <TouchableOpacity
             style={styles.headerCopy}

@@ -15,6 +15,7 @@ import { mcpRouter } from "./mcp-router";
 import { orchestratorRouter } from "./orchestrator-router";
 import { monetizationRouter } from "./monetization-router";
 import { crashReportingRouter, selfHealingRouter } from "./self-healing-router";
+import { projectsRouter } from "./projects-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -35,6 +36,7 @@ export const appRouter = router({
   developmentChat: developmentChatRouter,
   account: accountRouter,
   billing: billingRouter,
+  projects: projectsRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

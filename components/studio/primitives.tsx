@@ -2,6 +2,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ReactNode, useMemo } from "react";
 import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from "react-native";
 import { withAlpha } from "@/lib/theme-color-utils";
+import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { useColors } from "@/hooks/use-colors";
 
 type IconName = Parameters<typeof IconSymbol>[0]["name"];
@@ -21,8 +22,11 @@ export function StudioHeader({
 }) {
     const colors = useColors();
     const styles = useMemo(() => createStyles(colors), [colors]);
+  const { hamburgerProps, drawerProps } = useNavDrawer();
   return (
     <View style={styles.header}>
+      <NavDrawer {...drawerProps} />
+      <NavDrawerButton {...hamburgerProps} tint="#F2F6FC" />
       <View style={styles.titleGroup}>
         <Text style={styles.eyebrow}>{eyebrow}</Text>
         <Text style={styles.title}>{title}</Text>

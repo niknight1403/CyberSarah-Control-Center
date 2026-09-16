@@ -1,4 +1,5 @@
 import { ScreenContainer } from "@/components/screen-container";
+import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { trpc } from "@/lib/trpc";
 import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
 import * as Auth from "@/lib/_core/auth";
@@ -113,9 +114,14 @@ export default function AccountScreen() {
     await accountQuery.refetch();
   };
 
+  const navDrawer = useNavDrawer();
   return (
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <View style={styles.page}>
+        <View style={styles.menuRow}>
+          <NavDrawer {...navDrawer.drawerProps} />
+          <NavDrawerButton {...navDrawer.hamburgerProps} />
+        </View>
         <Text style={styles.eyebrow}>CYBERSARAH · KONTO</Text>
         <Text style={styles.title}>{sessionExpired && !user ? "Sitzung abgelaufen" : user ? "Dein Zugang" : mode === "login" ? "Anmelden" : "Konto erstellen"}</Text>
         <Text style={styles.lead}>{user ? "Sitzung, Berechtigungen und Verwaltungszugang werden hier sicher verwaltet." : "Melde dich an, um den Entwicklungsraum, KI-Provider und Verwaltungsfunktionen zu nutzen."}</Text>
@@ -194,6 +200,7 @@ export default function AccountScreen() {
 
 function createStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
+  menuRow: { marginBottom: 10 },
   page: { flex: 1, paddingTop: 20 },
   eyebrow: { color: lighten(colors.tint, 0.2), fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
   title: { color: "#F1F6FF", fontSize: 28, fontWeight: "900", marginTop: 8 },

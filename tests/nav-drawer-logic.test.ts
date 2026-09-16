@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+
+import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
+
+describe("DRAWER_ITEMS", () => {
+  it("enthaelt genau die acht erwarteten Einträge in Reihenfolge", () => {
+    expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
+      "Chat",
+      "Workflows",
+      "Plugins",
+      "Meetings",
+      "Dateien",
+      "Gedächtnis",
+      "Daten",
+      "Agenteneinstellungen",
+    ]);
+  });
+
+  it("markiert nur Meetings mit dem 'Neu'-Badge", () => {
+    const badged = DRAWER_ITEMS.filter((item) => item.badge);
+    expect(badged.map((item) => item.title)).toEqual(["Meetings"]);
+  });
+});
+
+describe("resolveActiveDrawerItem", () => {
+  it("findet exakte Treffer", () => {
+    expect(resolveActiveDrawerItem("/memory")?.title).toBe("Gedächtnis");
+    expect(resolveActiveDrawerItem("/settings")?.title).toBe("Agenteneinstellungen");
+  });
+
+  it("findet Praefix-Treffer fuer verschachtelte Routen", () => {
+    expect(resolveActiveDrawerItem("/chat/session-1")?.title).toBe("Chat");
+  });
+
+  it("behandelt den Root-Pfad nicht als Praefix fuer andere Routen", () => {
+    expect(resolveActiveDrawerItem("/plugins")?.title).toBe("Plugins");
+    expect(resolveActiveDrawerItem("")?.title).toBe("Dateien");
+    expect(resolveActiveDrawerItem("/")?.title).toBe("Dateien");
+  });
+
+  it("liefert null bei unbekannter Route", () => {
+    expect(resolveActiveDrawerItem("/unbekannt")).toBeNull();
+  });
+});

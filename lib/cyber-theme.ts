@@ -1,29 +1,45 @@
 /**
- * Cyber-Design-System (Sprint 126) — futuristisches Dark-Theme.
+ * Cyber-Design-System (Sprint 126, Farb-Update Sprint 132) — futuristisches
+ * Dark-Theme.
  *
- * Einheitliche Design-Tokens fuer alle Cyber-Screens: OLED-Schwarz als
- * Grundflaeche, Neon-Cyan/Cyber-Pink als Akzente, klare Typografie.
- * Bewusst als eigenes Modul: Die Cyber-Screens sind self-contained und
- * kollidieren nicht mit dem bestehenden App-Theme (useColors).
+ * Einheitliche Design-Tokens fuer alle Cyber-Screens: Indigo-Schwarz als
+ * Grundflaeche, ein vierfarbiges Neon-Spektrum (Pink → Violett → Blau →
+ * Cyan) als Akzente, klare Typografie. Bewusst als eigenes Modul: Die
+ * Cyber-Screens sind self-contained und kollidieren nicht mit dem
+ * bestehenden App-Theme (useColors).
+ *
+ * Sprint 132: Palette auf Wunsch durch ein moderneres, kontrastreicheres
+ * Neon-Spektrum ersetzt (inspiriert von aktuellen App-Store-Neon-Brandings —
+ * Pink/Magenta → Violett → Elektroblau → Cyan statt reinem Cyan/Pink-Duo).
+ * Alle bestehenden Token-Namen (cyan, pink, green, amber, bg, surface, …)
+ * bleiben erhalten — nur die Werte aendern sich, kein Screen musste
+ * angepasst werden. `purple` und `blue` sind neu und stehen fuer Verlaeufe
+ * und zusaetzliche Akzent-Faelle zur Verfuegung.
  */
 
 export const cyber = {
-  /** OLED-Grundflaeche — echtes Schwarz spart auf OLED-Displays Akku. */
-  bg: "#0B0F19",
-  surface: "#0F172A",
-  surfaceElevated: "#131B2E",
-  border: "#1E293B",
-  borderGlow: "rgba(0, 242, 254, 0.35)",
-  /** Neon-Akzente. */
-  cyan: "#00F2FE",
-  pink: "#FF007F",
-  green: "#00FF66",
-  amber: "#F5A623",
+  /** Indigo-Schwarz-Grundflaeche — dunkel genug fuer OLED-Ersparnis, mit
+   * leichtem Blau-/Violett-Unterton statt reinem Neutral-Schwarz. */
+  bg: "#0A0A14",
+  surface: "#12121F",
+  surfaceElevated: "#181830",
+  border: "#242440",
+  borderGlow: "rgba(139, 92, 246, 0.35)",
+  /** Neon-Spektrum (Pink → Violett → Blau → Cyan). */
+  pink: "#FF2D95",
+  purple: "#8B5CF6",
+  blue: "#3D8BFD",
+  cyan: "#00E5FF",
+  green: "#39FF88",
+  amber: "#FFB020",
   /** Typografie. */
-  text: "#F8FAFC",
-  textMuted: "#94A3B8",
-  textDim: "#64748B",
+  text: "#F5F5FF",
+  textMuted: "#9C9CC0",
+  textDim: "#6B6B8F",
 } as const;
+
+/** Vierfarbiger Verlauf fuer Hero-Flaechen/Glow-Effekte (Pink → Cyan). */
+export const cyberGradient = [cyber.pink, cyber.purple, cyber.blue, cyber.cyan] as const;
 
 /** Statusfarben — einheitlich in Widgets, Agent-Cards und Terminal. */
 export const statusColors = {

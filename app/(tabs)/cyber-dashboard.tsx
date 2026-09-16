@@ -11,6 +11,7 @@ import {
   type BackendTask,
 } from "@/lib/cybersarah-backend-client";
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
+import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { trpc } from "@/lib/trpc";
 
 /**
@@ -90,10 +91,15 @@ export default function CyberDashboardScreen() {
   const systemOnline = status != null && (status.state === "running" || status.state === "building");
   const tasks = taskLedger.data ?? [];
 
+  const navDrawer = useNavDrawer();
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
+          <View style={styles.menuRow}>
+            <NavDrawer {...navDrawer.drawerProps} />
+            <NavDrawerButton {...navDrawer.hamburgerProps} />
+          </View>
           <Text style={styles.headerKicker}>CONTROL CENTER</Text>
           <Text style={styles.headerTitle}>
             CYBER<Text style={{ color: cyber.cyan }}>SARAH</Text>
@@ -215,6 +221,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: cyber.bg },
   screen: { flex: 1 },
   content: { padding: 16, gap: 14, paddingBottom: 32 },
+  menuRow: { marginBottom: 4 },
   header: { marginBottom: 8, gap: 2 },
   headerKicker: { ...cyberTypography.caption, color: cyber.pink },
   headerTitle: { ...cyberTypography.display, color: cyber.text },

@@ -132,6 +132,7 @@ export default function AgentScreen() {
     useWorkspace();
   const {
     attachRepository,
+    listGithubRepositories,
     loadRepositoryDetails,
     loadWorkspaceHealth,
     settings,
@@ -905,6 +906,7 @@ export default function AgentScreen() {
                         return result;
                       })
                     }
+                    onListRepositories={settings.hasGitHubToken ? listGithubRepositories : undefined}
                   />
                 ) : null}
                 <View
