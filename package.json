@@ -101,7 +101,7 @@
     "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.8",
     "esbuild": "^0.28.2",
-    "eslint": "^10.10.0",
+    "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.2",
     "pm2": "^7.0.4",
     "prettier": "^3.7.4",

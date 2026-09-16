@@ -15,6 +15,7 @@ import { useThemeContext } from "@/lib/theme-provider";
 import { DESIGN_THEMES, designThemeDescription, designThemeIcon, designThemeLabel } from "@/lib/design-theme-logic";
 import { getSettingsBackupRestoreConfirmation, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, pickEncryptedSettingsBackup, previewEncryptedSettingsBackup, type SettingsBackupImportCandidate, type SettingsBackupPreview } from "@/lib/settings-backup";
 import { useWorkspace } from "@/lib/workspace-context";
+import { resolveDesignPalette } from "@/lib/_core/design-theme-palettes";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -25,7 +26,7 @@ type EndpointTestState = "idle" | "checking" | "ready" | "error";
 export default function SettingsScreen() {
   const { attachRepository, clearGitHubToken, clearProviderKey, clearServiceAccessToken, exportSettingsBackup, loading, restoreSettingsBackup, saveSettings, setProtectedChatContent, settings, testCloudProvider, testLocalProviderEndpoint } = useStudioSettings();
   const { loadRemoteFiles } = useWorkspace();
-  const { designTheme, setDesignTheme, palette } = useThemeContext();
+  const { colorScheme, designTheme, setDesignTheme, palette } = useThemeContext();
   const [workspaceUrl, setWorkspaceUrl] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [branch, setBranch] = useState("main");
@@ -262,6 +263,7 @@ export default function SettingsScreen() {
           <View style={styles.designOptionStack}>
             {DESIGN_THEMES.map((theme) => {
               const active = designTheme === theme;
+              const preview = resolveDesignPalette(theme, colorScheme);
               return (
                 <TouchableOpacity
                   accessibilityLabel={`Design ${designThemeLabel(theme)} aktivieren`}
@@ -272,6 +274,9 @@ export default function SettingsScreen() {
                   style={[styles.designOption, active ? { borderColor: palette.primary } : null]}
                 >
                   <IconSymbol name={designThemeIcon(theme)} size={17} color={palette.primary} />
+                  <View style={styles.palettePreview} accessibilityLabel={`${designThemeLabel(theme)} Farbpalette`}>
+                    {[preview.primary, preview.success, preview.warning, preview.error].map((color) => <View key={color} style={[styles.paletteSwatch, { backgroundColor: color }]} />)}
+                  </View>
                   <View style={styles.designOptionTextArea}>
                     <Text style={styles.designOptionTitle}>{designThemeLabel(theme)}</Text>
                     <Text style={styles.designOptionDescription}>{designThemeDescription(theme)}</Text>
@@ -587,6 +592,8 @@ const styles = StyleSheet.create({
   noticeText: { color: "#8B9AAE", flex: 1, fontSize: 12, lineHeight: 18 },
   designOptionStack: { gap: 8 },
   designOption: { alignItems: "center", borderColor: "#29384A", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, minHeight: 56, paddingHorizontal: 14, paddingVertical: 10 },
+  palettePreview: { flexDirection: "row", gap: 4, marginLeft: "auto" },
+  paletteSwatch: { borderRadius: 99, height: 10, width: 10 },
   designOptionTextArea: { flex: 1, gap: 2 },
   designOptionTitle: { color: "#F2F6FC", fontSize: 14, fontWeight: "700" },
   designOptionDescription: { color: "#99A7B8", fontSize: 11, fontWeight: "500" },

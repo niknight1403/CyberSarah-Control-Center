@@ -91,12 +91,11 @@ export function getOnboardingStepState(index: number, slides: readonly Onboardin
 /* ==================== Theme-Auswahl ==================== */
 
 /**
- * Kuratierte Design-Auswahl im Onboarding: vier unterscheidbare Looks statt
- * aller neun — der Rest bleibt im Theme-Lab (Entwicklungsvariante) bzw.
- * Konto-Tab. Reihenfolge ist bewusst: Standard-Design zuerst.
+ * Kuratierte Design-Auswahl im Onboarding. Die Registry ist die einzige
+ * Quelle, damit neue produktive Paletten nicht nur im Konto-Tab erscheinen.
  */
 // Sprint 127 — "neon" (Cyber Neon) ist das Standard-Design und steht an erster Stelle.
-export const ONBOARDING_THEME_CHOICES: readonly DesignTheme[] = ["neon", "slate", "glass"] as const;
+export const ONBOARDING_THEME_CHOICES: readonly DesignTheme[] = DESIGN_THEMES;
 
 export type OnboardingThemeChoice = {
   theme: DesignTheme;

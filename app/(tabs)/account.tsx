@@ -1,12 +1,12 @@
 import { ScreenContainer } from "@/components/screen-container";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { trpc } from "@/lib/trpc";
-import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
 import * as Auth from "@/lib/_core/auth";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { lighten, withAlpha } from "@/lib/theme-color-utils";
 import { useColors } from "@/hooks/use-colors";
+import { router } from "expo-router";
 
 export default function AccountScreen() {
     const colors = useColors();
@@ -60,7 +60,6 @@ export default function AccountScreen() {
   }, [accountQuery.error, localUser]);
 
   const user = accountQuery.data ?? localUser;
-  useAdminAutoSetup(user?.role === "admin" ? user : null);
   const busy = registerMutation.isPending || loginMutation.isPending || logoutMutation.isPending;
 
   const persistAccount = async (result: { sessionToken: string; user: NonNullable<typeof user> }) => {
@@ -132,13 +131,18 @@ export default function AccountScreen() {
           <View style={[styles.roleBadge, user.role === "admin" && styles.roleBadgeAdmin]}><Text style={styles.roleText}>{user.role === "admin" ? "ADMINISTRATOR · VOLLER ZUGRIFF" : "STANDARDZUGANG"}</Text></View>
           {user.role === "admin" ? <Text style={styles.adminCopy}>Alle Skills, Steuerungselemente und Administrationsfunktionen sind für dieses Konto freigeschaltet.</Text> : null}
           {user.role === "admin" ? (
-            <View style={styles.billingCard}>
-              <Text style={styles.billingTitle}>EXPERT-ZUGANG AKTIV</Text>
-              <Text style={styles.billingCopy}>
-                Dein Administratorzugang umfasst dauerhaft alle Expert-Funktionen.
-                Ein Abonnement oder Stripe-Checkout ist nicht erforderlich.
-              </Text>
-            </View>
+            <>
+              <View style={styles.billingCard}>
+                <Text style={styles.billingTitle}>EXPERT-ZUGANG AKTIV</Text>
+                <Text style={styles.billingCopy}>
+                  Dein Administratorzugang umfasst dauerhaft alle Expert-Funktionen.
+                  Ein Abonnement oder Stripe-Checkout ist nicht erforderlich.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => router.push("/admin")} style={styles.adminButton}>
+                <Text style={styles.adminButtonText}>Admin-Control-Center öffnen</Text>
+              </TouchableOpacity>
+            </>
           ) : (
           <View style={styles.billingCard}>
             <Text style={styles.billingTitle}>LIVE-ABRECHNUNG</Text>
@@ -226,6 +230,8 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   billingButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.14), borderColor: colors.tint, borderRadius: 9, borderWidth: 1, marginTop: 11, paddingVertical: 10 },
   billingButtonText: { color: "#E9E1FF", fontSize: 12, fontWeight: "900" },
   secondaryButton: { alignItems: "center", borderColor: "#425D78", borderRadius: 10, borderWidth: 1, marginTop: 18, paddingVertical: 11 },
+  adminButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.18), borderColor: colors.tint, borderRadius: 10, borderWidth: 1, marginTop: 12, paddingVertical: 12 },
+  adminButtonText: { color: lighten(colors.tint, 0.28), fontSize: 12, fontWeight: "900" },
   secondaryButtonText: { color: lighten(colors.tint, 0.35), fontSize: 12, fontWeight: "800" },
   message: { color: lighten(colors.success, 0.2), fontSize: 12, lineHeight: 18, marginTop: 14 },
   });

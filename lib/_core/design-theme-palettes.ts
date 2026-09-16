@@ -166,12 +166,64 @@ export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> 
       },
     },
   },
-
-
-
-
-
-
+  /** Theme D — Solar Ember: warm, fokussiert und kontrastreich. */
+  ember: {
+    light: {
+      background: "#FFF7F0",
+      surface: "#FFFFFF",
+      border: "#E8CFC1",
+      foreground: "#2A1720",
+      primary: "#C45A3B",
+      muted: "#795D61",
+      success: "#247A5A",
+      warning: "#B06B16",
+      error: "#B83E4B",
+    },
+    dark: {
+      background: "#160D12",
+      surface: "#24141B",
+      border: "#56313A",
+      foreground: "#FFF1E8",
+      primary: "#FF9B6A",
+      muted: "#CBA5A3",
+      success: "#61D7A4",
+      warning: "#F2BC62",
+      error: "#FF7F8D",
+    },
+    effects: {
+      light: { glowPrimary: "0 0 20px rgba(196, 90, 59, 0.22)", glowSoft: "0 0 14px rgba(238, 151, 75, 0.18)", blur: "0px", gradientFrom: "#FFF7F0", gradientTo: "#FBE8DC" },
+      dark: { glowPrimary: "0 0 22px rgba(255, 155, 106, 0.32)", glowSoft: "0 0 14px rgba(204, 84, 118, 0.24)", blur: "8px", gradientFrom: "#160D12", gradientTo: "#2A1420" },
+    },
+  },
+  /** Theme E — Forest Signal: ruhig, zugänglich und session-freundlich. */
+  forest: {
+    light: {
+      background: "#F1F8F4",
+      surface: "#FFFFFF",
+      border: "#C9DED2",
+      foreground: "#12251D",
+      primary: "#167A61",
+      muted: "#587267",
+      success: "#147A4D",
+      warning: "#A56A16",
+      error: "#B0444D",
+    },
+    dark: {
+      background: "#081512",
+      surface: "#10231E",
+      border: "#21483C",
+      foreground: "#E7FFF5",
+      primary: "#5EE0B5",
+      muted: "#91B9AA",
+      success: "#63E6A3",
+      warning: "#EBC56C",
+      error: "#FF8690",
+    },
+    effects: {
+      light: { glowPrimary: "0 0 18px rgba(22, 122, 97, 0.2)", glowSoft: "0 0 14px rgba(93, 206, 170, 0.16)", blur: "4px", gradientFrom: "#F1F8F4", gradientTo: "#E1F1EA" },
+      dark: { glowPrimary: "0 0 22px rgba(94, 224, 181, 0.3)", glowSoft: "0 0 14px rgba(38, 150, 118, 0.22)", blur: "10px", gradientFrom: "#081512", gradientTo: "#0D2921" },
+    },
+  },
 };
 
 /** Basis-Palette des Schemas mit den Design-Overrides verschmelzen. */

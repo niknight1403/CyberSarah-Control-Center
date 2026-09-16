@@ -15,6 +15,8 @@ describe("design theme logic", () => {
     expect(normalizeDesignTheme("neon")).toBe("neon");
     expect(normalizeDesignTheme("slate")).toBe("slate");
     expect(normalizeDesignTheme("glass")).toBe("glass");
+    expect(normalizeDesignTheme("ember")).toBe("ember");
+    expect(normalizeDesignTheme("forest")).toBe("forest");
     // Entfernte Themes (Sprint 128 Design-Kuration) fallen auf den Standard zurueck
     expect(normalizeDesignTheme("aurora")).toBe("neon");
     expect(normalizeDesignTheme("living")).toBe("neon");
@@ -26,15 +28,19 @@ describe("design theme logic", () => {
     expect(normalizeDesignTheme(undefined)).toBe("neon");
   });
 
-  it("exposes exactly the three curated design themes with stable key and German labels", () => {
-    expect(DESIGN_THEMES).toEqual(["neon", "slate", "glass"]);
+  it("exposes the curated Spectrum design themes with stable keys and German labels", () => {
+    expect(DESIGN_THEMES).toEqual(["neon", "slate", "glass", "ember", "forest"]);
     expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v4");
     expect(designThemeLabel("neon")).toBe("Cyber Neon");
     expect(designThemeLabel("slate")).toBe("Enterprise Slate");
     expect(designThemeLabel("glass")).toBe("Glas-Modern");
+    expect(designThemeLabel("ember")).toBe("Solar Ember");
+    expect(designThemeLabel("forest")).toBe("Forest Signal");
     expect(designThemeIcon("neon")).toBe("bolt.fill");
     expect(designThemeIcon("slate")).toBe("chart.bar.fill");
     expect(designThemeIcon("glass")).toBe("sparkles");
+    expect(designThemeIcon("ember")).toBe("sparkles");
+    expect(designThemeIcon("forest")).toBe("bolt.fill");
     for (const theme of DESIGN_THEMES) {
       expect(designThemeDescription(theme).length).toBeGreaterThan(10);
     }
@@ -67,8 +73,12 @@ describe("design theme logic", () => {
     expect(glass.surface).toContain("rgba");
     expect(glass.border).toContain("rgba");
 
-    // Sprint 128: entfernte Designs (aurora, obsidian, borealis, rose) sind
-    // nicht mehr Teil des Record — paletten bestehen nur noch aus neon/slate/glass.
+    const ember = resolveDesignPalette("ember", "dark");
+    expect(ember.primary).toBe("#FF9B6A");
+    const forest = resolveDesignPalette("forest", "dark");
+    expect(forest.primary).toBe("#5EE0B5");
+
+    // Legacy-Designs bleiben absichtlich nicht Teil des Records.
   });
 
   it("keeps Enterprise Slate light and the neon/glass variants dark", () => {

@@ -1,6 +1,6 @@
 /**
  * Design-Theme-Logik (rein, testbar): Die App kennt genau drei optische
- * Designs ("Cyber Neon", "Enterprise Slate", "Glas-Modern"), die
+ * Designs ("Cyber Neon", "Enterprise Slate", "Glas-Modern", "Solar Ember", "Forest Signal"), die
  * unabhaengig von der Hell/Dunkel-Praeferenz geschaltet werden koennen.
  * Jedes Design definiert seine eigene Palette pro Farbschema plus
  * Effekt-Tokens (Glow, Blur, Gradient) — siehe
@@ -10,13 +10,13 @@
  * Design-Kuration auf die drei im Play-Store-Listing beworbenen Themes.)
  */
 
-export type DesignTheme = "neon" | "slate" | "glass";
+export type DesignTheme = "neon" | "slate" | "glass" | "ember" | "forest";
 
 /** Sprint 128 — Design-Kuration: nur die drei im Play-Store-Listing
  * beworbenen Designs bleiben auswaehlbar ("Cyber Neon", "Enterprise
  * Slate", "Glas-Modern"). Alte Auswahlwerte werden beim Lesen per
  * normalizeDesignTheme automatisch auf den Standard gemappt. */
-export const DESIGN_THEMES: readonly DesignTheme[] = ["neon", "slate", "glass"] as const;
+export const DESIGN_THEMES: readonly DesignTheme[] = ["neon", "slate", "glass", "ember", "forest"] as const;
 
 export const DEFAULT_DESIGN_THEME: DesignTheme = "neon";
 
@@ -28,7 +28,7 @@ export const DEFAULT_DESIGN_THEME: DesignTheme = "neon";
 export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v4";
 
 export function normalizeDesignTheme(value: unknown): DesignTheme {
-  return value === "neon" || value === "slate" || value === "glass"
+  return value === "neon" || value === "slate" || value === "glass" || value === "ember" || value === "forest"
     ? value
     : DEFAULT_DESIGN_THEME;
 }
@@ -36,6 +36,8 @@ export function normalizeDesignTheme(value: unknown): DesignTheme {
 export function designThemeLabel(theme: DesignTheme): string {
   if (theme === "slate") return "Enterprise Slate";
   if (theme === "glass") return "Glas-Modern";
+  if (theme === "ember") return "Solar Ember";
+  if (theme === "forest") return "Forest Signal";
   return "Cyber Neon";
 }
 
@@ -46,11 +48,17 @@ export function designThemeDescription(theme: DesignTheme): string {
   if (theme === "glass") {
     return "Transluzente Flächen, weiche Gradients und Blur-Overlays.";
   }
+  if (theme === "ember") {
+    return "Warme Kupfer- und Pflaumentöne für fokussierte, energische Arbeitsflächen.";
+  }
+  if (theme === "forest") {
+    return "Ruhige Waldtöne mit mintfarbenen Signalen für lange Sessions.";
+  }
   return "Kontrastreicher Obsidian-Dark-Look mit Cyan-/Magenta-Glow-Akzenten.";
 }
 
 export function designThemeIcon(theme: DesignTheme): "bolt.fill" | "chart.bar.fill" | "sparkles" {
   if (theme === "slate") return "chart.bar.fill";
-  if (theme === "glass") return "sparkles";
+  if (theme === "glass" || theme === "ember") return "sparkles";
   return "bolt.fill";
 }

@@ -69,10 +69,10 @@ describe("Sprint 117: Slides und Schritt-Zustaende", () => {
 });
 
 describe("Sprint 117: kuratierte Theme-Auswahl", () => {
-  it("drei unterscheidbare Designs, alle aus der Registry (Sprint 128 Design-Kuration)", () => {
+  it("alle unterscheidbaren Designs aus der Registry", () => {
     const choices = getOnboardingThemeChoices();
-    expect(choices).toHaveLength(3);
-    expect(new Set(choices.map((choice) => choice.theme)).size).toBe(3);
+    expect(choices).toHaveLength(DESIGN_THEMES.length);
+    expect(new Set(choices.map((choice) => choice.theme)).size).toBe(DESIGN_THEMES.length);
     for (const choice of choices) {
       expect(DESIGN_THEMES).toContain(choice.theme);
       expect(choice.label.length).toBeGreaterThan(0);

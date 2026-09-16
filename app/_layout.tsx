@@ -22,6 +22,7 @@ import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { initCrashReporter } from "@/components/crash-reporting/crash-reporter";
+import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -103,6 +104,7 @@ export default function RootLayout() {
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <StudioSettingsProvider>
+            <AdminAutonomyBootstrap />
             <WorkspaceProvider>
             {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
             {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
@@ -141,4 +143,11 @@ export default function RootLayout() {
       <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
     </ThemeProvider>
   );
+}
+
+/** Startet die idempotente Admin-Konfiguration unabhängig vom aktuell sichtbaren Screen. */
+function AdminAutonomyBootstrap() {
+  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  useAdminAutoSetup(accountQuery.data ?? null);
+  return null;
 }
