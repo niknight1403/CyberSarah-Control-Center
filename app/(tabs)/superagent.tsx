@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
+import { coerceLedgerTask, type LedgerTask } from "@/lib/task-ledger-logic";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
@@ -31,28 +32,9 @@ import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsiv
 type TaskStatus = "pending" | "running" | "success" | "failed" | "escalated";
 type StepStatus = "pending" | "running" | "success" | "failed";
 
-interface StepRecord {
-  id: string;
-  name: string;
-  status: StepStatus;
-  attempts: number;
-  error?: string;
-  logs: string[];
-  startedAt: string;
-  finishedAt?: string;
-}
-
-interface TaskRecord {
-  id: string;
-  title: string;
-  objective: string;
-  status: TaskStatus;
-  correctionIterations: number;
-  steps: StepRecord[];
-  finalAnswer?: unknown;
-  createdAt: string;
-  updatedAt: string;
-}
+// Task-/Step-Typen kommen aus lib/task-ledger-logic (render-sicher normalisiert).
+type TaskRecord = LedgerTask;
+type StepRecord = LedgerTask["steps"][number];
 
 const STATUS_META: Record<TaskStatus | StepStatus, { label: string; color: string }> = {
   pending: { label: "WARTE", color: cyber.textDim },
@@ -112,7 +94,7 @@ export default function SuperagentScreen() {
   const optimizerTrigger = trpc.orchestrator.optimizerTrigger.useMutation();
 
   // Aktiven Task automatisch entExpandieren, sobald er endgueltig ist.
-  const activeTask = activeQuery.data as TaskRecord | undefined;
+  const activeTask = activeQuery.data ? coerceLedgerTask(activeQuery.data) : undefined;
   useEffect(() => {
     if (activeTask && (activeTask.status === "success" || activeTask.status === "failed" || activeTask.status === "escalated")) {
       setActiveId(null);
@@ -120,7 +102,7 @@ export default function SuperagentScreen() {
     }
   }, [activeTask]);
 
-  const ledger = (ledgerQuery.data ?? []) as TaskRecord[];
+  const ledger = ((ledgerQuery.data ?? []) as unknown[]).map(coerceLedgerTask);
 
   const startRun = async () => {
     const trimmed = objective.trim();
@@ -141,10 +123,11 @@ export default function SuperagentScreen() {
     }
   };
 
-  const statusOf = (t: TaskRecord) => STATUS_META[t.status];
+  const statusOf = (t: TaskRecord) => STATUS_META[t.status] ?? STATUS_META.pending;
   const toolCount = useMemo(() => toolsQuery.data?.tools?.length ?? 0, [toolsQuery.data]);
 
-  const detailTask = (activeTask && activeTask.id === expandedId ? activeTask : undefined) ?? ledger.find((t) => t.id === expandedId);
+  const detailTask = (activeTask && activeTask.id === expandedId ? activeTask : undefined)
+    ?? ledger.find((t) => t.id === expandedId);
 
   const navDrawer = useNavDrawer();
   return (
@@ -273,8 +256,8 @@ export default function SuperagentScreen() {
               <View style={styles.panel}>
                 <View style={styles.panelHeader}>
                   <Text style={styles.panelTitle}>{activeTask.title}</Text>
-                  <Text style={[styles.badge, { color: STATUS_META[activeTask.status].color, borderColor: `${STATUS_META[activeTask.status].color}66` }]}>
-                    {STATUS_META[activeTask.status].label}
+                  <Text style={[styles.badge, { color: (STATUS_META[activeTask.status] ?? STATUS_META.pending).color, borderColor: `${(STATUS_META[activeTask.status] ?? STATUS_META.pending).color}66` }]}>
+                    {(STATUS_META[activeTask.status] ?? STATUS_META.pending).label}
                   </Text>
                 </View>
                 <Text style={styles.objectiveText}>{activeTask.objective}</Text>
@@ -301,8 +284,8 @@ export default function SuperagentScreen() {
                         <View style={styles.ledgerRowMain}>
                           <Text style={styles.ledgerTitle} numberOfLines={1}>{task.title}</Text>
                           <Text style={styles.ledgerMeta}>
-                            {formatTime(task.createdAt)} · {task.steps.length} Schritte
-                            {task.correctionIterations > 0 ? ` · ${task.correctionIterations}× korrigiert` : ""}
+                            {formatTime(task.createdAt)} · {(task.steps?.length ?? 0)} Schritte
+                            {(task.correctionIterations ?? 0) > 0 ? ` · ${task.correctionIterations}× korrigiert` : ""}
                           </Text>
                         </View>
                         <Text style={[styles.badge, { color: meta.color, borderColor: `${meta.color}66` }]}>{meta.label}</Text>
@@ -311,8 +294,8 @@ export default function SuperagentScreen() {
                       {expanded && detailTask ? (
                         <View style={styles.detailBox}>
                           <Text style={styles.objectiveText}>{detailTask.objective}</Text>
-                          {detailTask.steps.map((step) => {
-                            const sm = STATUS_META[step.status];
+                          {(detailTask.steps ?? []).map((step) => {
+                            const sm = STATUS_META[step.status] ?? STATUS_META.pending;
                             return (
                               <View key={step.id} style={styles.stepRow}>
                                 <Text style={[styles.stepDot, { color: sm.color }]}>

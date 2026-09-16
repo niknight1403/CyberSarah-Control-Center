@@ -28,7 +28,23 @@ export const orchestratorRouter = router({
   /** Task-Ledger als Uebersicht (neueste zuerst). */
   tasks: adminProcedure
     .input(z.object({ limit: z.number().int().min(1).max(200).optional() }).optional())
-    .query(async ({ input }) => listTasks(input?.limit ?? 50)),
+    .query(async ({ input }) => {
+      // White-Screen-Fix (Sprint 133): Index-Einträge enthielten keine steps/
+      // correctionIterations, der Tab las aber task.steps.length -> TypeError.
+      // Der Endpoint hydratiert jetzt jeden Index-Eintrag zum Vollrecord;
+      // unlesbare Einzelrecords fallen still heraus (Ledger bleibt nutzbar).
+      const entries = await listTasks(input?.limit ?? 50);
+      const tasks = await Promise.all(
+        entries.map(async (entry) => {
+          try {
+            return await getTask(entry.id);
+          } catch {
+            return null;
+          }
+        }),
+      );
+      return tasks.filter((task): task is NonNullable<typeof task> => task != null);
+    }),
 
   /** Vollstaendigen Task-Record inkl. aller Schritte, Logs und Fehler abrufen. */
   task: adminProcedure.input(z.object({ id: z.string().min(1) })).query(async ({ input }) => getTask(input.id)),
