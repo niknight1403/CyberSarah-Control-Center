@@ -99,9 +99,8 @@ jobs:
           except Exception as e:
               print("ownerId-Lookup-Fehler:", e)
           print("ownerId:", owner_id)
-          _now = int(_time.time())
-          start = str(_now - 14400)
-          end = str(_now)
+          start = "2026-09-16T06:38:00Z"
+          end = "2026-09-16T06:50:00Z"
           attempts2 = [
               f"/logs?limit=100&ownerId={owner_id}&resource={app_sid}&startTime={start}&endTime={end}&direction=backward",
               f"/logs?limit=100&ownerId={owner_id}&resource={app_sid}&startTime={start}&endTime={end}",
@@ -114,8 +113,12 @@ jobs:
                   break
               except urllib.error.HTTPError as e:
                   print("Versuch fehlgeschlagen:", path[:90], "->", e.code, e.read()[:200])
-          if logs:
-              for entry in logs:
-                  line = entry.get("logs", entry)
-                  print(line.get("timestamp", ""), "|", line.get("level", "?"), "|", str(line.get("message", ""))[:400])
+          if logs is not None:
+              rows = logs.get("logs", logs) if isinstance(logs, dict) else logs
+              for line in (rows if isinstance(rows, list) else []):
+                  if isinstance(line, dict):
+                      print(line.get("timestamp", ""), "|", line.get("level", "?"), "|", str(line.get("message", ""))[:500])
+                  else:
+                      print("RAW:", str(line)[:500])
+              print("Anzahl Logs:", len(rows) if isinstance(rows, list) else "?")
           PY
