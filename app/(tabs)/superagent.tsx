@@ -104,6 +104,13 @@ export default function SuperagentScreen() {
   const runMutation = trpc.orchestrator.run.useMutation();
   const toolsQuery = trpc.orchestrator.tools.useQuery(undefined, { enabled: isAdmin });
 
+  const optimizerQuery = trpc.orchestrator.optimizerStatus.useQuery(undefined, {
+    enabled: isAdmin,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  });
+  const optimizerTrigger = trpc.orchestrator.optimizerTrigger.useMutation();
+
   // Aktiven Task automatisch entExpandieren, sobald er endgueltig ist.
   const activeTask = activeQuery.data as TaskRecord | undefined;
   useEffect(() => {
@@ -209,6 +216,57 @@ export default function SuperagentScreen() {
                 )}
               </Pressable>
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            </View>
+
+            <View style={styles.panel}>
+              <View style={styles.panelHeader}>
+                <Text style={styles.panelTitle}>Engineering-Optimizer</Text>
+                <Text
+                  style={[
+                    styles.badge,
+                    {
+                      color: optimizerQuery.data?.enabled ? cyber.green : cyber.textDim,
+                      borderColor: optimizerQuery.data?.enabled ? `${cyber.green}66` : `${cyber.textDim}66`,
+                    },
+                  ]}
+                >
+                  {optimizerTrigger.isPending || optimizerQuery.data?.running ? "LÄUFT" : optimizerQuery.data?.enabled ? "AKTIV" : "AUS"}
+                </Text>
+              </View>
+              <Text style={styles.panelText}>
+                Der Optimizer analysiert das System fortlaufend (alle {optimizerQuery.data?.intervalMinutes ?? 360} Minuten) — DB-Health, Fehlerlogs, Stabilität — und startet bei Handlungsbedarf automatisch einen Orchestrator-Task.
+              </Text>
+              {optimizerQuery.data?.lastCycleAt ? (
+                <Text style={styles.ledgerMeta}>
+                  Letzter Zyklus: {formatTime(optimizerQuery.data.lastCycleAt)}
+                  {optimizerQuery.data.nextCycleAt ? ` · Nächster: ~${formatTime(optimizerQuery.data.nextCycleAt)}` : ""}
+                </Text>
+              ) : (
+                <Text style={styles.ledgerMeta}>Erster Zyklus startet nach Boot-Phase (ca. 5 Minuten).</Text>
+              )}
+              {optimizerQuery.data?.recentCycles?.length ? (
+                optimizerQuery.data.recentCycles.slice(0, 3).map((cycle) => (
+                  <Text key={cycle.id} style={styles.ledgerMeta} numberOfLines={1}>
+                    · {cycle.title} — {cycle.summary ?? cycle.status}
+                  </Text>
+                ))
+              ) : null}
+              <Pressable
+                style={[styles.runButton, optimizerTrigger.isPending && styles.runButtonDisabled]}
+                disabled={optimizerTrigger.isPending}
+                onPress={() => {
+                  void optimizerTrigger.mutateAsync().catch((e: unknown) =>
+                    setError(e instanceof Error ? e.message : "Optimizer-Start fehlgeschlagen."),
+                  );
+                }}
+              >
+                {optimizerTrigger.isPending ? (
+                  <ActivityIndicator color={cyber.bg} size="small" />
+                ) : (
+                  <Text style={styles.runButtonText}>⟲ JETZT ANALYSIEREN & OPTIMIEREN</Text>
+                )}
+              </Pressable>
+              {optimizerQuery.data?.lastError ? <Text style={styles.errorText}>{optimizerQuery.data.lastError}</Text> : null}
             </View>
 
             {activeTask ? (

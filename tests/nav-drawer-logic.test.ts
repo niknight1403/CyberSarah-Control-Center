@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 
 describe("DRAWER_ITEMS", () => {
-  it("enthaelt genau die acht erwarteten Einträge in Reihenfolge", () => {
+  it("enthaelt genau die neun erwarteten Einträge in Reihenfolge", () => {
     expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
       "Chat",
       "Workflows",
+      "Designer",
       "Plugins",
       "Meetings",
       "Dateien",
@@ -16,9 +17,9 @@ describe("DRAWER_ITEMS", () => {
     ]);
   });
 
-  it("markiert nur Meetings mit dem 'Neu'-Badge", () => {
+  it("badgt Designer als 'KI' und Meetings als 'Neu'", () => {
     const badged = DRAWER_ITEMS.filter((item) => item.badge);
-    expect(badged.map((item) => item.title)).toEqual(["Meetings"]);
+    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Designer=KI", "Meetings=Neu"]);
   });
 });
 

@@ -21,6 +21,7 @@ const MAPPING = {
   "folder.fill": "folder",
   "sparkles": "auto-awesome",
   "wand.and.stars": "auto-fix-high",
+  "paintpalette.fill": "palette",
   "play.rectangle.fill": "play-circle-filled",
   "gearshape.fill": "settings",
   "arrow.clockwise": "refresh",

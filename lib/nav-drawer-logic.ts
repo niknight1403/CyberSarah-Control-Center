@@ -7,7 +7,7 @@
  * Einträge zeigt als die kompakte Bottom-Tab-Leiste.
  */
 
-export type DrawerRoute = "/chat" | "/superagent" | "/plugins" | "/meetings" | "/" | "/memory" | "/data" | "/settings";
+export type DrawerRoute = "/chat" | "/superagent" | "/designer" | "/plugins" | "/meetings" | "/" | "/memory" | "/data" | "/settings";
 
 export type DrawerItem = {
   route: DrawerRoute;
@@ -15,6 +15,7 @@ export type DrawerItem = {
   icon:
     | "message.fill"
     | "wand.and.stars"
+    | "paintpalette.fill"
     | "puzzlepiece.fill"
     | "video.fill"
     | "folder.fill"
@@ -28,6 +29,7 @@ export type DrawerItem = {
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/chat", title: "Chat", icon: "message.fill" },
   { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
+  { route: "/designer", title: "Designer", icon: "paintpalette.fill", badge: "KI" },
   { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },
   { route: "/meetings", title: "Meetings", icon: "video.fill", badge: "Neu" },
   { route: "/", title: "Dateien", icon: "folder.fill" },

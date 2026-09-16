@@ -13,6 +13,7 @@ import { memoryRouter } from "./memory-router";
 import { meteringRouter } from "./metering-router";
 import { mcpRouter } from "./mcp-router";
 import { orchestratorRouter } from "./orchestrator-router";
+import { designRouter } from "./design/design-router";
 import { monetizationRouter } from "./monetization-router";
 import { crashReportingRouter, selfHealingRouter } from "./self-healing-router";
 import { projectsRouter } from "./projects-router";
@@ -30,6 +31,7 @@ export const appRouter = router({
   metering: meteringRouter,
   mcp: mcpRouter,
   orchestrator: orchestratorRouter,
+  design: designRouter,
   monetization: monetizationRouter,
   selfHealing: selfHealingRouter,
   crashReporting: crashReportingRouter,

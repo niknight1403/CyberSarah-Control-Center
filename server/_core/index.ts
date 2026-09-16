@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
+import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
 import {
   isWebFallbackCandidate,
   mapUrlPathToWebFile,
@@ -261,6 +262,7 @@ async function startServer() {
   void restoreRouterState().catch(() => undefined);
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
+    startOptimizerLoop();
   });
 }
 
