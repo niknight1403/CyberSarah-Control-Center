@@ -87,6 +87,13 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="superagent"
+          options={{
+            title: "Superagent",
+            tabBarIcon: ({ color }) => <IconSymbol size={25} name="wand.and.stars" color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="preview"
           options={{
             title: "Vorschau",
