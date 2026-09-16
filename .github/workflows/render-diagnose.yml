@@ -98,13 +98,27 @@ jobs:
               f"/logs?limit=100&service={app_sid}",
           ]
           logs = None
-          for path in attempts:
+          owner_id = None
+          try:
+              for entry in api("/services?limit=20"):
+                  svc_o = entry.get("service", entry)
+                  if svc_o.get("id") == app_sid:
+                      owner_id = svc_o.get("ownerId")
+          except Exception as e:
+              print("ownerId-Lookup-Fehler:", e)
+          print("ownerId:", owner_id)
+          attempts2 = [
+              f"/logs?limit=100&ownerId={owner_id}&name=cybersarah-control-center&startTime={urllib.parse.quote(start)}&endTime={urllib.parse.quote(end)}",
+              f"/logs?limit=100&ownerId={owner_id}&name=cybersarah-control-center",
+              f"/logs?limit=100&ownerId={owner_id}",
+          ]
+          for path in attempts2:
               try:
                   logs = api(path)
-                  print("OK mit:", path[:80])
+                  print("OK mit:", path[:90])
                   break
               except urllib.error.HTTPError as e:
-                  print("Versuch fehlgeschlagen:", path[:80], "->", e.code, e.read()[:200])
+                  print("Versuch fehlgeschlagen:", path[:90], "->", e.code, e.read()[:200])
           if logs:
               for entry in logs:
                   line = entry.get("logs", entry)
