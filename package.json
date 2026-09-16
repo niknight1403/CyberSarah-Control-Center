@@ -91,7 +91,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@types/cookie": "^0.6.0",
     "@types/express": "^5.0.6",
-    "@types/node": "^22.19.3",
+    "@types/node": "^26.5.1",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "~19.3.0",
