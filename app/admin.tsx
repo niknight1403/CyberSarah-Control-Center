@@ -7,6 +7,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StudioHeader, StudioSection } from "@/components/studio/primitives";
 import { useColors } from "@/hooks/use-colors";
 import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
+import { AdminLiveStatusCard } from "@/components/studio/admin-live-status-card";
 import { trpc } from "@/lib/trpc";
 import {
   canAccess,
@@ -86,6 +87,9 @@ export default function AdminDashboardScreen() {
     <ScreenContainer>
       <StudioHeader eyebrow="Verwaltung" title="Admin-Dashboard" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <StudioSection label="Live" title="Backend-Live-Status" />
+        <AdminLiveStatusCard isAdmin={isAdmin} />
+
         <StudioSection label="Autonomie" title="Autonomer System-Agent" />
         <View style={[styles.agentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.agentStatusRow}>

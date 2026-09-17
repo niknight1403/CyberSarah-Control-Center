@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAdminLiveStatusViewModel,
   buildPreviewViewModel,
   formatPingLabel,
   formatUptimeLabel,
@@ -124,5 +125,60 @@ describe("live-runtime-view-logic", () => {
     expect(vm.stateBadge).toEqual({ label: "Gestoppt", tone: "warning" });
     expect(vm.description).toContain("Live-Protokoll");
     expect(vm.logCountLabel).toBe("1 Ereignis(se)");
+  });
+});
+
+describe("buildAdminLiveStatusViewModel (Sprint 148)", () => {
+  it("liefert fuer einen laufenden, fehlerfreien Server einen gruenen, ehrlichen Status", () => {
+    const vm = buildAdminLiveStatusViewModel({
+      status: { state: "running", serverUptimeMs: 90_000, pingMs: 42, logCount: 7 },
+      issueEntries: [{ level: "info", source: "server", message: "x", atMs: 1 }],
+      isAdmin: true,
+    });
+    expect(vm.isHealthy).toBe(true);
+    expect(vm.stateBadge.label).toBe("Online");
+    expect(vm.stateBadge.tone).toBe("ready");
+    expect(vm.uptimeLabel).toBe("1 min");
+    expect(vm.pingLabel).toBe("42 ms");
+    expect(vm.logCountLabel).toBe("7 im Ringpuffer");
+    expect(vm.errorCountLabel).toBe("keine Fehler/Warnungen");
+    expect(vm.recentIssueLines).toHaveLength(0);
+    expect(vm.showClearButton).toBe(true);
+  });
+
+  it("zeigt bei Fehlerzustand rot und nimmt nur error/warn-Eintraege in die Kurzliste (max. 3, neueste zuerst)", () => {
+    const vm = buildAdminLiveStatusViewModel({
+      status: { state: "error", serverUptimeMs: 1_000, pingMs: null, logCount: 3 },
+      issueEntries: [
+        { level: "error", source: "llm", message: "Timeout A", atMs: 10 },
+        { level: "info", source: "llm", message: "sollte nicht erscheinen", atMs: 11 },
+        { level: "warn", source: "db", message: "Warnung B", atMs: 12 },
+        { level: "error", source: "ws", message: "Timeout C", atMs: 13 },
+      ],
+      isAdmin: true,
+    });
+    expect(vm.isHealthy).toBe(false);
+    expect(vm.stateBadge.tone).toBe("warning");
+    expect(vm.pingLabel).toBe("–");
+    expect(vm.recentIssueLines.map((entry) => entry.message)).toEqual(["Timeout C", "Warnung B", "Timeout A"]);
+    expect(vm.errorCountLabel).toBe("2 Fehler (3 Ereignis(se))");
+  });
+
+  it("weist ohne Statusdaten ehrlich 'unbekannt' statt erfundener Werte aus", () => {
+    const vm = buildAdminLiveStatusViewModel({ status: null, isAdmin: false });
+    expect(vm.statusLoaded).toBe(false);
+    expect(vm.stateBadge.label).toBe("Status unbekannt");
+    expect(vm.headline).toBe("Backend-Status wird geladen …");
+    expect(vm.logCountLabel).toBe("unbekannt");
+    expect(vm.showClearButton).toBe(false);
+    expect(vm.isHealthy).toBe(false);
+  });
+
+  it("versteckt den Leeren-Button fuer Nicht-Admins (HITL-Schutz)", () => {
+    const vm = buildAdminLiveStatusViewModel({
+      status: { state: "running", serverUptimeMs: 60_000, pingMs: 10, logCount: 9 },
+      isAdmin: false,
+    });
+    expect(vm.showClearButton).toBe(false);
   });
 });
