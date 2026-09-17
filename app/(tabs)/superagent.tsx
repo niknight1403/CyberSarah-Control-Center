@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,30 +14,29 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
 import { coerceLedgerTask, type LedgerTask } from "@/lib/task-ledger-logic";
+import { buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
 /**
- * Sprint 129 — Superagent-Tab: Vollautonome Ausfuehrung von Zielen ueber
- * die Leitender-Superagent-Runtime (server/orchestrator/superagent.ts,
- * Sprint 123) — Task-Decomposition, Tool-Ausfuehrung und Selbstkorrektur.
+ * Sprint 149 — Superagent-Tab als echtes Chatfenster.
  *
- * Der Tab ist die Benutzerflaeche zum Orchestrator-Router:
- *  - Ziel eingeben → orchestrator.run (autonome Ausfuehrung)
- *  - Live-Verlauf des aktiven Tasks (Schritte, Logs, Runden)
- *  - Task-Ledger mit Vollstuendiger Nachverfolgbarkeit (Audit-Charakter)
- * Admin-gated wie der Router selbst — Infrastruktur-Tools (Git, Render,
- * Docker) laufen nur im vertrauenswuerdigen Kontext.
+ * Vorher war der Tab ein langes Scroll-Formular: Ziel oben eingeben,
+ * Antwort unten im Task-Ledger suchen. Jetzt funktioniert er wie ein
+ * Messenger:
+ *  - Ziel eintippen → erscheint als Nutzer-Nachricht (rechts)
+ *  - Der Superagent antwortet direkt darunter im Chat-Strom (links):
+ *    Live-Schritte, Selbstkorrektur-Runden und die finale Antwort —
+ *    die Liste scrollt automatisch auf die neueste Nachricht.
+ *  - Eingabefeld ist fixiert unten, Netz oben kompakt.
+ *
+ * Zugrundeliegende Runtime: server/orchestrator/superagent.ts —
+ * Task-Decomposition, Tool-Ausfuehrung, Selbstkorrektur. Admin-gated.
  */
 
 type TaskStatus = "pending" | "running" | "success" | "failed" | "escalated";
-type StepStatus = "pending" | "running" | "success" | "failed";
 
-// Task-/Step-Typen kommen aus lib/task-ledger-logic (render-sicher normalisiert).
-type TaskRecord = LedgerTask;
-type StepRecord = LedgerTask["steps"][number];
-
-const STATUS_META: Record<TaskStatus | StepStatus, { label: string; color: string }> = {
+const STATUS_META: Record<TaskStatus, { label: string; color: string }> = {
   pending: { label: "WARTE", color: cyber.textDim },
   running: { label: "LÄUFT", color: cyber.cyan },
   success: { label: "GRÜN", color: cyber.green },
@@ -46,19 +46,9 @@ const STATUS_META: Record<TaskStatus | StepStatus, { label: string; color: strin
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
   } catch {
-    return iso;
-  }
-}
-
-function formatAnswer(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
+    return "";
   }
 }
 
@@ -67,9 +57,8 @@ export default function SuperagentScreen() {
   const isAdmin = accountQuery.data?.role === "admin";
 
   const [objective, setObjective] = useState("");
-  const [title, setTitle] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const ledgerQuery = trpc.orchestrator.tasks.useQuery({ limit: 25 }, {
@@ -93,310 +82,328 @@ export default function SuperagentScreen() {
   });
   const optimizerTrigger = trpc.orchestrator.optimizerTrigger.useMutation();
 
-  // Aktiven Task automatisch entExpandieren, sobald er endgueltig ist.
+  const listRef = useRef<FlatList<SuperagentChatRow> | null>(null);
+  const stickToBottomRef = useRef(true);
+  const rowsLengthRef = useRef(0);
+
+  // Aktiven Lauf nach Abschluss aus dem Live-Polling nehmen.
   const activeTask = activeQuery.data ? coerceLedgerTask(activeQuery.data) : undefined;
   useEffect(() => {
     if (activeTask && (activeTask.status === "success" || activeTask.status === "failed" || activeTask.status === "escalated")) {
       setActiveId(null);
-      setExpandedId(activeTask.id);
+      setExpandedIds((prev) => new Set(prev).add(`${activeTask.id}-answer`));
     }
   }, [activeTask]);
 
   const ledger = ((ledgerQuery.data ?? []) as unknown[]).map(coerceLedgerTask);
+  const rows = useMemo(
+    () => buildSuperagentChatRows(ledger, activeTask),
+    [ledger, activeTask],
+  );
+  const toolCount = useMemo(() => toolsQuery.data?.tools?.length ?? 0, [toolsQuery.data]);
+
+  // Chat-UX: Bei neuen Nachrichten (oder waehrend ein Lauf live tickt) an
+  // das Listenende scrollen — aber nur, wenn der Nutzer nicht absichtlich
+  // im Verlauf hochscrollt.
+  useEffect(() => {
+    const grew = rows.length !== rowsLengthRef.current;
+    rowsLengthRef.current = rows.length;
+    if ((grew && rows.length > 0) || (activeId != null && stickToBottomRef.current)) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: grew });
+      });
+    }
+  }, [rows, activeId]);
+
+  const onScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+    const { y } = event.nativeEvent.contentOffset;
+    const bottomDistance =
+      event.nativeEvent.contentSize.height - event.nativeEvent.layoutMeasurement.height - y;
+    stickToBottomRef.current = bottomDistance < 120;
+  }, []);
+
+  const toggleExpanded = useCallback((key: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const startRun = async () => {
     const trimmed = objective.trim();
     if (trimmed.length < 3 || runMutation.isPending) return;
     setError(null);
+    stickToBottomRef.current = true;
     try {
-      const record = (await runMutation.mutateAsync({
-        objective: trimmed,
-        title: title.trim() || undefined,
-      })) as TaskRecord;
+      const record = (await runMutation.mutateAsync({ objective: trimmed })) as LedgerTask;
       setActiveId(record.id);
-      setExpandedId(record.id);
+      setExpandedIds((prev) => new Set(prev).add(`${record.id}-answer`));
       setObjective("");
-      setTitle("");
       void ledgerQuery.refetch();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ausführung fehlgeschlagen.");
     }
   };
 
-  const statusOf = (t: TaskRecord) => STATUS_META[t.status] ?? STATUS_META.pending;
-  const toolCount = useMemo(() => toolsQuery.data?.tools?.length ?? 0, [toolsQuery.data]);
-
-  const detailTask = (activeTask && activeTask.id === expandedId ? activeTask : undefined)
-    ?? ledger.find((t) => t.id === expandedId);
-
   const navDrawer = useNavDrawer();
-  return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={ledgerQuery.isFetching && activeId == null}
-            onRefresh={() => void ledgerQuery.refetch()}
-            tintColor={cyber.cyan}
-          />
-        }
-      >
-        <View style={styles.header}>
-          <View style={styles.menuRow}>
-            <NavDrawer {...navDrawer.drawerProps} />
-            <NavDrawerButton {...navDrawer.hamburgerProps} />
-          </View>
-          <Text style={styles.headerKicker}>AUTONOME AUSFÜHRUNG</Text>
-          <Text style={styles.headerTitle}>
-            SUPER<Text style={{ color: cyber.cyan }}>AGENT</Text>
-          </Text>
-          <View style={[styles.headerLine, { backgroundColor: `${cyber.cyan}55` }]} />
-          <Text style={styles.headerSub}>
-            Ziel eingeben — der Superagent zerlegt es selbst in Schritte, nutzt {toolCount > 0 ? `${toolCount} Tools` : "seine Tools"} und korrigiert sich eigenständig.
+
+  if (!isAdmin) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.center}>
+          <Text style={styles.lockTitle}>Admin-Zugang erforderlich</Text>
+          <Text style={styles.lockText}>
+            Die autonome Ausführung (Git, Render, Infrastruktur) ist vertrauensvoll und nur für Administratoren freigeschaltet. Melde dich mit deinem Admin-Konto an.
           </Text>
         </View>
+      </SafeAreaView>
+    );
+  }
 
-        {!isAdmin ? (
-          <View style={[styles.panel, styles.gapPanel]}>
-            <Text style={styles.panelTitle}>Admin-Zugang erforderlich</Text>
-            <Text style={styles.panelText}>
-              Die autonome Ausführung (Git, Render, Infrastruktur) ist vertrauensvoll und nur für Administratoren freigeschaltet. Melde dich mit deinem Admin-Konto an.
+  return (
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+      >
+        {/* Kompakter Netz-Kopf */}
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <View style={styles.menuRow}>
+              <NavDrawer {...navDrawer.drawerProps} />
+              <NavDrawerButton {...navDrawer.hamburgerProps} />
+            </View>
+            <Text style={styles.headerTitle}>
+              SUPER<Text style={{ color: cyber.cyan }}>AGENT</Text>
             </Text>
           </View>
-        ) : (
-          <>
-            <View style={styles.panel}>
-              <Text style={styles.inputLabel}>ZIEL</Text>
-              <TextInput
-                style={styles.inputObjective}
-                placeholder="z. B. Prüfe den Produktiv-Deploy und berichte den Systemstatus …"
-                placeholderTextColor={cyber.textDim}
-                value={objective}
-                onChangeText={setObjective}
-                multiline
-                editable={!runMutation.isPending}
-              />
-              <TextInput
-                style={styles.inputTitle}
-                placeholder="Titel (optional)"
-                placeholderTextColor={cyber.textDim}
-                value={title}
-                onChangeText={setTitle}
-                editable={!runMutation.isPending}
-              />
-              <Pressable
-                style={[styles.runButton, (objective.trim().length < 3 || runMutation.isPending) && styles.runButtonDisabled]}
-                disabled={objective.trim().length < 3 || runMutation.isPending}
-                onPress={() => void startRun()}
+          <Pressable
+            style={styles.optimizerChip}
+            onPress={() => {
+              void optimizerTrigger.mutateAsync().catch((e: unknown) =>
+                setError(e instanceof Error ? e.message : "Optimizer-Start fehlgeschlagen."),
+              );
+            }}
+          >
+            {optimizerTrigger.isPending ? (
+              <ActivityIndicator size="small" color={optimizerQuery.data?.enabled ? cyber.green : cyber.textDim} />
+            ) : (
+              <Text
+                style={[
+                  styles.optimizerChipText,
+                  { color: optimizerQuery.data?.enabled ? cyber.green : cyber.textDim },
+                ]}
               >
-                {runMutation.isPending ? (
-                  <ActivityIndicator color={cyber.bg} size="small" />
-                ) : (
-                  <Text style={styles.runButtonText}>▶ AUTONOM STARTEN</Text>
-                )}
-              </Pressable>
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            </View>
-
-            <View style={styles.panel}>
-              <View style={styles.panelHeader}>
-                <Text style={styles.panelTitle}>Engineering-Optimizer</Text>
-                <Text
-                  style={[
-                    styles.badge,
-                    {
-                      color: optimizerQuery.data?.enabled ? cyber.green : cyber.textDim,
-                      borderColor: optimizerQuery.data?.enabled ? `${cyber.green}66` : `${cyber.textDim}66`,
-                    },
-                  ]}
-                >
-                  {optimizerTrigger.isPending || optimizerQuery.data?.running ? "LÄUFT" : optimizerQuery.data?.enabled ? "AKTIV" : "AUS"}
-                </Text>
-              </View>
-              <Text style={styles.panelText}>
-                Der Optimizer analysiert das System fortlaufend (alle {optimizerQuery.data?.intervalMinutes ?? 360} Minuten) — DB-Health, Fehlerlogs, Stabilität — und startet bei Handlungsbedarf automatisch einen Orchestrator-Task.
+                ⟲ OPTIMIZER {optimizerQuery.data?.enabled ? "AKTIV" : "AUS"} · {toolCount > 0 ? `${toolCount} TOOLS` : "TOOLS"}
               </Text>
-              {optimizerQuery.data?.lastCycleAt ? (
-                <Text style={styles.ledgerMeta}>
-                  Letzter Zyklus: {formatTime(optimizerQuery.data.lastCycleAt)}
-                  {optimizerQuery.data.nextCycleAt ? ` · Nächster: ~${formatTime(optimizerQuery.data.nextCycleAt)}` : ""}
-                </Text>
-              ) : (
-                <Text style={styles.ledgerMeta}>Erster Zyklus startet nach Boot-Phase (ca. 5 Minuten).</Text>
-              )}
-              {optimizerQuery.data?.recentCycles?.length ? (
-                optimizerQuery.data.recentCycles.slice(0, 3).map((cycle) => (
-                  <Text key={cycle.id} style={styles.ledgerMeta} numberOfLines={1}>
-                    · {cycle.title} — {cycle.summary ?? cycle.status}
-                  </Text>
-                ))
-              ) : null}
-              <Pressable
-                style={[styles.runButton, optimizerTrigger.isPending && styles.runButtonDisabled]}
-                disabled={optimizerTrigger.isPending}
-                onPress={() => {
-                  void optimizerTrigger.mutateAsync().catch((e: unknown) =>
-                    setError(e instanceof Error ? e.message : "Optimizer-Start fehlgeschlagen."),
-                  );
-                }}
-              >
-                {optimizerTrigger.isPending ? (
-                  <ActivityIndicator color={cyber.bg} size="small" />
-                ) : (
-                  <Text style={styles.runButtonText}>⟲ JETZT ANALYSIEREN & OPTIMIEREN</Text>
-                )}
-              </Pressable>
-              {optimizerQuery.data?.lastError ? <Text style={styles.errorText}>{optimizerQuery.data.lastError}</Text> : null}
-            </View>
+            )}
+          </Pressable>
+          {optimizerQuery.data?.lastError ? (
+            <Text style={styles.optimizerError} numberOfLines={1}>{optimizerQuery.data.lastError}</Text>
+          ) : null}
+        </View>
 
-            {activeTask ? (
-              <View style={styles.panel}>
-                <View style={styles.panelHeader}>
-                  <Text style={styles.panelTitle}>{activeTask.title}</Text>
-                  <Text style={[styles.badge, { color: (STATUS_META[activeTask.status] ?? STATUS_META.pending).color, borderColor: `${(STATUS_META[activeTask.status] ?? STATUS_META.pending).color}66` }]}>
-                    {(STATUS_META[activeTask.status] ?? STATUS_META.pending).label}
-                  </Text>
-                </View>
-                <Text style={styles.objectiveText}>{activeTask.objective}</Text>
-                <View style={styles.progressRow}>
-                  <ActivityIndicator size="small" color={cyber.cyan} />
-                  <Text style={styles.progressText}>
-                    Runde {activeTask.correctionIterations + 1} · {activeTask.steps.length} Schritte · Selbstkorrektur aktiv
-                  </Text>
+        {/* Chat-Strom */}
+        <FlatList
+          ref={listRef}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          data={rows}
+          keyExtractor={(row) => row.key}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyBubble}>
+              <Text style={styles.emptyTitle}>AUTONOME AUSFÜHRUNG BEREIT</Text>
+              <Text style={styles.emptyText}>
+                Gib ein Ziel ein — der Superagent zerlegt es selbst in Schritte, nutzt seine Tools und korrigiert sich eigenständig. Der Verlauf läuft hier wie ein Chat.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) =>
+            item.kind === "objective" ? (
+              <View style={styles.objectiveBubbleWrap}>
+                <View style={styles.objectiveBubble}>
+                  <Text style={styles.objectiveTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.objectiveText}>{item.objective}</Text>
+                  <Text style={styles.objectiveMeta}>{formatTime(item.createdAt)}</Text>
                 </View>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.answerBubbleWrap}>
+                <Pressable style={styles.answerBubble} onPress={() => toggleExpanded(item.key)}>
+                  <View style={styles.answerHead}>
+                    <Text
+                      style={[
+                        styles.statusBadge,
+                        {
+                          color: STATUS_META[item.status].color,
+                          borderColor: `${STATUS_META[item.status].color}66`,
+                        },
+                      ]}
+                    >
+                      {STATUS_META[item.status].label}
+                    </Text>
+                    <Text style={styles.answerMeta}>
+                      Runde {item.round} · {item.stepCount} Schritte
+                      {item.status === "running" ? " · Selbstkorrektur aktiv" : ""}
+                    </Text>
+                  </View>
 
-            <View style={styles.panel}>
-              <Text style={styles.panelTitle}>Task-Ledger</Text>
-              {ledger.length === 0 ? (
-                <Text style={styles.panelText}>Noch keine autonomen Aufgaben ausgeführt.</Text>
-              ) : (
-                ledger.map((task) => {
-                  const meta = statusOf(task);
-                  const expanded = detailTask?.id === task.id;
-                  return (
-                    <View key={task.id} style={styles.ledgerEntry}>
-                      <Pressable style={styles.ledgerRow} onPress={() => setExpandedId(expanded ? null : task.id)}>
-                        <View style={styles.ledgerRowMain}>
-                          <Text style={styles.ledgerTitle} numberOfLines={1}>{task.title}</Text>
-                          <Text style={styles.ledgerMeta}>
-                            {formatTime(task.createdAt)} · {(task.steps?.length ?? 0)} Schritte
-                            {(task.correctionIterations ?? 0) > 0 ? ` · ${task.correctionIterations}× korrigiert` : ""}
-                          </Text>
-                        </View>
-                        <Text style={[styles.badge, { color: meta.color, borderColor: `${meta.color}66` }]}>{meta.label}</Text>
-                      </Pressable>
-
-                      {expanded && detailTask ? (
-                        <View style={styles.detailBox}>
-                          <Text style={styles.objectiveText}>{detailTask.objective}</Text>
-                          {(detailTask.steps ?? []).map((step) => {
-                            const sm = STATUS_META[step.status] ?? STATUS_META.pending;
-                            return (
-                              <View key={step.id} style={styles.stepRow}>
-                                <Text style={[styles.stepDot, { color: sm.color }]}>
-                                  {step.status === "success" ? "●" : step.status === "failed" ? "✕" : step.status === "running" ? "◐" : "○"}
-                                </Text>
-                                <View style={styles.stepMain}>
-                                  <Text style={styles.stepName}>{step.name}</Text>
-                                  {step.attempts > 1 ? (
-                                    <Text style={styles.stepMeta}>{step.attempts} Versuche</Text>
-                                  ) : null}
-                                  {step.error ? <Text style={styles.stepError}>{step.error}</Text> : null}
-                                  {step.logs.length > 0 ? (
-                                    <View style={styles.logBox}>
-                                      {step.logs.slice(-6).map((line, i) => (
-                                        <Text key={i} style={styles.logLine}>{line}</Text>
-                                      ))}
-                                    </View>
-                                  ) : null}
-                                </View>
-                              </View>
-                            );
-                          })}
-                          {formatAnswer(detailTask.finalAnswer) ? (
-                            <View style={styles.finalBox}>
-                              <Text style={styles.finalLabel}>ERGEBNIS</Text>
-                              <Text style={styles.finalText}>{formatAnswer(detailTask.finalAnswer)}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-                      ) : null}
+                  {item.status === "running" || item.status === "pending" ? (
+                    <View style={styles.progressRow}>
+                      <ActivityIndicator size="small" color={cyber.cyan} />
+                      <Text style={styles.progressText}>
+                        {item.steps.length > 0 ? item.steps[item.steps.length - 1].name : "Ziel wird zerlegt …"}
+                      </Text>
                     </View>
-                  );
-                })
+                  ) : null}
+
+                  {expandedIds.has(item.key) && item.steps.length > 0 ? (
+                    <View style={styles.stepBox}>
+                      {item.steps.map((step) => {
+                        const sm = step.status === "success"
+                          ? { dot: "●", color: cyber.green }
+                          : step.status === "failed"
+                            ? { dot: "✕", color: cyber.pink }
+                            : step.status === "running"
+                              ? { dot: "◐", color: cyber.cyan }
+                              : { dot: "○", color: cyber.textDim };
+                        return (
+                          <View key={step.id} style={styles.stepRow}>
+                            <Text style={[styles.stepDot, { color: sm.color }]}>{sm.dot}</Text>
+                            <View style={styles.stepMain}>
+                              <Text style={styles.stepName}>{step.name}</Text>
+                              {step.attempts > 1 ? (
+                                <Text style={styles.stepMeta}>{step.attempts} Versuche</Text>
+                              ) : null}
+                              {step.error ? <Text style={styles.stepError}>{step.error}</Text> : null}
+                              {step.logs.length > 0 ? (
+                                <View style={styles.logBox}>
+                                  {step.logs.slice(-4).map((line, i) => (
+                                    <Text key={i} style={styles.logLine} numberOfLines={1}>{line}</Text>
+                                  ))}
+                                </View>
+                              ) : null}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+
+                  {item.answer ? (
+                    <View style={styles.finalBox}>
+                      <Text style={styles.finalLabel}>ERGEBNIS</Text>
+                      <Text style={styles.finalText}>{item.answer}</Text>
+                    </View>
+                  ) : item.status === "failed" || item.status === "escalated" ? (
+                    <Text style={styles.noAnswerText}>
+                      Kein finales Ergebnis — tippe für die Schritt-Details und Logs.
+                    </Text>
+                  ) : null}
+                </Pressable>
+              </View>
+            )
+          }
+        />
+
+        {/* Fixierter Chat-Composer unten */}
+        <View style={styles.composer}>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <View style={styles.composerRow}>
+            <TextInput
+              style={styles.composerInput}
+              placeholder="Ziel eingeben — z. B. Prüfe den Produktiv-Deploy …"
+              placeholderTextColor={cyber.textDim}
+              value={objective}
+              onChangeText={setObjective}
+              multiline
+              editable={!runMutation.isPending}
+            />
+            <Pressable
+              style={[styles.sendButton, (objective.trim().length < 3 || runMutation.isPending) && styles.sendButtonDisabled]}
+              disabled={objective.trim().length < 3 || runMutation.isPending}
+              onPress={() => void startRun()}
+            >
+              {runMutation.isPending ? (
+                <ActivityIndicator color={cyber.bg} size="small" />
+              ) : (
+                <Text style={styles.sendButtonText}>▶</Text>
               )}
-            </View>
-          </>
-        )}
-      </ScrollView>
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: cyber.bg },
-  screen: { flex: 1 },
-  content: { padding: 16, paddingBottom: 48, gap: 16 },
-  menuRow: { marginBottom: 4 },
-  header: { gap: 4 },
-  headerKicker: { ...cyberTypography.caption, color: cyber.textDim, letterSpacing: 3, fontSize: 11 },
-  headerTitle: { ...cyberTypography.display, color: cyber.text },
-  headerLine: { height: 2, borderRadius: 1, marginTop: 6 },
-  headerSub: { color: cyber.textMuted, fontSize: 13, marginTop: 8, lineHeight: 18 },
-  gapPanel: { gap: 8 },
-  panel: { backgroundColor: cyber.surface, borderRadius: 12, borderWidth: 1, borderColor: `${cyber.cyan}22`, padding: 14, gap: 10 },
-  panelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
-  panelTitle: { color: cyber.text, fontSize: 15, fontWeight: "700", letterSpacing: 0.5 },
-  panelText: { color: cyber.textMuted, fontSize: 13, lineHeight: 19 },
-  inputLabel: { color: cyber.textDim, fontSize: 11, letterSpacing: 2, fontWeight: "700" },
-  inputObjective: {
-    backgroundColor: cyber.surfaceElevated,
-    color: cyber.text,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: `${cyber.cyan}33`,
-    padding: 12,
-    fontSize: 14,
-    minHeight: 84,
-    textAlignVertical: "top",
-  },
-  inputTitle: {
-    backgroundColor: cyber.surfaceElevated,
-    color: cyber.text,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: `${cyber.cyan}22`,
-    padding: 10,
-    fontSize: 13,
-  },
-  runButton: { backgroundColor: cyber.cyan, borderRadius: 8, paddingVertical: 12, alignItems: "center" },
-  runButtonDisabled: { opacity: 0.45 },
-  runButtonText: { color: cyber.bg, fontWeight: "800", letterSpacing: 1.5, fontSize: 13 },
-  errorText: { color: cyber.pink, fontSize: 12 },
-  objectiveText: { color: cyber.textMuted, fontSize: 13, fontStyle: "italic" },
+  root: { flex: 1 },
+  list: { flex: 1 },
+  listContent: { padding: 16, paddingBottom: 24, gap: 10 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
+  lockTitle: { color: cyber.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
+  lockText: { color: cyber.textMuted, fontSize: 13, lineHeight: 19, textAlign: "center" },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 6, borderBottomWidth: 1, borderBottomColor: `${cyber.cyan}18` },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  menuRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerTitle: { ...cyberTypography.display, color: cyber.text, fontSize: 22 },
+  optimizerChip: { alignSelf: "flex-start", borderWidth: 1, borderColor: `${cyber.cyan}33`, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: cyber.surface },
+  optimizerChipText: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5 },
+  optimizerError: { color: cyber.pink, fontSize: 11 },
+  objectiveBubbleWrap: { flexDirection: "row", justifyContent: "flex-end" },
+  objectiveBubble: { backgroundColor: `${cyber.cyan}26`, borderWidth: 1, borderColor: `${cyber.cyan}55`, borderRadius: 14, borderBottomRightRadius: 4, padding: 12, maxWidth: "82%", gap: 4 },
+  objectiveTitle: { color: cyber.cyan, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
+  objectiveText: { color: cyber.text, fontSize: 14, lineHeight: 20 },
+  objectiveMeta: { color: cyber.textDim, fontSize: 10, alignSelf: "flex-end" },
+  answerBubbleWrap: { flexDirection: "row", justifyContent: "flex-start" },
+  answerBubble: { backgroundColor: cyber.surface, borderWidth: 1, borderColor: `${cyber.cyan}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 12, maxWidth: "92%", flex: 1, gap: 8 },
+  answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  statusBadge: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  answerMeta: { color: cyber.textDim, fontSize: 11 },
   progressRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  progressText: { color: cyber.cyan, fontSize: 12, letterSpacing: 0.5 },
-  badge: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  ledgerEntry: { borderBottomWidth: 1, borderBottomColor: `${cyber.cyan}11`, paddingVertical: 8 },
-  ledgerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  ledgerRowMain: { flex: 1 },
-  ledgerTitle: { color: cyber.text, fontSize: 13, fontWeight: "600" },
-  ledgerMeta: { color: cyber.textDim, fontSize: 11, marginTop: 2 },
-  detailBox: { marginTop: 10, gap: 8 },
+  progressText: { color: cyber.cyan, fontSize: 12 },
+  stepBox: { gap: 8, borderTopWidth: 1, borderTopColor: `${cyber.cyan}18`, paddingTop: 8 },
   stepRow: { flexDirection: "row", gap: 8 },
-  stepDot: { fontSize: 12, marginTop: 2 },
-  stepMain: { flex: 1, gap: 3 },
+  stepDot: { fontSize: 12, lineHeight: 18 },
+  stepMain: { flex: 1, gap: 2 },
   stepName: { color: cyber.text, fontSize: 12, fontWeight: "600" },
   stepMeta: { color: cyber.textDim, fontSize: 10 },
   stepError: { color: cyber.pink, fontSize: 10 },
-  logBox: { backgroundColor: cyber.bg, borderRadius: 6, padding: 8, gap: 2 },
-  logLine: { color: cyber.textDim, fontSize: 10, fontFamily: "monospace" },
-  finalBox: { backgroundColor: `${cyber.green}0D`, borderRadius: 8, borderWidth: 1, borderColor: `${cyber.green}44`, padding: 10, gap: 4 },
+  logBox: { backgroundColor: cyber.surfaceElevated, borderRadius: 6, padding: 6, gap: 2 },
+  logLine: { color: cyber.textMuted, fontSize: 10, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }) },
+  finalBox: { borderTopWidth: 1, borderTopColor: `${cyber.cyan}18`, paddingTop: 8, gap: 2 },
   finalLabel: { color: cyber.green, fontSize: 10, fontWeight: "800", letterSpacing: 2 },
-  finalText: { color: cyber.text, fontSize: 12, lineHeight: 18 },
+  finalText: { color: cyber.text, fontSize: 13, lineHeight: 19 },
+  noAnswerText: { color: cyber.textDim, fontSize: 11, fontStyle: "italic" },
+  emptyBubble: { backgroundColor: cyber.surface, borderWidth: 1, borderColor: `${cyber.cyan}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 14, gap: 6, marginTop: 24 },
+  emptyTitle: { color: cyber.cyan, fontSize: 12, fontWeight: "800", letterSpacing: 2 },
+  emptyText: { color: cyber.textMuted, fontSize: 13, lineHeight: 19 },
+  composer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderTopWidth: 1, borderTopColor: `${cyber.cyan}18`, backgroundColor: cyber.bg, gap: 6 },
+  composerRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  composerInput: {
+    flex: 1,
+    backgroundColor: cyber.surfaceElevated,
+    color: cyber.text,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: `${cyber.cyan}33`,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
+    fontSize: 14,
+    maxHeight: 120,
+    textAlignVertical: "top",
+  },
+  sendButton: { backgroundColor: cyber.cyan, borderRadius: 12, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  sendButtonDisabled: { opacity: 0.45 },
+  sendButtonText: { color: cyber.bg, fontWeight: "900", fontSize: 16 },
+  errorText: { color: cyber.pink, fontSize: 12 },
 });

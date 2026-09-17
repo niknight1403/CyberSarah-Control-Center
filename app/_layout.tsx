@@ -24,6 +24,7 @@ import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { initCrashReporter } from "@/components/crash-reporting/crash-reporter";
 import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
 import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
+import { useAdminFullIntegration } from "@/lib/use-admin-full-integration";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -153,5 +154,9 @@ function AdminAutonomyBootstrap() {
   // Sprint 142: Autonomer System-Agent — scannt, analysiert und behebt
   // nach dem Admin-Login selbststaendig, bis das System wieder gruen ist.
   useAdminAutonomousAgent(accountQuery.data ?? null);
+  // Sprint 149: Alle Rechte/Tools/Anbindungen (Router, GitHub-Token, Design,
+  // Repository) nach dem Admin-Login GLOBAL integrieren — auf jedem Screen,
+  // inklusive Superagent-Tab und Entwicklungs-Chat, ohne manuelle Klicks.
+  useAdminFullIntegration(accountQuery.data ?? null);
   return null;
 }

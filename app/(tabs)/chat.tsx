@@ -18,10 +18,6 @@ import { formatProjectContext, readProjectContext } from "@/lib/project-upload-r
 import { RepositoryConnectCard } from "@/components/studio/repository-connect-card";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
-import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
-import { useAdminGithubTokenSync } from "@/lib/use-admin-github-token-sync";
-import { useAdminDesignThemeSync } from "@/lib/use-admin-design-theme-sync";
-import { useAdminRepositoryAutoConnect } from "@/lib/use-admin-repository-autoconnect";
 import { DevTracePanel } from "@/components/chat/dev-trace-panel";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -79,10 +75,6 @@ export default function ChatScreen() {
   // hergestellt, sobald ein Administrator angemeldet ist — kein manueller
   // Klick in den Einstellungen mehr noetig.
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
-  useAdminAutoRouter(accountQuery.data ?? null);
-  useAdminGithubTokenSync(accountQuery.data ?? null);
-  useAdminDesignThemeSync(accountQuery.data ?? null);
-  useAdminRepositoryAutoConnect(accountQuery.data ?? null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   // Sprint 139 — Robustes Auto-Scroll (Owner-Feedback 16.09.2026): Die Antwort
   // muss nach dem Senden sofort im sichtbaren Bereich erscheinen, wie in jedem

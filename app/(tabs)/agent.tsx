@@ -53,10 +53,6 @@ import { RepositoryConnectCard } from "@/components/studio/repository-connect-ca
 import { parseRepositoryChatIntent } from "@/lib/repository-intent-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
-import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
-import { useAdminGithubTokenSync } from "@/lib/use-admin-github-token-sync";
-import { useAdminDesignThemeSync } from "@/lib/use-admin-design-theme-sync";
-import { useAdminRepositoryAutoConnect } from "@/lib/use-admin-repository-autoconnect";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
@@ -124,10 +120,6 @@ export default function AgentScreen() {
     const colors = useColors();
     const styles = useMemo(() => createStyles(colors), [colors]);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
-  useAdminAutoRouter(accountQuery.data ?? null);
-  useAdminGithubTokenSync(accountQuery.data ?? null);
-  useAdminDesignThemeSync(accountQuery.data ?? null);
-  useAdminRepositoryAutoConnect(accountQuery.data ?? null);
   const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } =
     useWorkspace();
   const {
