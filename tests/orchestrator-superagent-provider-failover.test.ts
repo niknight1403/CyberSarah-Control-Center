@@ -52,7 +52,7 @@ describe("runOrchestratorTask — Zero-Cost-Multi-Provider-Failover (Sprint 150)
     delete process.env.ORCHESTRATOR_MODEL;
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.AI_GEMINI_API_KEY;
-    process.env.AI_GROQ_API_KEY = "groq-test-key-1234";
+    process.env.AI_GROQ_API_KEY = "groq-test-key-1234"; // gitleaks:allow — Test-Fixture, kein echtes Secret
     process.env.OPENAI_API_KEY = "sk-openai-test-exhausted";
   });
 
