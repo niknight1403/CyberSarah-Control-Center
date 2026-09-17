@@ -1,19 +1,31 @@
 /**
- * Superagenten-Runtime (Sprint 123).
+ * Superagenten-Runtime (Sprint 123, Sprint 150: Zero-Cost-Multi-Provider-Failover).
  *
- * Verknuepft das Agenten-Framework (OpenAI-kompatible Cloud-API oder lokales
- * Ollama) mit der Tool-Registry und dem State-Store. Der hinterlegte System-
- * Prompt erzwingt: autonome Task-Decomposition, Verifizierung nach jedem
- * Schritt, strukturierte Selbstkorrektur (maximal 3 Iterationen vor
- * Eskalation) und Sicherheit fuer destruktive Operationen.
+ * Verknuepft das Agenten-Framework mit der Tool-Registry und dem State-Store.
+ * Der hinterlegte System-Prompt erzwingt: autonome Task-Decomposition,
+ * Verifizierung nach jedem Schritt, strukturierte Selbstkorrektur (maximal 3
+ * Iterationen vor Eskalation) und Sicherheit fuer destruktive Operationen.
+ *
+ * Sprint 150 — Root-Cause-Fix: Der Superagent war bisher fest an
+ * OPENAI_API_KEY verdrahtet (server/_core/llm.ts::callLlm rief direkt
+ * api.openai.com auf). Sobald das OpenAI-Konto keine Credits mehr hatte
+ * ("insufficient_quota"/"credit_balance_exhausted"), eskalierte JEDE
+ * Superagent-Aufgabe nach 3 Iterationen — obwohl der App bereits ein
+ * funktionierender Zero-Cost-Multi-Provider-Router (invokeLLM, server/_core/
+ * llm.ts) mit autonomer Key-Rotation ueber Groq/OpenRouter/Gemini-Free-Tier
+ * zur Verfuegung stand (siehe modelRouterSettings.healthSnapshot: "managed"
+ * war durchgehend "ready"). Der Superagent nutzt diesen Router jetzt genauso
+ * wie der Entwicklungs-Chat (development-chat.ts) — unabhaengig vom
+ * Kreditstand eines einzelnen Anbieters.
  *
  * Konfiguration (ENV):
- *   - ORCHESTRATOR_LLM_BASE_URL  Basis-URL (Default: https://api.openai.com/v1)
- *   - ORCHESTRATOR_MODEL         Modellname (Default: gpt-4o-mini)
- *   - OLLAMA_BASE_URL            gesetzt = lokales Ollama wird genutzt
- *   - OPENAI_API_KEY             Cloud-API-Key (falls kein Ollama)
+ *   - OLLAMA_BASE_URL     gesetzt = lokales Ollama wird genutzt (explizite
+ *                         Admin-Wahl, hat Vorrang vor der Cloud-Kette)
+ *   - ORCHESTRATOR_MODEL  Optionaler Modellname-Override fuer die Cloud-Kette
+ *                         (leer = automatische Modellwahl je Anbieter)
  */
 
+import { invokeLLM, type Message as LlmMessage, type Tool as LlmTool } from "../_core/llm";
 import { executeTool, getToolDefinitions } from "./tool-registry";
 import {
   addStep,
@@ -54,32 +66,29 @@ interface ChatMessage {
 }
 
 interface LlmConfig {
+  mode: "ollama" | "cloud";
   baseUrl: string;
-  model: string;
-  apiKey: string | null;
+  model?: string;
 }
 
 function resolveLlmConfig(): LlmConfig {
   const ollamaUrl = process.env.OLLAMA_BASE_URL;
   if (ollamaUrl) {
-    return { baseUrl: ollamaUrl.replace(/\/$/, ""), model: process.env.ORCHESTRATOR_MODEL ?? "llama3.1", apiKey: null };
+    return { mode: "ollama", baseUrl: ollamaUrl.replace(/\/$/, ""), model: process.env.ORCHESTRATOR_MODEL ?? "llama3.1" };
   }
-  return {
-    baseUrl: (process.env.ORCHESTRATOR_LLM_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, ""),
-    model: process.env.ORCHESTRATOR_MODEL ?? "gpt-4o-mini",
-    apiKey: process.env.OPENAI_API_KEY ?? null,
-  };
+  // Cloud-Pfad: kein fester Provider mehr — Modellwahl bleibt optional
+  // (leer = der Router waehlt je Anbieter automatisch ein Standardmodell).
+  return { mode: "cloud", baseUrl: "", model: process.env.ORCHESTRATOR_MODEL || undefined };
 }
 
-async function callLlm(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+/** Lokaler Ollama-Aufruf (OpenAI-kompatibel, kein API-Key). Explizite Admin-Wahl. */
+async function callOllama(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
   try {
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: config.model,
         messages,
@@ -99,6 +108,32 @@ async function callLlm(config: LlmConfig, messages: ChatMessage[]): Promise<Chat
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Cloud-Aufruf ueber den zentralen Zero-Cost-Multi-Provider-Router
+ * (server/_core/llm.ts::invokeLLM) — derselbe Router, den auch der
+ * Entwicklungs-Chat nutzt. Rotiert autonom ueber Groq/OpenRouter/Gemini
+ * Free-Tier-Keys und weicht auf Forge/OpenAI nur aus, wenn kein Gratis-Key
+ * konfiguriert ist oder der Administrator AI_ALLOW_PAID_LLM_FALLBACK=true
+ * gesetzt hat. Ein einzelner erschoepfter Provider (z. B. OpenAI ohne
+ * Credits) blockiert damit nicht mehr den gesamten Superagenten.
+ */
+async function callManagedCloud(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
+  const result = await invokeLLM({
+    messages: messages as unknown as LlmMessage[],
+    tools: getToolDefinitions() as unknown as LlmTool[],
+    toolChoice: "auto",
+    maxTokens: 1_800,
+    ...(config.model ? { model: config.model } : {}),
+  });
+  const choice = result.choices?.[0]?.message;
+  if (!choice) throw new Error("LLM-API: keine Antwort-Message erhalten.");
+  return choice as ChatMessage;
+}
+
+async function callLlm(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
+  return config.mode === "ollama" ? callOllama(config, messages) : callManagedCloud(config, messages);
 }
 
 function parseToolArguments(raw: string): Record<string, unknown> {
@@ -143,9 +178,6 @@ export async function runOrchestratorTask(input: {
     await updateStep(task.id, step.id, { status: "running" });
 
     try {
-      if (!config.apiKey && !process.env.OLLAMA_BASE_URL) {
-        throw new Error("Kein LLM konfiguriert: weder OPENAI_API_KEY noch OLLAMA_BASE_URL gesetzt.");
-      }
       const assistantMessage = await callLlm(config, messages);
       const toolCalls = assistantMessage.tool_calls ?? [];
 
