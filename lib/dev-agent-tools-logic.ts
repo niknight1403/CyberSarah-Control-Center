@@ -259,11 +259,22 @@ export type WorkspaceToolRequestResult = { ok: true; request: WorkspaceToolReque
  * aus Tool-Name + geparsten Argumenten. Validiert Pflichtfelder, bevor ein
  * Netzwerkaufruf versucht wird.
  */
+export const NO_WORKSPACE_CONNECTED_ERROR =
+  "Kein Repository verbunden. Bitte zuerst in den Einstellungen ein Repository verbinden (\"Repository verbinden\"), danach stehen alle Git-Werkzeuge zur Verfuegung.";
+
 export function buildWorkspaceToolRequest(
   tool: AgentToolName,
   workspaceId: string,
   args: Record<string, unknown>,
 ): WorkspaceToolRequestResult {
+  // Sprint 147 — Selbstdiagnose-Haertung: Ohne verbundenes Repository ist
+  // JEDER Workspace-Aufruf zum Scheitern verurteilt (leere Workspace-ID im
+  // Pfad). Statt einen sinnlosen Netzwerk-Roundtrip zu riskieren, dessen
+  // Fehlertext das Modell zu einer erfundenen Ausrede verleiten kann, wird
+  // hier sofort ein klarer, deterministischer Fehler zurueckgegeben.
+  if (!workspaceId.trim()) {
+    return { ok: false, error: NO_WORKSPACE_CONNECTED_ERROR };
+  }
   const base = `/api/render/api/v1/workspaces/${encodeURIComponent(workspaceId)}`;
 
   switch (tool) {
@@ -457,6 +468,7 @@ Regeln:
 - Nach abgeschlossenen Fehlerbehebungen und vereinbarten Konventionen speichere die Kern-Erkenntnis mit save_learning ins Langzeit-Gedächtnis.
 - Du arbeitest autonom und mit voller Autoritaet ueber alle dir gegebenen Werkzeuge. Pruefe mit list_github_issues proaktiv offene Aufgaben und arbeite sie eigenstaendig ab; dokumentiere erkannte Bugs und fehlende Features sofort mit create_github_issue und schliesse mit close_github_issue nur verifiziert abgeschlossene Issues.
 - Fehlt fuer eine Aufgabe ein Werkzeug oder ein Connector (MCP, Skills, Integrationen), erfinde nichts — sage klar, was fehlt, und lege den Bedarf als Issue an, damit die Luecke autonom geschlossen werden kann.
+- Liefert ein Werkzeugaufruf ein Ergebnis, das mit "FEHLER" beginnt, ist DAS der einzige Grund, den du dem Nutzer nennen darfst: gib den tatsaechlichen Fehlergrund in eigenen, klaren Worten wieder (z. B. "kein Repository verbunden — bitte in den Einstellungen verbinden"). Erfinde niemals einen anderen, plausibler wirkenden Grund (z. B. angeblich fehlende System-Logs oder Serverzugriff) — das waere eine Falschaussage. Behaupte nie pauschale Unwissenheit ("ich kann das nicht pruefen"), solange ein Werkzeug existiert, das die Antwort liefert; rufe es zuerst auf.
 - Nutze checkout_branch fuer eigenstaendige Feature-Branches, statt direkt auf main zu arbeiten.
 - Antworte auf Deutsch, klar und knapp. Nach jeder Werkzeugnutzung fasse das Ergebnis kurz zusammen, bevor du den naechsten Schritt geht.`;
 }

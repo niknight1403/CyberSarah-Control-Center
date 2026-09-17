@@ -188,3 +188,35 @@ describe("dev-agent-tools-logic (Sprint 88)", () => {
     expect(buildAgentSystemPrompt("main")).not.toContain("System-Hinweis:");
   });
 });
+
+describe("dev-agent-tools-logic (Sprint 147 — Selbstdiagnose-Haertung)", () => {
+  it("liefert bei leerer Workspace-ID einen klaren, deterministischen Fehler statt eines Netzwerk-Roundtrips", () => {
+    const result = buildWorkspaceToolRequest("list_repo_files", "", {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("Kein Repository verbunden");
+      expect(result.error).toContain("Einstellungen");
+    }
+  });
+
+  it("greift den Leer-Workspace-Guard fuer verschiedene Werkzeuge (nicht nur list_repo_files)", () => {
+    const writeResult = buildWorkspaceToolRequest("write_repo_file", "   ", { path: "a.ts", content: "x" });
+    expect(writeResult.ok).toBe(false);
+    const statusResult = buildWorkspaceToolRequest("git_status", "", {});
+    expect(statusResult.ok).toBe(false);
+    const commitResult = buildWorkspaceToolRequest("commit_changes", "", { message: "test" });
+    expect(commitResult.ok).toBe(false);
+  });
+
+  it("baut normale Requests weiterhin korrekt, wenn eine Workspace-ID vorhanden ist (keine Regression)", () => {
+    const result = buildWorkspaceToolRequest("list_repo_files", "ws-123", {});
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.request.path).toBe("/api/render/api/v1/workspaces/ws-123/files");
+  });
+
+  it("weist das Modell im System-Prompt an, echte FEHLER-Gruende wiederzugeben statt sie zu erfinden", () => {
+    const prompt = buildAgentSystemPrompt("main");
+    expect(prompt).toContain("FEHLER");
+    expect(prompt.toLowerCase()).toContain("erfinde niemals einen anderen");
+  });
+});
