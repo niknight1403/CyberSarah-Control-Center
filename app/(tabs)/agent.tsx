@@ -4,6 +4,7 @@ import {
   StudioHeader,
   StudioSection,
 } from "@/components/studio/primitives";
+import { MarkdownLiteContent } from "@/components/chat/message-bubble";
 import { AgentAvatar } from "@/components/living/agent-avatar";
 import { resolveAvatarMood } from "@/lib/agent-avatar-logic";
 import { ScreenContainer } from "@/components/screen-container";
@@ -1706,7 +1707,11 @@ export default function AgentScreen() {
                           ? "ÄNDERUNGSVORSCHLAG"
                           : "AGENT"}
                     </Text>
-                    <Text style={styles.messageText}>{item.content}</Text>
+                    {isUser ? (
+                      <Text style={styles.messageText}>{item.content}</Text>
+                    ) : (
+                      <MarkdownLiteContent content={item.content} />
+                    )}
                     {item.proposalPreview?.changes.length ? (
                       <View style={styles.changeList}>
                         {item.proposal ? (

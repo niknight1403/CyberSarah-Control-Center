@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { avatarInitialsForRole, formatChatClock, senderLabelForRole } from "@/lib/chat-presentation-logic";
 import { darken, withAlpha } from "@/lib/theme-color-utils";
 import { useColors } from "@/hooks/use-colors";
+import { parseMarkdownLite, type InlineSpan } from "@/lib/markdown-lite";
 
 export type BubbleMessage = {
   id: string;
@@ -14,6 +15,85 @@ export type BubbleMessage = {
   timestampMs?: number;
   isThinking?: boolean;
 };
+
+type Palette = ReturnType<typeof useColors>;
+type BubbleStyles = ReturnType<typeof createStyles>;
+
+/**
+ * Sprint 138 — RenderMarkdownLite: zeigt LLM-Antworten als formatierte
+ * Bloecke (Ueberschriften, Listen, Code, Tabellen) statt als Roh-Markdown.
+ * Theme-bewusst (Sprint 133/143): alle Farben kommen aus den Theme-Tokens.
+ */
+function SpanText({ span, base, styles }: { span: InlineSpan; base: object; styles: BubbleStyles }) {
+  return (
+    <Text style={[base, span.bold && styles.bold, span.italic && styles.italic, span.mono && styles.mono]}>
+      {span.text}
+    </Text>
+  );
+}
+
+export function MarkdownLiteContent({ content }: { content: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const blocks = useMemo(() => parseMarkdownLite(content), [content]);
+  return (
+    <View>
+      {blocks.map((block, index) => {
+        switch (block.type) {
+          case "header":
+            return (
+              <Text key={index} style={styles.headerText}>
+                {block.spans.map((span, spanIndex) => (
+                  <SpanText key={spanIndex} span={span} base={styles.headerBase} styles={styles} />
+                ))}
+              </Text>
+            );
+          case "bullet":
+            return (
+              <View key={index} style={styles.bulletRow}>
+                <Text style={styles.bulletMarker}>•</Text>
+                <Text style={styles.contentAgent}>
+                  {block.spans.map((span, spanIndex) => (
+                    <SpanText key={spanIndex} span={span} base={styles.contentAgentBase} styles={styles} />
+                  ))}
+                </Text>
+              </View>
+            );
+          case "code":
+            return (
+              <View key={index} style={styles.codeBox}>
+                <Text style={styles.codeText} selectable>
+                  {block.code}
+                </Text>
+              </View>
+            );
+          case "tableRow":
+            return (
+              <Text key={index} style={[styles.tableText, block.header && styles.bold]}>
+                {block.cells.join("   |   ")}
+              </Text>
+            );
+          case "quote":
+            return (
+              <Text key={index} style={styles.quoteText}>
+                {block.spans.map((span, spanIndex) => (
+                  <SpanText key={spanIndex} span={span} base={styles.quoteBase} styles={styles} />
+                ))}
+              </Text>
+            );
+          default:
+            return (
+              <Text key={index} style={styles.contentAgent}>
+                {block.spans.map((span, spanIndex) => (
+                  <SpanText key={spanIndex} span={span} base={styles.contentAgentBase} styles={styles} />
+                ))}
+              </Text>
+            );
+        }
+      })}
+    </View>
+  );
+}
 
 /**
  * Sprint 49 — Hochwertige Nachrichten-Blase mit Avatar, Absender, Zeit
@@ -47,7 +127,7 @@ export function MessageBubble({ message, showTimestamp }: { message: BubbleMessa
             <Text style={styles.senderUser}>{label}</Text>
             {showTimestamp && message.timestampMs != null ? <Text style={styles.time}>{formatChatClock(message.timestampMs)}</Text> : null}
           </View>
-          <Text style={styles.contentUser}>{message.isThinking ? message.content : message.content}</Text>
+          <Text style={styles.contentUser}>{message.content}</Text>
         </LinearGradient>
       ) : (
         <View style={[styles.bubble, styles.bubbleAgent]}>
@@ -56,14 +136,12 @@ export function MessageBubble({ message, showTimestamp }: { message: BubbleMessa
             <Text style={styles.senderAgent}>{label}</Text>
             {showTimestamp && message.timestampMs != null ? <Text style={styles.time}>{formatChatClock(message.timestampMs)}</Text> : null}
           </View>
-          <Text style={[styles.contentAgent, message.isThinking && styles.contentThinking]}>{message.content}</Text>
+          {message.isThinking ? <Text style={[styles.contentAgent, styles.contentThinking]}>{message.content}</Text> : <MarkdownLiteContent content={message.content} />}
         </View>
       )}
     </Animated.View>
   );
 }
-
-type Palette = ReturnType<typeof useColors>;
 
 function createStyles(colors: Palette) {
   return StyleSheet.create({
@@ -92,5 +170,19 @@ function createStyles(colors: Palette) {
     contentAgent: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
     contentUser: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
     contentThinking: { color: colors.muted, fontStyle: "italic" },
+    // Sprint 138 — Markdown-Lite-Renderer-Stile (Theme-Token-basiert).
+    contentAgentBase: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5 },
+    bold: { fontWeight: "800" },
+    italic: { fontStyle: "italic" },
+    mono: { fontFamily: "monospace", fontSize: 12.5 },
+    headerBase: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5 },
+    headerText: { color: colors.tint, fontFamily: "monospace", fontSize: 14.5, fontWeight: "800", marginBottom: 6, marginTop: 4 },
+    bulletRow: { flexDirection: "row", gap: 6, marginBottom: 3 },
+    bulletMarker: { color: colors.tint, fontSize: 13.5, lineHeight: 22 },
+    codeBox: { backgroundColor: withAlpha(colors.foreground, 0.06), borderColor: colors.border, borderRadius: 4, borderWidth: 1, marginVertical: 6, paddingHorizontal: 10, paddingVertical: 8 },
+    codeText: { color: colors.foreground, fontFamily: "monospace", fontSize: 12, lineHeight: 18 },
+    tableText: { color: colors.foreground, fontFamily: "monospace", fontSize: 12.5, lineHeight: 19 },
+    quoteBase: { color: colors.muted, fontFamily: "monospace", fontSize: 13.5 },
+    quoteText: { borderLeftColor: colors.tint, borderLeftWidth: 2, color: colors.muted, fontFamily: "monospace", fontSize: 13.5, fontStyle: "italic", lineHeight: 22, marginBottom: 4, paddingLeft: 8 },
   });
 }
