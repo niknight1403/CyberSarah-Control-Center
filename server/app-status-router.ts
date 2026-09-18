@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+import { detectConfiguredProviders, type RouterProviderId } from "../lib/model-router-logic";
+import { getRouterHealth } from "./model-router";
 import {
   buildRuntimeStatusSnapshot,
   classifyRuntimeState,
@@ -84,5 +86,56 @@ export const appStatusRouter = router({
   clearLogs: adminProcedure.mutation(() => {
     const removed = clearRuntimeLogs();
     return { removed, state: classifyRuntimeState({ processUp: true, nowMs: Date.now() }) };
+  }),
+  /**
+   * Sprint 156 — Provider-Uebersicht fuer das Dashboard (protected, ohne
+   * Keys): Anzahl konfigurierter/gesunder Provider, aktiver Provider mit
+   * Default-Modell — ausschliesslich aus serverseitigem ENV/Health-Register
+   * abgeleitet. Keine API-Keys, keine Header, keine geratenen Namen.
+   */
+  providerSummary: protectedProcedure.query(() => {
+    const env = process.env as Record<string, string | undefined>;
+    const configured = detectConfiguredProviders(env);
+    const health = getRouterHealth();
+    const labels: Partial<Record<RouterProviderId, string>> = {
+      managed: "Managed (Forge)",
+      openai: "OpenAI",
+      anthropic: "Anthropic",
+      gemini: "Google Gemini",
+      openrouter: "OpenRouter",
+      groq: "Groq",
+      together: "Together AI",
+      huggingface: "Hugging Face",
+      ollama: "Ollama (lokal)",
+      lmstudio: "LM Studio (lokal)",
+      custom: "Eigener Endpoint",
+    };
+    const models: Partial<Record<RouterProviderId, string | undefined>> = {
+      openai: env.AI_OPENAI_MODEL,
+      anthropic: env.AI_ANTHROPIC_MODEL,
+      gemini: env.AI_GEMINI_MODEL,
+      openrouter: env.AI_OPENROUTER_MODEL,
+      groq: env.AI_GROQ_MODEL,
+      together: env.AI_TOGETHER_MODEL,
+      ollama: env.AI_OLLAMA_MODEL,
+      lmstudio: env.AI_LMSTUDIO_MODEL,
+      custom: env.AI_CUSTOM_MODEL,
+    };
+    let healthyCount = 0;
+    for (const provider of configured) {
+      if (health[provider]?.status === "ready") healthyCount += 1;
+    }
+    // Aktiver Provider: erster Gesunder in der Default-Prioritaet; ohne
+    // Health-Daten wird keiner als "aktiv" behauptet (Dashboard: "wird geprueft").
+    const priority: RouterProviderId[] = ["managed", "openai", "anthropic", "gemini", "openrouter", "groq", "together", "huggingface", "ollama", "lmstudio", "custom"];
+    const active = priority.find(
+      (provider) => configured.includes(provider) && health[provider]?.status === "ready",
+    ) ?? null;
+    return {
+      configuredCount: configured.length,
+      healthyCount,
+      activeProvider: active ? (labels[active] ?? active) : null,
+      activeModel: active ? (models[active] ?? null) : null,
+    };
   }),
 });

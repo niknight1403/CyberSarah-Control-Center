@@ -1,0 +1,75 @@
+/**
+ * Sprint 156 — Aktivitaetskarte (NICHT „Neueste Aktivitaeten"): kompakte
+ * System-/Nutzungsuebersicht der letzten 24 h. Nur echte Zaehlwerte;
+ * ohne Daten: „Noch keine Daten" + leere Sparkline. Kein erfundener 247er-Wert.
+ */
+import { StyleSheet, Text, View } from "react-native";
+
+import { neonPulse as t } from "@/lib/neon-pulse-theme";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { neonStyles } from "./neon-dashboard-styles";
+import { sparklineGeometry } from "@/lib/dashboard-view-model";
+
+export function ActivitySummaryCard({
+  count,
+  changePercent,
+  points,
+}: {
+  count: number | null;
+  changePercent: number | null;
+  points: number[];
+}) {
+  const geometry = sparklineGeometry(points);
+  const hasData = typeof count === "number" && count > 0;
+  return (
+    <View style={[neonStyles.neonCard, neonStyles.neonCardBlue, styles.card]}>
+      <View style={styles.header}>
+        <View style={styles.iconWrap} accessibilityLabel="Aktivität">
+          <IconSymbol size={16} name="chart.bar.fill" color={t.blue} />
+        </View>
+        <View style={styles.titleWrap}>
+          <Text style={neonStyles.sectionTitle}>Aktivität</Text>
+          <Text style={neonStyles.mutedLabel}>LETZTE 24 STUNDEN</Text>
+        </View>
+        <View style={styles.valueWrap}>
+          <Text style={styles.value} accessibilityLabel={hasData ? `${count} Aktivitäten` : "Noch keine Aktivitätsdaten"}>
+            {count === null ? "—" : String(count)}
+          </Text>
+          {typeof changePercent === "number" ? (
+            <Text style={[styles.change, { color: changePercent >= 0 ? t.emerald : t.danger }]}>
+              {changePercent >= 0 ? "+" : ""}{changePercent}% vs. Vortag
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <View style={styles.sparkArea} accessibilityLabel={hasData ? "Aktivitätsverlauf" : "Keine Aktivitätsdaten vorhanden"}>
+        {geometry.length >= 2 ? (
+          <View style={styles.sparkRow}>
+            {geometry.map((point, index) => (
+              <View key={index} style={[styles.sparkBar, { height: 4 + Math.round(point.y * 26) }]} />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.sparkEmpty}>
+            <Text style={styles.sparkEmptyText}>Noch keine Daten</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: { gap: 12 },
+  header: { flexDirection: "row", alignItems: "center", gap: 12 },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: "rgba(37, 168, 255, 0.55)", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
+  titleWrap: { flex: 1, gap: 2 },
+  valueWrap: { alignItems: "flex-end" },
+  value: { fontSize: 26, fontWeight: "900", color: t.textPrimary, fontVariant: ["tabular-nums"] },
+  change: { fontSize: 11, fontWeight: "700" },
+  sparkArea: { height: 40, justifyContent: "flex-end" },
+  sparkRow: { flexDirection: "row", alignItems: "flex-end", gap: 3, height: 40 },
+  sparkBar: { flex: 1, borderRadius: 2, backgroundColor: t.blue, opacity: 0.85 },
+  sparkEmpty: { height: 34, borderRadius: 8, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.14)", borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  sparkEmptyText: { fontSize: 11, color: t.textMuted },
+});
