@@ -1,9 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { resolveAllowedOrigins } from "../../lib/allowed-origins-logic";
+import { isTrpcRequestPath } from "../../lib/rate-limit-routing-logic";
 
 const DEFAULT_WINDOW_MS = 60_000;
-const DEFAULT_MAX_REQUESTS = 120;
+const DEFAULT_MAX_REQUESTS = 240;
 
 type RateLimitEntry = { count: number; resetAt: number };
 
@@ -71,7 +72,18 @@ export function createSecurityMiddleware() {
     }
     entry.count += 1;
     if (entry.count > maxRequests) {
-      res.setHeader("Retry-After", Math.ceil((entry.resetAt - now) / 1000));
+      const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000);
+      res.setHeader("Retry-After", retryAfterSeconds);
+      // Sprint 159: tRPC-Anfragen NICHT hier mit rohem JSON ablehnen — das
+      // sprengt die Batch-Envelope-Form, die der Client erwartet, und zeigt
+      // "Unable to transform response from server". Statt dessen als Flag
+      // durchreichen; server/_core/trpc.ts (rateLimitGuard) lehnt dort mit
+      // einer korrekt geformten, verstaendlichen TRPCError ab.
+      if (isTrpcRequestPath(req.path)) {
+        res.locals.rateLimitExceeded = { retryAfterSeconds };
+        next();
+        return;
+      }
       res
         .status(429)
         .json({ error: "Zu viele Anfragen. Bitte später erneut versuchen." });

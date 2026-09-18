@@ -9,6 +9,7 @@ function response() {
   const headers = new Map<string, string>();
   return {
     headers,
+    locals: {} as Record<string, unknown>,
     header(name: string, value: string) {
       headers.set(name, value);
     },
@@ -77,5 +78,25 @@ describe("HTTP security middleware", () => {
     middleware(request, second as never, next);
     expect(next).toHaveBeenCalledOnce();
     expect(second.statusCode).toBe(429);
+  });
+
+  it("passes tRPC rate-limit rejections through as res.locals instead of raw JSON", () => {
+    // Sprint 159: /api/trpc darf bei Rate-Limit NICHT direkt mit rohem JSON
+    // antworten (das kann der tRPC-Client nicht transformieren und zeigt
+    // "Unable to transform response from server"). Stattdessen muss die
+    // Anfrage durchgelassen werden, mit einem Flag fuer den tRPC-Handler.
+    vi.stubEnv("APP_ALLOWED_ORIGINS", "");
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const middleware = createSecurityMiddleware();
+    const next = vi.fn();
+    const first = response();
+    const second = response();
+    const request = { method: "GET", path: "/api/trpc/account.me", headers: {}, ip: "9.9.9.9" } as never;
+    middleware(request, first as never, next);
+    middleware(request, second as never, next);
+    expect(next).toHaveBeenCalledTimes(2);
+    expect(second.statusCode).toBe(200);
+    expect(second.locals.rateLimitExceeded).toBeTruthy();
+    expect(second.json).not.toHaveBeenCalled();
   });
 });

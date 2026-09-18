@@ -264,10 +264,11 @@ export async function runOrchestratorTask(input: {
           error: `Korrektur-Iteration ${iterations} nach Tool-Fehlern`,
         });
         if (iterations >= ESCALATION_THRESHOLD) {
-          await finishTask(task.id, "escalated", {
-            status: "escalated",
-            summary: "Drei aufeinanderfolgende Tool-Fehlerrunden — Eskalation an den Administrator.",
-          });
+          await finishTask(
+            task.id,
+            "escalated",
+            "Ich konnte die Aufgabe nicht abschließen: Drei aufeinanderfolgende Tool-Fehlerrunden. Ich habe eskaliert, damit ein Administrator eingreifen kann.",
+          );
           break;
         }
       } else {
@@ -280,10 +281,11 @@ export async function runOrchestratorTask(input: {
       await appendStepLog(task.id, step.id, `Laufzeitfehler: ${message}`);
       await updateStep(task.id, step.id, { status: "failed", error: message });
       if (iterations >= ESCALATION_THRESHOLD) {
-        await finishTask(task.id, "escalated", {
-          status: "escalated",
-          summary: `Wiederholter Laufzeitfehler nach ${iterations} Iterationen: ${message}`,
-        });
+        await finishTask(
+          task.id,
+          "escalated",
+          `Ich konnte die Aufgabe nicht abschließen: Wiederholter Laufzeitfehler nach ${iterations} Iterationen (${message}). Ich habe eskaliert, damit ein Administrator eingreifen kann.`,
+        );
         break;
       }
       // Fehler dem LLM zur Selbstkorrektur zurueckmelden.
@@ -296,10 +298,11 @@ export async function runOrchestratorTask(input: {
 
   const finalTask = (await getTask(task.id)) ?? task;
   if (finalTask.status === "running") {
-    await finishTask(task.id, "failed", {
-      status: "failed",
-      summary: `Maximale Rundenzahl (${maxRounds}) erreicht, ohne finale Antwort.`,
-    });
+    await finishTask(
+      task.id,
+      "failed",
+      `Ich konnte innerhalb von ${maxRounds} Runden keine finale Antwort erreichen. Bitte formuliere das Ziel enger oder versuche es erneut.`,
+    );
     return (await getTask(task.id)) ?? finalTask;
   }
   return finalTask;

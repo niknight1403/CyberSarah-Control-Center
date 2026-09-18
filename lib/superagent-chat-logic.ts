@@ -39,12 +39,22 @@ export type SuperagentChatRow =
       finishedAt: string;
     };
 
-/** Formatiert die finale Antwort render-sicher (string direkt, Objekte als JSON). */
+/**
+ * Formatiert die finale Antwort render-sicher. String wird direkt genutzt.
+ * Verteidigungslinie 2: Sollte doch einmal ein rohes {status, summary}-Objekt
+ * durchrutschen (z. B. aelterer Serverstand), wird daraus ein lesbarer Satz
+ * gebaut statt rohes JSON im Chat anzuzeigen (Dark-Cyber-Chat-Qualitaet).
+ */
 export function formatFinalAnswer(value: unknown): string | null {
   if (value == null) return null;
   if (typeof value === "string") {
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const summary = typeof record.summary === "string" ? record.summary.trim() : "";
+    if (summary) return summary;
   }
   try {
     const serialized = JSON.stringify(value, null, 2);
