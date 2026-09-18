@@ -1,3 +1,5 @@
+import { useColors } from "@/hooks/use-colors";
+import { useMemo } from "react";
 /**
  * Sprint 156 — Superagenten-Modul: breite Neon-Glas-Karte mit ECHTEM
  * Backend-Status. Zeigt niemals „LIVE · AKTIV" ohne aktiven Agenten und
@@ -8,18 +10,10 @@ import { useEffect, useState } from "react";
 import { router } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { neonPulse as t } from "@/lib/neon-pulse-theme";
 import { superAgentStatusCopy, type SuperAgentStatus } from "@/lib/dashboard-view-model";
-import { neonStyles } from "./neon-dashboard-styles";
+import { createNeonStyles } from "./neon-dashboard-styles";
 
-const STATUS_COLOR: Record<SuperAgentStatus, string> = {
-  active: t.emerald,
-  ready: t.cyan,
-  paused: t.warning,
-  unconfigured: t.textMuted,
-  offline: t.danger,
-  error: t.danger,
-};
+const STATUS_COLOR = (colors: ReturnType<typeof useColors>) => ({ active: colors.success, ready: colors.tint, paused: colors.warning, unconfigured: colors.icon, offline: colors.error, error: colors.error });
 
 /** Reduce-Motion sicher abfragen (Web-Polyfill: Promise-API). */
 function useReducedMotion(): boolean {
@@ -47,7 +41,10 @@ export function SuperAgentCard({
   detail: string;
   onRetry: () => void;
 }) {
-  const accent = STATUS_COLOR[status];
+  const colors = useColors();
+  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const accent = STATUS_COLOR(colors)[status];
   const pulse = useAnimatedValue(1);
   const reduceMotion = useReducedMotion();
 
@@ -66,7 +63,7 @@ export function SuperAgentCard({
   const deadBackend = status === "offline" || status === "error";
 
   return (
-    <View style={[neonStyles.neonCard, neonStyles.neonCardGradient, styles.card]}>
+    <View style={[themeStyles.neonCard, themeStyles.neonCardGradient, styles.card]}>
       <View style={styles.left}>
         <View
           style={[styles.avatarRing, { borderColor: `${accent}99`, shadowColor: accent }]}
@@ -95,21 +92,21 @@ export function SuperAgentCard({
             accessibilityLabel="Superagent-Status erneut laden"
             accessibilityRole="button"
             style={({ pressed }) => [
-              neonStyles.neonButton,
+              themeStyles.neonButton,
               styles.openButton,
               { borderColor: "rgba(255, 200, 87, 0.45)" },
               pressed && styles.pressed,
             ]}
             onPress={onRetry}
           >
-            <Text style={[styles.openButtonText, { color: t.warning }]}>Erneut laden</Text>
+            <Text style={[styles.openButtonText, { color: colors.warning }]}>Erneut laden</Text>
           </Pressable>
         ) : (
           <Pressable
             accessibilityLabel="Superagenten öffnen"
             accessibilityRole="button"
             style={({ pressed }) => [
-              neonStyles.neonButton,
+              themeStyles.neonButton,
               styles.openButton,
               { borderColor: `${accent}66`, backgroundColor: `${accent}1A` },
               pressed && styles.pressed,
@@ -125,7 +122,7 @@ export function SuperAgentCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 18 },
   left: { alignItems: "center", gap: 4 },
   avatarRing: {
@@ -145,15 +142,15 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: t.backgroundElevated,
+    backgroundColor: colors.background,
   },
   liveDot: { width: 9, height: 9, borderRadius: 5 },
   center: { flex: 1, gap: 3 },
-  title: { fontSize: 16, fontWeight: "900", color: t.textPrimary, letterSpacing: 1.2 },
-  subtitle: { fontSize: 12, color: t.textSecondary },
+  title: { fontSize: 16, fontWeight: "900", color: colors.text, letterSpacing: 1.2 },
+  subtitle: { fontSize: 12, color: colors.muted },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 2 },
   statusText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
-  detailText: { fontSize: 11, color: t.textMuted },
+  detailText: { fontSize: 11, color: colors.icon },
   right: { alignItems: "flex-end" },
   openButton: { flexDirection: "row", gap: 6, borderWidth: 1, backgroundColor: "rgba(25, 230, 255, 0.1)" },
   openButtonText: { fontWeight: "800", fontSize: 13 },

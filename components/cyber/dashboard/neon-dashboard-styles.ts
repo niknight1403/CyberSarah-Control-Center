@@ -5,50 +5,51 @@
  */
 import { StyleSheet } from "react-native";
 
-import { neonPulse as t } from "@/lib/neon-pulse-theme";
+import { useColors } from "@/hooks/use-colors";
 
-export const neonStyles = StyleSheet.create({
+export function createNeonStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   neonCard: {
-    backgroundColor: t.surface,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: t.border,
+    borderColor: colors.border,
     padding: 16,
     overflow: "hidden",
   },
   neonCardGreen: {
-    borderColor: "rgba(0, 245, 155, 0.42)",
-    shadowColor: "rgba(45, 255, 154, 0.22)",
+    borderColor: `${colors.success}6B`,
+    shadowColor: `${colors.success}38`,
     shadowOpacity: 0.9,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
   },
   neonCardViolet: {
-    borderColor: "rgba(168, 85, 247, 0.45)",
-    shadowColor: "rgba(168, 85, 247, 0.25)",
+    borderColor: `${colors.tint}73`,
+    shadowColor: `${colors.tint}40`,
     shadowOpacity: 0.9,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
   },
   neonCardBlue: {
-    borderColor: "rgba(37, 168, 255, 0.42)",
-    shadowColor: "rgba(37, 168, 255, 0.22)",
+    borderColor: `${colors.tint}6B`,
+    shadowColor: `${colors.tint}38`,
     shadowOpacity: 0.9,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
   },
   neonCardGradient: {
-    borderColor: "rgba(25, 230, 255, 0.55)",
-    shadowColor: "rgba(240, 45, 255, 0.28)",
+    borderColor: `${colors.tint}8C`,
+    shadowColor: `${colors.tint}47`,
     shadowOpacity: 0.85,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
   },
   glassSurface: {
-    backgroundColor: "rgba(10, 34, 50, 0.66)",
+    backgroundColor: `${colors.surface}A8`,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(91, 219, 255, 0.18)",
+    borderColor: `${colors.border}45`,
   },
   neonButton: {
     borderRadius: 12,
@@ -59,8 +60,9 @@ export const neonStyles = StyleSheet.create({
     minHeight: 44,
     minWidth: 44,
   },
-  sectionTitle: { fontSize: 15, fontWeight: "800", color: t.textPrimary, letterSpacing: 0.4 },
-  mutedLabel: { fontSize: 11, fontWeight: "600", color: t.textMuted, letterSpacing: 0.8 },
-  metricValue: { fontSize: 24, fontWeight: "800", color: t.textPrimary, fontVariant: ["tabular-nums"] },
+  sectionTitle: { fontSize: 15, fontWeight: "800", color: colors.text, letterSpacing: 0.4 },
+  mutedLabel: { fontSize: 11, fontWeight: "600", color: colors.icon, letterSpacing: 0.8 },
+  metricValue: { fontSize: 24, fontWeight: "800", color: colors.text, fontVariant: ["tabular-nums"] },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-});
+  });
+}

@@ -9,6 +9,7 @@
  * unter /business erreichbar.
  */
 import { useMemo } from "react";
+import { useColors } from "@/hooks/use-colors";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 
@@ -24,16 +25,16 @@ import { SuperAgentCard } from "@/components/cyber/dashboard/super-agent-card";
 import { DashboardErrorState, DashboardSkeleton } from "@/components/cyber/dashboard/dashboard-states";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { formatUptime, systemStatusCopy, workspaceStatusCopy } from "@/lib/dashboard-view-model";
-import { neonPulse as t } from "@/lib/neon-pulse-theme";
 import { isWideViewport } from "@/lib/viewport-logic";
 
 export default function DashboardScreen() {
+  const colors = useColors();
   const { vm, state, hasAlerts, isAdmin, retry, serverUptimeText } = useDashboardData();
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
   const threeColumns = wide;
 
-  const styles = useMemo(() => createStyles(threeColumns), [threeColumns]);
+  const styles = useMemo(() => createStyles(colors, threeColumns), [colors, threeColumns]);
 
   if (state === "loading" || vm === null) {
     return (
@@ -86,7 +87,7 @@ export default function DashboardScreen() {
             label="Provider"
             value={vm.kpis.providers === null ? "—" : String(vm.kpis.providers)}
             status={vm.kpis.providers === 0 ? "Kein Provider aktiv" : undefined}
-            accent={t.turquoise}
+            accent={colors.tint}
             loading={false}
             error={false}
             onPress={isAdmin ? () => router.push("/admin" as never) : undefined}
@@ -95,7 +96,7 @@ export default function DashboardScreen() {
             icon="checkmark.circle.fill"
             label="Uptime"
             value={formatUptime(vm.kpis.uptime)}
-            accent={vm.system.status === "healthy" ? t.emerald : t.warning}
+            accent={vm.system.status === "healthy" ? colors.success : colors.warning}
             loading={false}
             error={false}
           />
@@ -152,22 +153,22 @@ export default function DashboardScreen() {
 }
 
 
-const base = StyleSheet.create({
-  root: { backgroundColor: t.background },
+function createStyles(colors: ReturnType<typeof useColors>, threeColumns: boolean) {
+  const base = StyleSheet.create({
+  root: { backgroundColor: colors.background },
   content: { gap: 14, paddingBottom: 32, maxWidth: 1280, width: "100%", alignSelf: "center" as const },
   kpiRow: { flexDirection: "row", gap: 12 },
   systemRow: { flexDirection: "row", gap: 12 },
-  footnote: { fontSize: 11, color: t.textMuted, textAlign: "center", paddingTop: 4 },
+  footnote: { fontSize: 11, color: colors.icon, textAlign: "center", paddingTop: 4 },
   businessLink: {
     borderRadius: 12, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.2)",
     backgroundColor: "rgba(8, 27, 42, 0.6)", alignItems: "center", justifyContent: "center",
     minHeight: 44, paddingVertical: 10,
   },
-  businessLinkText: { color: t.textSecondary, fontSize: 12, fontWeight: "700" },
+  businessLinkText: { color: colors.muted, fontSize: 12, fontWeight: "700" },
   pressed: { opacity: 0.72 },
-});
+  });
 
-function createStyles(threeColumns: boolean) {
   if (threeColumns) return base;
   return StyleSheet.create({
     ...base,

@@ -1,3 +1,5 @@
+import { useColors } from "@/hooks/use-colors";
+import { useMemo } from "react";
 /**
  * Sprint 156 — KI-Chat-Karte: Provider-/Modellname nur wenn serverseitig
  * verfuegbar; niemals API-Keys. „Kein Provider verfuegbar" inkl. Pruef-
@@ -6,12 +8,11 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 
-import { neonPulse as t } from "@/lib/neon-pulse-theme";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { neonStyles } from "./neon-dashboard-styles";
+import { createNeonStyles } from "./neon-dashboard-styles";
 import { chatStatusCopy, type ChatStatus } from "@/lib/dashboard-view-model";
 
-const ACCENT: Record<ChatStatus, string> = { ready: t.emerald, checking: t.cyan, unavailable: t.danger, unknown: t.textMuted };
+const ACCENT = (colors: ReturnType<typeof useColors>) => ({ ready: colors.success, checking: colors.tint, unavailable: colors.error, unknown: colors.icon });
 
 export function AiChatStatusCard({
   status,
@@ -24,19 +25,22 @@ export function AiChatStatusCard({
   model?: string;
   isAdmin: boolean;
 }) {
-  const accent = ACCENT[status];
+  const colors = useColors();
+  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const accent = ACCENT(colors)[status];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`KI-Chat: ${chatStatusCopy[status]}`}
-      style={({ pressed }) => [neonStyles.neonCard, styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [themeStyles.neonCard, styles.card, pressed && styles.pressed]}
       onPress={() => router.push("/chat")}
     >
       <View style={styles.header}>
         <View style={[styles.iconWrap, { borderColor: `${accent}66` }]}>
           <IconSymbol size={16} name="message.fill" color={accent} />
         </View>
-        <Text style={neonStyles.sectionTitle}>KI-Chat</Text>
+        <Text style={themeStyles.sectionTitle}>KI-Chat</Text>
       </View>
       <Text style={[styles.state, { color: accent }]}>{chatStatusCopy[status]}</Text>
       {provider ? <Text style={styles.meta}>{provider}{model ? ` · ${model}` : ""}</Text> : null}
@@ -44,28 +48,28 @@ export function AiChatStatusCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Provider prüfen"
-          style={[neonStyles.neonButton, styles.checkButton]}
+          style={[themeStyles.neonButton, styles.checkButton]}
           onPress={() => router.push("/admin")}
         >
           <Text style={styles.checkButtonText}>Provider prüfen</Text>
         </Pressable>
       ) : null}
       <View style={styles.chevronRow}>
-        <Text style={neonStyles.mutedLabel}>Zum Chat</Text>
-        <IconSymbol size={13} name="chevron.right" color={t.textMuted} />
+        <Text style={themeStyles.mutedLabel}>Zum Chat</Text>
+        <IconSymbol size={13} name="chevron.right" color={colors.icon} />
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
   state: { fontSize: 15, fontWeight: "800" },
-  meta: { fontSize: 12, color: t.textSecondary },
+  meta: { fontSize: 12, color: colors.muted },
   checkButton: { backgroundColor: "rgba(255, 85, 119, 0.12)", borderWidth: 1, borderColor: "rgba(255, 85, 119, 0.45)" },
-  checkButtonText: { color: t.danger, fontWeight: "700", fontSize: 12 },
+  checkButtonText: { color: colors.error, fontWeight: "700", fontSize: 12 },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });

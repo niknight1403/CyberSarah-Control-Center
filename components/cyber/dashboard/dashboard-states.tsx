@@ -1,3 +1,5 @@
+import { useColors } from "@/hooks/use-colors";
+import { useMemo } from "react";
 /**
  * Sprint 156 — Loading-/Empty-/Error-States fuer das Dashboard.
  * Skeleton-Shimmer nur als dezente Opacity-Animation (performant,
@@ -6,8 +8,7 @@
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View, useAnimatedValue } from "react-native";
 import { useEffect, useState } from "react";
 
-import { neonPulse as t } from "@/lib/neon-pulse-theme";
-import { neonStyles } from "./neon-dashboard-styles";
+import { createNeonStyles } from "./neon-dashboard-styles";
 
 /** Reduce-Motion sicher abfragen (Web-Polyfill: Promise-API). */
 function useReducedMotion(): boolean {
@@ -25,6 +26,9 @@ function useReducedMotion(): boolean {
 }
 
 export function DashboardSkeleton() {
+  const colors = useColors();
+  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const opacity = useAnimatedValue(0.45);
   const reduceMotion = useReducedMotion();
   useEffect(() => {
@@ -59,14 +63,17 @@ export function DashboardSkeleton() {
 }
 
 export function DashboardErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const colors = useColors();
+  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[neonStyles.neonCard, styles.errorCard]} accessibilityLabel={`Fehler: ${message}`}>
+    <View style={[themeStyles.neonCard, styles.errorCard]} accessibilityLabel={`Fehler: ${message}`}>
       <Text style={styles.errorTitle}>Dashboard-Daten nicht verfügbar</Text>
       <Text style={styles.errorMessage}>{message}</Text>
       <Pressable
         accessibilityLabel="Erneut versuchen"
         accessibilityRole="button"
-        style={[neonStyles.neonButton, styles.retry]}
+        style={[themeStyles.neonButton, styles.retry]}
         onPress={onRetry}
       >
         <Text style={styles.retryText}>Erneut versuchen</Text>
@@ -75,9 +82,9 @@ export function DashboardErrorState({ message, onRetry }: { message: string; onR
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   wrap: { gap: 12 },
-  block: { borderRadius: 18, backgroundColor: t.surfaceStrong, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.14)" },
+  block: { borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.14)" },
   header: { height: 48 },
   user: { height: 96 },
   kpiRow: { flexDirection: "row", gap: 12 },
@@ -86,8 +93,8 @@ const styles = StyleSheet.create({
   activity: { height: 120 },
   superAgent: { height: 120 },
   errorCard: { gap: 10 },
-  errorTitle: { color: t.danger, fontSize: 15, fontWeight: "800" },
-  errorMessage: { color: t.textSecondary, fontSize: 13 },
-  retry: { backgroundColor: "rgba(25, 230, 255, 0.12)", borderWidth: 1, borderColor: t.border, alignSelf: "flex-start" },
-  retryText: { color: t.cyan, fontWeight: "700", fontSize: 13 },
+  errorTitle: { color: colors.error, fontSize: 15, fontWeight: "800" },
+  errorMessage: { color: colors.muted, fontSize: 13 },
+  retry: { backgroundColor: "rgba(25, 230, 255, 0.12)", borderWidth: 1, borderColor: colors.border, alignSelf: "flex-start" },
+  retryText: { color: colors.tint, fontWeight: "700", fontSize: 13 },
 });
