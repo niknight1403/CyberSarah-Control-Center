@@ -15,6 +15,7 @@ import {
   type KeyPoolEntry,
 } from "../../lib/key-rotation-logic";
 import { evaluateAndNotifyQuotaWarnings, recordProviderCall, recordProviderFailover } from "../provider-metering";
+import { diagnoseLlmPoolFailure, type LlmEndpointAttempt } from "../../lib/llm-failure-diagnostics";
 import { sendOpsDiscordAlert } from "../ops-alerts";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
@@ -550,6 +551,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   }
 
   let lastError: unknown;
+  const attempts: LlmEndpointAttempt[] = [];
   for (const endpoint of ordered) {
     // Sprint 85: model ist Pflicht und muss zum jeweiligen Endpoint passen
     // (Gemini-Endpoint → Gemini-Modell, Forge/OpenAI → OpenAI-Modell).
@@ -572,6 +574,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       if (!response.ok) {
         const errorText = await response.text();
         lastError = new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+        attempts.push({ source: endpoint.source, httpStatus: response.status, message: errorText });
         // Sprint 115: Aufruf ins Metering-Ledger (429/Auth/sonstige).
         recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
         runQuotaWarningCheck();
@@ -592,12 +595,20 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       return (await response.json()) as InvokeResult;
     } catch (error) {
       lastError = error;
+      attempts.push({ source: endpoint.source, httpStatus: null, message: error instanceof Error ? error.message : String(error) });
       recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
       recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
       continue;
     }
   }
 
+  // Sprint 153: Sind ALLE Versuche an Auth-/Guthaben-Problemen gescheitert,
+  // ersetzt die Diagnose den kryptischen Roh-Fehler durch eine klare
+  // Handlungsanweisung (gueltigen API-Key hinterlegen).
+  const diagnostics = diagnoseLlmPoolFailure(attempts);
+  if (diagnostics.actionableMessage) {
+    throw new Error(diagnostics.actionableMessage);
+  }
   throw lastError instanceof Error
     ? lastError
     : new Error("LLM invoke failed: alle Managed-Keys im Cooldown oder erschöpft");
