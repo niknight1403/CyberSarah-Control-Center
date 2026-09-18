@@ -60,6 +60,7 @@ export default function SuperagentScreen() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [optimisticRows, setOptimisticRows] = useState<SuperagentChatRow[]>([]);
 
   const ledgerQuery = trpc.orchestrator.tasks.useQuery({ limit: 25 }, {
     enabled: isAdmin,
@@ -97,8 +98,8 @@ export default function SuperagentScreen() {
 
   const ledger = ((ledgerQuery.data ?? []) as unknown[]).map(coerceLedgerTask);
   const rows = useMemo(
-    () => buildSuperagentChatRows(ledger, activeTask),
-    [ledger, activeTask],
+    () => [...buildSuperagentChatRows(ledger, activeTask), ...optimisticRows],
+    [ledger, activeTask, optimisticRows],
   );
   const toolCount = useMemo(() => toolsQuery.data?.tools?.length ?? 0, [toolsQuery.data]);
 
@@ -136,14 +137,45 @@ export default function SuperagentScreen() {
     if (trimmed.length < 3 || runMutation.isPending) return;
     setError(null);
     stickToBottomRef.current = true;
+    const optimisticId = `pending-${Date.now()}`;
+    const now = new Date().toISOString();
+    setOptimisticRows([
+      {
+        kind: "objective",
+        key: `${optimisticId}-objective`,
+        taskId: optimisticId,
+        title: "Neue Superagent-Aufgabe",
+        objective: trimmed,
+        createdAt: now,
+      },
+      {
+        kind: "answer",
+        key: `${optimisticId}-answer`,
+        taskId: optimisticId,
+        status: "running",
+        round: 1,
+        stepCount: 0,
+        steps: [],
+        answer: null,
+        finishedAt: now,
+      },
+    ]);
+    setObjective("");
     try {
       const record = (await runMutation.mutateAsync({ objective: trimmed })) as LedgerTask;
+      setOptimisticRows([]);
       setActiveId(record.id);
       setExpandedIds((prev) => new Set(prev).add(`${record.id}-answer`));
-      setObjective("");
       void ledgerQuery.refetch();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ausführung fehlgeschlagen.");
+      const message = e instanceof Error ? e.message : "Ausführung fehlgeschlagen.";
+      setError(message);
+      setOptimisticRows((current) => current.map((row) => row.kind === "answer" ? {
+        ...row,
+        status: "failed",
+        answer: message,
+        finishedAt: new Date().toISOString(),
+      } : row));
     }
   };
 
@@ -323,6 +355,13 @@ export default function SuperagentScreen() {
               value={objective}
               onChangeText={setObjective}
               multiline
+              onKeyPress={(event) => {
+                const nativeEvent = event.nativeEvent as typeof event.nativeEvent & { shiftKey?: boolean };
+                if (Platform.OS === "web" && nativeEvent.key === "Enter" && !nativeEvent.shiftKey) {
+                  event.preventDefault();
+                  void startRun();
+                }
+              }}
               editable={!runMutation.isPending}
             />
             <Pressable
