@@ -34,10 +34,9 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useColors } from "@/hooks/use-colors";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { DEFAULT_DESIGN_THEME, type DesignTheme } from "@/lib/design-theme-logic";
-import { DesignThemeDefinitions, resolveDesignPalette } from "@/lib/_core/design-theme-palettes";
+import { DesignThemeDefinitions, resolveDesignPalette, resolveDesignRuntimePalette } from "@/lib/_core/design-theme-palettes";
 import {
   getOnboardingStepState,
   getOnboardingThemeChoices,
@@ -138,7 +137,6 @@ function DesignPreview({ theme, colors }: { theme: DesignTheme; colors: Colors }
 }
 
 export default function OnboardingScreen() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { setDesignTheme, setThemePreference } = useThemeContext();
@@ -147,11 +145,16 @@ export default function OnboardingScreen() {
   const [stepIndex, setStepIndex] = useState(0);
   const [designChoice, setDesignChoice] = useState<DesignTheme | null>(null);
   const [previewTheme, setPreviewTheme] = useState<DesignTheme>(DEFAULT_DESIGN_THEME);
-  const [preferenceChoice, setPreferenceChoice] = useState<ThemePreference>("system");
+  // Der neue Neon-Look startet bewusst dunkel; "System" bleibt später auswählbar.
+  const [preferenceChoice, setPreferenceChoice] = useState<ThemePreference>("dark");
 
   const step = useMemo(() => getOnboardingStepState(stepIndex, ONBOARDING_SLIDES), [stepIndex]);
   const themeChoices = useMemo(() => getOnboardingThemeChoices(), []);
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const visualColors = useMemo(
+    () => resolveDesignRuntimePalette(previewTheme, preferenceChoice === "light" ? "light" : "dark"),
+    [preferenceChoice, previewTheme],
+  );
+  const styles = useMemo(() => createStyles(visualColors), [visualColors]);
 
   const finish = useCallback(async () => {
     if (!shouldCompleteOnboarding(step.isLast, designChoice !== null)) return;
@@ -167,7 +170,7 @@ export default function OnboardingScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={[colors.tint, colors.background]}
+        colors={[visualColors.tint, visualColors.background]}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -175,9 +178,9 @@ export default function OnboardingScreen() {
 
       {isWelcome ? (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <DriftingOrb size={140} color={withAlpha(colors.tint, 0.55)} top={40} left={-30} duration={5200} delay={80} />
+          <DriftingOrb size={140} color={withAlpha(visualColors.tint, 0.55)} top={40} left={-30} duration={5200} delay={80} />
           <DriftingOrb size={90} color={withAlpha("#FF3DAD", 0.45)} top={220} left={width - 90} duration={4200} delay={220} />
-          <DriftingOrb size={60} color={withAlpha(colors.tint, 0.4)} top={420} left={30} duration={3600} delay={360} />
+          <DriftingOrb size={60} color={withAlpha(visualColors.tint, 0.4)} top={420} left={30} duration={3600} delay={360} />
         </View>
       ) : null}
 
@@ -198,7 +201,7 @@ export default function OnboardingScreen() {
           style={[styles.glassCard, isWide && styles.glassCardWide]}
         >
           <View style={styles.iconBadge}>
-            <IconSymbol name={step.slide.icon} size={28} color={colors.tint} />
+            <IconSymbol name={step.slide.icon} size={28} color={visualColors.tint} />
           </View>
           <Text style={styles.title}>{step.slide.title}</Text>
           <Text style={styles.text}>{step.slide.text}</Text>
@@ -209,7 +212,7 @@ export default function OnboardingScreen() {
           <Animated.View entering={FadeInUp.duration(320).delay(120)} style={[styles.glassCard, isWide && styles.glassCardWide]}>
             <Text style={styles.sectionTitle}>Design wählen</Text>
 
-            <DesignPreview theme={previewTheme} colors={colors} />
+            <DesignPreview theme={previewTheme} colors={visualColors} />
             <Text style={styles.previewHint}>Live-Vorschau — tippe eine Karte an, um Farben und Effekte direkt zu sehen.</Text>
 
             <View style={styles.choiceGrid}>
@@ -227,7 +230,7 @@ export default function OnboardingScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                   >
-                    <IconSymbol name={choice.icon} size={22} color={selected ? colors.tint : colors.icon} />
+                    <IconSymbol name={choice.icon} size={22} color={selected ? visualColors.tint : visualColors.icon} />
                     <Text style={[styles.choiceLabel, selected && styles.choiceLabelSelected]} numberOfLines={1}>
                       {choice.label}
                     </Text>
@@ -287,7 +290,7 @@ export default function OnboardingScreen() {
   );
 }
 
-type Colors = ReturnType<typeof useColors>;
+type Colors = ReturnType<typeof resolveDesignRuntimePalette>;
 
 const previewStyles = StyleSheet.create({
   frame: {
