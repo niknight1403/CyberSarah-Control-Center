@@ -14,6 +14,8 @@ import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { handleRotationWebhook } from "../provider-admin";
+import { providerAdminIdSchema } from "../provider-admin-router";
 import { registerRenderProxy } from "./renderProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -26,6 +28,7 @@ import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
 import { checkDatabaseHealth } from "../db";
 import { restoreRouterState } from "../model-router";
+import { initProviderAdmin } from "../provider-admin";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -115,6 +118,29 @@ async function startServer() {
   registerStorageProxy(app);
   registerRenderProxy(app);
   registerOAuthRoutes(app);
+
+  // Sprint 155 — Autorisierter Rotations-Webhook: POST /api/provider-rotation/webhook
+  // Nur mit korrektem PROVIDER_ROTATION_WEBHOOK_SECRET (Timing-sicher geprueft).
+  // Nutzlast: { provider, apiKey, expiresAt? } — Antwort enthaelt NIE Voll-Keys.
+  app.post("/api/provider-rotation/webhook", async (req, res) => {
+    try {
+      const body = req.body as { provider?: unknown; apiKey?: unknown; expiresAt?: unknown };
+      const parsed = providerAdminIdSchema.safeParse(body?.provider);
+      if (!parsed.success || typeof body?.apiKey !== "string" || body.apiKey.trim().length < 8) {
+        res.status(400).json({ ok: false, error: "Ungültige Nutzlast — provider und apiKey (min. 8 Zeichen) sind erforderlich." });
+        return;
+      }
+      const result = await handleRotationWebhook({
+        provider: parsed.data as Parameters<typeof handleRotationWebhook>[0]["provider"],
+        apiKey: body.apiKey,
+        expiresAt: typeof body.expiresAt === "string" ? body.expiresAt : null,
+        providedSecret: req.headers["x-rotation-secret"] as string | undefined,
+      });
+      res.status(result.status).json({ ok: result.ok, maskedKey: result.maskedKey, message: result.safeMessage });
+    } catch {
+      res.status(500).json({ ok: false, error: "Interner Fehler beim Rotations-Webhook." });
+    }
+  });
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
@@ -261,6 +287,7 @@ async function startServer() {
 
   const port = parseInt(process.env.PORT || "3000", 10);
   void restoreRouterState().catch(() => undefined);
+  void initProviderAdmin().catch(() => undefined);
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
     startOptimizerLoop();

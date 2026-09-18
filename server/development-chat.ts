@@ -124,6 +124,8 @@ Sprache und Verständlichkeit (Sprint 138):
 
 Entwicklungsaufträge: Analysiere Code und Architektur nachvollziehbar, benenne Annahmen klar und schlage sichere, überprüfbare nächste Schritte vor. Erfinde keine ausgeführten Änderungen. Gib bei Code-Vorschlägen nur die relevanten Dateien und Abschnitte an.`;
 
+import { autonomousKeyRecovery, getRuntimeApiKey, isProviderDisabledRuntime } from "./provider-admin";
+
 function getEnv(name: string) {
   return process.env[name]?.trim() || undefined;
 }
@@ -179,13 +181,20 @@ function getProviderConfig(provider: Exclude<ProviderId, "managed" | "anthropic"
   };
 
   const config = base[provider];
+  // Sprint 154: Admin-hinterlegter Key (verschluesselter Store) hat Vorrang
+  // vor ENV; ENV bleibt Fallback. Kein Chatfenster liest Keys selbst.
+  const runtimeKey = getRuntimeApiKey(provider);
+  const resolvedApiKey = runtimeKey ?? config.apiKey;
   if (!config.endpoint) {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: `Der Endpoint für ${provider} ist serverseitig nicht konfiguriert.` });
   }
-  if (!config.apiKey && provider !== "ollama" && provider !== "lmstudio") {
+  if (!resolvedApiKey && provider !== "ollama" && provider !== "lmstudio") {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: `Der API-Schlüssel für ${provider} ist serverseitig nicht konfiguriert.` });
   }
-  return { endpoint: config.endpoint, apiKey: config.apiKey, headers: config.headers, model: requestedModel ?? config.defaultModel };
+  if (isProviderDisabledRuntime(provider)) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: `${provider} ist administrativ deaktiviert — bitte einen anderen Provider wählen oder den Provider im Admin-Bereich reaktivieren.` });
+  }
+  return { endpoint: config.endpoint, apiKey: resolvedApiKey, headers: config.headers, model: requestedModel ?? config.defaultModel };
 }
 
 function toProviderMessages(messages: ChatMessage[]) {
@@ -229,7 +238,7 @@ async function callOpenAICompatibleProvider(provider: Exclude<ProviderId, "manag
 }
 
 async function callAnthropic(messages: ChatMessage[], requestedModel?: string) {
-  const apiKey = getEnv("AI_ANTHROPIC_API_KEY") ?? getEnv("ANTHROPIC_API_KEY");
+  const apiKey = getRuntimeApiKey("anthropic") ?? getEnv("AI_ANTHROPIC_API_KEY") ?? getEnv("ANTHROPIC_API_KEY");
   if (!apiKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Der API-Schlüssel für anthropic ist serverseitig nicht konfiguriert." });
   const response = await fetch(getEnv("AI_ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -288,6 +297,9 @@ function getFallbackProviders(provider: ProviderId) {
 }
 
 async function callProvider(provider: ProviderId, messages: ChatMessage[], model?: string) {
+  if (isProviderDisabledRuntime(provider)) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: `${provider} ist administrativ deaktiviert.` });
+  }
   if (provider === "auto") return callManaged(messages, model);
   if (provider === "managed") return callManaged(messages, model);
   if (provider === "anthropic") return callAnthropic(messages, model);
@@ -939,6 +951,12 @@ async function handleAutoRoutedChat(
       }
       const message = error instanceof Error ? error.message : String(error);
       const rateLimited = /\b429\b/.test(message);
+      // Sprint 155: Key-Fehler (401/403/ungueltig/abgelaufen) loesen die
+      // autonome Key-Recovery im Hintergrund aus — der Failover laeuft
+      // unbeeinflusst weiter (nie auf das Recovery-Ergebnis gewartet).
+      if (/\b40[13]\b|invalid[_ -]?api[_ -]?key|unauthorized|permission denied|expired/i.test(message)) {
+        void autonomousKeyRecovery(provider).catch(() => undefined);
+      }
       recordRouterOutcome(
         provider,
         error instanceof Error && error.name === "AbortError"

@@ -18,6 +18,7 @@ import { monetizationRouter } from "./monetization-router";
 import { crashReportingRouter, selfHealingRouter } from "./self-healing-router";
 import { projectsRouter } from "./projects-router";
 import { superAgentsRouter } from "./super-agents-router";
+import { providerAdminRouter } from "./provider-admin-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -41,6 +42,7 @@ export const appRouter = router({
   billing: billingRouter,
   projects: projectsRouter,
   superAgents: superAgentsRouter,
+  providerAdmin: providerAdminRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
