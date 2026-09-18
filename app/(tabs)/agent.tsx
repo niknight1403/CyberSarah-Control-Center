@@ -822,6 +822,9 @@ export default function AgentScreen() {
           style={styles.flex}
         >
           <FlatList
+                initialNumToRender={12}
+                maxToRenderPerBatch={8}
+                windowSize={9}
             contentContainerStyle={styles.content}
             data={messages}
             keyExtractor={(message) => message.id}

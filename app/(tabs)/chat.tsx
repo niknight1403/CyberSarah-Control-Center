@@ -337,6 +337,9 @@ export default function ChatScreen() {
                 onOpenManager={() => setManagerVisible(true)}
               />
               <FlatList
+                initialNumToRender={12}
+                maxToRenderPerBatch={8}
+                windowSize={9}
                 ref={listRef}
                 contentContainerStyle={s.content}
                 data={messages}

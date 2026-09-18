@@ -49,6 +49,9 @@ export default function MemoryScreen() {
         <>
           <Text style={styles.sectionLabel}>LAUFENDE PROJEKTE ({projectsQuery.data?.length ?? 0})</Text>
           <FlatList
+                initialNumToRender={12}
+                maxToRenderPerBatch={8}
+                windowSize={9}
             data={projectsQuery.data ?? []}
             keyExtractor={(project) => String(project.id)}
             scrollEnabled={false}

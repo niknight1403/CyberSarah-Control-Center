@@ -59,6 +59,9 @@ export default function PreviewScreen() {
   return (
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <FlatList
+                initialNumToRender={12}
+                maxToRenderPerBatch={8}
+                windowSize={9}
         contentContainerStyle={styles.content}
         data={entries}
         keyExtractor={(entry) => entry.id}

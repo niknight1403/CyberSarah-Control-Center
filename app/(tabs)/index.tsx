@@ -250,6 +250,9 @@ export default function WorkspaceScreen() {
   return (
     <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
       <FlatList
+                initialNumToRender={12}
+                maxToRenderPerBatch={8}
+                windowSize={9}
         contentContainerStyle={styles.content}
         data={files}
         keyExtractor={(file) => file.id}

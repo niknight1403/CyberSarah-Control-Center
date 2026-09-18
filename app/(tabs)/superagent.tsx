@@ -243,6 +243,9 @@ export default function SuperagentScreen() {
 
         {/* Chat-Strom */}
         <FlatList
+                initialNumToRender={12}
+                maxToRenderPerBatch={8}
+                windowSize={9}
           ref={listRef}
           style={styles.list}
           contentContainerStyle={styles.listContent}
