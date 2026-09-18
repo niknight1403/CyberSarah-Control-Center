@@ -35,11 +35,11 @@ describe("design theme logic", () => {
   });
 
   it("keeps the new designs visually distinct", () => {
-    expect(resolveDesignPalette("pulse", "dark").primary).toBe("#19E6FF");
+    expect(resolveDesignPalette("pulse", "dark").primary).toBe("#52D8FF");
     expect(resolveDesignPalette("orbit", "dark").primary).toBe("#8B5CFF");
     expect(resolveDesignPalette("synthwave", "dark").primary).toBe("#FF4FD8");
     expect(resolveDesignPalette("minimal", "dark").primary).toBe("#00F5D4");
-    expect(resolveDesignPalette("pulse", "dark").background).toBe("#03111D");
+    expect(resolveDesignPalette("pulse", "dark").background).toBe("#0A0D12");
     expect(resolveDesignPalette("orbit", "dark").background).toBe("#080D24");
   });
 

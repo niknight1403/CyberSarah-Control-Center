@@ -48,9 +48,12 @@ Arbeitsweise:
 4. SICHERHEIT: Destruktive Operationen (Reboots, Container-Neustarts) nur mit explizitem confirm=true-Parameter. Keine unsicheren oder unvalidierten destruktiven Aktionen.
 5. TOOL-NUTZUNG: Nutze ausschliesslich die bereitgestellten Tools. Pruefe Fehler von Tools und reagiere strukturiert — nie blind wiederholen.
 
-Abschluss: Wenn das Ziel erreicht ist, antworte OHNE Tool-Aufruf mit einer kompakten JSON-Zusammenfassung:
-{"status":"success","summary":"...","steps":["Schritt 1: ...","Schritt 2: ..."],"result":...}
-Bei Nichterreichbarkeit nach 3 Iterationen: {"status":"escalated","summary":"...","blocker":"..."}
+Abschluss: Wenn das Ziel erreicht ist, antworte OHNE Tool-Aufruf mit einer klaren, freundlichen Zusammenfassung direkt fuer den Nutzer (Deutsch):
+- Was hast du getan? (2-4 kurze Saetze oder Stichpunkte)
+- Was ist das Ergebnis?
+- Welche naechsten Schritte sind sinnvoll?
+Schreibe in normalen Worten, verstaendlich auch fuer Nicht-Techniker. KEIN JSON, keine Code-Dumps, keine Tool-Protokolle oder Rohdaten — ausser der Nutzer fragt ausdruecklich danach.
+Wenn du das Ziel nach 3 Iterationen NICHT erreichen konntest, schreibe ebenfalls eine verstaendliche Zusammenfassung (was du versucht hast, was blockiert) und ergaenze als letzte eigene Zeile genau: STATUS: escalated
 
 Kommuniziere praegnant und strukturiert (Deutsch).`;
 
@@ -145,6 +148,46 @@ function parseToolArguments(raw: string): Record<string, unknown> {
   }
 }
 
+
+/**
+ * Dark-Cyber-Chat-Qualitaet: Die finale Antwort wird NIE als rohes JSON oder
+ * Tool-Protokoll an den Nutzer ausgeliefert.
+ *  - Klartext wird direkt verwendet (der optionale "STATUS: escalated"-Marker
+ *    wird nur zur Statuserkennung entfernt).
+ *  - Antworten aelterer Modelle im Legacy-JSON-Format {"status","summary",
+ *    "steps","result"} werden automatisch in natuerlichen Text uebersetzt.
+ */
+function formatFinalAnswerForUser(raw: string): { text: string; escalated: boolean } {
+  const content = (raw ?? "").trim();
+  if (!content) return { text: "", escalated: false };
+
+  const escalatedByMarker = /(^|\n)\s*STATUS:\s*escalated\b/i.test(content);
+  const stripped = content.replace(/(^|\n)\s*STATUS:\s*escalated\b[^\n]*/gi, "").trim();
+
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      const summary = typeof record.summary === "string" ? record.summary.trim() : "";
+      if (summary || typeof record.blocker === "string") {
+        const parts: string[] = [summary || String(record.blocker ?? "")];
+        if (Array.isArray(record.steps)) {
+          const steps = record.steps.map((step) => String(step)).filter((step) => step.trim().length > 0);
+          if (steps.length > 0) parts.push("Schritte: " + steps.join(" · "));
+        }
+        if (record.result != null && typeof record.result !== "object") parts.push(`Ergebnis: ${String(record.result).slice(0, 500)}`);
+        return {
+          text: parts.filter((part) => part.trim().length > 0).join("\n\n"),
+          escalated: record.status === "escalated" || escalatedByMarker,
+        };
+      }
+    }
+  } catch {
+    // Kein JSON — normaler Klartext, genau wie gewuenscht.
+  }
+  return { text: stripped || content, escalated: escalatedByMarker };
+}
+
 /**
  * Fuehrt eine Orchestrator-Aufgabe vollstaendig autonom aus:
  * Ledger-Eintrag -> LLM-Loop mit Tools -> verifizierte Schritte -> Abschluss.
@@ -182,17 +225,14 @@ export async function runOrchestratorTask(input: {
       const toolCalls = assistantMessage.tool_calls ?? [];
 
       if (toolCalls.length === 0) {
-        // Finale Antwort des Superagenten — Task abschliessen.
-        const content = assistantMessage.content ?? "{}";
-        try {
-          finalAnswer = JSON.parse(content);
-        } catch {
-          finalAnswer = { summary: content };
-        }
+        // Finale Antwort des Superagenten — nutzerfreundlich als Klartext
+        // abschliessen (kein rohes JSON im Chat).
+        const content = assistantMessage.content ?? "";
+        const formatted = formatFinalAnswerForUser(content);
+        finalAnswer = formatted.text;
         await appendStepLog(task.id, step.id, `Finale Antwort: ${content.slice(0, 400)}`);
-        await updateStep(task.id, step.id, { status: "success", result: finalAnswer });
-        const escalated = (finalAnswer as Record<string, unknown> | null)?.status === "escalated";
-        await finishTask(task.id, escalated ? "escalated" : "success", finalAnswer);
+        await updateStep(task.id, step.id, { status: formatted.escalated ? "failed" : "success", result: finalAnswer });
+        await finishTask(task.id, formatted.escalated ? "escalated" : "success", finalAnswer);
         break;
       }
 

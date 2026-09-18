@@ -1,53 +1,51 @@
 /**
- * Cyber-Design-System (Sprint 126, Farb-Update Sprint 132) — futuristisches
- * Dark-Theme.
+ * Cyber-Design-System (Sprint 126, Farb-Update Sprint 132, Dark-Cyber-Rebrand)
+ * — Dark-Cyber-Theme.
  *
- * Einheitliche Design-Tokens fuer alle Cyber-Screens: Indigo-Schwarz als
- * Grundflaeche, ein vierfarbiges Neon-Spektrum (Pink → Violett → Blau →
- * Cyan) als Akzente, klare Typografie. Bewusst als eigenes Modul: Die
- * Cyber-Screens sind self-contained und kollidieren nicht mit dem
- * bestehenden App-Theme (useColors).
- *
- * Sprint 132: Palette auf Wunsch durch ein moderneres, kontrastreicheres
- * Neon-Spektrum ersetzt (inspiriert von aktuellen App-Store-Neon-Brandings —
- * Pink/Magenta → Violett → Elektroblau → Cyan statt reinem Cyan/Pink-Duo).
+ * Einheitliche Design-Tokens fuer alle Cyber-Screens. Seit dem
+ * Dark-Cyber-Rebrand gilt strikt die offizielle CyberSarah-Palette:
+ *   Void #0A0D12 · Panel #121823 · Inset #1A2330
+ *   Signal Cyan #52D8FF · Electric Violet #8B7CFF
+ *   Ready Green #45D996 · Alert Amber #F6BA5E · Fault Coral #FF6B7A
+ *   Text #F2F6FC · Secondary #99A7B8
  * Alle bestehenden Token-Namen (cyan, pink, green, amber, bg, surface, …)
- * bleiben erhalten — nur die Werte aendern sich, kein Screen musste
- * angepasst werden. `purple` und `blue` sind neu und stehen fuer Verlaeufe
- * und zusaetzliche Akzent-Faelle zur Verfuegung.
+ * bleiben erhalten — nur die Werte haben sich geaendert, kein Screen musste
+ * angepasst werden. `purple` und `blue` bleiben als Verlaufs-/Akzent-Token
+ * erhalten und liegen auf der Palette (Violett bzw. Signal Cyan).
  */
 
 import { Platform } from "react-native";
 
 export const cyber = {
-  /** Indigo-Schwarz-Grundflaeche — dunkel genug fuer OLED-Ersparnis, mit
-   * leichtem Blau-/Violett-Unterton statt reinem Neutral-Schwarz. */
-  bg: "#0A0A14",
-  surface: "#12121F",
-  surfaceElevated: "#181830",
-  border: "#242440",
-  borderGlow: "rgba(139, 92, 246, 0.35)",
-  /** Neon-Spektrum (Pink → Violett → Blau → Cyan). */
-  pink: "#FF2D95",
-  purple: "#8B5CF6",
-  blue: "#3D8BFD",
-  cyan: "#00E5FF",
-  green: "#39FF88",
-  amber: "#FFB020",
+  /** Void — dunkel genug fuer OLED-Ersparnis, leicht blaeulicher Unterton. */
+  bg: "#0A0D12",
+  /** Panel — Karten und Flaechen. */
+  surface: "#121823",
+  /** Input/Code-Inset — leicht erhoebene Flaechen und Code-Bloecke. */
+  surfaceElevated: "#1A2330",
+  border: "#29384A",
+  borderGlow: "rgba(139, 124, 255, 0.35)",
+  /** Akzente der Dark-Cyber-Palette. */
+  pink: "#FF6B7A",
+  purple: "#8B7CFF",
+  blue: "#52D8FF",
+  cyan: "#52D8FF",
+  green: "#45D996",
+  amber: "#F6BA5E",
   /** Typografie. */
-  text: "#F5F5FF",
-  textMuted: "#9C9CC0",
-  textDim: "#6B6B8F",
+  text: "#F2F6FC",
+  textMuted: "#99A7B8",
+  textDim: "#6E7B8C",
 } as const;
 
-/** Vierfarbiger Verlauf fuer Hero-Flaechen/Glow-Effekte (Pink → Cyan). */
+/** Verlauf fuer Hero-Flaechen/Glow-Effekte (Coral → Violet → Signal Cyan). */
 export const cyberGradient = [cyber.pink, cyber.purple, cyber.blue, cyber.cyan] as const;
 
 /** Statusfarben — einheitlich in Widgets, Agent-Cards und Terminal. */
 export const statusColors = {
-  idle: "#6B7280",
+  idle: "#6E7B8C",
   running: cyber.cyan,
-  error: cyber.pink,
+  error: "#FF6B7A",
   success: cyber.green,
   warn: cyber.amber,
 } as const;

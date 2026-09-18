@@ -8,7 +8,7 @@
  * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
  * KOSTENFREIES Modell pro Source waehlt.
  */
-export type ManagedModelSource = "forge" | "gemini" | "openai" | "groq" | "openrouter";
+export type ManagedModelSource = "forge" | "gemini" | "openai" | "groq" | "openrouter" | "local-ollama" | "local-lmstudio";
 
 export function resolveManagedModel(
   requestedModel: string | undefined,
@@ -24,6 +24,14 @@ export function resolveManagedModel(
 
   if (source === "groq") {
     return env.AI_GROQ_MODEL?.trim() || "openai/gpt-oss-20b";
+  }
+
+  if (source === "local-ollama") {
+    return env.AI_OLLAMA_MODEL?.trim() || "qwen2.5-coder:7b";
+  }
+
+  if (source === "local-lmstudio") {
+    return env.AI_LMSTUDIO_MODEL?.trim() || "local-model";
   }
 
   if (source === "openrouter") {

@@ -33,8 +33,8 @@ const effects = (primary: string, secondary: string, from: string, to: string, b
 export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> = {
   pulse: {
     light: { background: "#EAFBFF", surface: "#F8FDFF", border: "#8DEBFF", foreground: "#071827", primary: "#00BFD9", muted: "#52758C", success: "#00A86B", warning: "#C17A00", error: "#D64463" },
-    dark: { background: "#03111D", surface: "#071B2A", border: "#19E6FF", foreground: "#F4F8FF", primary: "#19E6FF", muted: "#A9C1D8", success: "#00F59B", warning: "#FFC857", error: "#FF5577" },
-    effects: effects("rgba(25,230,255,.45)", "rgba(240,45,255,.28)", "#03111D", "#071B2A"),
+    dark: { background: "#0A0D12", surface: "#121823", border: "#52D8FF", foreground: "#F2F6FC", primary: "#52D8FF", muted: "#99A7B8", success: "#45D996", warning: "#F6BA5E", error: "#FF6B7A" },
+    effects: effects("rgba(82,216,255,.45)", "rgba(139,124,255,.28)", "#0A0D12", "#121823"),
   },
   orbit: {
     light: { background: "#EEF0FF", surface: "#FAFAFF", border: "#9C9BFF", foreground: "#11142B", primary: "#6551E8", muted: "#65709A", success: "#00A783", warning: "#B87A00", error: "#CF456A" },

@@ -24,7 +24,7 @@
 export type ManagedLlmEndpoint = {
   url: string;
   apiKey: string;
-  source: "forge" | "gemini" | "openai" | "groq" | "openrouter";
+  source: "forge" | "gemini" | "openai" | "groq" | "openrouter" | "local-ollama" | "local-lmstudio";
   /** Zusatz-Header pro Endpoint (z. B. OpenRouter-Ranking-Header). */
   headers?: Record<string, string>;
 };
@@ -62,7 +62,7 @@ const clean = (value: string | undefined): string | undefined => {
 
 /** Kostenvorbehalt eines Sources: 'free' = dauerhaft kostenfreies Kontingent. */
 export function isFreeManagedSource(source: ManagedLlmEndpoint["source"]): boolean {
-  return source === "groq" || source === "openrouter" || source === "gemini";
+  return source === "groq" || source === "openrouter" || source === "gemini" || source === "local-ollama" || source === "local-lmstudio";
 }
 
 /**

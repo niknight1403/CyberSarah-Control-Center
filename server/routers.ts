@@ -44,7 +44,14 @@ export const appRouter = router({
   superAgents: superAgentsRouter,
   providerAdmin: providerAdminRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
+    // an den Client senden — nur die oeffentlichen Felder.
+    me: publicProcedure.query((opts) => {
+      const user = opts.ctx.user;
+      if (!user) return null;
+      const { id, openId, name, email, loginMethod, role, lastSignedIn } = user;
+      return { id, openId, name, email, loginMethod, role, lastSignedIn };
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

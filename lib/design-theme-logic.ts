@@ -44,5 +44,5 @@ export function designThemeAccent(theme: DesignTheme): string {
   if (theme === "orbit") return "#8B5CFF";
   if (theme === "synthwave") return "#FF4FD8";
   if (theme === "minimal") return "#00F5D4";
-  return "#19E6FF";
+  return "#52D8FF";
 }

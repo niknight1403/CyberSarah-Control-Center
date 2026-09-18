@@ -208,14 +208,18 @@ class SDKServer {
       // "[Auth] Session payload missing required fields" fehlschlagen ->
       // Dashboard zeigte pauschal "nicht verfuegbar", obwohl Keys/Daten
       // vorhanden waren).
-      if (!isNonEmptyString(openId) || !isNonEmptyString(appId)) {
+      // Lokaler Modus (kein VITE_APP_ID konfiguriert): Sessions haben keine
+      // appId. Eine leere appId ist nur dann erlaubt; im OAuth-/Manus-Modus
+      // bleibt appId Pflichtfeld (identischer Fix wie lokaler Sprint-106/127-Patch).
+      const localMode = !ENV.appId;
+      if (!isNonEmptyString(openId) || (!localMode && !isNonEmptyString(appId))) {
         console.warn("[Auth] Session payload missing required fields (openId/appId)");
         return null;
       }
 
       return {
         openId,
-        appId,
+        appId: appId as string,
         name: isNonEmptyString(name) ? name : "",
       };
     } catch (error) {

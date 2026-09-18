@@ -285,6 +285,61 @@ const resolveManagedEndpoint = () => {
   return endpoint;
 };
 
+
+/**
+ * Dark-Cyber Zero-Config (Sprint 158): Ist KEIN Cloud-Key konfiguriert
+ * (lokal ohne API-Keys), faellt der Managed-Pfad automatisch auf erreichbare
+ * lokale LLM-Endpoints zurueck (Ollama, dann LM Studio) — der Chat bleibt
+ * ohne externe Setup-Blocker nutzbar. Ist auch lokal nichts erreichbar,
+ * gilt weiterhin die klare MANAGED_LLM_NO_KEY-Meldung.
+ */
+type LocalLlmCandidate = {
+  source: "local-ollama" | "local-lmstudio";
+  baseUrl: string;
+  apiKey: string;
+};
+
+const localLlmCandidates = (): LocalLlmCandidate[] => {
+  const trim = (value: string | undefined) => value?.trim() || undefined;
+  const base = (value: string | undefined, fallback: string) =>
+    (trim(value) ?? fallback).replace(/\/+$/, "");
+  return [
+    {
+      source: "local-ollama",
+      baseUrl: base(process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL, "http://127.0.0.1:11434/v1"),
+      apiKey: "ollama",
+    },
+    {
+      source: "local-lmstudio",
+      baseUrl: base(process.env.AI_LMSTUDIO_BASE_URL ?? process.env.LMSTUDIO_BASE_URL, "http://127.0.0.1:1234/v1"),
+      apiKey: "local",
+    },
+  ];
+};
+
+/** Erreichbarkeits-Probe gegen den OpenAI-kompatiblen /models-Endpoint. */
+async function probeLocalLlmEndpoint(baseUrl: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1_500);
+    const response = await fetch(`${baseUrl}/models`, { signal: controller.signal });
+    clearTimeout(timer);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Ersten erreichbaren lokalen Endpoint liefern (oder null). */
+async function resolveLocalManagedEndpoint(): Promise<ManagedLlmEndpoint | null> {
+  for (const candidate of localLlmCandidates()) {
+    if (await probeLocalLlmEndpoint(candidate.baseUrl)) {
+      return { url: `${candidate.baseUrl}/chat/completions`, apiKey: candidate.apiKey, source: candidate.source };
+    }
+  }
+  return null;
+}
+
 /**
  * Sprint 85 — Autonome API-Key-Rotation (Live-Integration der Bibliothek
  * lib/key-rotation-logic.ts): Der Managed-Aufruf verwaltet einen Pool aller
@@ -485,7 +540,18 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  const candidates = resolveManagedCandidates();
+  let candidates: ManagedLlmEndpoint[];
+  try {
+    candidates = resolveManagedCandidates();
+  } catch (error) {
+    // Dark-Cyber Zero-Config: ohne Cloud-Keys auf lokale LLMs ausweichen.
+    const localEndpoint = await resolveLocalManagedEndpoint();
+    if (localEndpoint) {
+      candidates = [localEndpoint];
+    } else {
+      throw error;
+    }
+  }
 
   const {
     messages,

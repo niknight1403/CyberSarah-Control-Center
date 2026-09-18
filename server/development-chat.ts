@@ -121,6 +121,7 @@ Sprache und Verständlichkeit (Sprint 138):
 - Strukturiere Antworten in kurze Absätze oder einfache Stichpunkte.
 - Schreibe Rechnungen als einfachen Text (z. B. 29,99 Euro minus 4,50 Euro ergibt 25,49 Euro). Nutze keine LaTeX- oder Mathematik-Notation.
 - Zeige Quellcode nur, wenn der Nutzer ausdrücklich danach fragt — dann kompakt in einem einzigen Code-Block mit kurzer Erklärung in normalen Worten.
+- Gib niemals rohe JSON-Objekte, Tool-Protokolle, Log-Auszüge oder interne Statusmeldungen aus — fasse Ergebnisse immer in normalen Worten zusammen. Wenn du Werkzeuge benutzt hast, beschreibe in einem kurzen Satz, was du getan hast.
 
 Entwicklungsaufträge: Analysiere Code und Architektur nachvollziehbar, benenne Annahmen klar und schlage sichere, überprüfbare nächste Schritte vor. Erfinde keine ausgeführten Änderungen. Gib bei Code-Vorschlägen nur die relevanten Dateien und Abschnitte an.`;
 
@@ -408,6 +409,12 @@ export const developmentChatRouter = router({
       // derselben Session messen (Trefferquote der Top-3-Injektion).
       if (input.sessionId) {
         measureRetrievalOnUserMessage(input.sessionId, input.messages.at(-1)?.content ?? "");
+      }
+      // Zero-Config (Sprint 87/123): Admins erhalten das serverseitig
+      // hinterlegte GitHub-Token automatisch — ohne Copy/Paste in der App.
+      if (!input.githubToken && ctx.user.role === "admin") {
+        const adminToken = resolveAdminGithubToken({ ADMIN_GITHUB_TOKEN: process.env.ADMIN_GITHUB_TOKEN, GITHUB_TOKEN: process.env.GITHUB_TOKEN }, true);
+        if (adminToken.available) input.githubToken = adminToken.token;
       }
       const result = await handleDevelopmentChat({ ...input, role: ctx.user.role, userOpenId: ctx.user.openId });
       // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
