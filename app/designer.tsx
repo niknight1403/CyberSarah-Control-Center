@@ -1,3 +1,4 @@
+import { useColors } from "@/hooks/use-colors";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -51,7 +52,8 @@ export default function DesignerScreen() {
   };
 
   const navDrawer = useNavDrawer();
-  const styles = useMemo(() => createStyles(), []);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const gallery = galleryQuery.data ?? [];
 
   return (
@@ -61,7 +63,7 @@ export default function DesignerScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={galleryQuery.isFetching} onRefresh={() => void galleryQuery.refetch()} tintColor={cyber.cyan} />
+          <RefreshControl refreshing={galleryQuery.isFetching} onRefresh={() => void galleryQuery.refetch()} tintColor={colors.tint} />
         }
       >
         <View style={styles.header}>
@@ -71,9 +73,9 @@ export default function DesignerScreen() {
           </View>
           <Text style={styles.headerKicker}>AI GRAFIK-DESIGNER</Text>
           <Text style={styles.headerTitle}>
-            DESIGNER<Text style={{ color: cyber.pink }}>AGENT</Text>
+            DESIGNER<Text style={{ color: colors.tint }}>AGENT</Text>
           </Text>
-          <View style={[styles.headerLine, { backgroundColor: `${cyber.pink}55` }]} />
+          <View style={[styles.headerLine, { backgroundColor: `${colors.tint}55` }]} />
           <Text style={styles.headerSub}>
             Der Designer-Agent entwirft Icons, Logos, Splash-Screens, Banner, Illustrationen und Design-Tokens im Cyber-Design-System — validiert und in der Galerie gespeichert.
           </Text>
@@ -93,7 +95,7 @@ export default function DesignerScreen() {
                   const active = type === assetType;
                   return (
                     <Pressable key={type} onPress={() => setAssetType(type)} style={[styles.typeChip, active && styles.typeChipActive]}>
-                      <Text style={[styles.typeChipText, active && { color: cyber.bg }]}>{DESIGN_ASSET_TYPE_META[type].label}</Text>
+                      <Text style={[styles.typeChipText, active && { color: colors.background }]}>{DESIGN_ASSET_TYPE_META[type].label}</Text>
                     </Pressable>
                   );
                 })}
@@ -104,7 +106,7 @@ export default function DesignerScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="z. B. Neon-Logo mit Hexagon-Rahmen und Claim 'Revenue OS' …"
-                placeholderTextColor={cyber.textDim}
+                placeholderTextColor={colors.icon}
                 value={description}
                 onChangeText={setDescription}
                 multiline
@@ -116,7 +118,7 @@ export default function DesignerScreen() {
                 onPress={() => void startGeneration()}
               >
                 {generateMutation.isPending ? (
-                  <ActivityIndicator color={cyber.bg} size="small" />
+                  <ActivityIndicator color={colors.background} size="small" />
                 ) : (
                   <Text style={styles.runButtonText}>✦ ENTWURF GENERIEREN</Text>
                 )}
@@ -162,36 +164,36 @@ export default function DesignerScreen() {
   );
 }
 
-const createStyles = () =>
+const createStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
-    safe: { backgroundColor: cyber.bg, flex: 1 },
+    safe: { backgroundColor: colors.background, flex: 1 },
     screen: { flex: 1 },
     content: { padding: 18, paddingBottom: 48 },
     header: { marginBottom: 18 },
     menuRow: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "flex-end" },
-    headerKicker: { ...cyberTypography.caption, color: cyber.textDim, fontSize: 11, letterSpacing: 3 },
-    headerTitle: { ...cyberTypography.display, color: cyber.text, marginTop: 4 },
+    headerKicker: { ...cyberTypography.caption, color: colors.icon, fontSize: 11, letterSpacing: 3 },
+    headerTitle: { ...cyberTypography.display, color: colors.text, marginTop: 4 },
     headerLine: { height: 2, marginVertical: 8, width: 56 },
-    headerSub: { color: cyber.textMuted, fontSize: 12, lineHeight: 17 },
-    panel: { backgroundColor: cyber.surface, borderColor: cyber.border, borderRadius: 14, borderWidth: 1, marginBottom: 14, padding: 14 },
-    panelTitle: { color: cyber.text, fontSize: 13, fontWeight: "800", marginBottom: 4 },
-    panelText: { color: cyber.textMuted, fontSize: 11, lineHeight: 16 },
-    inputLabel: { color: cyber.textDim, fontSize: 9, fontWeight: "800", letterSpacing: 0.6, marginBottom: 6, marginTop: 10 },
+    headerSub: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+    panel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, marginBottom: 14, padding: 14 },
+    panelTitle: { color: colors.text, fontSize: 13, fontWeight: "800", marginBottom: 4 },
+    panelText: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+    inputLabel: { color: colors.icon, fontSize: 9, fontWeight: "800", letterSpacing: 0.6, marginBottom: 6, marginTop: 10 },
     typeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-    typeChip: { borderColor: cyber.border, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
-    typeChipActive: { backgroundColor: cyber.pink, borderColor: cyber.pink },
-    typeChipText: { color: cyber.textMuted, fontSize: 10, fontWeight: "700" },
-    typeHint: { color: cyber.textDim, fontSize: 10, marginTop: 6 },
-    input: { backgroundColor: `${cyber.cyan}08`, borderColor: cyber.border, borderRadius: 10, borderWidth: 1, color: cyber.text, fontSize: 12, minHeight: 74, padding: 10, textAlignVertical: "top" },
-    runButton: { alignItems: "center", backgroundColor: cyber.pink, borderRadius: 10, marginTop: 12, paddingVertical: 12 },
+    typeChip: { borderColor: colors.border, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+    typeChipActive: { backgroundColor: colors.tint, borderColor: colors.tint },
+    typeChipText: { color: colors.muted, fontSize: 10, fontWeight: "700" },
+    typeHint: { color: colors.icon, fontSize: 10, marginTop: 6 },
+    input: { backgroundColor: `${colors.tint}08`, borderColor: colors.border, borderRadius: 10, borderWidth: 1, color: colors.text, fontSize: 12, minHeight: 74, padding: 10, textAlignVertical: "top" },
+    runButton: { alignItems: "center", backgroundColor: colors.tint, borderRadius: 10, marginTop: 12, paddingVertical: 12 },
     runButtonDisabled: { opacity: 0.4 },
-    runButtonText: { color: cyber.bg, fontSize: 12, fontWeight: "900", letterSpacing: 0.8 },
-    errorText: { color: cyber.pink, fontSize: 11, marginTop: 8 },
-    successText: { color: cyber.green, fontSize: 11, marginTop: 8 },
-    galleryRow: { alignItems: "center", borderTopColor: cyber.border, borderTopWidth: 1, flexDirection: "row", gap: 8, marginTop: 8, paddingTop: 8 },
+    runButtonText: { color: colors.background, fontSize: 12, fontWeight: "900", letterSpacing: 0.8 },
+    errorText: { color: colors.tint, fontSize: 11, marginTop: 8 },
+    successText: { color: colors.success, fontSize: 11, marginTop: 8 },
+    galleryRow: { alignItems: "center", borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: 8, marginTop: 8, paddingTop: 8 },
     galleryRowMain: { flex: 1 },
-    galleryTitle: { color: cyber.text, fontSize: 12, fontWeight: "700" },
-    galleryMeta: { color: cyber.textDim, fontSize: 9, marginTop: 2 },
-    deleteButton: { borderColor: `${cyber.pink}66`, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
-    deleteButtonText: { color: cyber.pink, fontSize: 10, fontWeight: "700" },
+    galleryTitle: { color: colors.text, fontSize: 12, fontWeight: "700" },
+    galleryMeta: { color: colors.icon, fontSize: 9, marginTop: 2 },
+    deleteButton: { borderColor: `${colors.tint}66`, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
+    deleteButtonText: { color: colors.tint, fontSize: 10, fontWeight: "700" },
   });

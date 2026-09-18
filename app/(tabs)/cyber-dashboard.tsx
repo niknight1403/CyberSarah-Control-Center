@@ -1,4 +1,5 @@
-import React from "react";
+import { useColors } from "@/hooks/use-colors";
+import React, { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -39,6 +40,8 @@ interface BackendState {
 const BACKEND_OFFLINE: BackendState = { online: false, mode: "…", stopped: false, tasks: [] };
 
 export default function CyberDashboardScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [backendState, setBackendState] = React.useState<BackendState>(BACKEND_OFFLINE);
 
   // Autonomes FastAPI-Backend (Sprint 131): 8-s-Polling nur, wenn erreichbar
@@ -102,19 +105,19 @@ export default function CyberDashboardScreen() {
           </View>
           <Text style={styles.headerKicker}>CONTROL CENTER</Text>
           <Text style={styles.headerTitle}>
-            CYBER<Text style={{ color: cyber.cyan }}>SARAH</Text>
+            CYBER<Text style={{ color: colors.tint }}>SARAH</Text>
           </Text>
-          <View style={[styles.headerLine, { backgroundColor: `${cyber.pink}55` }]} />
+          <View style={[styles.headerLine, { backgroundColor: `${colors.tint}55` }]} />
         </View>
 
         <View style={styles.gridRow}>
-          <LiveWidget title="System-Status" badge="LIVE" accent={systemOnline ? cyber.green : cyber.pink} style={styles.halfWidget}>
-            <WidgetMetric label="Backend" value={status?.stateLabel ?? "…"} accent={systemOnline ? cyber.green : cyber.pink} />
+          <LiveWidget title="System-Status" badge="LIVE" accent={systemOnline ? colors.success : colors.tint} style={styles.halfWidget}>
+            <WidgetMetric label="Backend" value={status?.stateLabel ?? "…"} accent={systemOnline ? colors.success : colors.tint} />
             <WidgetMetric label="Latenz" value={status?.pingMs != null ? `${status.pingMs} ms` : "…"} />
             <WidgetMetric label="Uptime" value={status ? formatUptime(status.serverUptimeMs) : "…"} />
           </LiveWidget>
 
-          <LiveWidget title="Cloud-Tokens" badge={account.data?.planLabel ?? "FREE"} accent={cyber.cyan} style={styles.halfWidget}>
+          <LiveWidget title="Cloud-Tokens" badge={account.data?.planLabel ?? "FREE"} accent={colors.tint} style={styles.halfWidget}>
             <WidgetMetric
               label="Heute"
               value={account.data ? `${account.data.usage.todayTokens.toLocaleString("de-DE")} / ${account.data.limits.dailyCloudTokens.toLocaleString("de-DE")}` : "…"}
@@ -123,11 +126,11 @@ export default function CyberDashboardScreen() {
               label="Monat"
               value={account.data ? `${Math.round(account.data.usage.monthTokens / 1000)}k / ${Math.round(account.data.limits.monthlyCloudTokens / 1000)}k` : "…"}
             />
-            <WidgetMetric label="Guthaben" value={account.data ? `${Math.round(account.data.usage.creditBalanceTokens / 1000)}k` : "…"} accent={cyber.green} />
+            <WidgetMetric label="Guthaben" value={account.data ? `${Math.round(account.data.usage.creditBalanceTokens / 1000)}k` : "…"} accent={colors.success} />
           </LiveWidget>
         </View>
 
-        <LiveWidget title="Agenten" badge="AUTO" accent={cyber.pink}>
+        <LiveWidget title="Agenten" badge="AUTO" accent={colors.tint}>
           <CyberAgentCard
             name="Leitender Superagent"
             role="Orchestrator — Task-Decomposition & Selbstkorrektur"
@@ -151,12 +154,12 @@ export default function CyberDashboardScreen() {
         <LiveWidget
           title="Autonomes Backend"
           badge={backendState.online ? (backendState.stopped ? "GESTOPPT" : "LIVE") : "OFFLINE"}
-          accent={backendState.online ? (backendState.stopped ? cyber.pink : cyber.green) : cyber.textDim}
+          accent={backendState.online ? (backendState.stopped ? colors.tint : colors.success) : colors.icon}
         >
           {backendState.online ? (
             <>
-              <WidgetMetric label="Executor-Modus" value={backendState.mode.toUpperCase()} accent={cyber.green} />
-              <WidgetMetric label="Tasks im Ledger" value={`${backendState.tasks.length}`} accent={backendState.tasks.length > 0 ? cyber.cyan : undefined} />
+              <WidgetMetric label="Executor-Modus" value={backendState.mode.toUpperCase()} accent={colors.success} />
+              <WidgetMetric label="Tasks im Ledger" value={`${backendState.tasks.length}`} accent={backendState.tasks.length > 0 ? colors.tint : undefined} />
               <WidgetMetric
                 label="Laufend"
                 value={`${backendState.tasks.filter((task) => task.status === "running").length}`}
@@ -164,7 +167,7 @@ export default function CyberDashboardScreen() {
               <WidgetMetric
                 label="Emergency Stop"
                 value={backendState.stopped ? "AKTIV" : "inaktiv"}
-                accent={backendState.stopped ? cyber.pink : cyber.green}
+                accent={backendState.stopped ? colors.tint : colors.success}
               />
             </>
           ) : (
@@ -177,7 +180,7 @@ export default function CyberDashboardScreen() {
         <LiveWidget
           title="Task-Ledger"
           badge={me.data?.role === "admin" ? "ADMIN" : undefined}
-          accent={cyber.cyan}
+          accent={colors.tint}
         >
           {me.data?.role !== "admin" ? (
             <Text style={styles.emptyText}>Admin-Zugang erforderlich für das Orchestrator-Ledger.</Text>
@@ -217,21 +220,21 @@ const TASK_DOT_STYLE = (status: string) => ({
   backgroundColor: TASK_DOT_COLORS[status] ?? cyber.textDim,
 });
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: cyber.bg },
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   screen: { flex: 1 },
   content: { padding: 16, gap: 14, paddingBottom: 32 },
   menuRow: { marginBottom: 4 },
   header: { marginBottom: 8, gap: 2 },
-  headerKicker: { ...cyberTypography.caption, color: cyber.pink },
-  headerTitle: { ...cyberTypography.display, color: cyber.text },
+  headerKicker: { ...cyberTypography.caption, color: colors.tint },
+  headerTitle: { ...cyberTypography.display, color: colors.text },
   headerLine: { height: 2, borderRadius: 1, marginTop: 6 },
   gridRow: { flexDirection: "row", gap: 12 },
   halfWidget: { flex: 1 },
-  emptyText: { color: cyber.textDim, fontSize: 12, lineHeight: 18 },
+  emptyText: { color: colors.icon, fontSize: 12, lineHeight: 18 },
   taskRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
 
   taskTextContainer: { flex: 1 },
-  taskTitle: { color: cyber.text, fontSize: 13, fontWeight: "600" },
-  taskMeta: { color: cyber.textDim, fontSize: 10, marginTop: 1 },
+  taskTitle: { color: colors.text, fontSize: 13, fontWeight: "600" },
+  taskMeta: { color: colors.icon, fontSize: 10, marginTop: 1 },
 });

@@ -1,3 +1,4 @@
+import { useColors } from "@/hooks/use-colors";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -53,6 +54,8 @@ function formatTime(iso: string): string {
 }
 
 export default function SuperagentScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const isAdmin = accountQuery.data?.role === "admin";
 
@@ -209,7 +212,7 @@ export default function SuperagentScreen() {
               <NavDrawerButton {...navDrawer.hamburgerProps} />
             </View>
             <Text style={styles.headerTitle}>
-              SUPER<Text style={{ color: cyber.cyan }}>AGENT</Text>
+              SUPER<Text style={{ color: colors.tint }}>AGENT</Text>
             </Text>
           </View>
           <Pressable
@@ -221,12 +224,12 @@ export default function SuperagentScreen() {
             }}
           >
             {optimizerTrigger.isPending ? (
-              <ActivityIndicator size="small" color={optimizerQuery.data?.enabled ? cyber.green : cyber.textDim} />
+              <ActivityIndicator size="small" color={optimizerQuery.data?.enabled ? colors.success : colors.icon} />
             ) : (
               <Text
                 style={[
                   styles.optimizerChipText,
-                  { color: optimizerQuery.data?.enabled ? cyber.green : cyber.textDim },
+                  { color: optimizerQuery.data?.enabled ? colors.success : colors.icon },
                 ]}
               >
                 ⟲ OPTIMIZER {optimizerQuery.data?.enabled ? "AKTIV" : "AUS"} · {toolCount > 0 ? `${toolCount} TOOLS` : "TOOLS"}
@@ -288,7 +291,7 @@ export default function SuperagentScreen() {
 
                   {item.status === "running" || item.status === "pending" ? (
                     <View style={styles.progressRow}>
-                      <ActivityIndicator size="small" color={cyber.cyan} />
+                      <ActivityIndicator size="small" color={colors.tint} />
                       <Text style={styles.progressText}>
                         {item.steps.length > 0 ? item.steps[item.steps.length - 1].name : "Ziel wird zerlegt …"}
                       </Text>
@@ -299,12 +302,12 @@ export default function SuperagentScreen() {
                     <View style={styles.stepBox}>
                       {item.steps.map((step) => {
                         const sm = step.status === "success"
-                          ? { dot: "●", color: cyber.green }
+                          ? { dot: "●", color: colors.success }
                           : step.status === "failed"
-                            ? { dot: "✕", color: cyber.pink }
+                            ? { dot: "✕", color: colors.tint }
                             : step.status === "running"
-                              ? { dot: "◐", color: cyber.cyan }
-                              : { dot: "○", color: cyber.textDim };
+                              ? { dot: "◐", color: colors.tint }
+                              : { dot: "○", color: colors.icon };
                         return (
                           <View key={step.id} style={styles.stepRow}>
                             <Text style={[styles.stepDot, { color: sm.color }]}>{sm.dot}</Text>
@@ -351,7 +354,7 @@ export default function SuperagentScreen() {
             <TextInput
               style={styles.composerInput}
               placeholder="Ziel eingeben — z. B. Prüfe den Produktiv-Deploy …"
-              placeholderTextColor={cyber.textDim}
+              placeholderTextColor={colors.icon}
               value={objective}
               onChangeText={setObjective}
               multiline
@@ -370,7 +373,7 @@ export default function SuperagentScreen() {
               onPress={() => void startRun()}
             >
               {runMutation.isPending ? (
-                <ActivityIndicator color={cyber.bg} size="small" />
+                <ActivityIndicator color={colors.background} size="small" />
               ) : (
                 <Text style={styles.sendButtonText}>▶</Text>
               )}
@@ -382,58 +385,58 @@ export default function SuperagentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: cyber.bg },
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   root: { flex: 1 },
   list: { flex: 1 },
   listContent: { padding: 16, paddingBottom: 24, gap: 10 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
-  lockTitle: { color: cyber.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  lockText: { color: cyber.textMuted, fontSize: 13, lineHeight: 19, textAlign: "center" },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 6, borderBottomWidth: 1, borderBottomColor: `${cyber.cyan}18` },
+  lockTitle: { color: colors.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
+  lockText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: "center" },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 6, borderBottomWidth: 1, borderBottomColor: `${colors.tint}18` },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   menuRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerTitle: { ...cyberTypography.display, color: cyber.text, fontSize: 22 },
-  optimizerChip: { alignSelf: "flex-start", borderWidth: 1, borderColor: `${cyber.cyan}33`, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: cyber.surface },
+  headerTitle: { ...cyberTypography.display, color: colors.text, fontSize: 22 },
+  optimizerChip: { alignSelf: "flex-start", borderWidth: 1, borderColor: `${colors.tint}33`, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: colors.surface },
   optimizerChipText: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5 },
-  optimizerError: { color: cyber.pink, fontSize: 11 },
+  optimizerError: { color: colors.tint, fontSize: 11 },
   objectiveBubbleWrap: { flexDirection: "row", justifyContent: "flex-end" },
-  objectiveBubble: { backgroundColor: `${cyber.cyan}26`, borderWidth: 1, borderColor: `${cyber.cyan}55`, borderRadius: 14, borderBottomRightRadius: 4, padding: 12, maxWidth: "82%", gap: 4 },
-  objectiveTitle: { color: cyber.cyan, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
-  objectiveText: { color: cyber.text, fontSize: 14, lineHeight: 20 },
-  objectiveMeta: { color: cyber.textDim, fontSize: 10, alignSelf: "flex-end" },
+  objectiveBubble: { backgroundColor: `${colors.tint}26`, borderWidth: 1, borderColor: `${colors.tint}55`, borderRadius: 14, borderBottomRightRadius: 4, padding: 12, maxWidth: "82%", gap: 4 },
+  objectiveTitle: { color: colors.tint, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
+  objectiveText: { color: colors.text, fontSize: 14, lineHeight: 20 },
+  objectiveMeta: { color: colors.icon, fontSize: 10, alignSelf: "flex-end" },
   answerBubbleWrap: { flexDirection: "row", justifyContent: "flex-start" },
-  answerBubble: { backgroundColor: cyber.surface, borderWidth: 1, borderColor: `${cyber.cyan}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 12, maxWidth: "92%", flex: 1, gap: 8 },
+  answerBubble: { backgroundColor: colors.surface, borderWidth: 1, borderColor: `${colors.tint}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 12, maxWidth: "92%", flex: 1, gap: 8 },
   answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   statusBadge: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  answerMeta: { color: cyber.textDim, fontSize: 11 },
+  answerMeta: { color: colors.icon, fontSize: 11 },
   progressRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  progressText: { color: cyber.cyan, fontSize: 12 },
-  stepBox: { gap: 8, borderTopWidth: 1, borderTopColor: `${cyber.cyan}18`, paddingTop: 8 },
+  progressText: { color: colors.tint, fontSize: 12 },
+  stepBox: { gap: 8, borderTopWidth: 1, borderTopColor: `${colors.tint}18`, paddingTop: 8 },
   stepRow: { flexDirection: "row", gap: 8 },
   stepDot: { fontSize: 12, lineHeight: 18 },
   stepMain: { flex: 1, gap: 2 },
-  stepName: { color: cyber.text, fontSize: 12, fontWeight: "600" },
-  stepMeta: { color: cyber.textDim, fontSize: 10 },
-  stepError: { color: cyber.pink, fontSize: 10 },
-  logBox: { backgroundColor: cyber.surfaceElevated, borderRadius: 6, padding: 6, gap: 2 },
-  logLine: { color: cyber.textMuted, fontSize: 10, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }) },
-  finalBox: { borderTopWidth: 1, borderTopColor: `${cyber.cyan}18`, paddingTop: 8, gap: 2 },
-  finalLabel: { color: cyber.green, fontSize: 10, fontWeight: "800", letterSpacing: 2 },
-  finalText: { color: cyber.text, fontSize: 13, lineHeight: 19 },
-  noAnswerText: { color: cyber.textDim, fontSize: 11, fontStyle: "italic" },
-  emptyBubble: { backgroundColor: cyber.surface, borderWidth: 1, borderColor: `${cyber.cyan}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 14, gap: 6, marginTop: 24 },
-  emptyTitle: { color: cyber.cyan, fontSize: 12, fontWeight: "800", letterSpacing: 2 },
-  emptyText: { color: cyber.textMuted, fontSize: 13, lineHeight: 19 },
-  composer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderTopWidth: 1, borderTopColor: `${cyber.cyan}18`, backgroundColor: cyber.bg, gap: 6 },
+  stepName: { color: colors.text, fontSize: 12, fontWeight: "600" },
+  stepMeta: { color: colors.icon, fontSize: 10 },
+  stepError: { color: colors.tint, fontSize: 10 },
+  logBox: { backgroundColor: colors.surface, borderRadius: 6, padding: 6, gap: 2 },
+  logLine: { color: colors.muted, fontSize: 10, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }) },
+  finalBox: { borderTopWidth: 1, borderTopColor: `${colors.tint}18`, paddingTop: 8, gap: 2 },
+  finalLabel: { color: colors.success, fontSize: 10, fontWeight: "800", letterSpacing: 2 },
+  finalText: { color: colors.text, fontSize: 13, lineHeight: 19 },
+  noAnswerText: { color: colors.icon, fontSize: 11, fontStyle: "italic" },
+  emptyBubble: { backgroundColor: colors.surface, borderWidth: 1, borderColor: `${colors.tint}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 14, gap: 6, marginTop: 24 },
+  emptyTitle: { color: colors.tint, fontSize: 12, fontWeight: "800", letterSpacing: 2 },
+  emptyText: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  composer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderTopWidth: 1, borderTopColor: `${colors.tint}18`, backgroundColor: colors.background, gap: 6 },
   composerRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   composerInput: {
     flex: 1,
-    backgroundColor: cyber.surfaceElevated,
-    color: cyber.text,
+    backgroundColor: colors.surface,
+    color: colors.text,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: `${cyber.cyan}33`,
+    borderColor: `${colors.tint}33`,
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 10,
@@ -441,8 +444,8 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     textAlignVertical: "top",
   },
-  sendButton: { backgroundColor: cyber.cyan, borderRadius: 12, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  sendButton: { backgroundColor: colors.tint, borderRadius: 12, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
   sendButtonDisabled: { opacity: 0.45 },
-  sendButtonText: { color: cyber.bg, fontWeight: "900", fontSize: 16 },
-  errorText: { color: cyber.pink, fontSize: 12 },
+  sendButtonText: { color: colors.background, fontWeight: "900", fontSize: 16 },
+  errorText: { color: colors.tint, fontSize: 12 },
 });

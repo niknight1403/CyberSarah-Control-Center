@@ -2,7 +2,8 @@ import { type ReactNode, useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { cyber, cyberTypography } from "@/lib/cyber-theme";
+import { cyberTypography } from "@/lib/cyber-theme";
+import { useColors } from "@/hooks/use-colors";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
 /**
@@ -12,7 +13,8 @@ import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsiv
  */
 export function DrawerScreen({ title, kicker, children, scroll = true }: { title: string; kicker: string; children: ReactNode; scroll?: boolean }) {
   const { visible, close, hamburgerProps, drawerProps } = useNavDrawer();
-  const styles = useMemo(() => createStyles(), []);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const content = (
     <>
@@ -36,36 +38,39 @@ export function DrawerScreen({ title, kicker, children, scroll = true }: { title
 }
 
 /** Kachel-Container fuer Inhalte auf Drawer-Screens. */
-export function DrawerCard({ children, accent = cyber.border }: { children: ReactNode; accent?: string }) {
-  const styles = useMemo(() => createStyles(), []);
+export function DrawerCard({ children, accent }: { children: ReactNode; accent?: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[styles.card, { borderColor: accent }]}>
+    <View style={[styles.card, { borderColor: accent ?? colors.border }]}>
       {children}
     </View>
   );
 }
 
 export function DrawerCardTitle({ children }: { children: ReactNode }) {
-  const styles = useMemo(() => createStyles(), []);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return <Text style={styles.cardTitle}>{children}</Text>;
 }
 
 export function DrawerBodyText({ children }: { children: ReactNode }) {
-  const styles = useMemo(() => createStyles(), []);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return <Text style={styles.body}>{children}</Text>;
 }
 
-function createStyles() {
+function createStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
-    safe: { backgroundColor: cyber.bg, flex: 1 },
+    safe: { backgroundColor: colors.background, flex: 1 },
     screen: { flex: 1 },
     content: { padding: 18, paddingBottom: 32 },
     header: { alignItems: "center", flexDirection: "row", gap: 12, marginBottom: 18 },
     headerCopy: { flex: 1 },
-    kicker: { ...cyberTypography.caption, color: cyber.textDim, letterSpacing: 1.6 },
-    title: { color: cyber.text, fontSize: 22, fontWeight: "900", letterSpacing: 0.8, marginTop: 2 },
-    card: { backgroundColor: cyber.surface, borderRadius: 16, borderWidth: 1, marginBottom: 14, padding: 16 },
-    cardTitle: { color: cyber.text, fontSize: 14, fontWeight: "800", marginBottom: 6 },
-    body: { color: cyber.textMuted, fontSize: 12, lineHeight: 18 },
+    kicker: { ...cyberTypography.caption, color: colors.icon, letterSpacing: 1.6 },
+    title: { color: colors.text, fontSize: 22, fontWeight: "900", letterSpacing: 0.8, marginTop: 2 },
+    card: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, marginBottom: 14, padding: 16 },
+    cardTitle: { color: colors.text, fontSize: 14, fontWeight: "800", marginBottom: 6 },
+    body: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   });
 }

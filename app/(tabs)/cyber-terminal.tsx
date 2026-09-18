@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useColors } from "@/hooks/use-colors";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -79,6 +80,8 @@ function backendLogToEntry(log: BackendAgentLog): LogEntry {
 }
 
 export default function CyberTerminalScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [stopped, setStopped] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [backendStopped, setBackendStopped] = useState(false);
@@ -184,10 +187,10 @@ export default function CyberTerminalScreen() {
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: stopped ? cyber.pink : logsQuery.isFetching ? cyber.cyan : cyber.green },
+                { backgroundColor: stopped ? colors.tint : logsQuery.isFetching ? colors.tint : colors.success },
               ]}
             />
-            <Text style={[styles.statusText, { color: stopped ? cyber.pink : cyber.textMuted }]}>
+            <Text style={[styles.statusText, { color: stopped ? colors.tint : colors.muted }]}>
               {stopped ? "ANGEHALTEN" : "STREAMING"}
             </Text>
           </View>
@@ -195,7 +198,7 @@ export default function CyberTerminalScreen() {
 
         <ScrollView style={styles.terminal} contentContainerStyle={styles.terminalContent} showsVerticalScrollIndicator={false}>
           {stopped ? (
-            <Text style={[styles.systemLine, { color: cyber.pink }]}>
+            <Text style={[styles.systemLine, { color: colors.tint }]}>
               ⛔ EMERGENCY STOP AKTIV — Live-Aktivitaeten pausiert.
               {backendStopped ? " Remote-Executor gestoppt." : ""}
               Zum Fortsetzen &quot;RESUME&quot; druecken.
@@ -208,7 +211,7 @@ export default function CyberTerminalScreen() {
                 <Text style={styles.logLine}>
                   <Text style={styles.timeText}>[{formatTime(entry.atMs)}]</Text>
                   {"  "}
-                  <Text style={{ color: LEVEL_COLORS[entry.level] ?? cyber.cyan }}>
+                  <Text style={{ color: LEVEL_COLORS[entry.level] ?? colors.tint }}>
                     {entry.level.toUpperCase().padEnd(7, " ")}
                   </Text>
                   {"  "}
@@ -256,8 +259,8 @@ export default function CyberTerminalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: cyber.bg },
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   screen: { flex: 1 },
   header: {
     flexDirection: "row",
@@ -266,42 +269,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: cyber.border,
+    borderBottomColor: colors.border,
   },
-  headerKicker: { ...cyberTypography.caption, color: cyber.pink },
-  headerTitle: { ...cyberTypography.headline, color: cyber.text, letterSpacing: 2 },
-  statusPill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: cyber.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  headerKicker: { ...cyberTypography.caption, color: colors.tint },
+  headerTitle: { ...cyberTypography.headline, color: colors.text, letterSpacing: 2 },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 5 },
   statusText: { ...cyberTypography.mono, fontSize: 10, letterSpacing: 1 },
   terminal: { flex: 1, backgroundColor: "#05070D" },
   terminalContent: { padding: 14, gap: 4 },
-  systemLine: { ...cyberTypography.mono, color: cyber.textDim },
+  systemLine: { ...cyberTypography.mono, color: colors.icon },
   logLine: { ...cyberTypography.mono, lineHeight: 18, flexWrap: "wrap" },
-  timeText: { color: cyber.textDim },
-  sourceText: { color: cyber.textMuted },
-  messageText: { color: cyber.text },
-  footer: { padding: 14, paddingBottom: 18, borderTopWidth: 1, borderTopColor: cyber.border, backgroundColor: cyber.bg },
-  backendHint: { ...cyberTypography.mono, fontSize: 10, color: cyber.textDim, textAlign: "center", marginBottom: 10 },
+  timeText: { color: colors.icon },
+  sourceText: { color: colors.muted },
+  messageText: { color: colors.text },
+  footer: { padding: 14, paddingBottom: 18, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background },
+  backendHint: { ...cyberTypography.mono, fontSize: 10, color: colors.icon, textAlign: "center", marginBottom: 10 },
   stopButton: {
-    backgroundColor: cyber.pink,
+    backgroundColor: colors.tint,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
-    shadowColor: cyber.pink,
+    shadowColor: colors.tint,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 18,
     elevation: 8,
   },
   resumeButton: {
-    backgroundColor: cyber.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: `${cyber.cyan}66`,
+    borderColor: `${colors.tint}66`,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
   },
   buttonPressed: { opacity: 0.85 },
   stopText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900", letterSpacing: 2 },
-  resumeText: { color: cyber.cyan, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
+  resumeText: { color: colors.tint, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
 });

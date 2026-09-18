@@ -1,3 +1,4 @@
+import { useColors } from "@/hooks/use-colors";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Link } from "expo-router";
@@ -13,7 +14,8 @@ import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/com
  * Klartext (nur booleans). Verwaltung bleibt im Einstellungs-Screen.
  */
 export default function PluginsScreen() {
-  const styles = useMemo(() => createStyles(), []);
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { settings } = useStudioSettings();
 
   const plugins = [
@@ -46,17 +48,17 @@ export default function PluginsScreen() {
 
   return (
     <DrawerScreen kicker="INTEGRATIONEN" title="Plugins">
-      <DrawerCard accent={`${cyber.blue}55`}>
+      <DrawerCard accent={`${colors.tint}55`}>
         <DrawerCardTitle>Anschlüsse des Control Centers</DrawerCardTitle>
         <DrawerBodyText>Status aller Integrationen auf einen Blick. Tokens werden verschlüsselt gespeichert und nie im Klartext angezeigt.</DrawerBodyText>
       </DrawerCard>
 
       {plugins.map((plugin) => (
-        <View key={plugin.key} style={[styles.pluginCard, { borderColor: plugin.connected ? `${cyber.green}55` : `${cyber.amber}55` }]}>
+        <View key={plugin.key} style={[styles.pluginCard, { borderColor: plugin.connected ? `${colors.success}55` : `${colors.warning}55` }]}>
           <View style={styles.pluginHeader}>
             <Text style={styles.pluginTitle}>{plugin.title}</Text>
-            <View style={[styles.badge, { backgroundColor: plugin.connected ? `${cyber.green}22` : `${cyber.amber}22`, borderColor: plugin.connected ? cyber.green : cyber.amber }]}>
-              <Text style={[styles.badgeText, { color: plugin.connected ? cyber.green : cyber.amber }]}>{plugin.badge}</Text>
+            <View style={[styles.badge, { backgroundColor: plugin.connected ? `${colors.success}22` : `${colors.warning}22`, borderColor: plugin.connected ? colors.success : colors.warning }]}>
+              <Text style={[styles.badgeText, { color: plugin.connected ? colors.success : colors.warning }]}>{plugin.badge}</Text>
             </View>
           </View>
           <Text style={styles.pluginDetail} numberOfLines={2}>{plugin.detail}</Text>
@@ -70,15 +72,15 @@ export default function PluginsScreen() {
   );
 }
 
-function createStyles() {
+function createStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
-    pluginCard: { backgroundColor: cyber.surface, borderRadius: 14, borderWidth: 1, marginBottom: 10, padding: 14 },
+    pluginCard: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, marginBottom: 10, padding: 14 },
     pluginHeader: { alignItems: "flex-start", flexDirection: "row", gap: 8 },
-    pluginTitle: { color: cyber.text, flex: 1, fontSize: 13, fontWeight: "800" },
+    pluginTitle: { color: colors.text, flex: 1, fontSize: 13, fontWeight: "800" },
     badge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2 },
     badgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.4 },
-    pluginDetail: { color: cyber.textMuted, fontSize: 11, lineHeight: 16, marginTop: 6 },
-    hint: { color: cyber.textDim, fontSize: 10, lineHeight: 15, marginTop: 8 },
-    hintLink: { color: cyber.cyan, fontWeight: "700" },
+    pluginDetail: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 6 },
+    hint: { color: colors.icon, fontSize: 10, lineHeight: 15, marginTop: 8 },
+    hintLink: { color: colors.tint, fontWeight: "700" },
   });
 }
