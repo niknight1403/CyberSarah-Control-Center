@@ -9,6 +9,7 @@ import {
   mapUrlPathToWebFile,
   resolveWebDistDir,
 } from "../../lib/static-web-logic";
+import { isTruthyEnvFlag } from "../../lib/trust-proxy-logic";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -50,7 +51,7 @@ async function startServer() {
   const startedAt = Date.now();
   const server = createServer(app);
 
-  app.set("trust proxy", process.env.TRUST_PROXY === "true");
+  app.set("trust proxy", isTruthyEnvFlag(process.env.TRUST_PROXY));
   app.use(createSecurityMiddleware());
   app.use(requestMetricsMiddleware);
 
