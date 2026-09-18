@@ -1,64 +1,48 @@
 /**
- * Design-Theme-Logik (rein, testbar): Die App kennt genau drei optische
- * Designs ("Cyber Neon", "Enterprise Slate", "Glas-Modern", "Solar Ember", "Forest Signal"), die
- * unabhaengig von der Hell/Dunkel-Praeferenz geschaltet werden koennen.
- * Jedes Design definiert seine eigene Palette pro Farbschema plus
- * Effekt-Tokens (Glow, Blur, Gradient) — siehe
- * lib/_core/design-theme-palettes.ts.
- *
- * "Cyber Neon" ist seit v2.1.0 das Standard-Design. (Sprint 128:
- * Design-Kuration auf die drei im Play-Store-Listing beworbenen Themes.)
+ * Produktive Neon-Theme-Registry für das CyberSarah Control Center.
+ * Die vier Designs sind unabhängig von Hell/Dunkel und werden von
+ * Onboarding, Einstellungen und ThemeProvider gemeinsam verwendet.
  */
 
-export type DesignTheme = "neon" | "slate" | "glass" | "ember" | "forest";
+export type DesignTheme = "pulse" | "orbit" | "synthwave" | "minimal";
 
-/** Sprint 128 — Design-Kuration: nur die drei im Play-Store-Listing
- * beworbenen Designs bleiben auswaehlbar ("Cyber Neon", "Enterprise
- * Slate", "Glas-Modern"). Alte Auswahlwerte werden beim Lesen per
- * normalizeDesignTheme automatisch auf den Standard gemappt. */
-export const DESIGN_THEMES: readonly DesignTheme[] = ["neon", "slate", "glass", "ember", "forest"] as const;
+export const DESIGN_THEMES: readonly DesignTheme[] = ["pulse", "orbit", "synthwave", "minimal"] as const;
+export const DEFAULT_DESIGN_THEME: DesignTheme = "pulse";
+export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v5";
 
-export const DEFAULT_DESIGN_THEME: DesignTheme = "neon";
-
-/**
- * Storage-Key v2: mit dem Design-Refresh (v1.3.1) wird der Standard auf
- * Aurora Glass gesetzt — Bestandsinstallationen mit v1-Key ("neon") starten
- * einmal frisch mit dem neuen Design.
- */
-export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v4";
-
+/** Legacy-Werte werden beim Lesen sicher auf das neue Neon-Pulse-Design migriert. */
 export function normalizeDesignTheme(value: unknown): DesignTheme {
-  return value === "neon" || value === "slate" || value === "glass" || value === "ember" || value === "forest"
-    ? value
-    : DEFAULT_DESIGN_THEME;
+  return DESIGN_THEMES.includes(value as DesignTheme) ? (value as DesignTheme) : DEFAULT_DESIGN_THEME;
 }
 
 export function designThemeLabel(theme: DesignTheme): string {
-  if (theme === "slate") return "Enterprise Slate";
-  if (theme === "glass") return "Glas-Modern";
-  if (theme === "ember") return "Solar Ember";
-  if (theme === "forest") return "Forest Signal";
-  return "Cyber Neon";
+  if (theme === "orbit") return "Cyber Orbit";
+  if (theme === "synthwave") return "Neon Synthwave";
+  if (theme === "minimal") return "Neon Minimal";
+  return "Neon Pulse";
 }
 
 export function designThemeDescription(theme: DesignTheme): string {
-  if (theme === "slate") {
-    return "Professionell, hell und dicht — klare neutrale Flächen für Produktivität.";
-  }
-  if (theme === "glass") {
-    return "Transluzente Flächen, weiche Gradients und Blur-Overlays.";
-  }
-  if (theme === "ember") {
-    return "Warme Kupfer- und Pflaumentöne für fokussierte, energische Arbeitsflächen.";
-  }
-  if (theme === "forest") {
-    return "Ruhige Waldtöne mit mintfarbenen Signalen für lange Sessions.";
-  }
-  return "Kontrastreicher Obsidian-Dark-Look mit Cyan-/Magenta-Glow-Akzenten.";
+  if (theme === "orbit") return "Futuristisches Blau, Violett und Türkis mit orbitaler Systemübersicht.";
+  if (theme === "synthwave") return "Modernes Pink, Orange und Cyan mit dynamischer KI-SaaS-Energie.";
+  if (theme === "minimal") return "Reduziertes Emerald-Cyan-Design mit klarer Benutzer- und Adminübersicht.";
+  return "Modernes Cyan-, Lime- und Magenta-Neon mit Glasflächen und Superagent-Fokus.";
 }
 
-export function designThemeIcon(theme: DesignTheme): "bolt.fill" | "chart.bar.fill" | "sparkles" {
-  if (theme === "slate") return "chart.bar.fill";
-  if (theme === "glass" || theme === "ember") return "sparkles";
+export function designThemeIcon(theme: DesignTheme): "bolt.fill" | "chart.bar.fill" | "sparkles" | "wand.and.stars" {
+  if (theme === "orbit") return "chart.bar.fill";
+  if (theme === "synthwave") return "sparkles";
+  if (theme === "minimal") return "wand.and.stars";
   return "bolt.fill";
+}
+
+export function isNeonDesign(theme: DesignTheme): boolean {
+  return DESIGN_THEMES.includes(theme);
+}
+
+export function designThemeAccent(theme: DesignTheme): string {
+  if (theme === "orbit") return "#8B5CFF";
+  if (theme === "synthwave") return "#FF4FD8";
+  if (theme === "minimal") return "#00F5D4";
+  return "#19E6FF";
 }

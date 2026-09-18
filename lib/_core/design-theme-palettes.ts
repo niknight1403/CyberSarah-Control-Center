@@ -1,268 +1,71 @@
-/**
- * Paletten und Effekt-Tokens der drei Design-Themes.
- *
- * Ein Design-Theme ueberschreibt die Basis-Palette (SchemeColors) pro
- * Farbschema und bringt zusaetzliche Effekt-Tokens mit, die der
- * Theme-Provider als CSS-Variablen bereitstellt:
- *   --effect-glow-primary / --effect-glow-soft  (Box-Shadow)
- *   --effect-blur                                (backdrop-filter)
- *   --effect-gradient-from / --effect-gradient-to
- *
- * Utilities in global.css (.effect-glow, .effect-glass, .effect-gradient)
- * konsumieren diese Variablen, damit Flaechen das aktive Design aufnehmen.
- */
-
 import type { ColorScheme, ThemeColorPalette } from "@/constants/theme";
-import { type DesignTheme } from "@/lib/design-theme-logic";
+import type { DesignTheme } from "@/lib/design-theme-logic";
 import themeConfig from "../../theme.config";
 
 type ColorTokenName = keyof typeof themeConfig.themeColors;
 export type DesignPalette = Record<ColorTokenName, string>;
 
-/**
- * Basis-Palette pro Farbschema, direkt aus theme.config gebaut — ohne die
- * react-native-Kette aus lib/_core/theme, damit dieses Modul auch in
- * Node/Vitest lauffaehig bleibt.
- */
 export const baseSchemePalettes: Record<ColorScheme, DesignPalette> = {
-  light: Object.fromEntries(
-    (Object.keys(themeConfig.themeColors) as ColorTokenName[]).map((name) => [name, themeConfig.themeColors[name].light]),
-  ) as DesignPalette,
-  dark: Object.fromEntries(
-    (Object.keys(themeConfig.themeColors) as ColorTokenName[]).map((name) => [name, themeConfig.themeColors[name].dark]),
-  ) as DesignPalette,
+  light: Object.fromEntries((Object.keys(themeConfig.themeColors) as ColorTokenName[]).map((name) => [name, themeConfig.themeColors[name].light])) as DesignPalette,
+  dark: Object.fromEntries((Object.keys(themeConfig.themeColors) as ColorTokenName[]).map((name) => [name, themeConfig.themeColors[name].dark])) as DesignPalette,
 };
 
 export type DesignThemeEffects = {
-  /** Box-Shadow für primäre Glow-Akzente ("none" ohne Glow). */
   glowPrimary: string;
-  /** Dezentere Sekundär-Glows ("none" ohne Glow). */
   glowSoft: string;
-  /** backdrop-filter Stärke als CSS-Länge ("0px" ohne Blur). */
   blur: string;
-  /** Gradient-Verlauf für Hintergründe (from → to). */
   gradientFrom: string;
   gradientTo: string;
 };
 
 type TokenOverrides = Partial<DesignPalette>;
-
 export type DesignThemeDefinition = {
   light: TokenOverrides;
   dark: TokenOverrides;
   effects: Record<ColorScheme, DesignThemeEffects>;
 };
 
-const noGlow: DesignThemeEffects = {
-  glowPrimary: "none",
-  glowSoft: "none",
-  blur: "0px",
-  gradientFrom: "#12161D",
-  gradientTo: "#12161D",
-};
+const effects = (primary: string, secondary: string, from: string, to: string, blur = "8px"): Record<ColorScheme, DesignThemeEffects> => ({
+  light: { glowPrimary: `0 0 20px ${primary}, 0 0 42px ${secondary}`, glowSoft: `0 0 14px ${secondary}`, blur, gradientFrom: from, gradientTo: to },
+  dark: { glowPrimary: `0 0 24px ${primary}, 0 0 52px ${secondary}`, glowSoft: `0 0 16px ${secondary}`, blur, gradientFrom: from, gradientTo: to },
+});
 
 export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> = {
-  /** Theme A — Cyber Neon / Dark Obsidian */
-  neon: {
-    light: {
-      background: "#0D1320",
-      surface: "#151E2E",
-      border: "#33445F",
-    },
-    dark: {
-      background: "#05070C",
-      surface: "#0B1220",
-      border: "#26354E",
-      foreground: "#F2F6FC",
-      primary: "#52D8FF",
-      muted: "#93A5BD",
-    },
-    effects: {
-      light: {
-        glowPrimary: "0 0 18px rgba(82, 216, 255, 0.35), 0 0 40px rgba(82, 216, 255, 0.18)",
-        glowSoft: "0 0 12px rgba(255, 61, 173, 0.22)",
-        blur: "0px",
-        gradientFrom: "#0D1320",
-        gradientTo: "#080C16",
-      },
-      dark: {
-        glowPrimary: "0 0 22px rgba(82, 216, 255, 0.45), 0 0 46px rgba(82, 216, 255, 0.2)",
-        glowSoft: "0 0 14px rgba(255, 61, 173, 0.28)",
-        blur: "0px",
-        gradientFrom: "#05070C",
-        gradientTo: "#0A0F1C",
-      },
-    },
+  pulse: {
+    light: { background: "#EAFBFF", surface: "#F8FDFF", border: "#8DEBFF", foreground: "#071827", primary: "#00BFD9", muted: "#52758C", success: "#00A86B", warning: "#C17A00", error: "#D64463" },
+    dark: { background: "#03111D", surface: "#071B2A", border: "#19E6FF", foreground: "#F4F8FF", primary: "#19E6FF", muted: "#A9C1D8", success: "#00F59B", warning: "#FFC857", error: "#FF5577" },
+    effects: effects("rgba(25,230,255,.45)", "rgba(240,45,255,.28)", "#03111D", "#071B2A"),
   },
-
-  /** Theme B — Enterprise Slate */
-  slate: {
-    light: {
-      background: "#F2F5F8",
-      surface: "#FFFFFF",
-      border: "#D9DFE8",
-      foreground: "#17202D",
-      primary: "#1D5BD8",
-      muted: "#5C6B7E",
-      success: "#178A50",
-      warning: "#B2740B",
-      error: "#C2404F",
-    },
-    dark: {
-      background: "#12161D",
-      surface: "#1B212B",
-      border: "#2B3542",
-      foreground: "#E9EEF5",
-      primary: "#7AA7F5",
-      muted: "#94A1B4",
-      success: "#3BBE7B",
-      warning: "#E5A84C",
-      error: "#E9707D",
-    },
-    effects: {
-      light: { ...noGlow, gradientFrom: "#F2F5F8", gradientTo: "#E8ECF2" },
-      dark: noGlow,
-    },
+  orbit: {
+    light: { background: "#EEF0FF", surface: "#FAFAFF", border: "#9C9BFF", foreground: "#11142B", primary: "#6551E8", muted: "#65709A", success: "#00A783", warning: "#B87A00", error: "#CF456A" },
+    dark: { background: "#080D24", surface: "#101A3B", border: "#5368FF", foreground: "#F2F4FF", primary: "#8B5CFF", muted: "#A8B4E8", success: "#00E7C1", warning: "#FFD166", error: "#FF668D" },
+    effects: effects("rgba(139,92,255,.48)", "rgba(25,230,255,.24)", "#080D24", "#17113A", "10px"),
   },
-
-  /** Theme C — Glassmorphism Modern */
-  glass: {
-    light: {
-      background: "#E7EDF7",
-      surface: "rgba(255, 255, 255, 0.62)",
-      border: "rgba(20, 35, 60, 0.12)",
-      foreground: "#1B2437",
-      primary: "#6D5CE6",
-      muted: "#55617A",
-      success: "#148556",
-      warning: "#A96A0B",
-      error: "#C2404F",
-    },
-    dark: {
-      background: "#0B1220",
-      surface: "rgba(255, 255, 255, 0.07)",
-      border: "rgba(255, 255, 255, 0.14)",
-      foreground: "#EEF2FF",
-      primary: "#8F7BFF",
-      muted: "#A7B3D0",
-      success: "#4ADE96",
-      warning: "#FBBE6C",
-      error: "#FF7B8A",
-    },
-    effects: {
-      light: {
-        glowPrimary: "0 0 18px rgba(109, 92, 230, 0.25)",
-        glowSoft: "none",
-        blur: "14px",
-        gradientFrom: "#DDE6F5",
-        gradientTo: "#EFEBFA",
-      },
-      dark: {
-        glowPrimary: "0 0 20px rgba(143, 123, 255, 0.3)",
-        glowSoft: "0 0 12px rgba(79, 209, 255, 0.2)",
-        blur: "18px",
-        gradientFrom: "#101A30",
-        gradientTo: "#221A46",
-      },
-    },
+  synthwave: {
+    light: { background: "#FFF0FA", surface: "#FFF9FD", border: "#FF9DDD", foreground: "#261127", primary: "#E62FBC", muted: "#8A6386", success: "#00A879", warning: "#C57900", error: "#D34B5D" },
+    dark: { background: "#170A20", surface: "#27112E", border: "#FF4FD8", foreground: "#FFF5FE", primary: "#FF4FD8", muted: "#D2A9CE", success: "#00F0A4", warning: "#FFB347", error: "#FF718A" },
+    effects: effects("rgba(255,79,216,.48)", "rgba(255,146,64,.3)", "#170A20", "#2E1029", "8px"),
   },
-  /** Theme D — Solar Ember: warm, fokussiert und kontrastreich. */
-  ember: {
-    light: {
-      background: "#FFF7F0",
-      surface: "#FFFFFF",
-      border: "#E8CFC1",
-      foreground: "#2A1720",
-      primary: "#C45A3B",
-      muted: "#795D61",
-      success: "#247A5A",
-      warning: "#B06B16",
-      error: "#B83E4B",
-    },
-    dark: {
-      background: "#160D12",
-      surface: "#24141B",
-      border: "#56313A",
-      foreground: "#FFF1E8",
-      primary: "#FF9B6A",
-      muted: "#CBA5A3",
-      success: "#61D7A4",
-      warning: "#F2BC62",
-      error: "#FF7F8D",
-    },
-    effects: {
-      light: { glowPrimary: "0 0 20px rgba(196, 90, 59, 0.22)", glowSoft: "0 0 14px rgba(238, 151, 75, 0.18)", blur: "0px", gradientFrom: "#FFF7F0", gradientTo: "#FBE8DC" },
-      dark: { glowPrimary: "0 0 22px rgba(255, 155, 106, 0.32)", glowSoft: "0 0 14px rgba(204, 84, 118, 0.24)", blur: "8px", gradientFrom: "#160D12", gradientTo: "#2A1420" },
-    },
-  },
-  /** Theme E — Forest Signal: ruhig, zugänglich und session-freundlich. */
-  forest: {
-    light: {
-      background: "#F1F8F4",
-      surface: "#FFFFFF",
-      border: "#C9DED2",
-      foreground: "#12251D",
-      primary: "#167A61",
-      muted: "#587267",
-      success: "#147A4D",
-      warning: "#A56A16",
-      error: "#B0444D",
-    },
-    dark: {
-      background: "#081512",
-      surface: "#10231E",
-      border: "#21483C",
-      foreground: "#E7FFF5",
-      primary: "#5EE0B5",
-      muted: "#91B9AA",
-      success: "#63E6A3",
-      warning: "#EBC56C",
-      error: "#FF8690",
-    },
-    effects: {
-      light: { glowPrimary: "0 0 18px rgba(22, 122, 97, 0.2)", glowSoft: "0 0 14px rgba(93, 206, 170, 0.16)", blur: "4px", gradientFrom: "#F1F8F4", gradientTo: "#E1F1EA" },
-      dark: { glowPrimary: "0 0 22px rgba(94, 224, 181, 0.3)", glowSoft: "0 0 14px rgba(38, 150, 118, 0.22)", blur: "10px", gradientFrom: "#081512", gradientTo: "#0D2921" },
-    },
+  minimal: {
+    light: { background: "#EFFAF7", surface: "#FBFFFE", border: "#81E4CA", foreground: "#071C19", primary: "#00A98F", muted: "#5A7E78", success: "#00A56B", warning: "#B87800", error: "#D0445A" },
+    dark: { background: "#061513", surface: "#0C2420", border: "#00F5D4", foreground: "#F0FFF9", primary: "#00F5D4", muted: "#9BC8BC", success: "#63FFB0", warning: "#FFD166", error: "#FF7488" },
+    effects: effects("rgba(0,245,212,.4)", "rgba(0,245,155,.22)", "#061513", "#0C2420", "4px"),
   },
 };
 
-/** Basis-Palette des Schemas mit den Design-Overrides verschmelzen. */
 export function resolveDesignPalette(designTheme: DesignTheme, scheme: ColorScheme): DesignPalette {
-  const base = baseSchemePalettes[scheme];
-  const overrides = DesignThemeDefinitions[designTheme][scheme];
-  return { ...base, ...overrides };
+  return { ...baseSchemePalettes[scheme], ...DesignThemeDefinitions[designTheme][scheme] };
 }
 
 export function resolveDesignEffects(designTheme: DesignTheme, scheme: ColorScheme): DesignThemeEffects {
   return DesignThemeDefinitions[designTheme].effects[scheme];
 }
 
-/**
- * Laufzeit-Palette im Format von Colors (text, tint, icon, ...) — inklusive
- * Design-Auflösung, damit style-basierte Konsumenten (useColors) das aktive
- * Design widerspiegeln.
- */
 export function resolveDesignRuntimePalette(designTheme: DesignTheme, scheme: ColorScheme): ThemeColorPalette {
   const base = resolveDesignPalette(designTheme, scheme);
-  return {
-    ...base,
-    text: base.foreground,
-    background: base.background,
-    tint: base.primary,
-    icon: base.muted,
-    tabIconDefault: base.muted,
-    tabIconSelected: base.primary,
-    border: base.border,
-  };
+  return { ...base, text: base.foreground, background: base.background, tint: base.primary, icon: base.muted, tabIconDefault: base.muted, tabIconSelected: base.primary, border: base.border };
 }
 
-/** Effekt-Tokens als flaches Record für CSS-Variablen-/vars()-Applikation. */
 export function effectCssVariables(effects: DesignThemeEffects): Record<string, string> {
-  return {
-    "effect-glow-primary": effects.glowPrimary,
-    "effect-glow-soft": effects.glowSoft,
-    "effect-blur": effects.blur,
-    "effect-gradient-from": effects.gradientFrom,
-    "effect-gradient-to": effects.gradientTo,
-  };
+  return { "effect-glow-primary": effects.glowPrimary, "effect-glow-soft": effects.glowSoft, "effect-blur": effects.blur, "effect-gradient-from": effects.gradientFrom, "effect-gradient-to": effects.gradientTo };
 }

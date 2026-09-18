@@ -5,7 +5,7 @@ import { useThemeContext } from "@/lib/theme-provider";
 type AdminUser = { role?: string } | null | undefined;
 
 /**
- * Sprint 127 — Autonome Cyber-Neon-Aktivierung fuer Administratoren.
+ * Neon-Pulse-Aktivierung fuer Administratoren.
  *
  * Der Administrator soll nach dem Login sofort im vorgesehenen "Cyber Neon"-
  * Design landen, ohne selbst zum Theme Lab navigieren zu muessen — analog zu
@@ -22,6 +22,6 @@ export function useAdminDesignThemeSync(user: AdminUser) {
     if (attemptedRef.current) return;
     if (user?.role !== "admin") return;
     attemptedRef.current = true;
-    if (designTheme !== "neon") setDesignTheme("neon");
+    if (designTheme !== "pulse") setDesignTheme("pulse");
   }, [user, designTheme, setDesignTheme]);
 }
