@@ -131,8 +131,19 @@ export type ResponseFormat =
   | { type: "json_object" }
   | { type: "json_schema"; json_schema: JsonSchema };
 
-const ensureArray = (value: MessageContent | MessageContent[]): MessageContent[] =>
-  Array.isArray(value) ? value : [value];
+// Sprint 151 — Root-Cause-Fix: ensureArray() gab bei null/undefined bisher
+// [null]/[undefined] zurueck. Eine Assistant-Nachricht mit reinen
+// Tool-Aufrufen hat oft content=null (oder das Feld fehlt komplett, je nach
+// Provider), sobald sie im naechsten Runden-Durchlauf erneut normalisiert
+// wird (Multi-Turn-Verlauf). normalizeContentPart bekam dann null/undefined
+// als "part" und stuerzte mit "Cannot read properties of undefined
+// (reading 'type')" ab — der Superagent eskalierte dadurch JEDE Aufgabe
+// mit Tool-Aufrufen nach 3 Wiederholungen. Fehlender Inhalt wird jetzt vor
+// jeder Content-Verarbeitung erkannt und sicher behandelt.
+const ensureArray = (value: MessageContent | MessageContent[] | null | undefined): MessageContent[] => {
+  if (value === null || value === undefined || value === "") return [];
+  return Array.isArray(value) ? value.filter((part) => part !== null && part !== undefined) : [value];
+};
 
 const normalizeContentPart = (part: MessageContent): TextContent | ImageContent | FileContent => {
   if (typeof part === "string") {
@@ -172,10 +183,14 @@ const normalizeMessage = (message: Message) => {
 
   const contentParts = ensureArray(message.content).map(normalizeContentPart);
 
-  // If there's only text content, collapse to a single string for compatibility
-  const collapsedContent = contentParts.length === 1 && contentParts[0].type === "text"
-    ? contentParts[0].text
-    : contentParts;
+  // If there's only text content, collapse to a single string for compatibility.
+  // Kein Content (leeres Array, z. B. reine Tool-Call-Antwort) -> null statt
+  // eines leeren Arrays, wie von OpenAI-kompatiblen APIs erwartet.
+  const collapsedContent = contentParts.length === 0
+    ? null
+    : contentParts.length === 1 && contentParts[0].type === "text"
+      ? contentParts[0].text
+      : contentParts;
 
   // Sprint 88 — eine Assistant-Nachricht mit Tool-Aufrufen muss diese im
   // Multi-Turn-Verlauf mitfuehren, sonst kann der Provider nachfolgende

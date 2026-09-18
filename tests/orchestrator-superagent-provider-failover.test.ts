@@ -100,4 +100,71 @@ describe("runOrchestratorTask — Zero-Cost-Multi-Provider-Failover (Sprint 150)
     expect(task.status).toBe("success");
     expect(calledUrls.some((u) => u.includes(GROQ_URL))).toBe(true);
   });
+
+  /**
+   * Sprint 151 — Root-Cause-Regressionstest.
+   *
+   * Vorher: Eine Assistant-Antwort mit reinen Tool-Aufrufen (kein Text,
+   * content=null bzw. das Feld fehlt komplett) wurde nach der Tool-
+   * Ausfuehrung unveraendert in den Multi-Turn-Verlauf zurueckgelegt. Sobald
+   * invokeLLM() diese Historie in der NAECHSTEN Runde erneut normalisierte
+   * (server/_core/llm.ts::normalizeMessage), scheiterte
+   * ensureArray(null).map(normalizeContentPart) mit "Cannot read properties
+   * of undefined (reading 'type')" — der Superagent eskalierte JEDE Aufgabe
+   * mit Tool-Aufrufen nach 3 Wiederholungen, unabhaengig vom Anbieter.
+   *
+   * Dieser Test simuliert genau das: Runde 1 liefert eine Tool-Call-Antwort
+   * ohne content-Feld, Runde 2 (nach Tool-Ausfuehrung) muss die Historie
+   * inkl. dieser Nachricht erneut normalisieren und darf nicht abstuerzen.
+   */
+  it("eskaliert NICHT, wenn eine Tool-Call-Antwort ohne Text-Content in Runde 2 erneut normalisiert wird", async () => {
+    let round = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes(GROQ_URL)) {
+          round += 1;
+          if (round === 1) {
+            // Reine Tool-Call-Antwort — kein "content"-Feld (wie bei
+            // manchen OpenAI-kompatiblen Providern ueblich).
+            return fakeResponse(200, {
+              id: "test-round-1",
+              created: Date.now(),
+              model: "llama-3.3-70b-versatile",
+              choices: [
+                {
+                  index: 0,
+                  message: {
+                    role: "assistant",
+                    tool_calls: [
+                      { id: "call_1", type: "function", function: { name: "fs.listWorkspace", arguments: "{}" } },
+                    ],
+                  },
+                  finish_reason: "tool_calls",
+                },
+              ],
+            });
+          }
+          return fakeResponse(200, {
+            id: "test-round-2",
+            created: Date.now(),
+            model: "llama-3.3-70b-versatile",
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content: '{"status":"success","summary":"Workspace geprueft."}' },
+                finish_reason: "stop",
+              },
+            ],
+          });
+        }
+        return fakeResponse(500, { error: "unerwarteter Endpoint im Test" });
+      }),
+    );
+
+    const task = await runOrchestratorTask({ objective: "Liste den Workspace-Inhalt auf" });
+
+    expect(task.status).toBe("success");
+    expect(round).toBeGreaterThanOrEqual(2);
+  });
 });
