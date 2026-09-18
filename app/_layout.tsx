@@ -53,6 +53,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       (window as unknown as { __csMounted?: boolean }).__csMounted = true;
+      (window as unknown as { __csHideStartupShell?: () => void }).__csHideStartupShell?.();
     }
   }, []);
 

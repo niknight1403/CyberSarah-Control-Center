@@ -12,6 +12,9 @@ RUN npm run build
 RUN mkdir -p node_modules/react-native-css-interop/.cache \
  && touch node_modules/react-native-css-interop/.cache/web.css
 RUN npx expo export -p web --output-dir web-dist
+# Expo output:single übernimmt app/+html.tsx nicht in die ausgelieferte index.html.
+# Die Startup-Shell wird deshalb deterministisch nach dem Export injiziert.
+RUN node scripts/inject-web-startup-shell.mjs web-dist
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime
