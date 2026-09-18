@@ -4,7 +4,7 @@ import { evaluateAndroidRelease } from "../lib/android-release-logic";
 describe("android release logic", () => {
   it("accepts a portrait release with required assets", () => {
     expect(evaluateAndroidRelease({
-      packageName: "com.app.customaistudiomobile",
+      packageName: "com.cybersarah.controlcenter",
       version: "1.0.0",
       orientation: "portrait",
       hasLauncherIcon: true,

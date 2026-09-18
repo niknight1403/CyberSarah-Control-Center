@@ -6,7 +6,7 @@ describe("release preflight logic", () => {
     const result = validateReleasePreflight({
       appName: "CyberSarah Control Center",
       version: "1.0.0",
-      androidPackage: "com.app.customaistudiomobile",
+      androidPackage: "com.cybersarah.controlcenter",
       orientation: "portrait",
       buildCommand: "pnpm build",
     });

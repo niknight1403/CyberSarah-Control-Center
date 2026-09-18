@@ -12,8 +12,8 @@
     "issues": [],
     "normalized": {
       "appName": "CyberSarah Control Center",
-      "version": "1.3.6",
-      "androidPackage": "com.app.customaistudiomobile",
+      "version": "2.3.0",
+      "androidPackage": "com.cybersarah.controlcenter",
       "orientation": "portrait",
       "buildCommand": "npm run build"
     }
