@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
+import compression from "compression";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
@@ -55,6 +56,9 @@ async function startServer() {
   const server = createServer(app);
 
   app.set("trust proxy", isTruthyEnvFlag(process.env.TRUST_PROXY));
+  // Komprimiert das große Expo-Web-Bundle und CSS/JSON vor der Auslieferung.
+  // Die Startup-Shell bleibt inline und erscheint bereits vor diesem Download.
+  app.use(compression({ threshold: 1024 }));
   app.use(createSecurityMiddleware());
   app.use(requestMetricsMiddleware);
 
