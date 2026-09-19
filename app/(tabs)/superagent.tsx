@@ -26,6 +26,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { MarkdownLiteContent } from "@/components/chat/message-bubble";
 import { GlassCard } from "@/components/glass/glass-primitives";
 import { AiCore } from "@/components/glass/ai-core";
 import { accentAlpha, glassDepth, glassPalette, glassRadii, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
@@ -376,7 +377,7 @@ export default function SuperagentScreen() {
                   {item.answer ? (
                     <View style={styles.finalBox}>
                       <Text style={styles.finalLabel}>ERGEBNIS</Text>
-                      <Text style={styles.finalText}>{item.answer}</Text>
+                      <MarkdownLiteContent content={item.answer} />
                     </View>
                   ) : item.status === "failed" || item.status === "escalated" ? (
                     <Text style={styles.noAnswerText}>

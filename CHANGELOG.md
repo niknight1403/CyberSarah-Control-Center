@@ -4,6 +4,11 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 189]
+
+### Changed
+- **Sprint 189 (Chat-Qualität) — Übersichtlichere Antworten in beiden Chatbereichen:** Der Leitende Superagent nutzt jetzt ein festes Antwortformat (### Ergebnis mit Kernantwort zuerst, ### Was ich getan habe als max. 5 Stichpunkte, ### Naechste Schritte max. 3) mit Praegnanz-Regeln (keine Floskeln, keine Rohdaten, ehrliche Zahlen). Der Superagent-Tab rendert finale Antworten ab sofort mit Markdown-Lite (Ueberschriften, Listen, Code) statt Fliesstext. Der Repo-Chat erhaelt die Kernantwort-zuerst-Regel plus klare Themen-Ueberschriften und Stichpunkt-Limits. Live verifiziert: beide Chatbereiche end-to-end gegen einen lokalen Server mit echter Postgres-DB, Admin-Login und Mock-LLM getestet (Orchestrator-Run inkl. Task-Ledger, Repo-Chat inkl. Historie-Persistenz).
+
 ## [Unreleased — Sprint 188]
 
 ### Changed
