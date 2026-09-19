@@ -4,6 +4,27 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [4.2.0] — 2026-09-19
+
+**Tag:** v4.2.0 · **Commit:** d198c88 · **Verifikation:** tsc fehlerfrei, 1173 Tests gruen (142 Dateien), Expo-Web-Export erfolgreich, ESLint 0 Errors / 0 Warnings (Start des Lint-Sprints: 86 Warnings), GitHub CI + Gitleaks success · **Kosten der Neuerungen:** 0,00 EUR
+
+### Added
+- **Sprint 166 — Custom-Spiel-Codegenerator (Stufe 2):** Freier LLM-Spielgenerator fuer eigene Spielideen (Single-File-HTML5, Sandbox-Haerte: kein eval/Netzwerk/CDN, Offline-Template-Fallback) mit vollautonomer Fix-Schleife ueber `developCustom`-Route und Admin-UI; weiterhin harte 0-EUR-Garantie. Erweiterte Live-Fix-Watchdog-Aktionen: `invalidate_runtime_caches` (Latenz/5xx) und `restart_subsystem` (Watchdog ab 3 Wiederholungen in 10 Min) mit ehrlicher `applied=false`-Kennzeichnung und Occurrence-Tracker.
+- **Sprint 167 — Secret-Vault:** Nutzer-scoped AES-256-GCM-Vault (KV-persistiert, gleiche Infrastruktur wie Provider-Keys). Erkannte API-Keys (Groq/OpenAI/Anthropic/Google/GitHub/OpenRouter/Slack/AWS/Bearer/Hex) werden im Repo-Chat und Superagenten-Chat autonom verschluesselt gespeichert, der Klartext aus dem Verlauf maskiert und ein ehrlicher Hinweis angehaengt; Klartext erscheint nie in Listen oder Logs. Neuer Secrets-Tab im Repo-Chat, VAULT-Modul im Superagenten-Chat; 13 neue Tests (1173 gesamt).
+- **Sprint 168 — CyberSarah Future Glass:** Komplettes Design-System-Fundament (`lib/design/future-glass.ts` mit Token-System, Lichtquellen-Palette, AI-Core-Statusmaschine) und Glass-Komponenten-Bibliothek (`components/glass/`: AiCore, GlassCard, GlowButton, StatusChip, GlassBackdrop, GlassHeader, MetricTile, ControlModuleCard, HoloActivityCard mit animiertem SVG-Line-Chart, SuperagentHeroCard). Dashboard komplett auf das neue System umgebaut (ausschliesslich echte Backend-Daten), schwebende CyberGlass-Bottom-Navigation, Chat-Bubbles als Glass-Layers.
+
+### Fixed
+- **Sprint 169 — Runtime-Haertung:** EADDRINUSE-Handler am Listener (klare Meldung statt rohem Crash, kontrollierter Exit 1, live verifiziert), globale unhandledRejection/uncaughtException-Handler (speisen Runtime-Logger + Self-Healing-Ledger), PG-Pool-Haertung (keepAlive, 30s Idle-Timeout, Idle-Fehler-Handler gegen Neon-Idle-Kills). CI-Lint-Gate repariert (19 Errors via offiziellen `useAnimatedValue`-Hook).
+- **Sprint 171 — Latenter Render-Loop geschlossen:** `coerceLedgerTask` erzeugte pro Render neue Objekte; ein Effekt mit neuer Set-Referenz lief bei jedem Render erneut.
+
+### Changed
+- **Sprint 170–172 — Lint-Sprint (86 → 0 Warnings):** Import-Hygiene, ungenutzte Variablen, axios-Named-Imports, tote Prefetches (Sprint 170). React-Compiler-Batch 1: alle 16 `set-state-in-effect`-Meldungen behoben — Spiegel-Staende durch Render-Ableitung ersetzt, offizielles Adjust-Pattern (React-Docs) fuer Provider-Wechsel/History-Reset/Hydratation, dokumentierte Ausnahmen fuer Fetch-on-Mount und Live-Polling (Sprint 171). React-Compiler-Batch 2: neue Tick-Uhr `hooks/use-now.ts` (useSyncExternalStore, Date.now lebt im Modul-Scope) ersetzt `Date.now()` in allen Render-Pfaden; Reanimated-Shared-Value-Writes ueber dokumentierte `"use no memo"`-Interop; nicht erhaltbare manuelle Memoisierung im Theme-Lab entfernt. ESLint final 0 Errors / 0 Warnings.
+
+### Compatibility
+- Keine Breaking Changes; keine Migration noetig. Betrieb weiterhin ohne Cloud-Keys moeglich (lokale Offline-Stufen Ollama / LM Studio).
+
+---
+
 ## [4.1.1] — 2026-09-19
 
 **Tag:** v4.1.1 · **Commit:** 376a980 · **Verifikation:** tsc fehlerfrei, 1149 Tests gruen (139 Dateien) · **Kosten der Neuerungen:** 0,00 EUR
