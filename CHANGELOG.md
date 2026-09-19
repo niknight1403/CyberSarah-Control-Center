@@ -4,6 +4,11 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 187]
+
+### Added
+- **Sprint 187 — Wix-API-Anbindung (read-only):** Admin-gated Karte „Wix-API" mit ehrlichem Konfigurationsstatus, verschlüsselter API-Key-Ablage (AES-256-GCM im KV, Env-Fallback), Site-ID-Setzung zur Laufzeit (KV, ohne Redeploy), Konto-Site-Suche (Tap-to-select) sowie Site-Properties (v4) und eCommerce-Orders-Views. Read-only-Client (`server/wix.ts`, 15-s-Timeout) mit klassifizierten Fehlerzustaenden aus der Live-Verifikation (META_SITE_NOT_FOUND, READ_ORDER_FORBIDDEN, HTML-403, Controller-404). 22 neue Tests (1195 gesamt). Siehe `docs/SPRINT_187_WIX_API.md`.
+
 ## [4.2.0] — 2026-09-19
 
 **Tag:** v4.2.0 · **Commit:** d198c88 · **Verifikation:** tsc fehlerfrei, 1173 Tests gruen (142 Dateien), Expo-Web-Export erfolgreich, ESLint 0 Errors / 0 Warnings (Start des Lint-Sprints: 86 Warnings), GitHub CI + Gitleaks success · **Kosten der Neuerungen:** 0,00 EUR
