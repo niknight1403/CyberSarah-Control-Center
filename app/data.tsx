@@ -1,5 +1,8 @@
 import { useNow } from "@/hooks/use-now";
-import { useColors } from "@/hooks/use-colors";
+/**
+ * Sprint 183 — Daten-Hub-Screen: useColors durch Glass-Tokens ersetzt. Logik unveraendert.
+ */
+import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { useMemo } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
@@ -13,10 +16,8 @@ import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/com
  * gut lesbare Uebersicht.
  */
 export default function DataScreen() {
-  const colors = useColors();
   // Sprint 172: Fallback-Zeit ueber die Tick-Uhr statt Date.now() im Render.
   const nowMs = useNow();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const dashboardQuery = trpc.dataHub.dashboard.useQuery(undefined, { retry: false, refetchInterval: 60_000 });
 
   const revenue = dashboardQuery.data?.revenue;
@@ -25,15 +26,15 @@ export default function DataScreen() {
   return (
     <DrawerScreen kicker="DATEN-HUB" title="Daten">
       {dashboardQuery.isLoading ? (
-        <View style={styles.centerRow}><ActivityIndicator color={colors.tint} /><Text style={styles.muted}>Live-Daten werden synchronisiert …</Text></View>
+        <View style={styles.centerRow}><ActivityIndicator color={glassPalette.cyan} /><Text style={styles.muted}>Live-Daten werden synchronisiert …</Text></View>
       ) : dashboardQuery.isError ? (
-        <DrawerCard accent={`${colors.tint}66`}>
+        <DrawerCard accent={`${glassPalette.cyan}66`}>
           <DrawerCardTitle>Daten-Hub nicht verfügbar</DrawerCardTitle>
           <DrawerBodyText>Melde dich an, um die Live-Geschäftsdaten zu sehen — derselbe Schutz wie im Dashboard.</DrawerBodyText>
         </DrawerCard>
       ) : (
         <>
-          <DrawerCard accent={`${colors.tint}55`}>
+          <DrawerCard accent={`${glassPalette.cyan}55`}>
             <DrawerCardTitle>Revenue (Stripe)</DrawerCardTitle>
             {revenue && revenue.status === "ok" ? (
               <>
@@ -46,13 +47,13 @@ export default function DataScreen() {
             )}
           </DrawerCard>
 
-          <DrawerCard accent={`${colors.success}55`}>
+          <DrawerCard accent={`${glassPalette.green}55`}>
             <DrawerCardTitle>Trading (Binance, öffentlich)</DrawerCardTitle>
             {trading && trading.status === "ok" && trading.tickers && trading.tickers.length > 0 ? (
               trading.tickers.slice(0, 3).map((ticker) => (
                 <View key={ticker.symbol} style={styles.tickerRow}>
                   <Text style={styles.tickerSymbol}>{ticker.symbol}</Text>
-                  <Text style={[styles.tickerPrice, ticker.changePercent < 0 && { color: colors.tint }]}>
+                  <Text style={[styles.tickerPrice, ticker.changePercent < 0 && { color: glassPalette.cyan }]}>
                     ${ticker.priceUsd.toLocaleString("de-DE")} ({ticker.changePercent >= 0 ? "+" : ""}{ticker.changePercent.toFixed(2)} %)
                   </Text>
                 </View>
@@ -62,14 +63,14 @@ export default function DataScreen() {
             )}
           </DrawerCard>
 
-          <DrawerCard accent={`${colors.tint}55`}>
+          <DrawerCard accent={`${glassPalette.cyan}55`}>
             <DrawerCardTitle>System</DrawerCardTitle>
             <Text style={styles.meta}>Snapshot von {new Date(dashboardQuery.data?.system.generatedAt ?? nowMs).toLocaleTimeString("de-DE")}</Text>
             {(dashboardQuery.data?.system.recentErrors ?? []).length === 0 ? (
-              <Text style={[styles.meta, { color: colors.success }]}>Keine Fehler in den letzten Logs.</Text>
+              <Text style={[styles.meta, { color: glassPalette.green }]}>Keine Fehler in den letzten Logs.</Text>
             ) : (
               (dashboardQuery.data?.system.recentErrors ?? []).map((message, index) => (
-                <Text key={index} style={[styles.meta, { color: colors.tint }]} numberOfLines={2}>• {message}</Text>
+                <Text key={index} style={[styles.meta, { color: glassPalette.cyan }]} numberOfLines={2}>• {message}</Text>
               ))
             )}
           </DrawerCard>
@@ -79,14 +80,16 @@ export default function DataScreen() {
   );
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
+function createStyles() {
   return StyleSheet.create({
     centerRow: { alignItems: "center", flexDirection: "row", gap: 10, paddingVertical: 12 },
-    muted: { color: colors.icon, fontSize: 12 },
-    value: { color: colors.text, fontSize: 22, fontWeight: "900", marginBottom: 4 },
-    meta: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 3 },
+    muted: { color: glassSurface.textSecondary, fontSize: 12 },
+    value: { color: glassSurface.textPrimary, fontSize: 22, fontWeight: "900", marginBottom: 4 },
+    meta: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 3 },
     tickerRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingVertical: 5 },
-    tickerSymbol: { color: colors.text, fontSize: 13, fontWeight: "800" },
-    tickerPrice: { color: colors.success, fontSize: 13, fontWeight: "700" },
+    tickerSymbol: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800" },
+    tickerPrice: { color: glassPalette.green, fontSize: 13, fontWeight: "700" },
   });
 }
+
+const styles = createStyles();
