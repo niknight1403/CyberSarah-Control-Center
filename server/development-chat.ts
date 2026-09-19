@@ -33,6 +33,8 @@ import { z } from "zod";
 import { invokeLLM, type InvokeResult, type Message, type Tool, type ToolCall } from "./_core/llm";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { callWorkspaceService } from "./_core/renderProxy";
+import { processSecretsInUserMessage } from "./secret-vault";
+import { buildSecretStoredNotice } from "../lib/secret-vault-logic";
 import { resolveAdminGithubToken } from "../lib/admin-integrations-logic";
 import {
   AGENT_TOOL_DEFINITIONS,
@@ -418,7 +420,27 @@ export const developmentChatRouter = router({
         const adminToken = resolveAdminGithubToken({ ADMIN_GITHUB_TOKEN: process.env.ADMIN_GITHUB_TOKEN, GITHUB_TOKEN: process.env.GITHUB_TOKEN }, true);
         if (adminToken.available) input.githubToken = adminToken.token;
       }
+      // Sprint 167: Secrets in ALLEN Nachrichten verarbeiten — Klartext
+      // wird AUTONOM verschluesselt im Vault abgelegt und NIE persistiert.
+      const storedSecretNames: string[] = [];
+      for (const message of input.messages) {
+        if (!message?.content) continue;
+        try {
+          const processed = await processSecretsInUserMessage(ctx.user.openId, message.content);
+          if (processed.storedNames.length > 0) {
+            message.content = processed.sanitizedText;
+            for (const name of processed.storedNames) {
+              if (!storedSecretNames.includes(name)) storedSecretNames.push(name);
+            }
+          }
+        } catch (error) {
+          console.warn("[developmentChat] Secret-Verarbeitung uebersprungen:", error);
+        }
+      }
       const result = await handleDevelopmentChat({ ...input, role: ctx.user.role, userOpenId: ctx.user.openId });
+      if (storedSecretNames.length > 0) {
+        result.content = `${result.content}${buildSecretStoredNotice(storedSecretNames)}`;
+      }
       // Sprint 54: Turn auf PostgreSQL persistieren (Best-Effort —
       // Persistenzfehler brechen die Chat-Antwort nicht ab).
       try {

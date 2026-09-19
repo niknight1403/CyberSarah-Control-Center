@@ -4,8 +4,10 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +20,7 @@ import { coerceLedgerTask, type LedgerTask } from "@/lib/task-ledger-logic";
 import { buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
+import { SecretsPanel } from "@/components/secrets/secrets-panel";
 
 /**
  * Sprint 149 — Superagent-Tab als echtes Chatfenster.
@@ -77,6 +80,7 @@ export default function SuperagentScreen() {
   );
 
   const runMutation = trpc.orchestrator.run.useMutation();
+  const [vaultOpen, setVaultOpen] = useState(false);
   const toolsQuery = trpc.orchestrator.tools.useQuery(undefined, { enabled: isAdmin });
 
   const optimizerQuery = trpc.orchestrator.optimizerStatus.useQuery(undefined, {
@@ -239,7 +243,32 @@ export default function SuperagentScreen() {
           {optimizerQuery.data?.lastError ? (
             <Text style={styles.optimizerError} numberOfLines={1}>{optimizerQuery.data.lastError}</Text>
           ) : null}
+          <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
+            <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
+          </Pressable>
         </View>
+
+        {/* Sprint 167: Secrets-Bereich des Superagenten-Chats */}
+        <Modal
+          visible={vaultOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setVaultOpen(false)}
+        >
+          <View style={[styles.vaultModal, { backgroundColor: colors.background }]}>
+            <View style={styles.vaultModalHeader}>
+              <Text style={styles.vaultModalTitle}>
+                VAULT<Text style={{ color: colors.tint }}>SECRETS</Text>
+              </Text>
+              <Pressable onPress={() => setVaultOpen(false)} style={styles.vaultClose}>
+                <Text style={styles.vaultCloseText}>Schließen</Text>
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.vaultContent}>
+              <SecretsPanel />
+            </ScrollView>
+          </View>
+        </Modal>
 
         {/* Chat-Strom */}
         <FlatList
@@ -449,6 +478,31 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   },
   sendButton: { backgroundColor: colors.tint, borderRadius: 12, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
   sendButtonDisabled: { opacity: 0.45 },
+  vaultChip: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: `${colors.tint}55`,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 6,
+    marginLeft: 8,
+  },
+  vaultChipText: { fontSize: 10, letterSpacing: 1, color: colors.tint, fontWeight: "700" },
+  vaultModal: { flex: 1, paddingTop: 16 },
+  vaultModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  vaultModalTitle: { fontSize: 16, fontWeight: "800", letterSpacing: 1, color: colors.text },
+  vaultClose: { paddingVertical: 6, paddingHorizontal: 10 },
+  vaultCloseText: { color: colors.tint, fontSize: 13, fontWeight: "600" },
+  vaultContent: { padding: 16, paddingBottom: 40 },
   sendButtonText: { color: colors.background, fontWeight: "900", fontSize: 16 },
   errorText: { color: colors.tint, fontSize: 12 },
 });

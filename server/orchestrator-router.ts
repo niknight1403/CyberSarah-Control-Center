@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
+import { processSecretsInUserMessage } from "./secret-vault";
+import { buildSecretStoredNotice } from "../lib/secret-vault-logic";
 import { runOrchestratorTask, SUPERAGENT_SYSTEM_PROMPT } from "./orchestrator/superagent";
 import { getTask, listTasks } from "./orchestrator/state-store";
 import { getToolDefinitions } from "./orchestrator/tool-registry";
@@ -23,7 +25,37 @@ export const orchestratorRouter = router({
         maxRounds: z.number().int().min(1).max(24).optional(),
       }),
     )
-    .mutation(async ({ input }) => runOrchestratorTask(input)),
+    .mutation(async ({ input, ctx }) => {
+      // Sprint 167: Secrets im Ziel verarbeiten — Klartext wird AUTONOM im
+      // Vault gespeichert, das Objective maskiert (nie im Ledger offen).
+      let secretsNotice: string | null = null;
+      try {
+        const processed = await processSecretsInUserMessage(ctx.user.openId, input.objective);
+        if (processed.storedNames.length > 0) {
+          input.objective = processed.sanitizedText;
+          secretsNotice = buildSecretStoredNotice(processed.storedNames);
+        }
+      } catch (error) {
+        console.warn("[orchestrator] Secret-Verarbeitung uebersprungen:", error);
+      }
+      const task = await runOrchestratorTask(input);
+      if (secretsNotice && typeof task.finalAnswer === "string") {
+        task.finalAnswer = `${task.finalAnswer}${secretsNotice}`;
+      } else if (secretsNotice) {
+        // Kein finalAnswer: Hinweis als eigenen Schritt dokumentieren.
+        const now = new Date().toISOString();
+        task.steps.push({
+          id: `secrets-${Date.now().toString(36)}`,
+          name: "secrets-vault",
+          status: "success",
+          attempts: 1,
+          logs: [secretsNotice.replace(/^\s+$/gm, "").trim()],
+          startedAt: now,
+          finishedAt: now,
+        });
+      }
+      return task;
+    }),
 
   /** Task-Ledger als Uebersicht (neueste zuerst). */
   tasks: adminProcedure

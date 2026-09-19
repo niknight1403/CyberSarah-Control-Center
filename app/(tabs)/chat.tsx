@@ -19,6 +19,7 @@ import { RepositoryConnectCard } from "@/components/studio/repository-connect-ca
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
 import { DevTracePanel } from "@/components/chat/dev-trace-panel";
+import { SecretsPanel } from "@/components/secrets/secrets-panel";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
@@ -35,7 +36,7 @@ type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal; t
 type ChatAttachment = MediaAttachment;
 type ConnectorTestStatus = "idle" | "testing" | "success" | "error";
 type ConnectorTestState = { status: ConnectorTestStatus; message?: string };
-type InnerTab = "chat" | "github" | "skills";
+type InnerTab = "chat" | "github" | "skills" | "secrets";
 
 const ACTIVE_AGENT_STORAGE_KEY = "custom-ai-studio.superagents.active.v1";
 
@@ -318,7 +319,7 @@ export default function ChatScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.flex}>
             <StudioHeader eyebrow="CYBERSARAH · KI-OPERATIONS" title="Chat" />
             <View style={s.tabBar}>
-              {([["chat", "chatbubbles", "Chat"], ["github", "logo-github", "GitHub"], ["skills", "sparkles", "Skills"]] as const).map(([tab, icon, label]) => (
+              {([["chat", "chatbubbles", "Chat"], ["github", "logo-github", "GitHub"], ["skills", "sparkles", "Skills"], ["secrets", "lock-closed", "Secrets"]] as const).map(([tab, icon, label]) => (
                 <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[s.tab, activeTab === tab && s.tabActive]}>
                   <Ionicons name={icon as never} size={14} color={activeTab === tab ? colors.tint : "#6B7D90"} />
                   <Text style={[s.tabText, activeTab === tab && s.tabTextActive]}>{label}</Text>
@@ -444,6 +445,13 @@ export default function ChatScreen() {
                     {connectorTests[id].message && <Text style={[s.testResult, { color: statusColor(connectorTests[id].status) }]}>{connectorTests[id].message}</Text>}
                   </View>
                 ))}
+              </ScrollView>
+            )}
+
+            {activeTab === "secrets" && (
+              <ScrollView contentContainerStyle={s.content}>
+                <StudioSection label="Vault" title="Secrets sicher verwalten" />
+                <SecretsPanel />
               </ScrollView>
             )}
 

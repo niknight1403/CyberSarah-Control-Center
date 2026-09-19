@@ -21,6 +21,7 @@ import { superAgentsRouter } from "./super-agents-router";
 import { providerAdminRouter } from "./provider-admin-router";
 import { autonomousDevRouter } from "./autonomous-dev-router";
 import { keylessSearchRouter } from "./keyless-search";
+import { secretsRouter } from "./secrets-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -47,6 +48,7 @@ export const appRouter = router({
   providerAdmin: providerAdminRouter,
   autonomousDev: autonomousDevRouter,
   keylessSearch: keylessSearchRouter,
+  secrets: secretsRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.
