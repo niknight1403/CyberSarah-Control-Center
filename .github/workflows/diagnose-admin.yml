@@ -1,0 +1,49 @@
+name: Diagnose Admin-Rollen
+
+# Read-only-Diagnose: Warum hat der Login keine Admin-Rechte?
+# Listet (a) alle Konten aus der produktiven Neon-DB (Rolle, E-Mail,
+# Login-Methode) und (b) ADMIN_EMAIL/OWNER_OPEN_ID auf dem Render-Service.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Abhaengigkeiten installieren
+        run: npm ci --include=dev --no-audit --no-fund
+      - name: Konten aus produktiver DB listen
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx tsx scripts/diagnose-admin.ts
+      - name: Render-ENV ADMIN_EMAIL / OWNER_OPEN_ID auslesen
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          key = os.environ["RENDER_API_KEY"]
+          app_sid = "srv-dahjgllg1s2s73bf9u4g"
+
+          req = urllib.request.Request(
+              f"https://api.render.com/v1/services/{app_sid}/env-vars?limit=100",
+              headers={"Authorization": "Bearer " + key},
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              entries = json.load(response)
+
+          print("--- Render-ENV (Admin-relevant) ---")
+          for entry in entries:
+              item = entry.get("envVar", entry)
+              if item.get("key") in ("ADMIN_EMAIL", "OWNER_OPEN_ID", "OAUTH_SERVER_URL"):
+                  value = item.get("value") or "(leer)"
+                  print(f"{item.get('key')} = {value}")
+          PY
