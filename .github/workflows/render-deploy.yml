@@ -78,6 +78,9 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
           OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
+          # ADMIN_EMAIL wird an Render synchronisiert (buildServiceEnv) —
+          # macht die Admin-Rolle unabhaengig vom Code-Default.
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           WORKSPACE_SERVICE_URL: ${{ secrets.WORKSPACE_SERVICE_URL }}
           # Fallback: gleiches Token wie der Workspace-Service selbst (SERVICE_ACCESS_TOKEN)
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
@@ -123,6 +126,9 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
           OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
+          # ADMIN_EMAIL wird an Render synchronisiert (buildServiceEnv) —
+          # macht die Admin-Rolle unabhaengig vom Code-Default.
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           WORKSPACE_SERVICE_URL: ${{ secrets.WORKSPACE_SERVICE_URL }}
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN || 'app.cybersarah-ki.com' }}
