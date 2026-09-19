@@ -1,12 +1,11 @@
 import { useColors } from "@/hooks/use-colors";
-import { useMemo } from "react";
+import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Superagenten-Modul: breite Neon-Glas-Karte mit ECHTEM
  * Backend-Status. Zeigt niemals „LIVE · AKTIV" ohne aktiven Agenten und
  * startet keine kostenpflichtigen LLM-Aufrufe beim Oeffnen des Dashboards.
  */
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View, useAnimatedValue } from "react-native";
-import { useEffect, useState } from "react";
 import { router } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";

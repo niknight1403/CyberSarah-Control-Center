@@ -1,11 +1,10 @@
 import { useColors } from "@/hooks/use-colors";
-import { useMemo } from "react";
+import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Dashboard-Header: Logo, Schriftzug, Notification-Bell mit
  * ehrlichem Indikator (nur bei echten Fehlern aus dem Backend-Status).
  */
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-native";
-import { useEffect, useState } from "react";
 import { router } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";

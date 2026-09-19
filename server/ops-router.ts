@@ -222,10 +222,27 @@ function probeChat(): OpsCheckInput {
   if (endpoint) {
     return { kind: "chat", state: "ok", detail: `Managed-LLM: ${endpoint.source}` };
   }
+  // Custom-Provider (OpenAI-kompatibel) und lokale Endpoints (Ollama/LM
+  // Studio) sind vollwertige Chat-Provider des Model-Routers — sie duerfen
+  // den Ops-Check nicht faelschlich als 'degraded' melden.
+  const customBaseUrl = (
+    process.env.AI_CUSTOM_BASE_URL?.trim() || process.env.CUSTOM_OPENAI_BASE_URL?.trim() || ""
+  ).replace(/\/$/, "");
+  if (customBaseUrl) {
+    return { kind: "chat", state: "ok", detail: `Custom-LLM: ${customBaseUrl}` };
+  }
+  const ollamaBaseUrl = process.env.AI_OLLAMA_BASE_URL?.trim() || "";
+  if (ollamaBaseUrl) {
+    return { kind: "chat", state: "ok", detail: `Lokales LLM: Ollama (${ollamaBaseUrl})` };
+  }
+  const lmStudioBaseUrl = process.env.AI_LMSTUDIO_BASE_URL?.trim() || "";
+  if (lmStudioBaseUrl) {
+    return { kind: "chat", state: "ok", detail: `Lokales LLM: LM Studio (${lmStudioBaseUrl})` };
+  }
   return {
     kind: "chat",
     state: "degraded",
-    detail: "kein KI-Key konfiguriert (Groq/OpenRouter/Gemini/Forge/OpenAI)",
+    detail: "kein KI-Key konfiguriert (Groq/OpenRouter/Gemini/Forge/OpenAI/Custom/Ollama)",
   };
 }
 

@@ -15,6 +15,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetManagedKeyPoolForTests } from "../server/_core/llm";
+import { runOrchestratorTask } from "../server/orchestrator/superagent";
+
 // Der State-Store persistiert Tasks ueber die generische KV-Tabelle
 // (modelRouterSettings) in Neon-Postgres. Fuer diesen reinen Provider-
 // Failover-Test wird eine In-Memory-Fake-DB verwendet, damit der Test ohne
@@ -26,9 +29,6 @@ vi.mock("../server/db", () => ({
     kv.set(key, value);
   }),
 }));
-
-import { resetManagedKeyPoolForTests } from "../server/_core/llm";
-import { runOrchestratorTask } from "../server/orchestrator/superagent";
 
 const fakeResponse = (status: number, body: unknown) =>
   ({

@@ -15,7 +15,7 @@ import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { handleRotationWebhook } from "../provider-admin";
+import { handleRotationWebhook , initProviderAdmin } from "../provider-admin";
 import { providerAdminIdSchema } from "../provider-admin-router";
 import { registerRenderProxy } from "./renderProxy";
 import { appRouter } from "../routers";
@@ -29,7 +29,6 @@ import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
 import { checkDatabaseHealth } from "../db";
 import { restoreRouterState } from "../model-router";
-import { initProviderAdmin } from "../provider-admin";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,

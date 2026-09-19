@@ -1,12 +1,11 @@
 import { useColors } from "@/hooks/use-colors";
-import { useMemo } from "react";
+import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Loading-/Empty-/Error-States fuer das Dashboard.
  * Skeleton-Shimmer nur als dezente Opacity-Animation (performant,
  * Reduce-Motion-sicher), kein Blur.
  */
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View, useAnimatedValue } from "react-native";
-import { useEffect, useState } from "react";
 
 import { createNeonStyles } from "./neon-dashboard-styles";
 

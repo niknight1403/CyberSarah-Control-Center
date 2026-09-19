@@ -23,7 +23,17 @@ import {
   PROVIDER_ADMIN_META,
   sanitizeAuditDetail,
   secretIntegrityHash,
-} from "../lib/provider-admin-logic";
+
+  parseKeyPool,
+  nextPoolIndex,
+  parseSecretManagerConfig,
+  shouldTriggerAutonomousRotation,
+  webhookSecretMatches} from "../lib/provider-admin-logic";
+
+// ---------------------------------------------------------------------------
+// Key-Pools & autonome Rotation (Sprint 155)
+// ---------------------------------------------------------------------------
+
 
 // ---------------------------------------------------------------------------
 // Provider-Matrix (Phase 1)
@@ -250,18 +260,6 @@ describe("Audit-Hygiene", () => {
     expect(event.provider).toBe("openai");
   });
 });
-
-// ---------------------------------------------------------------------------
-// Key-Pools & autonome Rotation (Sprint 155)
-// ---------------------------------------------------------------------------
-
-import {
-  parseKeyPool,
-  nextPoolIndex,
-  parseSecretManagerConfig,
-  shouldTriggerAutonomousRotation,
-  webhookSecretMatches,
-} from "../lib/provider-admin-logic";
 
 describe("parseKeyPool", () => {
   it("parst kommaseparierte ENV-Pools und ignoriert Leereinträge", () => {
