@@ -9,6 +9,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 import { AdminLiveStatusCard } from "@/components/studio/admin-live-status-card";
 import { ProviderAdminCard } from "@/components/studio/provider-admin-card";
+import { AutonomousDevCard } from "@/components/studio/autonomous-dev-card";
 import { trpc } from "@/lib/trpc";
 import {
   canAccess,
@@ -93,6 +94,9 @@ export default function AdminDashboardScreen() {
 
         <StudioSection label="Provider" title="LLM-Provider & API-Keys" />
         <ProviderAdminCard isAdmin={isAdmin} />
+
+        <StudioSection label="Entwicklung" title="Autonome Entwicklung (0 EUR)" />
+        <AutonomousDevCard isAdmin={isAdmin} />
 
         <StudioSection label="Autonomie" title="Autonomer System-Agent" />
         <View style={[styles.agentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

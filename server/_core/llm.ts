@@ -6,6 +6,7 @@ import {
   resolveManagedLlmEndpoints,
   type ManagedLlmEndpoint,
 } from "../../lib/managed-llm-fallback-logic";
+import { isProviderQuarantined } from "../../lib/live-fix-logic";
 import { resolveManagedModel } from "../../lib/managed-model-logic";
 import {
   createKeyPoolEntry,
@@ -578,6 +579,15 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   let ordered = candidates.filter((endpoint) => activeSources.has(endpoint.source));
   if (ordered.length === 0) {
     ordered = [...candidates];
+  }
+
+  // Sprint 165 — Live-Fix-Quarantaene: Der Self-Healing-Live-Fix setzt
+  // limitierte Provider (429/Quota) fuer 60s in Quarantaene; die Kette
+  // rotiert sofort auf den naechsten Endpoint. Sind ALLE in Quarantaene,
+  // wird trotzdem Best-Effort weitergearbeitet (Service bleibt nie stumm).
+  const notQuarantined = ordered.filter((endpoint) => !isProviderQuarantined(endpoint.source));
+  if (notQuarantined.length > 0) {
+    ordered = notQuarantined;
   }
 
   const payload: Record<string, unknown> = {

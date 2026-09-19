@@ -1,3 +1,30 @@
+## Sprint 165 (2026-09-19) — Offene Punkte aus dem V4.1-Review behoben
+
+### Keyless Web-Search (Alternative zu bezahlten Search-APIs)
+- `lib/keyless-search.ts` + `server/keyless-search.ts`: echte, keylose Web-Suche via DuckDuckGo-HTML-Scraping (uddg-Redirect-Dekodierung, Snippet-Extraktion, Dedup, Ergebnisbegrenzung, 8s-Timeout, ehrliches Fehlverhalten) — 0 EUR, 0 API-Keys.
+- tRPC: `keylessSearch.search` (admin-geschuetzt). Live verifiziert: 8 Treffer fuer 'kostenlose llm api'.
+- 5 neue Logik-Tests; Router registriert.
+
+### Live-Fix-Quarantaene in der Chat-Runtime
+- `server/_core/llm.ts`: `invokeLLM()` filtert quarantaenierte Provider (60s nach 429/Quota) aus der Kaskade — die Kette rotiert sofort auf den naechsten Endpoint; sind alle in Quarantaene, wird Best-Effort weitergearbeitet (nie stumm).
+
+### Admin-UI
+- `components/studio/autonomous-dev-card.tsx` + Einbindung in app/admin.tsx: Template-Auswahl (8 Vorlagen), Wunsch-Feld, Ein-Klick-Entwicklung (0 EUR), letzte Laeufe mit Kosten-Nachweis.
+
+## Sprint 164 (2026-09-19) — Vollautonome 0-EUR-Entwicklung + Live-Fix-Agent
+
+- Zero-Cost-Dev-Stack-Registry (`lib/free-dev-stack.ts`): alle kostenlosen LLMs (Groq/OpenRouter :free/Gemini/Cerebras/SambaNova/GitHub Models + lokale Ollama/LM-Studio-Endpunkte), Werkzeuge (tsc, vitest, node --check) und Anbindungs-Alternativen (GitHub-API Free, Neon Free, DuckDuckGo, lokale Ablage) mit ehrlichem isZeroCost-Nachweis; bezahlte Endpoints werden NIE gewaehlt.
+- Autonome Entwicklungs-Pipeline (`lib/autonomous-dev-logic.ts` + `server/autonomous-dev.ts`): 8 Standalone-HTML5-Templates (Pong, Snake, Breakout, Flappy, To-Do, Notizen, Taschenrechner, Timer) — Plan -> freie LLM-Personalisierung (Cloud -> Ollama -> Template-Defaults) -> node --check-Verifikation mit autonomer Fix-Schleife -> Lieferung ins Workspace; auch OHNE jeden API-Key vollstaendig autonom (Offline-Modus), harte 0-EUR-Garantie. Live-Lauf: Snake 4,4 KB, Verifikation bestanden.
+- Live-Fix-Agent (`lib/live-fix-logic.ts`, verdrahtet in server/self-healing.ts): Incidents werden sofort live behoben — Backup-Waechter-Reset bei DB-Stoerung, Log-Puffer-Purge bei OOM, 60s-Provider-Quarantaene bei 429/Quota; angewandte Fixes werden am Incident dokumentiert.
+- tRPC: `autonomousDev`-Router (catalog/stack/develop/runs/preview). 17 neue Tests. Release v4.1.0 veroeffentlicht.
+
+## Sprint 163 (2026-09-19) — ToolLimitResolverAgent & Tool-Rotator
+
+- `artifacts/api-server`: Dynamic Tool & Key Rotator Engine mit kostenloser Multi-Tier-Kaskade (Tier 1: Groq/Gemini 2.5/Cerebras/SambaNova/GitHub Models, Tier 2: OpenRouter :free/HF Serverless/Cloudflare Workers AI, Tier 3: lokales Ollama — garantiert unbegrenzt).
+- ToolLimitResolverAgent (BaseAgent): faengt 429/403/503, Quota- und Token-Limits autonom ab, rotiert in Millisekunden, re-executet gescheiterte Tasks ohne Datenverlust; Dedicated VIP Admin Bypass (Admin-Keys nie vom Cooldown-Loop beruehrt), 60s-Cooldown-Queue mit Selbstheilung (STATUS: HEALTHY).
+- Zentrale Task-Execution-Pipeline + Express/tRPC-Middleware-Adapter; Resilienz- & HITL-Test-Suite (32 Checks, Exit-Codes, GREEN-Banner).
+
+
 ## Sprint 162 (2026-09-19) — Vektor-Gedaechtnis produktiv: Tabelle, Store-Adapter, Prompt-Injektion
 
 ### Memory
