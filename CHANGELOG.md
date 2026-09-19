@@ -8,6 +8,8 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
 ### Added
 - **Sprint 187 — Wix-API-Anbindung (read-only):** Admin-gated Karte „Wix-API" mit ehrlichem Konfigurationsstatus, verschlüsselter API-Key-Ablage (AES-256-GCM im KV, Env-Fallback), Site-ID-Setzung zur Laufzeit (KV, ohne Redeploy), Konto-Site-Suche (Tap-to-select) sowie Site-Properties (v4) und eCommerce-Orders-Views. Read-only-Client (`server/wix.ts`, 15-s-Timeout) mit klassifizierten Fehlerzustaenden aus der Live-Verifikation (META_SITE_NOT_FOUND, READ_ORDER_FORBIDDEN, HTML-403, Controller-404). 22 neue Tests (1195 gesamt). Siehe `docs/SPRINT_187_WIX_API.md`.
+- **Sprint 187 (Performance) — KDF-Root-Cause-Fix:** NODE_ENV wurde in dieser Umgebung mit 'production' gesetzt; Vitest ueberschreibt ein besetztes NODE_ENV nicht, sodass die KDF-Guards (NODE_ENV=test) ins Leere liefen und PBKDF2 volle 310.000 Iterationen zog (~60 s je Backup-Datei). vitest.config.ts erzwingt jetzt NODE_ENV='test', support-backup erhaelt das Sprint-112-Override-Muster (Envelope-Iterationszahl), Worker-Reuse (isolate: false) und testTimeout: 180.000. Suite: 61 s → 4 s.
+- **Sprint 187 (CI-Fix) — ENV dynamisch:** server/_core/env.ts friert die Env-Werte nicht mehr beim Modul-Import ein (dynamische Getter). Mit isolate: false bewertete sonst ein frueher Import ohne JWT_SECRET ENV.cookieSecret fuer alle Testdateien des Workers leer (CI: 'DataError: Zero-length key'). Produktion unberuehrt.
 
 ## [4.2.0] — 2026-09-19
 
