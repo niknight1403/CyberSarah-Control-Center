@@ -22,9 +22,13 @@ import {
   triggerEmergencyStop,
   type BackendAgentLog,
 } from "@/lib/cybersarah-backend-client";
+
 import { cyber, cyberTypography } from "@/lib/cyber-theme";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
+
+// Sprint 172: Stabile Identitaet fuer den leeren Log-Fallback (kein [] im Render).
+const EMPTY_LOG_ENTRIES: LogEntry[] = [];
 
 /**
  * Sprint 126 — Cyber-Terminal: Echtzeit-Log-Viewer mit farblich
@@ -80,6 +84,10 @@ function backendLogToEntry(log: BackendAgentLog): LogEntry {
 }
 
 export default function CyberTerminalScreen() {
+  // Reanimated + React Compiler (Sprint 172): Shared-Value-Writes (stopScale)
+  // sind sanktionierte Reanimated-Mutationen — "use no memo" ist die
+  // dokumentierte Interop-Direktive; Verhalten unveraendert.
+  "use no memo";
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [stopped, setStopped] = useState(false);
@@ -129,7 +137,7 @@ export default function CyberTerminalScreen() {
     };
   }, [backendOnline, stopped]);
 
-  const studioEntries = (logsQuery.data?.entries ?? []) as unknown as LogEntry[];
+  const studioEntries = (logsQuery.data?.entries ?? EMPTY_LOG_ENTRIES) as unknown as LogEntry[];
   const merged = React.useMemo(() => {
     if (!backendOnline || backendLogs.length === 0) return studioEntries;
     const byId = new Map<string, LogEntry>();
@@ -144,10 +152,12 @@ export default function CyberTerminalScreen() {
   const stopAnimated = useAnimatedStyle(() => ({ transform: [{ scale: stopScale.value }] }));
 
   const handleStopIn = useCallback(() => {
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated Shared-Value-Write (sanktionierte API, keine React-State-Mutation).
     stopScale.value = withSpring(0.94, { damping: 10, stiffness: 320 });
   }, [stopScale]);
 
   const handleStopOut = useCallback(() => {
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated Shared-Value-Write (sanktionierte API, keine React-State-Mutation).
     stopScale.value = withSpring(1, { damping: 14 });
   }, [stopScale]);
 

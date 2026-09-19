@@ -36,15 +36,13 @@ export default function ThemeLabScreen() {
   const appVariant = resolveAppVariant(process.env.EXPO_PUBLIC_APP_VARIANT);
 
   // Hooks muessen vor jedem Early-Return laufen (react-hooks/rules-of-hooks,
-  // Sprint 128 Lint-Pass): Memoisierung zuerst, Variant-Gate danach.
-  const swatches = useMemo(
-    () =>
-      paletteNames.map((name) => ({
-        name,
-        value: resolveDesignPalette(designTheme, colorScheme)[name],
-      })),
-    [designTheme, colorScheme],
-  );
+  // Sprint 128 Lint-Pass): Variant-Gate danach. Sprint 172: Die manuelle
+  // useMemo-Spiegelung konnte der Compiler nicht erhalten — direkte Berechnung
+  // (winzig, ~12 Eintraege), Optimierung ueberlaesst der Compiler-Kompilierung.
+  const swatches = paletteNames.map((name) => ({
+    name,
+    value: resolveDesignPalette(designTheme, colorScheme)[name],
+  }));
 
   const tileStyles = useMemo(() => {
     const build = (scheme: ColorScheme) => {

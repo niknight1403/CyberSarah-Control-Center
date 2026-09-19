@@ -1,3 +1,4 @@
+import { useNow } from "@/hooks/use-now";
 import { useColors } from "@/hooks/use-colors";
 import { useMemo } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
@@ -13,6 +14,8 @@ import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/com
  */
 export default function DataScreen() {
   const colors = useColors();
+  // Sprint 172: Fallback-Zeit ueber die Tick-Uhr statt Date.now() im Render.
+  const nowMs = useNow();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const dashboardQuery = trpc.dataHub.dashboard.useQuery(undefined, { retry: false, refetchInterval: 60_000 });
 
@@ -61,7 +64,7 @@ export default function DataScreen() {
 
           <DrawerCard accent={`${colors.tint}55`}>
             <DrawerCardTitle>System</DrawerCardTitle>
-            <Text style={styles.meta}>Snapshot von {new Date(dashboardQuery.data?.system.generatedAt ?? Date.now()).toLocaleTimeString("de-DE")}</Text>
+            <Text style={styles.meta}>Snapshot von {new Date(dashboardQuery.data?.system.generatedAt ?? nowMs).toLocaleTimeString("de-DE")}</Text>
             {(dashboardQuery.data?.system.recentErrors ?? []).length === 0 ? (
               <Text style={[styles.meta, { color: colors.success }]}>Keine Fehler in den letzten Logs.</Text>
             ) : (

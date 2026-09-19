@@ -31,6 +31,7 @@ import { DEFAULT_SKILL_PREFERENCES, enabledSkillCount, normalizeSkillPreferences
 import { FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ListRenderItemInfo } from "react-native";
 import { darken, withAlpha } from "@/lib/theme-color-utils";
 import { useColors } from "@/hooks/use-colors";
+import { useNow } from "@/hooks/use-now";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal; timestampMs?: number };
 type ChatAttachment = MediaAttachment;
@@ -81,6 +82,8 @@ export default function ChatScreen() {
   const [managerVisible, setManagerVisible] = useState(false);
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
+  // Sprint 172: Aktuelle Zeit im Render ueber die Tick-Uhr statt Date.now().
+  const nowMs = useNow();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   // Sprint 139 — Robustes Auto-Scroll (Owner-Feedback 16.09.2026): Die Antwort
   // muss nach dem Senden sofort im sichtbaren Bereich erscheinen, wie in jedem
@@ -225,6 +228,7 @@ export default function ChatScreen() {
 
   const testConnector = async (connector: ConnectorId) => {
     setConnectorTests((c) => ({ ...c, [connector]: { status: "testing", message: "Prüfung läuft …" } }));
+    // eslint-disable-next-line react-hooks/purity -- Event-Handler (kein Render-Pfad): Latenzmessung des Verbindungstests.
     const startMs = Date.now();
     try {
       if (connector === "workspace") await loadWorkspaceHealth();
@@ -235,6 +239,7 @@ export default function ChatScreen() {
         if (!readyForChat) throw new Error("KI-Provider nicht konfiguriert.");
         await requestDevelopmentChat("Verbindungstest: Antworte nur mit OK.");
       }
+      // eslint-disable-next-line react-hooks/purity -- Event-Handler (kein Render-Pfad): Latenzmessung des Verbindungstests.
       const endMs = Date.now();
       const sample: LatencySample = { providerId: connector, latencyMs: endMs - startMs, timestampMs: endMs };
       const scores = rankProviders([sample], { nowMs: endMs, maxSampleAgeMs: 300000, degradedThresholdMs: 2000 });
@@ -304,7 +309,7 @@ export default function ChatScreen() {
         {showDay && msg.timestampMs != null ? (
           <View style={s.dayDividerRow}>
             <View style={s.dayDividerLine} />
-            <Text style={s.dayDividerText}>{formatChatDay(msg.timestampMs, Date.now())}</Text>
+            <Text style={s.dayDividerText}>{formatChatDay(msg.timestampMs, nowMs)}</Text>
             <View style={s.dayDividerLine} />
           </View>
         ) : null}

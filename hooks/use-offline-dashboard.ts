@@ -1,3 +1,4 @@
+import { useNow } from "./use-now";
 /**
  * Sprint 119 — Offline-Pufferung des Daten-Hubs: Hook fuer das Dashboard.
  *
@@ -34,6 +35,8 @@ export function useOfflineDashboard(): OfflineDataState<DataHubDashboardData> & 
   // (kein synchrones setState im Effect, kein zusaetzlicher Render).
   const cacheLookupDoneRef = useRef(false);
   const lastPersistedPayload = useRef<string>("");
+  // Sprint 172: Zeitstempel fuer die Render-Entscheidung ueber die Tick-Uhr.
+  const nowMs = useNow();
 
   // Live-Daten puffern (normalisiert: gleiche Antwort nicht doppelt schreiben).
   useEffect(() => {
@@ -82,10 +85,9 @@ export function useOfflineDashboard(): OfflineDataState<DataHubDashboardData> & 
         isLoading: query.isLoading,
         queryError: query.error,
         cachedEnvelope,
-        // Date.now() im Memo: Zustand wird bei jeder Render-Entscheidung neu bewertet.
-        nowMs: Date.now(),
+        nowMs,
       }),
-    [query.data, query.isLoading, query.error, cachedEnvelope],
+    [query.data, query.isLoading, query.error, cachedEnvelope, nowMs],
   );
 
   const refresh = useCallback(() => {

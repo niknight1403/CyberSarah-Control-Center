@@ -91,6 +91,7 @@ import {
 import { Image as ExpoImage } from "expo-image";
 import { darken, lighten, withAlpha } from "@/lib/theme-color-utils";
 import { useColors } from "@/hooks/use-colors";
+import { useNow } from "@/hooks/use-now";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal };
 type ChatAttachment = MediaAttachment;
@@ -138,6 +139,8 @@ export default function AgentScreen() {
   const [lastProviderUsed, setLastProviderUsed] = useState(settings.provider);
   const [chatError, setChatError] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  // Sprint 172: Aktuelle Zeit im Render ueber die Tick-Uhr (kein Date.now waehrend des Renderns).
+  const nowMs = useNow();
   const [backupPassword, setBackupPassword] = useState("");
   const [backupPasswordRepeat, setBackupPasswordRepeat] = useState("");
   const [backupState, setBackupState] = useState<
@@ -160,7 +163,6 @@ export default function AgentScreen() {
   // Duplikat- und Überlaufbehandlung stammen unverändert aus der geprüften
   // Zustandsmaschine; das Limit folgt der bestehenden Verlaufskonfiguration.
   const proposalSources = useMemo<ProposalSource[]>(() => {
-    const nowMs = Date.now();
     return messages
       .map((message, index) => ({ message, index }))
       .flatMap(({ message, index }) => (message.proposal ? [{ message, index }] : []))
@@ -186,13 +188,13 @@ export default function AgentScreen() {
           statusOverride: queueStatusOverrides[message.id],
         };
       });
-  }, [messages, queueStatusOverrides]);
+  }, [messages, queueStatusOverrides, nowMs]);
 
   const proposalQueueView = useMemo(() => {
     if (!proposalSources.length) return null;
     try {
       return buildProposalQueueView(proposalSources, {
-        nowMs: Date.now(),
+        nowMs,
         maxQueued: DEVELOPMENT_CHAT_HISTORY_LIMIT,
         ttlMs: DEFAULT_PROPOSAL_QUEUE_TTL_MS,
         defaultPriority: "normal",
@@ -200,7 +202,7 @@ export default function AgentScreen() {
     } catch {
       return null;
     }
-  }, [proposalSources]);
+  }, [proposalSources, nowMs]);
 
   const proposalMessages = useMemo(() => {
     const lookup = new Map<string, AgentProposal>();
@@ -540,6 +542,7 @@ export default function AgentScreen() {
     if (!selectedChanges.length) return;
     // Sprint 46: Vor jeder Anwendung wird automatisch ein hash-gesicherter
     // Snapshot erzeugt (geprüfte Sprint-36-Logik).
+    // eslint-disable-next-line react-hooks/purity -- Event-Handler (kein Render-Pfad): Zeitstempel gehoert zum Snapshot.
     const snapshots = buildProposalSnapshots(files, selectedChanges, Date.now());
     setMessages((current) =>
       current.map((message) =>

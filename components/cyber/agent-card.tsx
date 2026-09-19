@@ -14,12 +14,19 @@ export interface CyberAgentCardProps {
 }
 
 export function CyberAgentCard({ name, role, status, metric, onPress }: CyberAgentCardProps) {
+  // Reanimated + React Compiler (Sprint 172): Shared-Value-Writes sind die
+  // sanktionierte Reanimated-API, gelten dem Compiler aber als Mutation.
+  // "use no memo" ist die dokumentierte Interop-Direktive (Komponente wird
+  // bewusst nicht compiler-optimiert, Verhalten unveraendert).
+  "use no memo";
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useSharedValue(1);
   const glow = useSharedValue(0);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], shadowOpacity: 0.12 + glow.value * 0.25 }));
+  // eslint-disable-next-line react-hooks/immutability -- Reanimated Shared-Value-Writes (sanktionierte API, keine React-State-Mutation).
   const handlePressIn = useCallback(() => { scale.value = withSpring(0.97, { damping: 12, stiffness: 300 }); glow.value = withSpring(1, { damping: 14 }); }, [scale, glow]);
+  // eslint-disable-next-line react-hooks/immutability -- Reanimated Shared-Value-Writes (sanktionierte API, keine React-State-Mutation).
   const handlePressOut = useCallback(() => { scale.value = withSpring(1, { damping: 14, stiffness: 260 }); glow.value = withSpring(0, { damping: 16 }); }, [scale, glow]);
   const statusColor = status === "success" ? colors.success : status === "running" ? colors.tint : status === "error" ? colors.error : status === "warn" ? colors.warning : colors.icon;
   return (

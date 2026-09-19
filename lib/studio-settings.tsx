@@ -203,7 +203,7 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
     await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(nextSettings));
     setSettings(nextSettings);
     return nextSettings;
-  }, [settings.hasGitHubToken, settings.hasProviderKey, settings.hasServiceAccessToken, settings.localProviderEndpoints, settings.protectChatContent, settings.providerKeyStatus, settings.workspaceId]);
+  }, [settings.hasGitHubToken, settings.hasServiceAccessToken, settings.localProviderEndpoints, settings.protectChatContent, settings.providerKeyStatus, settings.workspaceId]);
 
   const setProtectedChatContent = useCallback(async (enabled: boolean) => {
     const nextSettings = { ...settings, protectChatContent: enabled };

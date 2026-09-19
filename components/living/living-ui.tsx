@@ -92,6 +92,8 @@ const ORB_COLORS: Record<OrbState, [string, string, string]> = {
   error: ["#FF7B8A", "#FF4A3A", "#7C5CFF"],
 };
 
+const ORB_PHASE_SEED_MS = Date.now();
+
 export function AiOrb({ state = "idle", size = 24 }: { state?: OrbState; size?: number }) {
   const pulse = useMemo(() => new Animated.Value(0), []);
   useEffect(() => {
@@ -120,7 +122,10 @@ export function AiOrb({ state = "idle", size = 24 }: { state?: OrbState; size?: 
     outputRange: [1, 1 + ORB_PULSE_SCALE[state]],
   });
   // Startphase deterministisch aus der Logik (kein sichtbarer Kaltstart bei 0).
-  const initialPhase = orbPulsePhase(Date.now(), state);
+  // Sprint 172: Seed einmalig beim Modul-Laden ziehen (Modul-Scope) — Date.now()
+  // waehrend des Renderns ist unrein und eine Tick-Uhr wuerde die Opacity je
+  // Render aendern; der Modul-Seed ist stabil und visuell neutral.
+  const initialPhase = orbPulsePhase(ORB_PHASE_SEED_MS, state);
 
   return (
     <Animated.View style={{ width: size, height: size, transform: [{ scale }] }}>
