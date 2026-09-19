@@ -2,9 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { CYBERSARAH_REVENUE_REPOSITORY_NAME, CYBERSARAH_REVENUE_REPOSITORY_URL, CYBERSARAH_REVENUE_DEFAULT_BRANCH, normalizeBranch, normalizeRepositoryUrl } from "@/lib/repository-intent-logic";
 import { filterGithubRepositories, formatRelativeUpdatedAt, repositoryToConnectInput, type GithubRepositorySummary } from "@/lib/github-repository-picker-logic";
-import { PrimaryButton } from "@/components/studio/primitives";
+/**
+ * Sprint 182 — Repository-Connect-Card auf "CyberSarah Future Glass"
+ * umgestellt: GlowButton statt PrimaryButton, Glass-Tokens statt
+ * useColors/Hand-Hexes. Verbindungslogik (Autonomer Connector, Fallback)
+ * unveraendert.
+ */
+import { GlowButton } from "@/components/glass/glass-primitives";
+import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { lighten, withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
 
 export type RepositoryConnectResult = { workspaceId: string; branch: string; files: string[] };
 
@@ -21,8 +27,6 @@ type RepositoryConnectCardProps = {
 };
 
 export function RepositoryConnectCard({ onConnect, onClose, onListRepositories }: RepositoryConnectCardProps) {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]);
   const [repositoryUrl, setRepositoryUrl] = useState(CYBERSARAH_REVENUE_REPOSITORY_URL);
   const [branch, setBranch] = useState(CYBERSARAH_REVENUE_DEFAULT_BRANCH);
   const [state, setState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
@@ -104,12 +108,12 @@ export function RepositoryConnectCard({ onConnect, onClose, onListRepositories }
             autoCorrect={false}
             onChangeText={setQuery}
             placeholder="Repository suchen…"
-            placeholderTextColor="#5C6B82"
+            placeholderTextColor={glassSurface.textMuted}
             style={styles.input}
             value={query}
           />
           {repoState === "loading" ? (
-            <View style={styles.loadingRow}><ActivityIndicator color={colors.tint} /><Text style={styles.loadingText}>Repositories werden geladen…</Text></View>
+            <View style={styles.loadingRow}><ActivityIndicator color={glassPalette.cyan} /><Text style={styles.loadingText}>Repositories werden geladen…</Text></View>
           ) : filteredRepos.length === 0 ? (
             <Text style={styles.emptyText}>Keine Repositories gefunden.</Text>
           ) : (
@@ -129,7 +133,7 @@ export function RepositoryConnectCard({ onConnect, onClose, onListRepositories }
                     <Text style={styles.repoName} numberOfLines={1}>{item.fullName}{item.isPrivate ? " 🔒" : ""}</Text>
                     <Text style={styles.repoMeta} numberOfLines={1}>{item.defaultBranch} · {formatRelativeUpdatedAt(item.updatedAt)}</Text>
                   </View>
-                  {selectedId === item.id && state === "connecting" ? <ActivityIndicator color={colors.tint} /> : <Text style={styles.repoArrow}>→</Text>}
+                  {selectedId === item.id && state === "connecting" ? <ActivityIndicator color={glassPalette.cyan} /> : <Text style={styles.repoArrow}>→</Text>}
                 </TouchableOpacity>
               )}
             />
@@ -156,46 +160,48 @@ export function RepositoryConnectCard({ onConnect, onClose, onListRepositories }
       {state === "connected" ? <View style={styles.success}><Text style={styles.successTitle}>Repository verbunden</Text><Text style={styles.successText}>{message}</Text></View> : null}
       {state === "error" ? <Text style={styles.error}>{message}</Text> : null}
       {mode === "manual" ? (
-        <PrimaryButton icon="link" label={state === "connecting" ? "Workspace wird verbunden …" : state === "connected" ? "Fertig" : "Repository verbinden"} onPress={state === "connected" ? onClose : () => void connect()} disabled={state === "connecting" || !validUrl} />
+        <GlowButton accent="cyan" label={state === "connecting" ? "Workspace wird verbunden …" : state === "connected" ? "Fertig" : "Repository verbinden"} onPress={state === "connected" ? onClose : () => void connect()} disabled={state === "connecting" || !validUrl} />
       ) : state === "connected" ? (
-        <PrimaryButton icon="link" label="Fertig" onPress={onClose} />
+        <GlowButton accent="cyan" label="Fertig" onPress={onClose} />
       ) : null}
       <Text style={styles.footer}>Nur HTTPS · keine Secrets in der URL · Branch bleibt sichtbar</Text>
     </View>
   );
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
+function createStyles() {
   return StyleSheet.create({
-  card: { backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.4), borderRadius: 20, borderWidth: 1, marginBottom: 16, padding: 15 },
+  card: { backgroundColor: withAlpha(glassPalette.cyan, 0.1), borderColor: withAlpha(glassPalette.cyan, 0.4), borderRadius: 20, borderWidth: 1, marginBottom: 16, padding: 15 },
   headerRow: { alignItems: "center", flexDirection: "row", gap: 10 },
-  icon: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.16), borderRadius: 16, height: 38, justifyContent: "center", width: 38 },
-  iconText: { color: lighten(colors.tint, 0.35), fontSize: 20, fontWeight: "900" },
+  icon: { alignItems: "center", backgroundColor: withAlpha(glassPalette.cyan, 0.16), borderRadius: 16, height: 38, justifyContent: "center", width: 38 },
+  iconText: { color: lighten(glassPalette.cyan, 0.35), fontSize: 20, fontWeight: "900" },
   headerCopy: { flex: 1 },
-  eyebrow: { color: colors.tint, fontSize: 9, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
-  title: { color: lighten(colors.tint, 0.45), fontSize: 15, fontWeight: "900" },
+  eyebrow: { color: glassPalette.cyan, fontSize: 9, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
+  title: { color: lighten(glassPalette.cyan, 0.45), fontSize: 15, fontWeight: "900" },
   closeButton: { alignItems: "center", minHeight: 40, minWidth: 40, justifyContent: "center" },
-  closeText: { color: "#A6B1C2", fontSize: 24, lineHeight: 26 },
-  description: { color: "#B0AEC2", fontSize: 11, lineHeight: 16, marginBottom: 14, marginTop: 12 },
-  label: { color: "#8E9CAF", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: 6, marginTop: 4 },
-  input: { backgroundColor: "#101521", borderColor: "#34435B", borderRadius: 11, borderWidth: 1, color: "#EDF4FC", fontSize: 12, minHeight: 44, paddingHorizontal: 11 },
-  inputError: { borderColor: "#B96872" },
+  closeText: { color: glassSurface.textSecondary, fontSize: 24, lineHeight: 26 },
+  description: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16, marginBottom: 14, marginTop: 12 },
+  label: { color: glassSurface.textSecondary, fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: 6, marginTop: 4 },
+  input: { backgroundColor: glassDepth.deep, borderColor: glassSurface.border, borderRadius: 11, borderWidth: 1, color: glassSurface.textPrimary, fontSize: 12, minHeight: 44, paddingHorizontal: 11 },
+  inputError: { borderColor: glassPalette.red },
   loadingRow: { alignItems: "center", flexDirection: "row", gap: 8, paddingVertical: 14 },
-  loadingText: { color: "#8E9CAF", fontSize: 11 },
-  emptyText: { color: "#8E9CAF", fontSize: 11, paddingVertical: 10, textAlign: "center" },
+  loadingText: { color: glassSurface.textSecondary, fontSize: 11 },
+  emptyText: { color: glassSurface.textSecondary, fontSize: 11, paddingVertical: 10, textAlign: "center" },
   repoList: { marginTop: 8, maxHeight: 260 },
-  repoRow: { alignItems: "center", borderBottomColor: "#1E2733", borderBottomWidth: 1, flexDirection: "row", gap: 8, paddingVertical: 10 },
+  repoRow: { alignItems: "center", borderBottomColor: glassDepth.layer, borderBottomWidth: 1, flexDirection: "row", gap: 8, paddingVertical: 10 },
   repoRowActive: { opacity: 0.6 },
   repoRowText: { flex: 1 },
-  repoName: { color: "#EDF4FC", fontSize: 12, fontWeight: "700" },
-  repoMeta: { color: "#7C8AA0", fontSize: 10, marginTop: 2 },
-  repoArrow: { color: colors.tint, fontSize: 14, fontWeight: "900" },
+  repoName: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "700" },
+  repoMeta: { color: glassSurface.textMuted, fontSize: 10, marginTop: 2 },
+  repoArrow: { color: glassPalette.cyan, fontSize: 14, fontWeight: "900" },
   manualLink: { alignSelf: "center", marginTop: 10, paddingVertical: 4 },
-  manualLinkText: { color: colors.tint, fontSize: 11, fontWeight: "700" },
-  success: { backgroundColor: "#132D2C", borderColor: withAlpha(colors.success, 0.4), borderRadius: 11, borderWidth: 1, marginBottom: 10, marginTop: 12, padding: 10 },
-  successTitle: { color: lighten(colors.success, 0.2), fontSize: 11, fontWeight: "900" },
-  successText: { color: lighten(colors.success, 0.3), fontSize: 10, marginTop: 3 },
-  error: { color: colors.error, fontSize: 10, lineHeight: 15, marginVertical: 10 },
-  footer: { color: "#76869C", fontSize: 9, lineHeight: 14, marginTop: 9, textAlign: "center" },
+  manualLinkText: { color: glassPalette.cyan, fontSize: 11, fontWeight: "700" },
+  success: { backgroundColor: glassDepth.layer, borderColor: withAlpha(glassPalette.green, 0.4), borderRadius: 11, borderWidth: 1, marginBottom: 10, marginTop: 12, padding: 10 },
+  successTitle: { color: lighten(glassPalette.green, 0.2), fontSize: 11, fontWeight: "900" },
+  successText: { color: lighten(glassPalette.green, 0.3), fontSize: 10, marginTop: 3 },
+  error: { color: glassPalette.red, fontSize: 10, lineHeight: 15, marginVertical: 10 },
+  footer: { color: glassSurface.textMuted, fontSize: 9, lineHeight: 14, marginTop: 9, textAlign: "center" },
   });
 }
+
+const styles = createStyles();

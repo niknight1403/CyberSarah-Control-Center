@@ -4,8 +4,14 @@ import { router } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { StudioHeader, StudioSection } from "@/components/studio/primitives";
-import { useColors } from "@/hooks/use-colors";
+/**
+ * Sprint 182 — Admin-Dashboard auf "CyberSarah Future Glass" uebertragen:
+ * GlassBackdrop + Glass-Typografie statt Studio-Primitives, Farb-Token
+ * statt useColors. Logik (Rollen-Gate, Live-Status, Quota-Overrides)
+ * unveraendert.
+ */
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 import { AdminLiveStatusCard } from "@/components/studio/admin-live-status-card";
 import { ProviderAdminCard } from "@/components/studio/provider-admin-card";
@@ -27,7 +33,6 @@ import {
  * nicht verhandelt.
  */
 export default function AdminDashboardScreen() {
-  const colors = useColors();
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const agentState = useAdminAutonomousAgent(accountQuery.data ?? null);
   const role = accountQuery.data?.role ?? null;
@@ -49,15 +54,20 @@ export default function AdminDashboardScreen() {
 
   if (!dashboardAccess.allowed) {
     return (
-      <ScreenContainer>
-        <StudioHeader eyebrow="Verwaltung" title="Admin-Dashboard" />
-        <View style={[styles.lockCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <IconSymbol name="lock.fill" size={24} color={colors.muted} />
-          <Text style={[styles.lockText, { color: colors.muted }]}>
+      <GlassBackdrop accent="purple">
+        <ScreenContainer containerClassName="bg-transparent">
+        <View style={styles.headerBlock}>
+          <Text style={styles.eyebrow}>VERWALTUNG</Text>
+          <Text style={styles.screenTitle}>Admin-Dashboard</Text>
+        </View>
+        <View style={[styles.lockCard, { backgroundColor: glassDepth.glass, borderColor: glassSurface.border }]}>
+          <IconSymbol name="lock.fill" size={24} color={glassSurface.textSecondary} />
+          <Text style={[styles.lockText, { color: glassSurface.textSecondary }]}>
             {dashboardAccess.reason} — dieser Bereich ist der Admin-Rolle vorbehalten.
           </Text>
         </View>
-      </ScreenContainer>
+        </ScreenContainer>
+      </GlassBackdrop>
     );
   }
 
@@ -79,36 +89,44 @@ export default function AdminDashboardScreen() {
   };
 
   const capRow = (label: string, value: string) => (
-    <View key={label} style={[styles.capRow, { borderColor: colors.border }]}>
-      <Text style={[styles.capLabel, { color: colors.muted }]}>{label}</Text>
-      <Text style={[styles.capValue, { color: colors.text }]}>{value}</Text>
+    <View key={label} style={[styles.capRow, { borderColor: glassSurface.border }]}>
+      <Text style={[styles.capLabel, { color: glassSurface.textSecondary }]}>{label}</Text>
+      <Text style={[styles.capValue, { color: glassSurface.textPrimary }]}>{value}</Text>
     </View>
   );
 
   return (
-    <ScreenContainer>
-      <StudioHeader eyebrow="Verwaltung" title="Admin-Dashboard" />
+    <GlassBackdrop accent="purple">
+      <ScreenContainer containerClassName="bg-transparent">
+        <View style={styles.headerBlock}>
+          <Text style={styles.eyebrow}>VERWALTUNG</Text>
+          <Text style={styles.screenTitle}>Admin-Dashboard</Text>
+        </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <StudioSection label="Live" title="Backend-Live-Status" />
+        <Text style={styles.sectionLabel}>LIVE</Text>
+        <Text style={styles.sectionTitle}>Backend-Live-Status</Text>
         <AdminLiveStatusCard isAdmin={isAdmin} />
 
-        <StudioSection label="Provider" title="LLM-Provider & API-Keys" />
+        <Text style={styles.sectionLabel}>PROVIDER</Text>
+        <Text style={styles.sectionTitle}>LLM-Provider & API-Keys</Text>
         <ProviderAdminCard isAdmin={isAdmin} />
 
-        <StudioSection label="Entwicklung" title="Autonome Entwicklung (0 EUR)" />
+        <Text style={styles.sectionLabel}>ENTWICKLUNG</Text>
+        <Text style={styles.sectionTitle}>Autonome Entwicklung (0 EUR)</Text>
         <AutonomousDevCard isAdmin={isAdmin} />
 
-        <StudioSection label="Autonomie" title="Autonomer System-Agent" />
-        <View style={[styles.agentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={styles.sectionLabel}>AUTONOMIE</Text>
+        <Text style={styles.sectionTitle}>Autonomer System-Agent</Text>
+        <View style={[styles.agentCard, { backgroundColor: glassDepth.glass, borderColor: glassSurface.border }]}>
           <View style={styles.agentStatusRow}>
             <View
               accessibilityLabel={`Systemstatus: ${agentState.status}`}
               style={[
                 styles.agentStatusDot,
-                { backgroundColor: agentState.status === "red" ? "#FF007F" : agentState.status === "healing" ? "#F5A623" : "#00F2FE" },
+                { backgroundColor: agentState.status === "red" ? glassPalette.red : agentState.status === "healing" ? glassPalette.amber : glassPalette.cyan },
               ]}
             />
-            <Text style={[styles.agentStatusText, { color: colors.text }]}>
+            <Text style={[styles.agentStatusText, { color: glassSurface.textPrimary }]}>
               {agentState.status === "red"
                 ? "Kritisch — Agent arbeitet autonom an der Behebung"
                 : agentState.status === "healing"
@@ -116,30 +134,32 @@ export default function AdminDashboardScreen() {
                   : "Alles grün — keine offenen Incidents"}
             </Text>
           </View>
-          <Text style={[styles.agentMeta, { color: colors.muted }]}>
+          <Text style={[styles.agentMeta, { color: glassSurface.textSecondary }]}>
             Offen: {agentState.openCount} · Kritisch: {agentState.criticalCount} · Auto-Redeploy:{" "}
             {agentState.autoRedeployEnabled ? "aktiv" : "inaktiv"} · Letzter Scan:{" "}
             {agentState.lastScanAt != null ? new Date(agentState.lastScanAt).toLocaleTimeString("de-DE") : "—"}
           </Text>
           {agentState.log.slice(0, 3).map((entry) => (
-            <Text key={`${entry.at}-${entry.kind}`} style={[styles.agentLog, { color: colors.muted }]} numberOfLines={1}>
+            <Text key={`${entry.at}-${entry.kind}`} style={[styles.agentLog, { color: glassSurface.textSecondary }]} numberOfLines={1}>
               · [{entry.kind}] {entry.reason}
             </Text>
           ))}
-          <Text style={[styles.agentMeta, { color: colors.muted }]}>
+          <Text style={[styles.agentMeta, { color: glassSurface.textSecondary }]}>
             Der Agent scannt alle 60 s, analysiert Fehler, behebt autonom und bringt das System selbst auf grün — manuelle Einstellungen sind nicht nötig.
           </Text>
         </View>
 
-        <StudioSection label="Abo" title="Subscription-Verwaltung" />
-        <View style={[styles.tierCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.tierName, { color: colors.tint }]}>{ROLE_TIER_LABELS[tier]}</Text>
-          <Text style={[styles.tierDetail, { color: colors.muted }]}>
+        <Text style={styles.sectionLabel}>ABO</Text>
+        <Text style={styles.sectionTitle}>Subscription-Verwaltung</Text>
+        <View style={[styles.tierCard, { backgroundColor: glassDepth.glass, borderColor: glassSurface.border }]}>
+          <Text style={[styles.tierName, { color: glassPalette.cyan }]}>{ROLE_TIER_LABELS[tier]}</Text>
+          <Text style={[styles.tierDetail, { color: glassSurface.textSecondary }]}>
             Rolle: {role ?? "unbekannt"} · Abo-Tier: {subscriptionTier ?? "keins"}
           </Text>
         </View>
 
-        <StudioSection label="Caps" title="Token-Quota & Caps" />
+        <Text style={styles.sectionLabel}>CAPS</Text>
+        <Text style={styles.sectionTitle}>Token-Quota & Caps</Text>
         <View>
           {capRow("Tokens pro Tag", formatCap(effectiveCaps.maxTokensPerDay))}
           {capRow("Agent-Iterationen (max)", formatCap(effectiveCaps.maxAgentIterations))}
@@ -148,44 +168,47 @@ export default function AdminDashboardScreen() {
           {capRow("Anfragen pro Minute", formatCap(effectiveCaps.requestsPerMinute))}
         </View>
 
-        <StudioSection label="Overrides" title="Quota-Overrides (nur anheben)" />
+        <Text style={styles.sectionLabel}>OVERRIDES</Text>
+        <Text style={styles.sectionTitle}>Quota-Overrides (nur anheben)</Text>
           <TextInput
             accessibilityLabel="Token-Quota-Override"
             keyboardType="number-pad"
             placeholder="z. B. 2000000 Tokens/Tag"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={glassSurface.textSecondary}
             value={tokenQuotaOverride}
             onChangeText={setTokenQuotaOverride}
-            style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+            style={[styles.input, { backgroundColor: glassDepth.void, borderColor: glassSurface.border, color: glassSurface.textPrimary }]}
           />
           <TextInput
             accessibilityLabel="Key-Pool-Größen-Override"
             keyboardType="number-pad"
             placeholder="z. B. 8 eigene Keys"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={glassSurface.textSecondary}
             value={maxKeys}
             onChangeText={setMaxKeys}
-            style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+            style={[styles.input, { backgroundColor: glassDepth.void, borderColor: glassSurface.border, color: glassSurface.textPrimary }]}
           />
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Overrides übernehmen"
             onPress={saveOverrides}
-            style={[styles.saveButton, { backgroundColor: colors.tint }]}
+            style={[styles.saveButton, { backgroundColor: glassPalette.cyan }]}
           >
-            <Text style={[styles.saveButtonText, { color: colors.background }]}>Overrides übernehmen</Text>
+            <Text style={[styles.saveButtonText, { color: glassDepth.void }]}>Overrides übernehmen</Text>
           </TouchableOpacity>
 
-        <StudioSection label="Navigation" title="Zurück" />
+        <Text style={styles.sectionLabel}>NAVIGATION</Text>
+        <Text style={styles.sectionTitle}>Zurück</Text>
           <TouchableOpacity
             accessibilityRole="button"
             onPress={() => router.back()}
-            style={[styles.backButton, { borderColor: colors.border }]}
+            style={[styles.backButton, { borderColor: glassSurface.border }]}
           >
-            <Text style={[styles.backButtonText, { color: colors.tint }]}>Zurück</Text>
+            <Text style={[styles.backButtonText, { color: glassPalette.cyan }]}>Zurück</Text>
           </TouchableOpacity>
       </ScrollView>
-    </ScreenContainer>
+      </ScreenContainer>
+    </GlassBackdrop>
   );
 }
 
@@ -195,6 +218,11 @@ function formatCap(value: number): string {
 }
 
 const styles = StyleSheet.create({
+  headerBlock: { marginTop: 8 },
+  eyebrow: { ...glassType.label, color: glassPalette.purple },
+  screenTitle: { ...glassType.display, color: glassSurface.textPrimary, marginTop: 4 },
+  sectionLabel: { ...glassType.label, color: glassSurface.textMuted, marginTop: 18 },
+  sectionTitle: { ...glassType.headline, color: glassSurface.textPrimary, marginTop: 2 },
   content: { gap: 14, paddingBottom: 40 },
   lockCard: { alignItems: "center", borderRadius: 12, borderWidth: 1, gap: 8, padding: 24 },
   agentCard: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 14 },
