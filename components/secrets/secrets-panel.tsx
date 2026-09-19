@@ -22,7 +22,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useColors } from "@/hooks/use-colors";
+import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { trpc } from "@/lib/trpc";
 
 const KIND_LABELS: Record<string, string> = {
@@ -48,8 +48,6 @@ function formatDate(iso: string): string {
 }
 
 export function SecretsPanel() {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const listQuery = trpc.secrets.list.useQuery(undefined, { retry: false });
   const upsertMutation = trpc.secrets.upsert.useMutation();
@@ -116,7 +114,7 @@ export function SecretsPanel() {
   return (
     <View>
       <View style={styles.introCard}>
-        <Ionicons name="lock-closed" size={16} color={colors.tint} />
+        <Ionicons name="lock-closed" size={16} color={glassPalette.cyan} />
         <Text style={styles.introText}>
           Verschlüsselter Vault (AES-256-GCM) — erkannte Keys im Chat werden automatisch
           gespeichert, der Klartext niemals im Verlauf abgelegt. Werte sind nur maskiert sichtbar.
@@ -130,7 +128,7 @@ export function SecretsPanel() {
           accessibilityLabel="Secret-Name"
           autoCapitalize="characters"
           placeholder="NAME (z. B. GROQ_API_KEY)"
-          placeholderTextColor={colors.icon}
+          placeholderTextColor={glassSurface.textSecondary}
           value={name}
           onChangeText={setName}
           style={styles.input}
@@ -138,7 +136,7 @@ export function SecretsPanel() {
         <TextInput
           accessibilityLabel="Secret-Wert"
           placeholder="Wert (Key/Token) — verschlüsselt abgelegt"
-          placeholderTextColor={colors.icon}
+          placeholderTextColor={glassSurface.textSecondary}
           value={value}
           onChangeText={setValue}
           secureTextEntry
@@ -149,7 +147,7 @@ export function SecretsPanel() {
         <TextInput
           accessibilityLabel="Notiz"
           placeholder="Optionale Notiz (z. B. wofür der Key ist)"
-          placeholderTextColor={colors.icon}
+          placeholderTextColor={glassSurface.textSecondary}
           value={note}
           onChangeText={setNote}
           style={styles.input}
@@ -160,7 +158,7 @@ export function SecretsPanel() {
           style={[styles.saveButton, upsertMutation.isPending && styles.buttonDisabled]}
         >
           {upsertMutation.isPending ? (
-            <ActivityIndicator size="small" color={colors.background} />
+            <ActivityIndicator size="small" color={glassDepth.void} />
           ) : (
             <Text style={styles.saveButtonText}>Verschlüsselt speichern</Text>
           )}
@@ -174,7 +172,7 @@ export function SecretsPanel() {
         VAULT · {entries.length} SECRET{entries.length === 1 ? "" : "S"}
       </Text>
       {listQuery.isLoading ? (
-        <ActivityIndicator size="small" color={colors.tint} />
+        <ActivityIndicator size="small" color={glassPalette.cyan} />
       ) : entries.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyText}>
@@ -198,7 +196,7 @@ export function SecretsPanel() {
                 disabled={deleteMutation.isPending}
                 style={styles.deleteButton}
               >
-                <Ionicons name="trash-outline" size={16} color={colors.error ?? "#E5484D"} />
+                <Ionicons name="trash-outline" size={16} color={glassPalette.red ?? glassPalette.red} />
               </TouchableOpacity>
             </View>
           </View>
@@ -208,7 +206,7 @@ export function SecretsPanel() {
   );
 }
 
-function createStyles(colors: Record<string, string>) {
+function createStyles() {
   return StyleSheet.create({
     introCard: {
       flexDirection: "row",
@@ -216,56 +214,58 @@ function createStyles(colors: Record<string, string>) {
       alignItems: "flex-start",
       padding: 12,
       borderRadius: 12,
-      backgroundColor: `${colors.tint}14`,
+      backgroundColor: `${glassPalette.cyan}14`,
       marginBottom: 12,
     },
-    introText: { flex: 1, fontSize: 12, lineHeight: 17, color: colors.icon },
+    introText: { flex: 1, fontSize: 12, lineHeight: 17, color: glassSurface.textSecondary },
     sectionLabel: {
       fontSize: 11,
       fontWeight: "700",
       letterSpacing: 0.8,
-      color: colors.icon,
+      color: glassSurface.textSecondary,
       marginBottom: 8,
       marginTop: 4,
     },
     addCard: {
       padding: 14,
       borderRadius: 14,
-      backgroundColor: colors.card,
+      backgroundColor: glassDepth.glass,
       marginBottom: 12,
       gap: 8,
     },
     input: {
       borderWidth: 1,
-      borderColor: colors.border ?? "#2A3548",
+      borderColor: glassSurface.border ?? glassSurface.border,
       borderRadius: 10,
       paddingHorizontal: 12,
       paddingVertical: 10,
       fontSize: 14,
-      color: colors.text,
-      backgroundColor: colors.background,
+      color: glassSurface.textPrimary,
+      backgroundColor: glassDepth.void,
     },
     saveButton: {
-      backgroundColor: colors.tint,
+      backgroundColor: glassPalette.cyan,
       borderRadius: 10,
       paddingVertical: 11,
       alignItems: "center",
     },
     buttonDisabled: { opacity: 0.55 },
-    saveButtonText: { color: colors.background, fontWeight: "700", fontSize: 14 },
-    statusText: { fontSize: 12, color: colors.icon, marginBottom: 10 },
+    saveButtonText: { color: glassDepth.void, fontWeight: "700", fontSize: 14 },
+    statusText: { fontSize: 12, color: glassSurface.textSecondary, marginBottom: 10 },
     entryCard: {
       padding: 12,
       borderRadius: 12,
-      backgroundColor: colors.card,
+      backgroundColor: glassDepth.glass,
       marginBottom: 8,
     },
     entryRow: { flexDirection: "row", alignItems: "center", gap: 10 },
     entryInfo: { flex: 1 },
-    entryName: { color: colors.text, fontWeight: "700", fontSize: 14 },
-    entryDetail: { color: colors.icon, fontSize: 12, marginTop: 2 },
+    entryName: { color: glassSurface.textPrimary, fontWeight: "700", fontSize: 14 },
+    entryDetail: { color: glassSurface.textSecondary, fontSize: 12, marginTop: 2 },
     deleteButton: { padding: 6 },
-    emptyCard: { padding: 14, borderRadius: 12, backgroundColor: colors.card },
-    emptyText: { color: colors.icon, fontSize: 12, lineHeight: 17 },
+    emptyCard: { padding: 14, borderRadius: 12, backgroundColor: glassDepth.glass },
+    emptyText: { color: glassSurface.textSecondary, fontSize: 12, lineHeight: 17 },
   });
 }
+
+const styles = createStyles();

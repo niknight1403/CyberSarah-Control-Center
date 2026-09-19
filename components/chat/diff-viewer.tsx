@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { useColors } from "@/hooks/use-colors";
+import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { getDetailedFileDiffPreview, type FileDiffInput } from "@/lib/file-diff-logic";
 import { tokenizeLine, type SyntaxTokenKind } from "@/lib/syntax-highlight-logic";
 
@@ -10,40 +10,39 @@ import { tokenizeLine, type SyntaxTokenKind } from "@/lib/syntax-highlight-logic
  * leichter Syntax-Hervorhebung und Design-Theme-Farben.
  */
 export function DiffViewer({ diff, maxChangedLines = 32 }: { diff: FileDiffInput; maxChangedLines?: number }) {
-  const colors = useColors();
   const preview = getDetailedFileDiffPreview(diff, maxChangedLines);
 
   if (!preview) {
     return (
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.path, { color: colors.muted }]}>Ohne inhaltliche Änderung: {diff.path}</Text>
+      <View style={[styles.card, { backgroundColor: glassDepth.glass, borderColor: glassSurface.border }]}>
+        <Text style={[styles.path, { color: glassSurface.textSecondary }]}>Ohne inhaltliche Änderung: {diff.path}</Text>
       </View>
     );
   }
 
   const tokenColor = (kind: SyntaxTokenKind): string => {
-    if (kind === "keyword") return colors.tint;
-    if (kind === "string") return colors.success;
-    if (kind === "number") return colors.warning;
-    if (kind === "comment") return colors.muted;
-    return colors.text;
+    if (kind === "keyword") return glassPalette.cyan;
+    if (kind === "string") return glassPalette.green;
+    if (kind === "number") return glassPalette.amber;
+    if (kind === "comment") return glassSurface.textSecondary;
+    return glassSurface.textPrimary;
   };
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.card, { backgroundColor: glassDepth.glass, borderColor: glassSurface.border }]}>
       <View style={styles.header}>
-        <Text style={[styles.path, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.path, { color: glassSurface.textPrimary }]} numberOfLines={1}>
           {preview.path}
         </Text>
-        <Text style={[styles.summary, { color: preview.addedLines > 0 || preview.removedLines > 0 ? colors.warning : colors.muted }]}>
+        <Text style={[styles.summary, { color: preview.addedLines > 0 || preview.removedLines > 0 ? glassPalette.amber : glassSurface.textSecondary }]}>
           +{preview.addedLines} −{preview.removedLines}
         </Text>
       </View>
-      <View style={[styles.lines, { borderColor: colors.border }]}>
+      <View style={[styles.lines, { borderColor: glassSurface.border }]}>
         {preview.lines.map((line) => {
-          const bg = line.kind === "added" ? `${String(colors.success)}18` : line.kind === "removed" ? `${String(colors.error)}18` : "transparent";
+          const bg = line.kind === "added" ? `${String(glassPalette.green)}18` : line.kind === "removed" ? `${String(glassPalette.red)}18` : "transparent";
           const marker = line.kind === "added" ? "+" : line.kind === "removed" ? "−" : " ";
-          const markerColor = line.kind === "added" ? colors.success : line.kind === "removed" ? colors.error : colors.muted;
+          const markerColor = line.kind === "added" ? glassPalette.green : line.kind === "removed" ? glassPalette.red : glassSurface.textSecondary;
           return (
             <View key={`${line.kind}-${line.lineNumber}`} style={[styles.line, { backgroundColor: bg }]}>
               <Text style={[styles.marker, { color: markerColor }]}>{marker}</Text>
@@ -59,7 +58,7 @@ export function DiffViewer({ diff, maxChangedLines = 32 }: { diff: FileDiffInput
           );
         })}
         {preview.truncated ? (
-          <Text style={[styles.truncated, { color: colors.muted }]}>… weitere Änderungen ausgeblendet</Text>
+          <Text style={[styles.truncated, { color: glassSurface.textSecondary }]}>… weitere Änderungen ausgeblendet</Text>
         ) : null}
       </View>
     </View>
@@ -84,7 +83,7 @@ const styles = StyleSheet.create({
   lines: { borderTopWidth: 1, paddingVertical: 4 },
   line: { flexDirection: "row", paddingHorizontal: 8, paddingVertical: 1 },
   marker: { fontFamily: "monospace", width: 14 },
-  lineNumber: { color: "#8A93A6", fontFamily: "monospace", fontSize: 10, marginRight: 8 },
-  content: { color: "#F2F6FC", flex: 1, fontFamily: "monospace", fontSize: 11 },
+  lineNumber: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 10, marginRight: 8 },
+  content: { color: glassSurface.textPrimary, flex: 1, fontFamily: "monospace", fontSize: 11 },
   truncated: { fontSize: 10, fontStyle: "italic", padding: 6 },
 });
