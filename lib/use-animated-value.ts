@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useState } from "react";
 import { Animated } from "react-native";
 
 /**
@@ -11,15 +11,12 @@ import { Animated } from "react-native";
  * App zeigte einen permanent weissen Bildschirm.
  *
  * Dieser Hook liefert dieselbe Semantik (stabile Animated.Value-Instanz mit
- * Initialwert, lazy erzeugt, identisch ueber Re-Renders) auf ALLEN
- * Plattformen: native und Web. Die Implementierung entspricht dem
- * offiziellen RN-Muster (useRef + einmalige Instantiierung) und ist damit
- * auch bei StrictMode-Doppelrendern sicher (idempotente Initialisierung).
+ * Initialwert, exakt einmal erzeugt, identisch ueber alle Re-Renders) auf
+ * ALLEN Plattformen: native und Web. Die lazy useState-Initialisierung
+ * erzeugt die Instanz einmalig und ref-frei — auch unter StrictMode und
+ * der React-Compiler-Lint-Regel "keine Ref-Zugriffe im Render" sauber.
  */
 export function useAnimatedValue(initial: number): Animated.Value {
-  const ref = useRef<Animated.Value | null>(null);
-  if (ref.current === null) {
-    ref.current = new Animated.Value(initial);
-  }
-  return ref.current;
+  const [value] = useState(() => new Animated.Value(initial));
+  return value;
 }

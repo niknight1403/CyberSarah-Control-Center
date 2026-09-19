@@ -73,28 +73,33 @@ window.console.error = (...args) => {
 
 document.write(html.replace(/<script[^>]*src="[^"]*"[^>]*><\/script>/g, ""));
 
-globalThis.window = window;
-globalThis.document = window.document;
-globalThis.navigator = window.navigator;
-globalThis.location = window.location;
-globalThis.localStorage = window.localStorage;
-globalThis.fetch = window.fetch;
-globalThis.history = window.history;
-globalThis.screen = window.screen;
-globalThis.self = window;
+// Node >= 21 hat eigene nur-Lese-Globals (navigator, …): nur setzen, wenn
+// zulaessig; vorhandene Node-Globals bleiben sonst unangetastet.
+function defineGlobal(name, value) {
+  if (name in globalThis) return; // bereits vorhanden (z. B. Node-22-navigator)
+  try { globalThis[name] = value; } catch { /* nur-Lese — ignorieren */ }
+}
+
+defineGlobal("window", window);
+defineGlobal("document", window.document);
+defineGlobal("navigator", window.navigator);
+defineGlobal("location", window.location);
+defineGlobal("localStorage", window.localStorage);
+defineGlobal("fetch", window.fetch);
+defineGlobal("history", window.history);
+defineGlobal("screen", window.screen);
+defineGlobal("self", window);
 globalThis.devicePixelRatio = 2;
 globalThis.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
 globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
-globalThis.requestAnimationFrame = window.requestAnimationFrame;
-globalThis.cancelAnimationFrame = window.cancelAnimationFrame;
-globalThis.matchMedia = window.matchMedia;
-globalThis.scrollTo = window.scrollTo;
+defineGlobal("requestAnimationFrame", window.requestAnimationFrame);
+defineGlobal("cancelAnimationFrame", window.cancelAnimationFrame);
+defineGlobal("matchMedia", window.matchMedia);
+defineGlobal("scrollTo", window.scrollTo);
 // Alle weiteren DOM-Klassen (ShadowRoot, HTMLStyleElement, CSSFontFaceRule, …)
 // aus der happy-dom-Window uebernehmen, soweit im Node-Global fehlend.
 for (const key of Object.getOwnPropertyNames(window)) {
-  if (!(key in globalThis)) {
-    try { globalThis[key] = window[key]; } catch { /* ignoriert */ }
-  }
+  defineGlobal(key, window[key]);
 }
 
 try {
