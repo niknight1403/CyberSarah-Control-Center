@@ -1,3 +1,44 @@
+# Changelog
+
+Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
+dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
+Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+
+## [4.1.1] — 2026-09-19
+
+**Tag:** v4.1.1 · **Commit:** 376a980 · **Verifikation:** tsc fehlerfrei, 1149 Tests gruen (139 Dateien) · **Kosten der Neuerungen:** 0,00 EUR
+
+### Added
+- **Echte keylose Web-Suche:** DuckDuckGo-HTML-Scraping (`lib/keyless-search.ts`, `server/keyless-search.ts`) als dauerhaft kostenlose Alternative zu bezahlten Search-APIs — Redirect-Dekodierung (uddg), Snippet-Extraktion, Dedup, 8s-Timeout, ehrliches Fehlverhalten (keine erfundenen Treffer). Neuer admin-geschuetzter tRPC-Endpunkt `keylessSearch.search`. Live verifiziert: 8 Treffer fuer 'kostenlose llm api', 0 API-Keys.
+- **Admin-UI 'Autonome Entwicklung':** Neue Karte im Admin-Dashboard (`components/studio/autonomous-dev-card.tsx`, eingebunden in `app/admin.tsx`) — Template-Auswahl aller 8 Vorlagen (Pong, Snake, Breakout, Flappy, To-Do, Notizen, Taschenrechner, Timer), Wunsch-Feld, Ein-Klick-Entwicklung mit 0-EUR-Nachweis und Uebersicht der letzten Laeufe inklusive Kosten.
+- **Tests:** 5 neue Logik-Tests fuer die Such-Parsing-Basis (Redirect-Dekodierung, Dedup, Validierung, Encoding).
+
+### Fixed
+- **Live-Fix-Quarantaene wirkt jetzt in der Chat-Runtime:** `invokeLLM()` (`server/_core/llm.ts`) filtert vom Self-Healing-Live-Fix quarantaenierte Provider (60s nach 429/Quota-Fehler) aktiv aus der Kette und rotiert sofort auf den naechsten Endpoint; sind alle Provider in Quarantaene, wird Best-Effort weitergearbeitet — der Service bleibt nie stumm.
+
+### Documentation
+- CHANGELOG um die Sprint-Abschnitte 163 (ToolLimitResolverAgent & Tool-Rotator), 164 (vollautonome 0-EUR-Entwicklung + Live-Fix-Agent) und 165 (Review-Fixes) ergaenzt.
+
+### Compatibility
+- Keine Breaking Changes; keine Migration noetig. Betrieb weiterhin ohne Cloud-Keys moeglich (lokale Offline-Stufen Ollama / LM Studio).
+
+---
+
+## [4.1.0] — 2026-09-19
+
+**Tag:** v4.1.0 · **Verifikation:** tsc fehlerfrei, 1144 Tests gruen · **Kosten der Neuerungen:** 0,00 EUR
+
+### Added
+- **Zero-Cost-Dev-Stack-Registry:** alle kostenlosen LLMs (Groq, OpenRouter :free, Gemini 2.5, Cerebras, SambaNova, GitHub Models plus lokale Ollama-/LM-Studio-Endpunkte), kostenlosen Entwicklungswerkzeuge und Anbindungs-Alternativen (GitHub-API Free, Neon Free, DuckDuckGo, lokale Ablage) mit ehrlichem `isZeroCost`-Nachweis; bezahlte Endpoints werden NIE gewaehlt.
+- **Autonome Entwicklungs-Pipeline:** 8 Standalone-HTML5-Templates mit Plan -> freie LLM-Personalisierung (Cloud -> Ollama -> Template-Defaults) -> `node --check`-Verifikation mit autonomer Fix-Schleife -> Lieferung ins Workspace; vollstaendig autonom auch ohne jeden API-Key (Offline-Modus). Live-Lauf: Snake, 4,4 KB, Verifikation bestanden.
+- **Live-Fix-Agent:** Incidents werden sofort live behoben (Backup-Waechter-Reset bei DB-Stoerung, Log-Puffer-Purge bei OOM, 60s-Provider-Quarantaene bei 429/Quota); angewandte Fixes werden am Incident dokumentiert.
+- **tRPC:** Router `autonomousDev` (catalog / stack / develop / runs / preview); 17 neue Logik-Tests.
+
+### Compatibility
+- Keine Breaking Changes; keine Migration noetig.
+
+---
+
 ## Sprint 165 (2026-09-19) — Offene Punkte aus dem V4.1-Review behoben
 
 ### Keyless Web-Search (Alternative zu bezahlten Search-APIs)
