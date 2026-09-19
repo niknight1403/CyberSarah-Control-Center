@@ -19,6 +19,19 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 ### Changed
 - **Sprint 191 — Deterministische Test-Hooks statt vi.mock ( komplette Fehlerklasse behoben):** Unter `isolate: false` (Sprint 187) haengt die vi.mock-Aufloesung von Worker-Belegung und Dateireihenfolge ab — auf produktiven VPS mit echter DATABASE_URL konnten KV-gemockte Tests real gegen Postgres laufen (28P01). Neu: zentraler Test-Hook `setModelRouterKvForTests` in server/db.ts und `setInvokeLlmForTests` in server/_core/llm.ts (Guard: NODE_ENV=test ODER VITEST-Marker; ausserhalb von Tests abgelehnt). Alle vier betroffenen Tests (secret-vault, wix-vault, orchestrator-failover, development-chat-server) binden ihre In-Memory-Fakes jetzt direkt und loesen den Hook in afterAll wieder (isolate:false-Hygiene). Der Sprint-190-Adapter in server/secret-vault.ts wurde vom zentralen Hook abgeloest und entfernt. Verifiziert: Suite gruen mit falschem DB-Passwort, ohne DATABASE_URL, unter gezielt vergiftetem Modul-Cache im Einzel-Worker (145 Dateien / 1196 Tests) und mit geleaktem NODE_ENV=production. Keine Produktionsverhaltens-Aenderung — die Hooks greifen nur im Test-Modus.
 
+## [Unreleased — Sprint 192]
+
+### Added — Future-Glass Max: komplettes Grafik-Upgrade
+- **GlassBackdrop v2:** dritte Lichtwolke (Blue, Daten), driftender Aurora-Schleier (26 s Pendel, Native Driver), haarfeines Cyber-Grid-Maschennetz und bis zu 5 driftende Lichtpartikel mit Fade — alles ausschaltbar per `atmosphere={false}` fuer dichte Screens. Basis: neue deterministische Logik `lib/design/glass-atmosphere-logic.ts` (seeded LCG statt Math.random im Render-Pfad, geklammerte Grid-Dichte 60-160 px, dezente Alpha-Obergrenzen) mit 8 neuen Tests.
+- **GlassCard:** diagonaler Akzent-Gradient-Wash bei Glow >= 1 — Karten bekommen Licht von oben links statt flacher Flaeche.
+- **GlowButton:** vertikaler Lichtschein auf primaeren CTAs ("beleuchtet"-Effekt).
+- **MetricTile:** Glow 1 + diagonaler Akzent-Wash — Kennzahlen-Kacheln wirken gerahmt vom Licht.
+- **AI-CORE:** gegenlaeufiger, duennerer Innenring (zweite Rotationsebene) — mehr Tiefe in jedem Zustand.
+- Alle Effekte laufen ausschliesslich ueber Tokens aus future-glass.ts (keine hardcodierten Farben ausserhalb lib/design/), nur Opacity/Transform-Animationen, web+mobile-kompatibel.
+
+### Changed
+- App-Version 2.3.0 → **2.4.0**.
+
 ## [Unreleased — Sprint 188]
 
 ### Changed

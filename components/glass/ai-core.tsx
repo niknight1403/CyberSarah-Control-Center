@@ -101,6 +101,23 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
     return () => loop.stop();
   }, [orbit, visual.particles]);
 
+  // --- Gegenlaeufiger innerer Ring (Sprint 192: zweite Rotationsebene) ---
+  const counterRotation = useMemo(() => new Animated.Value(0), []);
+  useEffect(() => {
+    if (visual.rotationMs <= 0) return;
+    const loop = Animated.loop(
+      Animated.timing(counterRotation, {
+        toValue: 1,
+        duration: visual.rotationMs * 1.6,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [counterRotation, visual.rotationMs]);
+  const counterSpin = counterRotation.interpolate({ inputRange: [0, 1], outputRange: ["360deg", "0deg"] });
+
   const ringWidth = Math.max(2, size * 0.055);
   const coreSize = size * 0.52;
 
@@ -122,21 +139,39 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
         />
         {/* Rotierender Ring mit Segmenten */}
         {visual.rotationMs > 0 ? (
-          <Animated.View
-            style={[
-              styles.ring,
-              {
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                borderWidth: ringWidth,
-                borderColor: accentAlpha(visual.accent, 0.75),
-                borderTopColor: "transparent",
-                borderLeftColor: accentAlpha(visual.accent, 0.18),
-                transform: [{ rotate: spin }],
-              },
-            ]}
-          />
+          <>
+            <Animated.View
+              style={[
+                styles.ring,
+                {
+                  width: size,
+                  height: size,
+                  borderRadius: size / 2,
+                  borderWidth: ringWidth,
+                  borderColor: accentAlpha(visual.accent, 0.75),
+                  borderTopColor: "transparent",
+                  borderLeftColor: accentAlpha(visual.accent, 0.18),
+                  transform: [{ rotate: spin }],
+                },
+              ]}
+            />
+            {/* Gegenlaeufiger, duennerer Innenring — zweite Tiefenebene (Sprint 192) */}
+            <Animated.View
+              style={[
+                styles.ring,
+                {
+                  width: size * 0.8,
+                  height: size * 0.8,
+                  borderRadius: (size * 0.8) / 2,
+                  borderWidth: Math.max(1, ringWidth * 0.55),
+                  borderColor: accentAlpha(visual.accent, 0.4),
+                  borderBottomColor: accentAlpha(visual.accent, 0.1),
+                  borderRightColor: "transparent",
+                  transform: [{ rotate: counterSpin }],
+                },
+              ]}
+            />
+          </>
         ) : (
           <View
             style={[

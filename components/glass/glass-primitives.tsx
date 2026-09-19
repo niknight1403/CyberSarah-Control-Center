@@ -11,6 +11,7 @@
 
 import React from "react";
 import { Animated, Platform, Pressable, StyleSheet, Text, View, useAnimatedValue, type ViewStyle } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 import {
   accentAlpha,
@@ -74,6 +75,16 @@ export function GlassCard({ children, accent, glow = 0, elevated = false, onPres
         style,
       ]}
     >
+      {/* Akzent-Gradient-Wash — diagonaler Lichtschein (Sprint 192). */}
+      {accent && glow > 0 ? (
+        <LinearGradient
+          colors={[accentAlpha(accent, glow === 2 ? 0.14 : 0.07), "transparent"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      ) : null}
       {/* Innerer Highlight-Saum oben — Tiefenwirkung ohne Blur. */}
       <View style={styles.highlightEdge} pointerEvents="none" />
       {children}
@@ -139,6 +150,16 @@ export function GlowButton({ label, onPress, accent = "purple", variant = "prima
           },
         ]}
       >
+        {/* Vertikaler Lichtschein — primaerer CTA wirkt "beleuchtet" (Sprint 192). */}
+        {isPrimary ? (
+          <LinearGradient
+            colors={["rgba(255, 255, 255, 0.22)", "transparent"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={[StyleSheet.absoluteFill, { borderTopLeftRadius: glassRadii.pill, borderTopRightRadius: glassRadii.pill }]}
+            pointerEvents="none"
+          />
+        ) : null}
         {icon}
         <Text style={[glassType.title, { color: textColor, fontSize: 14 }]}>{label}</Text>
       </Animated.View>
