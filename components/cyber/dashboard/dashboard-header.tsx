@@ -1,4 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
+import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
 import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Dashboard-Header: Logo, Schriftzug, Notification-Bell mit
@@ -25,8 +25,6 @@ function useReducedMotion(): boolean {
 }
 
 export function DashboardHeader({ hasAlerts }: { hasAlerts: boolean }) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const reduceMotion = useReducedMotion();
   return (
     <View style={styles.row}>
@@ -49,14 +47,14 @@ export function DashboardHeader({ hasAlerts }: { hasAlerts: boolean }) {
         style={({ pressed }) => [styles.bell, pressed && styles.bellPressed]}
         onPress={() => router.push("/quality" as never)}
       >
-        <IconSymbol size={20} name="exclamationmark.triangle.fill" color={colors.muted} />
+        <IconSymbol size={20} name="exclamationmark.triangle.fill" color={glassSurface.textSecondary} />
         {hasAlerts ? <View style={[styles.alertDot, reduceMotion && styles.alertDotStatic]} /> : null}
       </Pressable>
     </View>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   brand: { flexDirection: "row", alignItems: "center", gap: 10 },
   logoMark: {
@@ -67,22 +65,22 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     justifyContent: "center",
     backgroundColor: "rgba(25, 230, 255, 0.12)",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: glassSurface.border,
   },
-  logoGlyph: { color: colors.tint, fontWeight: "900", fontSize: 14, letterSpacing: 1 },
-  title: { color: colors.text, fontSize: 17, fontWeight: "800", letterSpacing: 0.3 },
-  subtitle: { color: colors.icon, fontSize: 10, fontWeight: "700", letterSpacing: 1.6 },
+  logoGlyph: { color: glassPalette.cyan, fontWeight: "900", fontSize: 14, letterSpacing: 1 },
+  title: { color: glassSurface.textPrimary, fontSize: 17, fontWeight: "800", letterSpacing: 0.3 },
+  subtitle: { color: glassSurface.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 1.6 },
   bell: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: glassDepth.glass,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: glassSurface.border,
   },
-  bellPressed: { backgroundColor: colors.surface },
+  bellPressed: { backgroundColor: glassDepth.glass },
   alertDot: {
     position: "absolute",
     top: 8,
@@ -90,11 +88,13 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.tint,
-    shadowColor: colors.tint,
+    backgroundColor: glassPalette.cyan,
+    shadowColor: glassPalette.cyan,
     shadowOpacity: 0.9,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 0 },
   },
   alertDotStatic: { shadowOpacity: 0 },
 });
+
+const styles = createStyles();

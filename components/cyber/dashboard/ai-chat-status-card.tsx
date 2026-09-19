@@ -1,5 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
-import { useMemo } from "react";
+import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — KI-Chat-Karte: Provider-/Modellname nur wenn serverseitig
  * verfuegbar; niemals API-Keys. „Kein Provider verfuegbar" inkl. Pruef-
@@ -12,7 +11,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { createNeonStyles } from "./neon-dashboard-styles";
 import { chatStatusCopy, type ChatStatus } from "@/lib/dashboard-view-model";
 
-const ACCENT = (colors: ReturnType<typeof useColors>) => ({ ready: colors.success, checking: colors.tint, unavailable: colors.error, unknown: colors.icon });
+const ACCENT = () => ({ ready: glassPalette.green, checking: glassPalette.cyan, unavailable: glassPalette.red, unknown: glassSurface.textSecondary });
 
 export function AiChatStatusCard({
   status,
@@ -25,10 +24,8 @@ export function AiChatStatusCard({
   model?: string;
   isAdmin: boolean;
 }) {
-  const colors = useColors();
-  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const accent = ACCENT(colors)[status];
+  
+  const accent = ACCENT()[status];
   return (
     <Pressable
       accessibilityRole="button"
@@ -56,20 +53,23 @@ export function AiChatStatusCard({
       ) : null}
       <View style={styles.chevronRow}>
         <Text style={themeStyles.mutedLabel}>Zum Chat</Text>
-        <IconSymbol size={13} name="chevron.right" color={colors.icon} />
+        <IconSymbol size={13} name="chevron.right" color={glassSurface.textSecondary} />
       </View>
     </Pressable>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
   state: { fontSize: 15, fontWeight: "800" },
-  meta: { fontSize: 12, color: colors.muted },
+  meta: { fontSize: 12, color: glassSurface.textSecondary },
   checkButton: { backgroundColor: "rgba(255, 85, 119, 0.12)", borderWidth: 1, borderColor: "rgba(255, 85, 119, 0.45)" },
-  checkButtonText: { color: colors.error, fontWeight: "700", fontSize: 12 },
+  checkButtonText: { color: glassPalette.red, fontWeight: "700", fontSize: 12 },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });
+
+const styles = createStyles();
+const themeStyles = createNeonStyles();

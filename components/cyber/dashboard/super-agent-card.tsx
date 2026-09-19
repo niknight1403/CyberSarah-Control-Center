@@ -1,4 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
+import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
 import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Superagenten-Modul: breite Neon-Glas-Karte mit ECHTEM
@@ -12,7 +12,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { superAgentStatusCopy, type SuperAgentStatus } from "@/lib/dashboard-view-model";
 import { createNeonStyles } from "./neon-dashboard-styles";
 
-const STATUS_COLOR = (colors: ReturnType<typeof useColors>) => ({ active: colors.success, ready: colors.tint, paused: colors.warning, unconfigured: colors.icon, offline: colors.error, error: colors.error });
+const STATUS_COLOR = () => ({ active: glassPalette.green, ready: glassPalette.cyan, paused: glassPalette.amber, unconfigured: glassSurface.textSecondary, offline: glassPalette.red, error: glassPalette.red });
 
 /** Reduce-Motion sicher abfragen (Web-Polyfill: Promise-API). */
 function useReducedMotion(): boolean {
@@ -40,10 +40,8 @@ export function SuperAgentCard({
   detail: string;
   onRetry: () => void;
 }) {
-  const colors = useColors();
-  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const accent = STATUS_COLOR(colors)[status];
+  
+  const accent = STATUS_COLOR()[status];
   const pulse = useAnimatedValue(1);
   const reduceMotion = useReducedMotion();
 
@@ -98,7 +96,7 @@ export function SuperAgentCard({
             ]}
             onPress={onRetry}
           >
-            <Text style={[styles.openButtonText, { color: colors.warning }]}>Erneut laden</Text>
+            <Text style={[styles.openButtonText, { color: glassPalette.amber }]}>Erneut laden</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -121,7 +119,7 @@ export function SuperAgentCard({
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 18 },
   left: { alignItems: "center", gap: 4 },
   avatarRing: {
@@ -141,17 +139,20 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.background,
+    backgroundColor: glassDepth.void,
   },
   liveDot: { width: 9, height: 9, borderRadius: 5 },
   center: { flex: 1, gap: 3 },
-  title: { fontSize: 16, fontWeight: "900", color: colors.text, letterSpacing: 1.2 },
-  subtitle: { fontSize: 12, color: colors.muted },
+  title: { fontSize: 16, fontWeight: "900", color: glassSurface.textPrimary, letterSpacing: 1.2 },
+  subtitle: { fontSize: 12, color: glassSurface.textSecondary },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 2 },
   statusText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
-  detailText: { fontSize: 11, color: colors.icon },
+  detailText: { fontSize: 11, color: glassSurface.textSecondary },
   right: { alignItems: "flex-end" },
   openButton: { flexDirection: "row", gap: 6, borderWidth: 1, backgroundColor: "rgba(25, 230, 255, 0.1)" },
   openButtonText: { fontWeight: "800", fontSize: 13 },
   pressed: { opacity: 0.7 },
 });
+
+const styles = createStyles();
+const themeStyles = createNeonStyles();

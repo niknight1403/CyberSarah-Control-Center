@@ -1,4 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
+import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
 import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Loading-/Empty-/Error-States fuer das Dashboard.
@@ -25,8 +25,6 @@ function useReducedMotion(): boolean {
 }
 
 export function DashboardSkeleton() {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const opacity = useAnimatedValue(0.45);
   const reduceMotion = useReducedMotion();
   useEffect(() => {
@@ -61,9 +59,7 @@ export function DashboardSkeleton() {
 }
 
 export function DashboardErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const colors = useColors();
-  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  
   return (
     <View style={[themeStyles.neonCard, styles.errorCard]} accessibilityLabel={`Fehler: ${message}`}>
       <Text style={styles.errorTitle}>Dashboard-Daten nicht verfügbar</Text>
@@ -80,9 +76,9 @@ export function DashboardErrorState({ message, onRetry }: { message: string; onR
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   wrap: { gap: 12 },
-  block: { borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.14)" },
+  block: { borderRadius: 18, backgroundColor: glassDepth.glass, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.14)" },
   header: { height: 48 },
   user: { height: 96 },
   kpiRow: { flexDirection: "row", gap: 12 },
@@ -91,8 +87,11 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   activity: { height: 120 },
   superAgent: { height: 120 },
   errorCard: { gap: 10 },
-  errorTitle: { color: colors.error, fontSize: 15, fontWeight: "800" },
-  errorMessage: { color: colors.muted, fontSize: 13 },
-  retry: { backgroundColor: "rgba(25, 230, 255, 0.12)", borderWidth: 1, borderColor: colors.border, alignSelf: "flex-start" },
-  retryText: { color: colors.tint, fontWeight: "700", fontSize: 13 },
+  errorTitle: { color: glassPalette.red, fontSize: 15, fontWeight: "800" },
+  errorMessage: { color: glassSurface.textSecondary, fontSize: 13 },
+  retry: { backgroundColor: "rgba(25, 230, 255, 0.12)", borderWidth: 1, borderColor: glassSurface.border, alignSelf: "flex-start" },
+  retryText: { color: glassPalette.cyan, fontWeight: "700", fontSize: 13 },
 });
+
+const styles = createStyles();
+const themeStyles = createNeonStyles();

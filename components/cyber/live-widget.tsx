@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View, type ViewProps } from "react-native";
-import { useColors } from "@/hooks/use-colors";
+import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
 import { cyberTypography } from "@/lib/cyber-theme";
 
 export interface LiveWidgetProps extends ViewProps {
@@ -11,9 +11,7 @@ export interface LiveWidgetProps extends ViewProps {
 }
 
 export function LiveWidget({ title, badge, accent, children, style, ...rest }: LiveWidgetProps) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const resolvedAccent = accent ?? colors.tint;
+  const resolvedAccent = accent ?? glassPalette.cyan;
   return (
     <View style={[styles.widget, { borderColor: `${resolvedAccent}33` }, style]} {...rest}>
       <View style={styles.titleRow}>
@@ -27,21 +25,21 @@ export function LiveWidget({ title, badge, accent, children, style, ...rest }: L
 }
 
 export function WidgetMetric({ label, value, accent, mono = true }: { label: string; value: string; accent?: string; mono?: boolean }) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return <View style={styles.metric}><Text style={styles.metricLabel}>{label.toUpperCase()}</Text><Text style={[mono ? cyberTypography.mono : styles.metricValue, { color: accent ?? colors.text }]}>{value}</Text></View>;
+  return <View style={styles.metric}><Text style={styles.metricLabel}>{label.toUpperCase()}</Text><Text style={[mono ? cyberTypography.mono : styles.metricValue, { color: accent ?? glassSurface.textPrimary }]}>{value}</Text></View>;
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
+function createStyles() {
   return StyleSheet.create({
-    widget: { backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, padding: 14, gap: 10 },
+    widget: { backgroundColor: glassDepth.glass, borderRadius: 16, borderWidth: 1, padding: 14, gap: 10 },
     titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     title: { ...cyberTypography.caption },
     badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
     badgeText: { fontSize: 9, fontWeight: "700", letterSpacing: 1 },
     accentLine: { height: 1, borderRadius: 1, opacity: 0.5 },
     metric: { gap: 2 },
-    metricLabel: { ...cyberTypography.caption, color: colors.icon, fontSize: 9 },
+    metricLabel: { ...cyberTypography.caption, color: glassSurface.textSecondary, fontSize: 9 },
     metricValue: { fontSize: 18, fontWeight: "800" },
   });
 }
+
+const styles = createStyles();

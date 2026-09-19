@@ -1,5 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
-import { useMemo } from "react";
+import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — Systemstatus-Karte: echte Werte aus appStatus (Uptime,
  * Workspace-Ping), korrekt abgeleitet — „/api/health != DB-Readiness".
@@ -11,7 +10,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { createNeonStyles } from "./neon-dashboard-styles";
 import type { SystemStatus } from "@/lib/dashboard-view-model";
 
-const ACCENT = (colors: ReturnType<typeof useColors>) => ({ healthy: colors.success, checking: colors.tint, degraded: colors.warning, offline: colors.error, unknown: colors.icon });
+const ACCENT = () => ({ healthy: glassPalette.green, checking: glassPalette.cyan, degraded: glassPalette.amber, offline: glassPalette.red, unknown: glassSurface.textSecondary });
 
 export function SystemStatusCard({
   status,
@@ -26,10 +25,8 @@ export function SystemStatusCard({
   offline: boolean;
   onRetry: () => void;
 }) {
-  const colors = useColors();
-  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const accent = ACCENT(colors)[status];
+  
+  const accent = ACCENT()[status];
   return (
     <Pressable
       accessibilityRole="button"
@@ -57,13 +54,13 @@ export function SystemStatusCard({
       ) : null}
       <View style={styles.chevronRow}>
         <Text style={themeStyles.mutedLabel}>Details</Text>
-        <IconSymbol size={13} name="chevron.right" color={colors.icon} />
+        <IconSymbol size={13} name="chevron.right" color={glassSurface.textSecondary} />
       </View>
     </Pressable>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -72,8 +69,11 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   uptimeRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   uptimeTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(109, 138, 164, 0.25)", overflow: "hidden" },
   uptimeBar: { height: 6, borderRadius: 3 },
-  uptimeValue: { fontSize: 13, fontWeight: "800", color: colors.text, fontVariant: ["tabular-nums"] },
+  uptimeValue: { fontSize: 13, fontWeight: "800", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
   retry: { backgroundColor: "rgba(255, 200, 87, 0.12)", borderWidth: 1, borderColor: "rgba(255, 200, 87, 0.4)" },
-  retryText: { color: colors.warning, fontWeight: "700", fontSize: 12 },
+  retryText: { color: glassPalette.amber, fontWeight: "700", fontSize: 12 },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });
+
+const styles = createStyles();
+const themeStyles = createNeonStyles();

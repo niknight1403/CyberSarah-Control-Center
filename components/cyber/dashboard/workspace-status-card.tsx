@@ -1,5 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
-import { useMemo } from "react";
+import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — Workspace-Karte: echte Service-Verfuegbarkeit und Anzahl,
  * keine erfundenen Projektzahlen; Empty-State wenn nichts konfiguriert.
@@ -11,7 +10,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { createNeonStyles } from "./neon-dashboard-styles";
 import { workspaceStatusCopy, type WorkspaceStatus } from "@/lib/dashboard-view-model";
 
-const ACCENT = (colors: ReturnType<typeof useColors>) => ({ ready: colors.success, checking: colors.tint, unavailable: colors.warning, unknown: colors.icon });
+const ACCENT = () => ({ ready: glassPalette.green, checking: glassPalette.cyan, unavailable: glassPalette.amber, unknown: glassSurface.textSecondary });
 
 export function WorkspaceStatusCard({
   status,
@@ -22,10 +21,8 @@ export function WorkspaceStatusCard({
   count: number | null;
   detail: string;
 }) {
-  const colors = useColors();
-  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const accent = ACCENT(colors)[status];
+  
+  const accent = ACCENT()[status];
   const countText = count === null ? "—" : String(count);
   return (
     <Pressable
@@ -44,18 +41,21 @@ export function WorkspaceStatusCard({
       <Text style={styles.meta} accessibilityLabel={`${countText} aktive Workspaces`}>{countText} aktive Workspaces</Text>
       <View style={styles.chevronRow}>
         <Text style={themeStyles.mutedLabel}>Projekte &amp; Automationen</Text>
-        <IconSymbol size={13} name="chevron.right" color={colors.icon} />
+        <IconSymbol size={13} name="chevron.right" color={glassSurface.textSecondary} />
       </View>
     </Pressable>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
   state: { fontSize: 15, fontWeight: "800" },
-  meta: { fontSize: 12, color: colors.muted, fontVariant: ["tabular-nums"] },
+  meta: { fontSize: 12, color: glassSurface.textSecondary, fontVariant: ["tabular-nums"] },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });
+
+const styles = createStyles();
+const themeStyles = createNeonStyles();
