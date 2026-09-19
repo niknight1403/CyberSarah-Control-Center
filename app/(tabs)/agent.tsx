@@ -1,9 +1,16 @@
-import {
-  PrimaryButton,
-  StatusBadge,
-  StudioHeader,
-  StudioSection,
-} from "@/components/studio/primitives";
+/**
+ * Sprint 177 — Entwicklungsraum auf "CyberSarah Future Glass" uebertragen
+ * (Teil 1 der Agent-Screen-Migration; Fortsetzung der Sprints 168/173-176).
+ * Logik unveraendert; visuelle Schicht auf das Glass-System umgestellt:
+ * GlassBackdrop statt Flachhintergrund, dynamische Theme-Farben auf die
+ * Glass-Palette (tint->cyan, warning->amber, success->green, error->red),
+ * StudioHeader/StudioSection auf Glass-Typografie, StatusBadge auf StatusChip,
+ * PrimaryButton auf GlowButton.
+ */
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlowButton, StatusChip } from "@/components/glass/glass-primitives";
+import type { GlassAccent } from "@/lib/design/future-glass";
+import { glassPalette, glassType } from "@/lib/design/future-glass";
 import { MarkdownLiteContent } from "@/components/chat/message-bubble";
 import { AgentAvatar } from "@/components/living/agent-avatar";
 import { resolveAvatarMood } from "@/lib/agent-avatar-logic";
@@ -90,7 +97,6 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { darken, lighten, withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
 import { useNow } from "@/hooks/use-now";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal };
@@ -119,8 +125,6 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export default function AgentScreen() {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]);
   const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } =
     useWorkspace();
   const {
@@ -825,11 +829,13 @@ export default function AgentScreen() {
   };
 
   return (
-    <ScreenContainer
-      className="px-5"
-      edges={["top", "left", "right", "bottom"]}
-    >
-      <StudioErrorBoundary section="Agent">
+    <GlassBackdrop accent="purple">
+      <ScreenContainer
+        className="px-5"
+        containerClassName="bg-transparent"
+        edges={["top", "left", "right", "bottom"]}
+      >
+        <StudioErrorBoundary section="Agent">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.flex}
@@ -844,10 +850,8 @@ export default function AgentScreen() {
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               <>
-                <StudioHeader
-                  eyebrow="CYBERSARAH · ENTWICKLUNGSRAUM"
-                  title="Chat"
-                />
+                <Text style={styles.eyebrow}>CYBERSARAH · ENTWICKLUNGSRAUM</Text>
+                <Text style={styles.screenTitle}>Chat</Text>
                 <View style={styles.chatHero}>
                   <AgentAvatar
                     name="CyberSarah"
@@ -930,7 +934,7 @@ export default function AgentScreen() {
                     <IconSymbol
                       name="sparkles"
                       size={17}
-                      color={readyForChat ? lighten(colors.tint, 0.12) : colors.warning}
+                      color={readyForChat ? lighten(glassPalette.cyan, 0.12) : glassPalette.amber}
                     />
                   </View>
                   <View style={styles.readinessCopy}>
@@ -960,7 +964,7 @@ export default function AgentScreen() {
                 >
                   <View style={styles.providerStatusIcon}>
                     {providerActivity === "requesting" ? (
-                      <ActivityIndicator color={colors.tint} size="small" />
+                      <ActivityIndicator color={glassPalette.cyan} size="small" />
                     ) : (
                       <View
                         style={[
@@ -985,26 +989,20 @@ export default function AgentScreen() {
                       {providerStatus.detail}
                     </Text>
                   </View>
-                  <StatusBadge
-                    label={providerStatus.badge}
-                    tone={providerStatus.tone}
-                  />
+                  <StatusChip label={providerStatus.badge} accent={toneAccent(providerStatus.tone)} />
                 </View>
                 <View style={styles.contextRow}>
                   <View style={styles.contextChip}>
                     <IconSymbol
                       name="doc.text.fill"
                       size={14}
-                      color={colors.tint}
+                      color={glassPalette.cyan}
                     />
                     <Text numberOfLines={1} style={styles.contextText}>
                       {contextLabel}
                     </Text>
                   </View>
-                  <StatusBadge
-                    label={readyForChat ? "Kontrolliert" : "Offline"}
-                    tone={readyForChat ? "accent" : "warning"}
-                  />
+                  <StatusChip label={readyForChat ? "Kontrolliert" : "Offline"} accent={readyForChat ? "cyan" : "amber"} />
                 </View>
                 <TouchableOpacity
                   accessibilityLabel="KI-Verbindung testen"
@@ -1018,7 +1016,7 @@ export default function AgentScreen() {
                       styles.contextChipDisabled,
                   ]}
                 >
-                  <IconSymbol name="bolt.fill" size={14} color={colors.tint} />
+                  <IconSymbol name="bolt.fill" size={14} color={glassPalette.cyan} />
                   <Text numberOfLines={1} style={styles.contextText}>
                     {connectionTest.status === "checking"
                       ? "KI-Verbindung wird geprüft …"
@@ -1055,16 +1053,12 @@ export default function AgentScreen() {
                     <Text style={styles.clearHistoryText}>Verlauf löschen</Text>
                   </TouchableOpacity>
                 </View>
-                <StudioSection
-                  label="Konversation"
-                  title="Reviewbarer Projektkontext"
-                />
+                <Text style={styles.sectionLabel}>KONVERSATION</Text>
+                <Text style={styles.sectionTitle}>Reviewbarer Projektkontext</Text>
                 {proposalQueueView ? (
                   <>
-                    <StudioSection
-                      label="VORSCHLAGSWARTESCHLANGE"
-                      title="Agenten-Vorschläge"
-                    />
+                    <Text style={styles.sectionLabel}>VORSCHLAGSWARTESCHLANGE</Text>
+                    <Text style={styles.sectionTitle}>Agenten-Vorschläge</Text>
                     <View style={styles.proposalQueueCard}>
                       <Text style={styles.proposalQueueMeta}>
                         {proposalQueueView.summary.summaryText}
@@ -1087,10 +1081,7 @@ export default function AgentScreen() {
                                 {item.expiryLabel}
                               </Text>
                             </View>
-                            <StatusBadge
-                              label={item.badgeLabel}
-                              tone={item.badgeTone}
-                            />
+                            <StatusChip label={item.badgeLabel} accent={toneAccent(item.badgeTone)} />
                           </View>
                           {item.actionable ? (
                             <View style={styles.proposalQueueActions}>
@@ -1179,7 +1170,7 @@ export default function AgentScreen() {
                       ]}
                     >
                       {mediaPickerBusy ? (
-                        <ActivityIndicator color={colors.tint} size="small" />
+                        <ActivityIndicator color={glassPalette.cyan} size="small" />
                       ) : (
                         <Text style={styles.plusButtonText}>＋</Text>
                       )}
@@ -1507,7 +1498,7 @@ export default function AgentScreen() {
                                 {isLoading ? (
                                   <View style={styles.previewLoading}>
                                     <ActivityIndicator
-                                      color={colors.tint}
+                                      color={glassPalette.cyan}
                                       size="small"
                                     />
                                     <Text style={styles.previewLoadingText}>
@@ -1583,8 +1574,9 @@ export default function AgentScreen() {
                     textAlignVertical="top"
                     value={prompt}
                   />
-                  <PrimaryButton
-                    icon="arrow.up.circle.fill"
+                  <GlowButton
+                    accent="cyan"
+                    variant="primary"
                     label={
                       isThinking ? "Agent analysiert …" : "Vorschlag erstellen"
                     }
@@ -1605,7 +1597,7 @@ export default function AgentScreen() {
                 </View>
                 <View style={styles.backupCard}>
                   <View style={styles.backupTitleRow}>
-                    <IconSymbol name="lock.fill" size={16} color={colors.warning} />
+                    <IconSymbol name="lock.fill" size={16} color={glassPalette.amber} />
                     <Text style={styles.backupTitle}>
                       VERSCHLÜSSELTES SUPPORT-BACKUP
                     </Text>
@@ -1635,8 +1627,9 @@ export default function AgentScreen() {
                     style={styles.backupInput}
                     value={backupPasswordRepeat}
                   />
-                  <PrimaryButton
-                    icon="square.and.arrow.up"
+                  <GlowButton
+                    accent="purple"
+                    variant="primary"
                     label={
                       backupState === "exporting"
                         ? "Backup wird verschlüsselt …"
@@ -1702,7 +1695,7 @@ export default function AgentScreen() {
                 >
                   {!isUser ? (
                     <View style={styles.agentAvatar}>
-                      <IconSymbol name="sparkles" size={16} color={lighten(colors.tint, 0.12)} />
+                      <IconSymbol name="sparkles" size={16} color={lighten(glassPalette.cyan, 0.12)} />
                     </View>
                   ) : null}
                   <View
@@ -1864,18 +1857,23 @@ export default function AgentScreen() {
           />
         </KeyboardAvoidingView>
       </StudioErrorBoundary>
-    </ScreenContainer>
+      </ScreenContainer>
+    </GlassBackdrop>
   );
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
+function createStyles() {
   return StyleSheet.create({
+  eyebrow: { ...glassType.label, color: glassPalette.cyan, marginTop: 8 },
+  screenTitle: { ...glassType.display, color: "#F2F6FC", marginTop: 4 },
+  sectionLabel: { ...glassType.label, color: "#6E7B8C", marginTop: 18 },
+  sectionTitle: { ...glassType.headline, color: "#F2F6FC", marginTop: 2 },
   flex: { flex: 1 },
   content: { paddingBottom: 20 },
   chatHero: {
     alignItems: "center",
-    backgroundColor: withAlpha(colors.tint, 0.1),
-    borderColor: withAlpha(colors.tint, 0.16),
+    backgroundColor: withAlpha(glassPalette.cyan, 0.1),
+    borderColor: withAlpha(glassPalette.cyan, 0.16),
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: "row",
@@ -1885,7 +1883,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   chatHeroIcon: {
     alignItems: "center",
-    backgroundColor: withAlpha(colors.tint, 0.16),
+    backgroundColor: withAlpha(glassPalette.cyan, 0.16),
     borderRadius: 17,
     height: 44,
     justifyContent: "center",
@@ -1924,11 +1922,11 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     marginBottom: 13,
     padding: 12,
   },
-  readinessReady: { backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.22) },
-  readinessWaiting: { backgroundColor: darken(colors.warning, 0.85), borderColor: darken(colors.warning, 0.6) },
+  readinessReady: { backgroundColor: withAlpha(glassPalette.cyan, 0.1), borderColor: withAlpha(glassPalette.cyan, 0.22) },
+  readinessWaiting: { backgroundColor: darken(glassPalette.amber, 0.85), borderColor: darken(glassPalette.amber, 0.6) },
   readinessIcon: {
     alignItems: "center",
-    backgroundColor: withAlpha(colors.tint, 0.12),
+    backgroundColor: withAlpha(glassPalette.cyan, 0.12),
     borderRadius: 11,
     height: 35,
     justifyContent: "center",
@@ -1951,9 +1949,9 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     marginBottom: 13,
     padding: 11,
   },
-  providerStatusLocal: { backgroundColor: darken(colors.success, 0.78), borderColor: darken(colors.success, 0.55) },
-  providerStatusCloud: { backgroundColor: "#17253A", borderColor: withAlpha(colors.tint, 0.25) },
-  providerStatusWarning: { backgroundColor: darken(colors.warning, 0.85), borderColor: darken(colors.warning, 0.55) },
+  providerStatusLocal: { backgroundColor: darken(glassPalette.green, 0.78), borderColor: darken(glassPalette.green, 0.55) },
+  providerStatusCloud: { backgroundColor: "#17253A", borderColor: withAlpha(glassPalette.cyan, 0.25) },
+  providerStatusWarning: { backgroundColor: darken(glassPalette.amber, 0.85), borderColor: darken(glassPalette.amber, 0.55) },
   providerStatusIcon: {
     alignItems: "center",
     backgroundColor: "#0D151E",
@@ -1963,9 +1961,9 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     width: 30,
   },
   providerStatusDot: { borderRadius: 6, height: 11, width: 11 },
-  providerStatusDotLocal: { backgroundColor: colors.success },
-  providerStatusDotCloud: { backgroundColor: colors.tint },
-  providerStatusDotWarning: { backgroundColor: colors.warning },
+  providerStatusDotLocal: { backgroundColor: glassPalette.green },
+  providerStatusDotCloud: { backgroundColor: glassPalette.cyan },
+  providerStatusDotWarning: { backgroundColor: glassPalette.amber },
   providerStatusCopy: { flex: 1, minWidth: 0 },
   providerStatusEyebrow: {
     color: "#8E9CAF",
@@ -1996,10 +1994,10 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     marginBottom: 18,
   },
   connectionTestTextError: {
-    color: colors.error,
+    color: glassPalette.red,
   },
   connectionTestTextReady: {
-    color: colors.success,
+    color: glassPalette.green,
   },
   contextChipDisabled: {
     opacity: 0.55,
@@ -2089,7 +2087,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     paddingVertical: 5,
   },
   proposalQueueActionPrimary: {
-    backgroundColor: withAlpha(colors.tint, 0.16),
+    backgroundColor: withAlpha(glassPalette.cyan, 0.16),
     borderColor: "#3D5A85",
   },
   proposalQueueActionText: {
@@ -2122,7 +2120,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   userMessageRow: { justifyContent: "flex-end" },
   agentAvatar: {
     alignItems: "center",
-    backgroundColor: withAlpha(colors.tint, 0.12),
+    backgroundColor: withAlpha(glassPalette.cyan, 0.12),
     borderRadius: 13,
     height: 27,
     justifyContent: "center",
@@ -2138,13 +2136,13 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   agentBubble: { backgroundColor: "#151C29", borderTopLeftRadius: 5 },
   userBubble: { backgroundColor: "#20354A", borderTopRightRadius: 5 },
   messageRole: {
-    color: lighten(colors.tint, 0.12),
+    color: lighten(glassPalette.cyan, 0.12),
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.1,
     marginBottom: 5,
   },
-  userMessageRole: { color: lighten(colors.tint, 0.15) },
+  userMessageRole: { color: lighten(glassPalette.cyan, 0.15) },
   messageText: { color: "#E5ECF5", fontSize: 14, lineHeight: 20 },
   changeList: {
     borderTopColor: "#2A3548",
@@ -2168,7 +2166,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     paddingHorizontal: 6,
     paddingVertical: 5,
   },
-  changeRowSelected: { backgroundColor: withAlpha(colors.tint, 0.13) },
+  changeRowSelected: { backgroundColor: withAlpha(glassPalette.cyan, 0.13) },
   changeSelection: {
     alignItems: "center",
     borderColor: "#63718A",
@@ -2179,8 +2177,8 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     width: 18,
   },
   changeSelectionSelected: {
-    backgroundColor: colors.tint,
-    borderColor: colors.tint,
+    backgroundColor: glassPalette.cyan,
+    borderColor: glassPalette.cyan,
   },
   changeSelectionMark: {
     color: "#071218",
@@ -2190,7 +2188,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   changeCopy: { flex: 1 },
   changePath: {
-    color: lighten(colors.tint, 0.25),
+    color: lighten(glassPalette.cyan, 0.25),
     fontFamily: "monospace",
     fontSize: 11,
     fontWeight: "800",
@@ -2203,8 +2201,8 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   applyButton: {
     alignItems: "center",
-    backgroundColor: withAlpha(colors.tint, 0.25),
-    borderColor: colors.tint,
+    backgroundColor: withAlpha(glassPalette.cyan, 0.25),
+    borderColor: glassPalette.cyan,
     borderRadius: 10,
     borderWidth: 1,
     flexDirection: "row",
@@ -2218,7 +2216,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   applyText: { color: "#E6FAFF", fontSize: 12, fontWeight: "900" },
   undoButton: {
     alignItems: "center",
-    borderColor: darken(colors.warning, 0.35),
+    borderColor: darken(glassPalette.amber, 0.35),
     borderRadius: 10,
     borderWidth: 1,
     justifyContent: "center",
@@ -2226,15 +2224,15 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     minHeight: 44,
     paddingHorizontal: 12,
   },
-  undoText: { color: colors.warning, fontSize: 12, fontWeight: "900" },
+  undoText: { color: glassPalette.amber, fontSize: 12, fontWeight: "900" },
   appliedText: {
-    color: colors.success,
+    color: glassPalette.green,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 12,
   },
   restoredText: {
-    color: colors.warning,
+    color: glassPalette.amber,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 12,
@@ -2265,11 +2263,11 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     minWidth: 108,
     paddingHorizontal: 10,
   },
-  plusButtonText: { color: colors.tint, fontSize: 25, lineHeight: 28 },
+  plusButtonText: { color: glassPalette.cyan, fontSize: 25, lineHeight: 28 },
   toolbarButtonText: { color: "#C7D4E4", fontSize: 11, fontWeight: "800" },
   toolsButton: {
     alignItems: "center",
-    borderColor: withAlpha(colors.tint, 0.22),
+    borderColor: withAlpha(glassPalette.cyan, 0.22),
     borderRadius: 12,
     borderWidth: 1,
     flex: 1,
@@ -2277,7 +2275,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     minHeight: 44,
     paddingHorizontal: 8,
   },
-  toolsButtonText: { color: lighten(colors.tint, 0.25), fontSize: 11, fontWeight: "800" },
+  toolsButtonText: { color: lighten(glassPalette.cyan, 0.25), fontSize: 11, fontWeight: "800" },
   attachMenu: {
     backgroundColor: "#0E151F",
     borderColor: "#33445B",
@@ -2298,7 +2296,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     minHeight: 58,
     paddingHorizontal: 5,
   },
-  attachOptionIcon: { color: colors.tint, fontSize: 20, marginBottom: 2 },
+  attachOptionIcon: { color: glassPalette.cyan, fontSize: 20, marginBottom: 2 },
   attachOptionText: {
     color: "#C9D6E5",
     fontSize: 10,
@@ -2307,14 +2305,14 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   toolsMenu: {
     backgroundColor: "#111622",
-    borderColor: withAlpha(colors.tint, 0.22),
+    borderColor: withAlpha(glassPalette.cyan, 0.22),
     borderRadius: 14,
     borderWidth: 1,
     marginBottom: 10,
     padding: 12,
   },
   toolsMenuLabel: {
-    color: colors.tint,
+    color: glassPalette.cyan,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1,
@@ -2329,7 +2327,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     minHeight: 38,
   },
   toolName: { color: "#D7E1EE", fontSize: 12, fontWeight: "700" },
-  toolStatusActive: { color: colors.success, fontSize: 10, fontWeight: "900" },
+  toolStatusActive: { color: glassPalette.green, fontSize: 10, fontWeight: "900" },
   toolNameBlock: { flex: 1, paddingVertical: 7 },
   toolDetail: { color: "#8798AD", fontSize: 10, marginTop: 2 },
   connectorActions: { alignItems: "center", flexDirection: "row", gap: 7 },
@@ -2342,17 +2340,17 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     minHeight: 36,
     paddingHorizontal: 8,
   },
-  configureButtonText: { color: lighten(colors.tint, 0.3), fontSize: 10, fontWeight: "800" },
+  configureButtonText: { color: lighten(glassPalette.cyan, 0.3), fontSize: 10, fontWeight: "800" },
   testButton: {
     alignItems: "center",
-    borderColor: withAlpha(colors.tint, 0.22),
+    borderColor: withAlpha(glassPalette.cyan, 0.22),
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 36,
     paddingHorizontal: 8,
   },
-  testButtonText: { color: colors.tint, fontSize: 10, fontWeight: "800" },
+  testButtonText: { color: glassPalette.cyan, fontSize: 10, fontWeight: "800" },
   connectorTestText: {
     color: "#8293A8",
     fontSize: 9,
@@ -2372,8 +2370,8 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   skillToggleOn: {
     alignItems: "flex-end",
-    backgroundColor: withAlpha(colors.tint, 0.25),
-    borderColor: colors.tint,
+    backgroundColor: withAlpha(glassPalette.cyan, 0.25),
+    borderColor: glassPalette.cyan,
   },
   skillToggleKnob: {
     backgroundColor: "#9EACBD",
@@ -2433,7 +2431,7 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     justifyContent: "center",
     width: 88,
   },
-  previewFallbackIcon: { color: colors.tint, fontSize: 23, fontWeight: "900" },
+  previewFallbackIcon: { color: glassPalette.cyan, fontSize: 23, fontWeight: "900" },
   previewFallbackKind: {
     color: "#829DB8",
     fontSize: 8,
@@ -2494,10 +2492,10 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     lineHeight: 16,
     marginTop: 10,
   },
-  chatError: { color: colors.error, fontSize: 11, lineHeight: 16, marginTop: 9 },
+  chatError: { color: glassPalette.red, fontSize: 11, lineHeight: 16, marginTop: 9 },
   backupCard: {
-    backgroundColor: darken(colors.warning, 0.87),
-    borderColor: darken(colors.warning, 0.62),
+    backgroundColor: darken(glassPalette.amber, 0.87),
+    borderColor: darken(glassPalette.amber, 0.62),
     borderRadius: 18,
     borderWidth: 1,
     marginTop: 16,
@@ -2510,20 +2508,20 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     marginBottom: 7,
   },
   backupTitle: {
-    color: colors.warning,
+    color: glassPalette.amber,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.1,
   },
   backupHint: {
-    color: darken(colors.warning, 0.25),
+    color: darken(glassPalette.amber, 0.25),
     fontSize: 11,
     lineHeight: 16,
     marginBottom: 11,
   },
   backupInput: {
     backgroundColor: "#121823",
-    borderColor: darken(colors.warning, 0.65),
+    borderColor: darken(glassPalette.amber, 0.65),
     borderRadius: 10,
     borderWidth: 1,
     color: "#EDF4FC",
@@ -2533,25 +2531,25 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     paddingHorizontal: 11,
   },
   backupSuccess: {
-    color: colors.success,
+    color: glassPalette.green,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 9,
   },
-  backupError: { color: colors.error, fontSize: 11, lineHeight: 16, marginTop: 9 },
+  backupError: { color: glassPalette.red, fontSize: 11, lineHeight: 16, marginTop: 9 },
   backupVerification: {
-    borderTopColor: darken(colors.warning, 0.62),
+    borderTopColor: darken(glassPalette.amber, 0.62),
     borderTopWidth: 1,
     marginTop: 11,
     paddingTop: 10,
   },
   backupVerificationTitle: {
-    color: lighten(colors.success, 0.15),
+    color: lighten(glassPalette.green, 0.15),
     fontSize: 11,
     fontWeight: "900",
     marginBottom: 4,
   },
-  backupVerificationText: { color: darken(colors.warning, 0.2), fontSize: 10, lineHeight: 15 },
+  backupVerificationText: { color: darken(glassPalette.amber, 0.2), fontSize: 10, lineHeight: 15 },
   backupPreviewExcerpt: {
     color: "#E2D9C0",
     fontSize: 10,
@@ -2561,3 +2559,10 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   });
 }
+
+/** Tone-Mapping Studio-Badge -> Glass-Akzent (Sprint 177). */
+function toneAccent(tone: "ready" | "warning" | "neutral" | "accent"): GlassAccent {
+  return tone === "ready" ? "green" : tone === "warning" ? "amber" : tone === "accent" ? "cyan" : "blue";
+}
+
+const styles = createStyles();
