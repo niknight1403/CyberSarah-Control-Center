@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
   modelRouterSettings,
@@ -36,11 +37,32 @@ function isAdministratorEmail(email: string | null | undefined) {
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+// Sprint 169 — Connection-Pool-Haertung: Managed Postgres (Neon) baut
+// Idle-Verbindungen nach wenigen Minuten ab. Der Default-Pool von node-postgres
+// haelt dann tote Clients (Fehler auf naechster Query) und ohne 'error'-Handler
+// am Pool wirft ein Idle-Client-Fehler eine unbehandelte Exception, die den
+// ganzen Serverprozess reisst. Expliziter Pool mit Keepalive (TCP-Signale
+// gegen stille Timeouts), Idle-Timeout unterhalb der Provider-Grenze und
+// Verbindungs-Timeout; Idle-Fehler werden protokolliert, ohne den Pool zu
+// toeten — pg ersetzt den fehlerhaften Client intern.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        max: 10,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 10_000,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10_000,
+      });
+      pool.on("error", (error) => {
+        console.warn(
+          "[Database] Idle-Client-Fehler (Pool bleibt aktiv):",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
+      _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

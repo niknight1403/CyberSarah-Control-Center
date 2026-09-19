@@ -9,8 +9,8 @@
  * semi-transparenter backgroundColor + Border + Shadow.
  */
 
-import React, { useRef } from "react";
-import { Animated, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import React from "react";
+import { Animated, Platform, Pressable, StyleSheet, Text, View, useAnimatedValue, type ViewStyle } from "react-native";
 
 import {
   accentAlpha,
@@ -41,7 +41,7 @@ interface GlassCardProps {
 }
 
 export function GlassCard({ children, accent, glow = 0, elevated = false, onPress, style, testID }: GlassCardProps) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useAnimatedValue(1);
 
   const pressIn = () => {
     if (!onPress) return;
@@ -103,7 +103,7 @@ interface GlowButtonProps {
 }
 
 export function GlowButton({ label, onPress, accent = "purple", variant = "primary", disabled, icon, testID }: GlowButtonProps) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useAnimatedValue(1);
   const pressIn = () => Animated.timing(scale, { toValue: glassMotion.pressScale, duration: glassMotion.fast, useNativeDriver: true }).start();
   const pressOut = () => Animated.timing(scale, { toValue: 1, duration: glassMotion.fast, useNativeDriver: true }).start();
 
@@ -157,7 +157,7 @@ interface StatusChipProps {
 }
 
 export function StatusChip({ label, accent = "green", live = false }: StatusChipProps) {
-  const pulse = useRef(new Animated.Value(0.5)).current;
+  const pulse = useAnimatedValue(0.5);
   React.useEffect(() => {
     if (!live) return;
     const loop = Animated.loop(

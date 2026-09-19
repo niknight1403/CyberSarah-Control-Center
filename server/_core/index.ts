@@ -291,10 +291,50 @@ async function startServer() {
   const port = parseInt(process.env.PORT || "3000", 10);
   void restoreRouterState().catch(() => undefined);
   void initProviderAdmin().catch(() => undefined);
+
+  // Sprint 169 — Port-Konflikt-Haertung (EADDRINUSE): Ohne diesen Handler
+  // wirft der Listener eine unbehandelte Exception mit rohem Stack-Trace und
+  // der Supervisor (PM2/Render) startet blind gegen denselben belegten Port
+  // in einen Restart-Loop. Jetzt: loesbare, deutsche Fehlermeldung ueber den
+  // Runtime-Logger (speist auch die port_in_use-Signatur des Self-Healing-
+  // Ledgers) und kontrollierter Exit — das Recovery entscheidet der Supervisor.
+  server.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(
+        `[api] FEHLER EADDRINUSE: Port ${port} ist bereits belegt. Belegenden Prozess finden (lsof -i :${port} bzw. Render-Log) oder PORT auf freien Wert setzen. Prozess wird kontrolliert beendet.`,
+      );
+    } else {
+      console.error("[api] Listener-Fehler, Prozess wird beendet:", error);
+    }
+    process.exit(1);
+  });
+
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
     startOptimizerLoop();
   });
 }
 
-startServer().catch(console.error);
+// Sprint 169 — Globale Async-Exception-Haertung: Unbehandelte Rejections
+// beenden Node seit v15 sofort mit rohem Stack. Sie landen jetzt sauber im
+// Runtime-Logger und damit im Self-Healing-Ledger (Signatur
+// unhandled_rejection) — der Prozess bleibt am Leben, der Fehler bleibt
+// beobachtbar und klassifiziert. Unbehandelte Exceptions sind dagegen nicht
+// fortsetzbar (Interna unklar): loggen und kontrolliert beenden (Exit 1),
+// damit PM2/Render sauber statt mitten im Request neu starten.
+process.on("unhandledRejection", (reason) => {
+  console.error("[api] Unbehandelte Promise-Rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error(
+    "[api] Unbehandelte Exception — Prozess wird kontrolliert beendet:",
+    error,
+  );
+  process.exit(1);
+});
+
+startServer().catch((error) => {
+  console.error("[api] Server-Start fehlgeschlagen:", error);
+  process.exit(1);
+});

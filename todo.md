@@ -266,3 +266,4 @@
 - [x] 10 neue deterministische Tests (tests/ops-paas-logic.test.ts); 671/671 Tests gruen, tsc sauber, Server-Build erfolgreich
 - [x] Doku: docs/SPRINT_110_ZENTRALE_BETRIEBSANSICHT.md; .env.example um vier optionale Variablen ergaenzt
 - Offen (bewusst): Render-Deploy-Check ohne Key 'unknown'; Stufenverlauf prozesslokal (kein Erstalarm nach Restart)
+- [x] Sprint 169: Runtime-Härtung + Lint-Gate-Reparatur — EADDRINUSE-Handler am Listener (klare Meldung statt rohem Crash, kontrollierter Exit 1; live verifiziert auf Port 4599), globale unhandledRejection/uncaughtException-Handler (speisen Runtime-Logger + Self-Healing-Ledger), PG-Pool-Härtung (keepAlive, 30s Idle-Timeout, 10s Verbindungs-Timeout, Idle-Fehler-Handler gegen Neon-Idle-Kills), 19 Lint-Errors in glass-primitives/holo-activity-card via offiziellem useAnimatedValue-Hook behoben (CI-Lint-Gate war rot); 1173/1173 Tests, tsc sauber, Build grün, eslint 0 Errors

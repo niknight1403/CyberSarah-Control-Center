@@ -8,8 +8,8 @@
  * Dauer-Animation im Leerlauf (Performance).
  */
 
-import React, { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import React, { useEffect } from "react";
+import { Animated, StyleSheet, Text, View, useAnimatedValue } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
@@ -42,7 +42,7 @@ export function HoloActivityCard({
   const geometry = sparklineGeometry(points);
   const hasData = geometry.length >= 2;
   const path = buildPath(geometry);
-  const fadeIn = useRef(new Animated.Value(0)).current;
+  const fadeIn = useAnimatedValue(0);
 
   useEffect(() => {
     fadeIn.setValue(0);
