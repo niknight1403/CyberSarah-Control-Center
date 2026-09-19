@@ -1,16 +1,25 @@
+/**
+ * Sprint 173 — Konto-Screen auf "CyberSarah Future Glass" umgebaut.
+ *
+ * Logik (Auth, Session-Expiry-Handling, Billing-Checkout/Portal/Kündigung,
+ * Rechnungsliste) bleibt unveraendert; ausschliesslich die visuelle Schicht
+ * wird auf das verbindliche Glass-System (Sprint 168) uebertragen:
+ * GlassBackdrop statt flachem Hintergrund, GlassCard statt Ad-hoc-Karte,
+ * GlowButton statt handgebauter Buttons, StatusChip statt Role-Badge,
+ * Typography/Tokens aus lib/design/future-glass statt Hartkodierungen.
+ */
 import { ScreenContainer } from "@/components/screen-container";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import { trpc } from "@/lib/trpc";
 import * as Auth from "@/lib/_core/auth";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { lighten, withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
+import { accentAlpha, glassDepth, glassPalette, glassRadii, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
 export default function AccountScreen() {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -115,124 +124,156 @@ export default function AccountScreen() {
 
   const navDrawer = useNavDrawer();
   return (
-    <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
-      <View style={styles.page}>
-        <View style={styles.menuRow}>
-          <NavDrawer {...navDrawer.drawerProps} />
-          <NavDrawerButton {...navDrawer.hamburgerProps} />
-        </View>
-        <Text style={styles.eyebrow}>CYBERSARAH · KONTO</Text>
-        <Text style={styles.title}>{sessionExpired && !user ? "Sitzung abgelaufen" : user ? "Dein Zugang" : mode === "login" ? "Anmelden" : "Konto erstellen"}</Text>
-        <Text style={styles.lead}>{user ? "Sitzung, Berechtigungen und Verwaltungszugang werden hier sicher verwaltet." : "Melde dich an, um den Entwicklungsraum, KI-Provider und Verwaltungsfunktionen zu nutzen."}</Text>
-
-        {user ? <View style={styles.card}>
-          <Text style={styles.name}>{user.name || user.email || "CyberSarah Nutzer"}</Text>
-          <Text style={styles.email}>{user.email || "Keine E-Mail-Adresse hinterlegt"}</Text>
-          <View style={[styles.roleBadge, user.role === "admin" && styles.roleBadgeAdmin]}><Text style={styles.roleText}>{user.role === "admin" ? "ADMINISTRATOR · VOLLER ZUGRIFF" : "STANDARDZUGANG"}</Text></View>
-          {user.role === "admin" ? <Text style={styles.adminCopy}>Alle Skills, Steuerungselemente und Administrationsfunktionen sind für dieses Konto freigeschaltet.</Text> : null}
-          {user.role === "admin" ? (
-            <>
-              <View style={styles.billingCard}>
-                <Text style={styles.billingTitle}>EXPERT-ZUGANG AKTIV</Text>
-                <Text style={styles.billingCopy}>
-                  Dein Administratorzugang umfasst dauerhaft alle Expert-Funktionen.
-                  Ein Abonnement oder Stripe-Checkout ist nicht erforderlich.
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => router.push("/admin")} style={styles.adminButton}>
-                <Text style={styles.adminButtonText}>Admin-Control-Center öffnen</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-          <View style={styles.billingCard}>
-            <Text style={styles.billingTitle}>LIVE-ABRECHNUNG</Text>
-            <Text style={styles.billingCopy}>{billingQuery.data?.subscription ? `Stufe: ${billingQuery.data?.tierLabel ?? "Lite"} · Status: ${billingQuery.data.subscription.status}${billingQuery.data.subscription.cancelAtPeriodEnd ? " · Kündigung vorgemerkt" : ""}` : "Noch kein aktives Abonnement — Stufe wählen:"}</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-              {(["lite", "pro", "expert"] as const).map((tier) => (
-                <TouchableOpacity key={tier} disabled={checkoutMutation.isPending} onPress={() => void openCheckout(tier)} style={[styles.billingButton, { flex: 1, backgroundColor: billingQuery.data?.tier === tier ? "#4b5563" : undefined }]}>
-                  <Text style={styles.billingButtonText}>{checkoutMutation.isPending && checkoutMutation.variables?.tier === tier ? "…" : tier === "expert" ? "Expert" : tier === "pro" ? "Pro" : "Lite"}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {billingQuery.data?.subscription ? (
-              <>
-                <TouchableOpacity disabled={portalMutation.isPending || cancelMutation.isPending} onPress={() => void openPortal()} style={[styles.billingButton, { marginTop: 8 }]}>
-                  <Text style={styles.billingButtonText}>{portalMutation.isPending ? "Portal wird geöffnet …" : "Abonnement verwalten"}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  disabled={cancelMutation.isPending || billingQuery.data.subscription.cancelAtPeriodEnd}
-                  onPress={async () => {
-                    try {
-                      await cancelMutation.mutateAsync();
-                      setMessage("Abonnement wird zum Periodenende gekündigt — im Portal widerrufbar.");
-                      await billingQuery.refetch();
-                    } catch (error) {
-                      setMessage(error instanceof Error ? error.message : "Die Kündigung ist fehlgeschlagen.");
-                    }
-                  }}
-                  style={[styles.billingButton, { marginTop: 8, opacity: billingQuery.data.subscription.cancelAtPeriodEnd ? 0.5 : 1 }]}
-                >
-                  <Text style={styles.billingButtonText}>{billingQuery.data.subscription.cancelAtPeriodEnd ? "Kündigung vorgemerkt" : "Zum Periodenende kündigen"}</Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
-            {(invoicesQuery.data?.invoices?.length ?? 0) > 0 ? (
-              <View style={{ marginTop: 10 }}>
-                <Text style={styles.billingCopy}>Rechnungen:</Text>
-                {invoicesQuery.data!.invoices.slice(0, 5).map((invoice) => (
-                  <TouchableOpacity key={invoice.id} disabled={!invoice.hostedInvoiceUrl} onPress={() => (invoice.hostedInvoiceUrl ? Linking.openURL(invoice.hostedInvoiceUrl) : undefined)} style={{ paddingVertical: 6 }}>
-                    <Text style={[styles.billingCopy, { color: "#9ca3af" }]}>{invoice.created ? new Date(invoice.created).toLocaleDateString("de-DE") : "—"} · {(invoice.amountTotal / 100).toFixed(2)} € · {invoice.status === "paid" ? "bezahlt" : invoice.status === "open" ? "offen" : "storniert"}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
+    <GlassBackdrop accent="purple">
+      <ScreenContainer style={styles.transparent} edges={["top", "left", "right", "bottom"]}>
+        <View style={styles.page}>
+          <View style={styles.menuRow}>
+            <NavDrawer {...navDrawer.drawerProps} />
+            <NavDrawerButton {...navDrawer.hamburgerProps} />
           </View>
+          <Text style={styles.eyebrow}>CYBERSARAH · KONTO</Text>
+          <Text style={styles.title}>{sessionExpired && !user ? "Sitzung abgelaufen" : user ? "Dein Zugang" : mode === "login" ? "Anmelden" : "Konto erstellen"}</Text>
+          <Text style={styles.lead}>{user ? "Sitzung, Berechtigungen und Verwaltungszugang werden hier sicher verwaltet." : "Melde dich an, um den Entwicklungsraum, KI-Provider und Verwaltungsfunktionen zu nutzen."}</Text>
+
+          {user ? (
+            <GlassCard accent="purple" glow={1} style={styles.card}>
+              <Text style={styles.name}>{user.name || user.email || "CyberSarah Nutzer"}</Text>
+              <Text style={styles.email}>{user.email || "Keine E-Mail-Adresse hinterlegt"}</Text>
+              <View style={styles.roleRow}>
+                <StatusChip label={user.role === "admin" ? "ADMINISTRATOR · VOLLER ZUGRIFF" : "STANDARDZUGANG"} accent={user.role === "admin" ? "purple" : "blue"} />
+              </View>
+              {user.role === "admin" ? <Text style={styles.adminCopy}>Alle Skills, Steuerungselemente und Administrationsfunktionen sind für dieses Konto freigeschaltet.</Text> : null}
+              {user.role === "admin" ? (
+                <>
+                  <GlassCard accent="green" style={styles.billingCard}>
+                    <Text style={styles.billingTitle}>EXPERT-ZUGANG AKTIV</Text>
+                    <Text style={styles.billingCopy}>
+                      Dein Administratorzugang umfasst dauerhaft alle Expert-Funktionen.
+                      Ein Abonnement oder Stripe-Checkout ist nicht erforderlich.
+                    </Text>
+                  </GlassCard>
+                  <GlowButton label="Admin-Control-Center öffnen" onPress={() => router.push("/admin")} accent="cyan" variant="secondary" testID="account-open-admin" />
+                </>
+              ) : (
+                <GlassCard accent="green" style={styles.billingCard}>
+                  <Text style={styles.billingTitle}>LIVE-ABRECHNUNG</Text>
+                  <Text style={styles.billingCopy}>{billingQuery.data?.subscription ? `Stufe: ${billingQuery.data?.tierLabel ?? "Lite"} · Status: ${billingQuery.data.subscription.status}${billingQuery.data.subscription.cancelAtPeriodEnd ? " · Kündigung vorgemerkt" : ""}` : "Noch kein aktives Abonnement — Stufe wählen:"}</Text>
+                  <View style={styles.tierRow}>
+                    {(["lite", "pro", "expert"] as const).map((tier) => (
+                      <GlowButton
+                        key={tier}
+                        label={checkoutMutation.isPending && checkoutMutation.variables?.tier === tier ? "…" : tier === "expert" ? "Expert" : tier === "pro" ? "Pro" : "Lite"}
+                        onPress={() => void openCheckout(tier)}
+                        disabled={checkoutMutation.isPending}
+                        accent="green"
+                        variant={billingQuery.data?.tier === tier ? "primary" : "ghost"}
+                      />
+                    ))}
+                  </View>
+                  {billingQuery.data?.subscription ? (
+                    <>
+                      <GlowButton label={portalMutation.isPending ? "Portal wird geöffnet …" : "Abonnement verwalten"} onPress={() => void openPortal()} disabled={portalMutation.isPending || cancelMutation.isPending} accent="green" variant="secondary" testID="account-open-portal" />
+                      <GlowButton
+                        label={billingQuery.data.subscription.cancelAtPeriodEnd ? "Kündigung vorgemerkt" : "Zum Periodenende kündigen"}
+                        onPress={() =>
+                          void (async () => {
+                            try {
+                              await cancelMutation.mutateAsync();
+                              setMessage("Abonnement wird zum Periodenende gekündigt — im Portal widerrufbar.");
+                              await billingQuery.refetch();
+                            } catch (error) {
+                              setMessage(error instanceof Error ? error.message : "Die Kündigung ist fehlgeschlagen.");
+                            }
+                          })()
+                        }
+                        disabled={cancelMutation.isPending || billingQuery.data.subscription.cancelAtPeriodEnd}
+                        accent="amber"
+                        variant="ghost"
+                        testID="account-cancel-subscription"
+                      />
+                    </>
+                  ) : null}
+                  {(invoicesQuery.data?.invoices?.length ?? 0) > 0 ? (
+                    <View style={styles.invoiceBlock}>
+                      <Text style={styles.billingCopy}>Rechnungen:</Text>
+                      {invoicesQuery.data!.invoices.slice(0, 5).map((invoice) => (
+                        <Pressable key={invoice.id} disabled={!invoice.hostedInvoiceUrl} onPress={() => (invoice.hostedInvoiceUrl ? Linking.openURL(invoice.hostedInvoiceUrl) : undefined)} style={styles.invoiceRow}>
+                          <Text style={styles.invoiceText}>{invoice.created ? new Date(invoice.created).toLocaleDateString("de-DE") : "—"} · {(invoice.amountTotal / 100).toFixed(2)} € · {invoice.status === "paid" ? "bezahlt" : invoice.status === "open" ? "offen" : "storniert"}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+                </GlassCard>
+              )}
+              <View style={styles.logoutRow}>
+                <GlowButton label={busy ? "Abmeldung läuft …" : "Abmelden"} onPress={() => void logout()} disabled={busy} accent="red" variant="ghost" testID="account-logout" />
+              </View>
+            </GlassCard>
+          ) : (
+            <GlassCard accent="cyan" glow={1} style={styles.card}>
+              <View style={styles.switchRow}>
+                <Pressable onPress={() => setMode("login")} style={[styles.switchButton, mode === "login" && styles.switchButtonActive]} accessibilityRole="button">
+                  <Text style={[styles.switchText, mode === "login" && styles.switchTextActive]}>Login</Text>
+                </Pressable>
+                <Pressable onPress={() => setMode("register")} style={[styles.switchButton, mode === "register" && styles.switchButtonActive]} accessibilityRole="button">
+                  <Text style={[styles.switchText, mode === "register" && styles.switchTextActive]}>Registrieren</Text>
+                </Pressable>
+              </View>
+              {mode === "register" ? <TextInput autoCapitalize="words" onChangeText={setName} placeholder="Name" placeholderTextColor={glassSurface.textMuted} style={styles.input} value={name} /> : null}
+              <TextInput autoCapitalize="none" autoComplete="email" keyboardType="email-address" onChangeText={setEmail} placeholder="E-Mail-Adresse" placeholderTextColor={glassSurface.textMuted} style={styles.input} value={email} />
+              <TextInput autoCapitalize="none" autoComplete={mode === "login" ? "current-password" : "new-password"} onChangeText={setPassword} placeholder="Passwort (mindestens 12 Zeichen)" placeholderTextColor={glassSurface.textMuted} secureTextEntry style={styles.input} value={password} />
+              {busy ? (
+                <View style={styles.busyRow}>
+                  <ActivityIndicator color={glassPalette.cyan} />
+                </View>
+              ) : (
+                <GlowButton label={mode === "login" ? "Sicher anmelden" : "Konto erstellen"} onPress={() => void submit()} disabled={busy || !email.trim() || !password} accent="cyan" variant="primary" testID="account-submit" />
+              )}
+            </GlassCard>
           )}
-          <TouchableOpacity disabled={busy} onPress={() => void logout()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{busy ? "Abmeldung läuft …" : "Abmelden"}</Text></TouchableOpacity>
-        </View> : <View style={styles.card}>
-          <View style={styles.switchRow}><TouchableOpacity onPress={() => setMode("login")} style={[styles.switchButton, mode === "login" && styles.switchButtonActive]}><Text style={styles.switchText}>Login</Text></TouchableOpacity><TouchableOpacity onPress={() => setMode("register")} style={[styles.switchButton, mode === "register" && styles.switchButtonActive]}><Text style={styles.switchText}>Registrieren</Text></TouchableOpacity></View>
-          {mode === "register" ? <TextInput autoCapitalize="words" onChangeText={setName} placeholder="Name" placeholderTextColor="#718198" style={styles.input} value={name} /> : null}
-          <TextInput autoCapitalize="none" autoComplete="email" keyboardType="email-address" onChangeText={setEmail} placeholder="E-Mail-Adresse" placeholderTextColor="#718198" style={styles.input} value={email} />
-          <TextInput autoCapitalize="none" autoComplete={mode === "login" ? "current-password" : "new-password"} onChangeText={setPassword} placeholder="Passwort (mindestens 12 Zeichen)" placeholderTextColor="#718198" secureTextEntry style={styles.input} value={password} />
-          <TouchableOpacity disabled={busy || !email.trim() || !password} onPress={() => void submit()} style={[styles.primaryButton, (busy || !email.trim() || !password) && styles.disabled]}>{busy ? <ActivityIndicator color="#EFFBFF" /> : <Text style={styles.primaryButtonText}>{mode === "login" ? "Sicher anmelden" : "Konto erstellen"}</Text>}</TouchableOpacity>
-        </View>}
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-      </View>
-    </ScreenContainer>
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+        </View>
+      </ScreenContainer>
+    </GlassBackdrop>
   );
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
-  return StyleSheet.create({
-  menuRow: { marginBottom: 10 },
-  page: { flex: 1, paddingTop: 20 },
-  eyebrow: { color: lighten(colors.tint, 0.2), fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
-  title: { color: "#F1F6FF", fontSize: 28, fontWeight: "900", marginTop: 8 },
-  lead: { color: "#9EADBF", fontSize: 13, lineHeight: 20, marginTop: 9 },
-  card: { backgroundColor: "#111B29", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 18, borderWidth: 1, marginTop: 22, padding: 16 },
-  switchRow: { backgroundColor: "#0B121D", borderRadius: 10, flexDirection: "row", marginBottom: 14, padding: 3 },
-  switchButton: { alignItems: "center", borderRadius: 8, flex: 1, paddingVertical: 10 },
-  switchButtonActive: { backgroundColor: withAlpha(colors.tint, 0.16) },
-  switchText: { color: "#D8E9F8", fontSize: 12, fontWeight: "800" },
-  input: { backgroundColor: "#0B121D", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 11, borderWidth: 1, color: "#F1F6FF", fontSize: 14, marginTop: 10, minHeight: 48, paddingHorizontal: 12 },
-  primaryButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.3), borderColor: colors.tint, borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 15, minHeight: 48 },
-  primaryButtonText: { color: "#F5FDFF", fontSize: 13, fontWeight: "900" },
-  disabled: { opacity: 0.45 },
-  name: { color: "#F1F6FF", fontSize: 18, fontWeight: "900" },
-  email: { color: "#9EADBF", fontSize: 13, marginTop: 5 },
-  roleBadge: { alignSelf: "flex-start", backgroundColor: "#293646", borderRadius: 999, marginTop: 14, paddingHorizontal: 10, paddingVertical: 6 },
-  roleBadgeAdmin: { backgroundColor: withAlpha(colors.tint, 0.2) },
-  roleText: { color: "#D9ECFA", fontSize: 10, fontWeight: "900", letterSpacing: 0.7 },
-  adminCopy: { color: lighten(colors.tint, 0.28), fontSize: 12, lineHeight: 18, marginTop: 12 },
-  billingCard: { backgroundColor: "#0B121D", borderColor: withAlpha(colors.tint, 0.2), borderRadius: 12, borderWidth: 1, marginTop: 16, padding: 12 },
-  billingTitle: { color: lighten(colors.tint, 0.28), fontSize: 10, fontWeight: "900", letterSpacing: 0.9 },
-  billingCopy: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 6 },
-  billingButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.14), borderColor: colors.tint, borderRadius: 9, borderWidth: 1, marginTop: 11, paddingVertical: 10 },
-  billingButtonText: { color: "#E9E1FF", fontSize: 12, fontWeight: "900" },
-  secondaryButton: { alignItems: "center", borderColor: "#425D78", borderRadius: 10, borderWidth: 1, marginTop: 18, paddingVertical: 11 },
-  adminButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.18), borderColor: colors.tint, borderRadius: 10, borderWidth: 1, marginTop: 12, paddingVertical: 12 },
-  adminButtonText: { color: lighten(colors.tint, 0.28), fontSize: 12, fontWeight: "900" },
-  secondaryButtonText: { color: lighten(colors.tint, 0.35), fontSize: 12, fontWeight: "800" },
-  message: { color: lighten(colors.success, 0.2), fontSize: 12, lineHeight: 18, marginTop: 14 },
-  });
-}
+const styles = StyleSheet.create({
+  transparent: { backgroundColor: "transparent" },
+  menuRow: { marginBottom: glassSpacing.md },
+  page: { flex: 1, paddingTop: glassSpacing.xl },
+  eyebrow: { ...glassType.label, color: accentAlpha("cyan", 0.9), marginTop: glassSpacing.sm },
+  title: { ...glassType.display, color: glassSurface.textPrimary, marginTop: glassSpacing.sm },
+  lead: { ...glassType.body, color: glassSurface.textSecondary, lineHeight: 20, marginTop: glassSpacing.sm },
+  card: { marginTop: glassSpacing.xl, padding: glassSpacing.lg },
+  name: { ...glassType.headline, color: glassSurface.textPrimary },
+  email: { ...glassType.body, color: glassSurface.textSecondary, marginTop: glassSpacing.xs },
+  roleRow: { marginTop: glassSpacing.md },
+  adminCopy: { ...glassType.caption, color: accentAlpha("cyan", 0.85), lineHeight: 18, marginTop: glassSpacing.md },
+  billingCard: { marginTop: glassSpacing.lg, padding: glassSpacing.md },
+  billingTitle: { ...glassType.label, color: glassPalette.green },
+  billingCopy: { ...glassType.caption, color: glassSurface.textSecondary, lineHeight: 18, marginTop: glassSpacing.xs },
+  tierRow: { flexDirection: "row", gap: glassSpacing.sm, marginTop: glassSpacing.md },
+  invoiceBlock: { marginTop: glassSpacing.md },
+  invoiceRow: { paddingVertical: 6 },
+  invoiceText: { ...glassType.caption, color: glassSurface.textMuted },
+  logoutRow: { marginTop: glassSpacing.lg },
+  switchRow: { backgroundColor: glassDepth.layer, borderRadius: glassRadii.md, flexDirection: "row", marginBottom: glassSpacing.md, padding: 3 },
+  switchButton: { alignItems: "center", borderRadius: glassRadii.sm, flex: 1, paddingVertical: 10 },
+  switchButtonActive: { backgroundColor: accentAlpha("cyan", 0.16) },
+  switchText: { ...glassType.caption, color: glassSurface.textSecondary },
+  switchTextActive: { color: glassPalette.cyan },
+  input: {
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
+    borderRadius: glassRadii.md,
+    borderWidth: 1,
+    color: glassSurface.textPrimary,
+    fontSize: 14,
+    marginTop: glassSpacing.sm,
+    minHeight: 48,
+    paddingHorizontal: glassSpacing.md,
+  },
+  busyRow: { alignItems: "center", justifyContent: "center", marginTop: glassSpacing.lg, minHeight: 48 },
+  message: { ...glassType.caption, color: glassPalette.green, lineHeight: 18, marginTop: glassSpacing.md },
+});
