@@ -2,7 +2,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View , useWindowDimensions } f
 import { usePathname, useRouter } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useColors } from "@/hooks/use-colors";
+/** Sprint 184 — Glass-Tokens statt useColors. */
+import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { useThemeContext } from "@/lib/theme-provider";
 import { designThemeLabel } from "@/lib/design-theme-logic";
 import { resolveActiveSidebarItem, SIDEBAR_ITEMS } from "@/lib/viewport-logic";
@@ -16,7 +17,6 @@ export function AppSidebar() {
   const { width } = useWindowDimensions();
   const pathname = usePathname() ?? "/";
   const router = useRouter();
-  const colors = useColors();
   const { designTheme } = useThemeContext();
   const wide = width >= 1100;
   // Sprint 171: Rail-Breite direkt aus der Fensterbreite ableiten statt
@@ -32,14 +32,14 @@ export function AppSidebar() {
       style={[
         styles.sidebar,
         narrowRail ? styles.rail : styles.panel,
-        { backgroundColor: colors.surface, borderColor: colors.border },
+        { backgroundColor: glassDepth.glass, borderColor: glassSurface.border },
       ]}
     >
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         <View style={styles.brand}>
-          <IconSymbol name="bolt.fill" size={narrowRail ? 18 : 20} color={colors.tint} />
+          <IconSymbol name="bolt.fill" size={narrowRail ? 18 : 20} color={glassPalette.cyan} />
           {narrowRail ? null : (
-            <Text style={[styles.brandTitle, { color: colors.text }]} numberOfLines={1}>
+            <Text style={[styles.brandTitle, { color: glassSurface.textPrimary }]} numberOfLines={1}>
               CyberSarah
             </Text>
           )}
@@ -54,14 +54,14 @@ export function AppSidebar() {
               onPress={() => router.push(item.route)}
               style={[
                 styles.item,
-                active ? { backgroundColor: `${String(colors.tint)}22`, borderColor: colors.tint } : null,
+                active ? { backgroundColor: `${glassPalette.cyan}22`, borderColor: glassPalette.cyan } : null,
               ]}
             >
-              <IconSymbol name={item.icon} size={20} color={active ? colors.tint : colors.icon} />
+              <IconSymbol name={item.icon} size={20} color={active ? glassPalette.cyan : glassSurface.textSecondary} />
               {narrowRail ? null : (
                 <Text
                   numberOfLines={1}
-                  style={[styles.itemTitle, { color: active ? colors.tint : colors.text }]}
+                  style={[styles.itemTitle, { color: active ? glassPalette.cyan : glassSurface.textPrimary }]}
                 >
                   {item.title}
                 </Text>
@@ -71,7 +71,7 @@ export function AppSidebar() {
         })}
       </ScrollView>
       {narrowRail ? null : (
-        <Text style={[styles.designHint, { color: colors.muted }]} numberOfLines={1}>
+        <Text style={[styles.designHint, { color: glassSurface.textSecondary }]} numberOfLines={1}>
           Design: {designThemeLabel(designTheme)}
         </Text>
       )}
