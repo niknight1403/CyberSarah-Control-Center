@@ -5,22 +5,66 @@ import type { ReactNode } from "react";
  * Web-Startshell: wird inline vor dem Expo-Bundle gerendert und verhindert
  * einen weißen Bildschirm während Download, React-Mount und erster Queries.
  * React entfernt sie unmittelbar nach dem erfolgreichen Mount.
+ *
+ * Sprint 160: Farben liegen als CSS-Variablen vor (Default = Neon Pulse) und
+ * werden von THEME_PRECOLOR_SCRIPT VOR dem ersten Paint synchron anhand des
+ * lokal gespeicherten Design-Themes ueberschrieben — die Shell zeigt so
+ * bereits die richtige Palette, statt kurz auf Pulse zu blitzen und dann
+ * umzuspringen. Die vier Farbwerte sind bewusst minimal (Hintergrund + zwei
+ * Glow-Toene) und muessen bei neuen Themes in DESIGN_THEME_PRECOLORS unten
+ * UND in lib/_core/design-theme-palettes.ts (dark-Palette) gepflegt werden.
  */
 const STARTUP_SHELL = `
 <style id="cs-startup-style">
-  html, body { margin: 0; min-height: 100%; background: #0A0D12; }
-  #cs-startup-shell { position: fixed; inset: 0; z-index: 2147483646; display: grid; place-items: center; overflow: hidden; color: #F2F6FC; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at 20% 10%, rgba(82,216,255,.25), transparent 38%), radial-gradient(circle at 85% 85%, rgba(139,124,255,.18), transparent 42%), #0A0D12; transition: opacity .18s ease; }
-  #cs-startup-shell::before { content: ""; position: absolute; width: 42vmax; height: 42vmax; border: 1px solid rgba(25,230,255,.18); border-radius: 50%; box-shadow: 0 0 80px rgba(25,230,255,.12), inset 0 0 80px rgba(240,45,255,.08); animation: cs-pulse 2.4s ease-in-out infinite; }
-  .cs-startup-card { position: relative; width: min(420px, calc(100vw - 48px)); padding: 28px 30px; box-sizing: border-box; border: 1px solid rgba(25,230,255,.48); border-radius: 24px; background: rgba(7,27,42,.84); box-shadow: 0 0 34px rgba(25,230,255,.16), 0 18px 60px rgba(0,0,0,.28); text-align: center; backdrop-filter: blur(14px); }
-  .cs-startup-mark { display: inline-grid; place-items: center; width: 52px; height: 52px; margin-bottom: 16px; border-radius: 16px; color: #0A0D12; font-size: 25px; font-weight: 800; background: linear-gradient(135deg, #52D8FF, #45D996); box-shadow: 0 0 26px rgba(82,216,255,.45); }
+  :root {
+    --cs-startup-bg: #0A0D12;
+    --cs-startup-glow-a: rgba(25,230,255,.25);
+    --cs-startup-glow-b: rgba(139,124,255,.18);
+    --cs-startup-border: rgba(25,230,255,.48);
+    --cs-startup-accent-from: #52D8FF;
+    --cs-startup-accent-to: #45D996;
+  }
+  html, body { margin: 0; min-height: 100%; background: var(--cs-startup-bg); }
+  #cs-startup-shell { position: fixed; inset: 0; z-index: 2147483646; display: grid; place-items: center; overflow: hidden; color: #F2F6FC; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at 20% 10%, var(--cs-startup-glow-a), transparent 38%), radial-gradient(circle at 85% 85%, var(--cs-startup-glow-b), transparent 42%), var(--cs-startup-bg); transition: opacity .18s ease; }
+  #cs-startup-shell::before { content: ""; position: absolute; width: 42vmax; height: 42vmax; border: 1px solid var(--cs-startup-border); border-radius: 50%; box-shadow: 0 0 80px var(--cs-startup-glow-a), inset 0 0 80px var(--cs-startup-glow-b); animation: cs-pulse 2.4s ease-in-out infinite; }
+  .cs-startup-card { position: relative; width: min(420px, calc(100vw - 48px)); padding: 28px 30px; box-sizing: border-box; border: 1px solid var(--cs-startup-border); border-radius: 24px; background: rgba(7,27,42,.84); box-shadow: 0 0 34px var(--cs-startup-glow-a), 0 18px 60px rgba(0,0,0,.28); text-align: center; backdrop-filter: blur(14px); }
+  .cs-startup-mark { display: inline-grid; place-items: center; width: 52px; height: 52px; margin-bottom: 16px; border-radius: 16px; color: #0A0D12; font-size: 25px; font-weight: 800; background: linear-gradient(135deg, var(--cs-startup-accent-from), var(--cs-startup-accent-to)); box-shadow: 0 0 26px var(--cs-startup-glow-a); }
   .cs-startup-title { margin: 0; font-size: 22px; letter-spacing: -.02em; }
   .cs-startup-copy { margin: 8px 0 20px; color: #A9C1D8; font-size: 13px; }
   .cs-startup-track { height: 4px; overflow: hidden; border-radius: 99px; background: rgba(169,193,216,.18); }
-  .cs-startup-track::after { content: ""; display: block; width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #52D8FF, #8B7CFF); animation: cs-loading 1.2s ease-in-out infinite; }
+  .cs-startup-track::after { content: ""; display: block; width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cs-startup-accent-from), var(--cs-startup-accent-to)); animation: cs-loading 1.2s ease-in-out infinite; }
   @keyframes cs-loading { 0% { transform: translateX(-120%); } 100% { transform: translateX(300%); } }
   @keyframes cs-pulse { 0%, 100% { transform: scale(.92); opacity: .55; } 50% { transform: scale(1.04); opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 </style>
+<script>
+  (function () {
+    // Sprint 160: synchron VOR dem ersten Paint ausgefuehrt (kein DOMContentLoaded-
+    // Warten) — liest den rohen localStorage-Key von AsyncStorage (Web nutzt
+    // localStorage ohne Praefix) und faerbt die Startup-Shell direkt in der
+    // zuletzt gewaehlten Design-Palette statt im Pulse-Default.
+    var PRECOLORS = {
+      pulse: { bg: '#0A0D12', glowA: 'rgba(82,216,255,.25)', glowB: 'rgba(139,124,255,.18)', border: 'rgba(82,216,255,.48)', from: '#52D8FF', to: '#45D996' },
+      orbit: { bg: '#080D24', glowA: 'rgba(139,92,255,.28)', glowB: 'rgba(25,230,255,.18)', border: 'rgba(139,92,255,.5)', from: '#8B5CFF', to: '#19E6FF' },
+      synthwave: { bg: '#170A20', glowA: 'rgba(255,79,216,.28)', glowB: 'rgba(255,146,64,.18)', border: 'rgba(255,79,216,.5)', from: '#FF4FD8', to: '#FF9240' },
+      minimal: { bg: '#061513', glowA: 'rgba(0,245,212,.22)', glowB: 'rgba(0,245,155,.15)', border: 'rgba(0,245,212,.45)', from: '#00F5D4', to: '#00F59B' }
+    };
+    try {
+      var stored = window.localStorage.getItem('cybersarah.design-theme.v5');
+      var theme = PRECOLORS[stored] ? stored : 'pulse';
+      var c = PRECOLORS[theme];
+      var root = document.documentElement.style;
+      root.setProperty('--cs-startup-bg', c.bg);
+      root.setProperty('--cs-startup-glow-a', c.glowA);
+      root.setProperty('--cs-startup-glow-b', c.glowB);
+      root.setProperty('--cs-startup-border', c.border);
+      root.setProperty('--cs-startup-accent-from', c.from);
+      root.setProperty('--cs-startup-accent-to', c.to);
+    } catch (e) {
+      // localStorage nicht verfuegbar (privater Modus o.ae.) -> Pulse-Default aus dem Style-Block bleibt aktiv.
+    }
+  })();
+</script>
 <div id="cs-startup-shell" role="status" aria-live="polite">
   <div class="cs-startup-card">
     <div class="cs-startup-mark">✦</div>

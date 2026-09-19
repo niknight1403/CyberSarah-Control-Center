@@ -22,6 +22,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     passwordHash: null,
     stripeCustomerId: null,
     role: "user",
+    designTheme: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),

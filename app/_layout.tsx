@@ -25,6 +25,7 @@ import { initCrashReporter } from "@/components/crash-reporting/crash-reporter";
 import { useAdminAutoSetup } from "@/lib/use-admin-autosetup";
 import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 import { useAdminFullIntegration } from "@/lib/use-admin-full-integration";
+import { DesignThemeProfileSync } from "@/lib/design-theme-profile-sync";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -51,9 +52,12 @@ export default function RootLayout() {
   // Sprint 73 DIAGNOSE-Build: Signal an das Diagnose-Overlay im +html.tsx,
   // dass React erfolgreich gemountet hat (WebView-Diagnose weisser Screen).
   useEffect(() => {
+    // Sprint 160: __csMounted bleibt fuer das Diagnose-Overlay (+html.tsx)
+    // erhalten. Das Ausblenden der Startup-Shell passiert NICHT mehr hier,
+    // sondern in ThemeProvider — erst wenn die gespeicherte Design-Wahl aus
+    // AsyncStorage geladen ist, damit kein Standarddesign aufblitzt.
     if (Platform.OS === "web" && typeof window !== "undefined") {
       (window as unknown as { __csMounted?: boolean }).__csMounted = true;
-      (window as unknown as { __csHideStartupShell?: () => void }).__csHideStartupShell?.();
     }
   }, []);
 
@@ -108,6 +112,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <StudioSettingsProvider>
             <AdminAutonomyBootstrap />
+            <DesignThemeProfileSync />
             <WorkspaceProvider>
             {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
             {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}

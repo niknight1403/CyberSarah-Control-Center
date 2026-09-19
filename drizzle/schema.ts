@@ -42,6 +42,10 @@ export const users = pgTable("users", {
   passwordHash: varchar("passwordHash", { length: 255 }),
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }).unique(),
   role: userRole("role").default("user").notNull(),
+  /** Persistente Design-Theme-Wahl (Sprint 160): synchronisiert mit
+   * cybersarah.design-theme.v5 im Client. NULL = kein Profil-Override,
+   * Client faellt auf lokalen Speicher / Default zurueck. */
+  designTheme: varchar("designTheme", { length: 32 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()

@@ -6,6 +6,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { hashPassword, normalizeAccountEmail, validateAccountPassword, verifyPassword } from "./local-auth";
+import { DESIGN_THEMES } from "../lib/design-theme-logic";
 
 const registerSchema = z.object({
   email: z.string().trim().email().max(320),
@@ -18,8 +19,8 @@ const loginSchema = z.object({
   password: z.string().min(1).max(256),
 });
 
-function toAccountUser(user: { id: number; openId: string; name: string | null; email: string | null; loginMethod: string | null; role: "user" | "admin"; lastSignedIn: Date }) {
-  return { id: user.id, openId: user.openId, name: user.name, email: user.email, loginMethod: user.loginMethod, role: user.role, lastSignedIn: user.lastSignedIn };
+function toAccountUser(user: { id: number; openId: string; name: string | null; email: string | null; loginMethod: string | null; role: "user" | "admin"; lastSignedIn: Date; designTheme?: string | null }) {
+  return { id: user.id, openId: user.openId, name: user.name, email: user.email, loginMethod: user.loginMethod, role: user.role, lastSignedIn: user.lastSignedIn, designTheme: user.designTheme ?? null };
 }
 
 async function createAccountSession(openId: string, name: string | null) {
@@ -30,6 +31,10 @@ function persistSessionCookie(ctx: { req: Parameters<typeof getSessionCookieOpti
   const cookieOptions = getSessionCookieOptions(ctx.req);
   ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 1000 * 60 * 60 * 24 * 30 });
 }
+
+const designThemeSchema = z.object({
+  designTheme: z.enum(DESIGN_THEMES as unknown as [string, ...string[]]),
+});
 
 export const accountRouter = router({
   register: publicProcedure.input(registerSchema).mutation(async ({ ctx, input }) => {
@@ -69,4 +74,11 @@ export const accountRouter = router({
     }
   }),
   me: protectedProcedure.query(({ ctx }) => toAccountUser(ctx.user)),
+  // Sprint 160 — Design-Theme-Auswahl dauerhaft im Benutzerprofil speichern.
+  // Prioritaet beim Laden: Profil > lokaler Speicher > Default (siehe
+  // lib/theme-provider.tsx). Client bleibt auch ohne Login voll funktional.
+  setDesignTheme: protectedProcedure.input(designThemeSchema).mutation(async ({ ctx, input }) => {
+    await db.setUserDesignTheme(ctx.user.openId, input.designTheme);
+    return { designTheme: input.designTheme };
+  }),
 });

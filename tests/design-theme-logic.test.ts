@@ -48,7 +48,10 @@ describe("design theme logic", () => {
       const runtime = resolveDesignRuntimePalette(theme, "dark");
       expect(runtime.text).toBe(runtime.foreground);
       expect(runtime.tint).toBe(runtime.primary);
-      expect(runtime.icon).toBe(runtime.muted);
+      // Sprint 160: icon ist ein eigenstaendiges Token und bewusst nicht
+      // mehr an muted gekoppelt (vgl. Theme-Registry design-theme-palettes).
+      expect(runtime.icon).toBe(resolveDesignPalette(theme, "dark").icon);
+      expect(typeof runtime.icon).toBe("string");
       expect(runtime.tabIconSelected).toBe(runtime.primary);
     }
   });

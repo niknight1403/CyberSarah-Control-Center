@@ -46,3 +46,18 @@ export function designThemeAccent(theme: DesignTheme): string {
   if (theme === "minimal") return "#00F5D4";
   return "#52D8FF";
 }
+
+/**
+ * Sprint 160 — Prioritaet beim Start: Benutzerprofil > lokaler Speicher >
+ * Standardwert. Ungueltige/fehlende/kaputte Werte fallen automatisch auf
+ * DEFAULT_DESIGN_THEME zurueck (ueber normalizeDesignTheme).
+ */
+export function resolveInitialDesignTheme(profileTheme: unknown, storedTheme: unknown): DesignTheme {
+  if (typeof profileTheme === "string" && DESIGN_THEMES.includes(profileTheme as DesignTheme)) {
+    return profileTheme as DesignTheme;
+  }
+  if (typeof storedTheme === "string" && DESIGN_THEMES.includes(storedTheme as DesignTheme)) {
+    return storedTheme as DesignTheme;
+  }
+  return DEFAULT_DESIGN_THEME;
+}
