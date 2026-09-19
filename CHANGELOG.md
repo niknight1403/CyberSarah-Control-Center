@@ -4,6 +4,11 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 188]
+
+### Changed
+- **Sprint 188 (Design) — Dashboard-Styling auf Glass-Primitives vereinheitlicht:** Der letzte Ad-hoc-Link im Dashboard („Geschäftsdaten öffnen") nutzt jetzt `GlowButton` (secondary, Akzent blau/Daten) aus den verbindlichen Glass-Primitives statt eigener Pressable-Karten-Styles — inkl. Press-Scale-Feedback, Glow-Rand und Accessibility-Label. Keine Ad-hoc-Flächen mehr im Dashboard-Screen; weiterhin ausschließlich Tokens aus `lib/design/future-glass.ts`.
+
 ## [Unreleased — Sprint 187]
 
 ### Added

@@ -1,5 +1,8 @@
 /**
  * Sprint 168 — Dashboard komplett auf "CyberSarah Future Glass" umgebaut.
+ * Sprint 188 (Design): letzten Ad-hoc-Link (Geschäftsdaten) auf die
+ * Glass-Primitives umgestellt — GlowButton (secondary, accent blue) statt
+ * eigener Pressable-Karten-Styles. Keine Ad-hoc-Flaechen mehr in diesem Screen.
  *
  * KEINE reine Farbaenderung: neuer Hintergrund (atmosphaerischer Deep-Void
  * mit Lichtwolken), neuer vereinheitlichter Header (Logo+Avatar+Status in
@@ -9,11 +12,12 @@
  * Superagenten. Alle Daten bleiben echt (useDashboardData) — kein Mock.
  */
 import { useMemo } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlowButton } from "@/components/glass/glass-primitives";
 import { GlassHeader } from "@/components/glass/glass-header";
 import { MetricTile } from "@/components/glass/metric-tile";
 import { ControlModuleCard } from "@/components/glass/control-module-card";
@@ -130,14 +134,13 @@ export default function DashboardScreen() {
 
           <SuperagentHeroCard status={vm.superAgent.status} name={vm.superAgent.name} detail={vm.superAgent.detail} onRetry={retry} />
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Geschäftsdaten-Dashboard öffnen"
-            style={({ pressed }) => [styles.businessLink, pressed && styles.pressed]}
+          <GlowButton
+            label="Geschäftsdaten (Revenue, Trading, Ops) öffnen"
+            accent="blue"
+            variant="secondary"
+            testID="dashboard-open-business"
             onPress={() => router.push("/business" as never)}
-          >
-            <Text style={styles.businessLinkText}>Geschäftsdaten (Revenue, Trading, Ops) öffnen</Text>
-          </Pressable>
+          />
           <Text style={styles.footnote}>Alle Werte stammen live aus dem Backend — ohne Platzhalterdaten.</Text>
         </ScrollView>
       </ScreenContainer>
@@ -159,17 +162,5 @@ function createStyles(wide: boolean) {
     metricRow: { flexDirection: "row", gap: glassSpacing.md },
     moduleRow: wide ? { flexDirection: "row", gap: glassSpacing.md } : { flexDirection: "column", gap: glassSpacing.md },
     footnote: { fontSize: 11, color: glassSurface.textMuted, textAlign: "center", paddingTop: 4 },
-    businessLink: {
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: glassSurface.border,
-      backgroundColor: glassSurface.card,
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: 44,
-      paddingVertical: 10,
-    },
-    businessLinkText: { color: glassSurface.textSecondary, fontSize: 12, fontWeight: "700" },
-    pressed: { opacity: 0.72 },
   });
 }
