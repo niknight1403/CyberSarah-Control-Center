@@ -138,6 +138,32 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Sprint 160 — persistente Design-Theme-Auswahl im Benutzerprofil.
+ * NULL/undefined bedeutet: kein Profil-Override, Client nutzt lokalen
+ * Speicher bzw. Default. Validierung der vier erlaubten Werte erfolgt
+ * bereits im tRPC-Router (Zod-Enum) — hier nur die reine Persistenz.
+ */
+export async function setUserDesignTheme(openId: string, designTheme: string | null): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot set design theme: database not available");
+    return;
+  }
+  await db.update(users).set({ designTheme }).where(eq(users.openId, openId));
+}
+
+export async function getUserDesignTheme(openId: string): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db
+    .select({ designTheme: users.designTheme })
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
+  return result.length > 0 ? result[0].designTheme ?? null : null;
+}
+
 export async function getUserByEmail(email: string) {
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");

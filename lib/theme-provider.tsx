@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Appearance, View, useColorScheme as useSystemColorScheme } from "react-native";
+import { Appearance, Platform, View, useColorScheme as useSystemColorScheme } from "react-native";
 import { colorScheme as nativewindColorScheme, vars } from "nativewind";
 
 import { type ColorScheme, type ThemeColorPalette } from "@/constants/theme";
@@ -27,6 +27,13 @@ type ThemeContextValue = {
   setDesignTheme: (theme: DesignTheme) => void;
   /** Laufzeit-Palette des aktiven Designs (inklusive text, tint, icon, ...). */
   palette: ThemeColorPalette;
+  /**
+   * Sprint 160 — true, sobald der lokal gespeicherte Theme-Wert aus
+   * AsyncStorage gelesen wurde (Erfolg oder Fehlschlag). Gate fuer den
+   * Web-Startup-Shell-Ausblendtrigger, damit die App nie kurz das
+   * Standarddesign statt der gespeicherten Wahl zeigt.
+   */
+  themeLoaded: boolean;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -36,6 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme: ColorScheme = rawSystemScheme === "dark" ? "dark" : "light";
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>("system");
   const [designTheme, setDesignThemeState] = useState<DesignTheme>(DEFAULT_DESIGN_THEME);
+  const [themeLoaded, setThemeLoaded] = useState(false);
   const colorScheme = resolveThemePreference(themePreference, systemScheme);
   const palette = useMemo(() => resolveDesignRuntimePalette(designTheme, colorScheme), [designTheme, colorScheme]);
 
@@ -84,7 +92,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         if (storedPreference) setThemePreferenceState(normalizeThemePreference(storedPreference));
         if (storedDesign) setDesignThemeState(normalizeDesignTheme(storedDesign));
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!active) return;
+        setThemeLoaded(true);
+        // Sprint 160: Startup-Shell (app/+html.tsx) erst ausblenden, wenn die
+        // gespeicherte Design-Wahl feststeht — verhindert ein kurzes
+        // Aufblitzen des Standarddesigns vor dem eigentlich gewaehlten Theme.
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          (window as unknown as { __csHideStartupShell?: () => void }).__csHideStartupShell?.();
+        }
+      });
     return () => {
       active = false;
     };
@@ -112,8 +130,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       designTheme,
       setDesignTheme,
       palette,
+      themeLoaded,
     }),
-    [colorScheme, themePreference, setColorScheme, setThemePreference, designTheme, setDesignTheme, palette],
+    [colorScheme, themePreference, setColorScheme, setThemePreference, designTheme, setDesignTheme, palette, themeLoaded],
   );
   return (
     <ThemeContext.Provider value={value}>
