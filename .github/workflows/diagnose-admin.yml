@@ -1,10 +1,23 @@
 name: Diagnose Admin-Rollen
 
 # Read-only-Diagnose: Warum hat der Login keine Admin-Rechte?
-# Listet (a) alle Konten aus der produktiven Neon-DB (Rolle, E-Mail,
-# Login-Methode) und (b) ADMIN_EMAIL/OWNER_OPEN_ID auf dem Render-Service.
+# a) Modus db:     Listet alle Konten aus der produktiven Neon-DB
+#                  (Rolle, E-Mail, Login-Methode) und liest ADMIN_EMAIL/
+#                  OWNER_OPEN_ID auf dem Render-Service aus.
+# b) Modus live:   Loggt sich mit dem produktiven Admin-Konto gegen die
+#                  Live-API ein und prueft die Berechtigungs-Kette
+#                  (login -> account.me -> admin-geschuetzter Endpoint).
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Was pruefen?"
+        type: choice
+        options:
+          - db
+          - live
+          - beides
+        default: beides
 
 permissions:
   contents: read
@@ -18,12 +31,15 @@ jobs:
         with:
           node-version: 22
       - name: Abhaengigkeiten installieren
+        if: ${{ inputs.mode != 'live' }}
         run: npm ci --include=dev --no-audit --no-fund
       - name: Konten aus produktiver DB listen
+        if: ${{ inputs.mode == 'db' || inputs.mode == 'beides' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx tsx scripts/diagnose-admin.ts
       - name: Render-ENV ADMIN_EMAIL / OWNER_OPEN_ID auslesen
+        if: ${{ inputs.mode == 'db' || inputs.mode == 'beides' }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
@@ -47,3 +63,10 @@ jobs:
                   value = item.get("value") or "(leer)"
                   print(f"{item.get('key')} = {value}")
           PY
+      - name: Live-API Berechtigungs-Kette pruefen (Admin-Login)
+        if: ${{ inputs.mode == 'live' || inputs.mode == 'beides' }}
+        env:
+          LIVE_API_BASE_URL: ${{ secrets.RENDER_PUBLIC_URL || 'https://cybersarah-control-center.onrender.com' }}
+          ADMIN_EMAIL: niko.oeben@gmail.com
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: node scripts/live-check-admin.mjs
