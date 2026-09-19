@@ -1,5 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -23,7 +22,14 @@ import {
   type BackendAgentLog,
 } from "@/lib/cybersarah-backend-client";
 
-import { cyber, cyberTypography } from "@/lib/cyber-theme";
+/**
+ * Sprint 180 — Cyber-Terminal auf "CyberSarah Future Glass" uebertragen:
+ * cyber-theme-Palette durch Glass-Tokens ersetzt, Deep-Void-Hintergrund
+ * und transparenter SafeArea-Container ueber GlassBackdrop. Logik
+ * (Log-Streaming, Stop/Resume, SSE) unveraendert.
+ */
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 
@@ -52,10 +58,10 @@ const EMPTY_LOG_ENTRIES: LogEntry[] = [];
 type LogLevelKey = "info" | "warn" | "error" | "success";
 
 const LEVEL_COLORS: Record<LogLevelKey, string> = {
-  info: cyber.cyan,
-  warn: cyber.amber,
-  error: cyber.pink,
-  success: cyber.green,
+  info: glassPalette.cyan,
+  warn: glassPalette.amber,
+  error: glassPalette.red,
+  success: glassPalette.green,
 };
 
 interface LogEntry {
@@ -88,8 +94,6 @@ export default function CyberTerminalScreen() {
   // sind sanktionierte Reanimated-Mutationen — "use no memo" ist die
   // dokumentierte Interop-Direktive; Verhalten unveraendert.
   "use no memo";
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const [stopped, setStopped] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [backendStopped, setBackendStopped] = useState(false);
@@ -184,7 +188,8 @@ export default function CyberTerminalScreen() {
 
   const navDrawer = useNavDrawer();
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <GlassBackdrop accent="green">
+      <SafeAreaView style={styles.safeTransparent} edges={["top"]}>
       <View style={styles.screen}>
         <View style={styles.header}>
           <NavDrawer {...navDrawer.drawerProps} />
@@ -197,10 +202,10 @@ export default function CyberTerminalScreen() {
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: stopped ? colors.tint : logsQuery.isFetching ? colors.tint : colors.success },
+                { backgroundColor: stopped ? glassPalette.cyan : logsQuery.isFetching ? glassPalette.cyan : glassPalette.green },
               ]}
             />
-            <Text style={[styles.statusText, { color: stopped ? colors.tint : colors.muted }]}>
+            <Text style={[styles.statusText, { color: stopped ? glassPalette.cyan : glassSurface.textSecondary }]}>
               {stopped ? "ANGEHALTEN" : "STREAMING"}
             </Text>
           </View>
@@ -208,7 +213,7 @@ export default function CyberTerminalScreen() {
 
         <ScrollView style={styles.terminal} contentContainerStyle={styles.terminalContent} showsVerticalScrollIndicator={false}>
           {stopped ? (
-            <Text style={[styles.systemLine, { color: colors.tint }]}>
+            <Text style={[styles.systemLine, { color: glassPalette.cyan }]}>
               ⛔ EMERGENCY STOP AKTIV — Live-Aktivitaeten pausiert.
               {backendStopped ? " Remote-Executor gestoppt." : ""}
               Zum Fortsetzen &quot;RESUME&quot; druecken.
@@ -221,7 +226,7 @@ export default function CyberTerminalScreen() {
                 <Text style={styles.logLine}>
                   <Text style={styles.timeText}>[{formatTime(entry.atMs)}]</Text>
                   {"  "}
-                  <Text style={{ color: LEVEL_COLORS[entry.level] ?? colors.tint }}>
+                  <Text style={{ color: LEVEL_COLORS[entry.level] ?? glassPalette.cyan }}>
                     {entry.level.toUpperCase().padEnd(7, " ")}
                   </Text>
                   {"  "}
@@ -265,12 +270,14 @@ export default function CyberTerminalScreen() {
           )}
         </View>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </GlassBackdrop>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const createStyles = () => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: glassDepth.void },
+  safeTransparent: { flex: 1, backgroundColor: "transparent" },
   screen: { flex: 1 },
   header: {
     flexDirection: "row",
@@ -279,42 +286,44 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: glassSurface.border,
   },
-  headerKicker: { ...cyberTypography.caption, color: colors.tint },
-  headerTitle: { ...cyberTypography.headline, color: colors.text, letterSpacing: 2 },
-  statusPill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  headerKicker: { ...glassType.caption, color: glassPalette.cyan },
+  headerTitle: { ...glassType.headline, color: glassSurface.textPrimary, letterSpacing: 2 },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: glassSurface.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 5 },
-  statusText: { ...cyberTypography.mono, fontSize: 10, letterSpacing: 1 },
+  statusText: { ...glassType.body, fontSize: 10, letterSpacing: 1 },
   terminal: { flex: 1, backgroundColor: "#05070D" },
   terminalContent: { padding: 14, gap: 4 },
-  systemLine: { ...cyberTypography.mono, color: colors.icon },
-  logLine: { ...cyberTypography.mono, lineHeight: 18, flexWrap: "wrap" },
-  timeText: { color: colors.icon },
-  sourceText: { color: colors.muted },
-  messageText: { color: colors.text },
-  footer: { padding: 14, paddingBottom: 18, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background },
-  backendHint: { ...cyberTypography.mono, fontSize: 10, color: colors.icon, textAlign: "center", marginBottom: 10 },
+  systemLine: { ...glassType.body, color: glassSurface.textSecondary },
+  logLine: { ...glassType.body, lineHeight: 18, flexWrap: "wrap" },
+  timeText: { color: glassSurface.textSecondary },
+  sourceText: { color: glassSurface.textSecondary },
+  messageText: { color: glassSurface.textPrimary },
+  footer: { padding: 14, paddingBottom: 18, borderTopWidth: 1, borderTopColor: glassSurface.border, backgroundColor: glassDepth.void },
+  backendHint: { ...glassType.body, fontSize: 10, color: glassSurface.textSecondary, textAlign: "center", marginBottom: 10 },
   stopButton: {
-    backgroundColor: colors.tint,
+    backgroundColor: glassPalette.cyan,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
-    shadowColor: colors.tint,
+    shadowColor: glassPalette.cyan,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 18,
     elevation: 8,
   },
   resumeButton: {
-    backgroundColor: colors.surface,
+    backgroundColor: glassDepth.glass,
     borderWidth: 1,
-    borderColor: `${colors.tint}66`,
+    borderColor: `${glassPalette.cyan}66`,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
   },
   buttonPressed: { opacity: 0.85 },
   stopText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900", letterSpacing: 2 },
-  resumeText: { color: colors.tint, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
+  resumeText: { color: glassPalette.cyan, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
 });
+
+const styles = createStyles();

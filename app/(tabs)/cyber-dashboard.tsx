@@ -1,5 +1,4 @@
-import { useColors } from "@/hooks/use-colors";
-import React, { useMemo } from "react";
+import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -11,7 +10,14 @@ import {
   listTasks,
   type BackendTask,
 } from "@/lib/cybersarah-backend-client";
-import { cyber, cyberTypography } from "@/lib/cyber-theme";
+/**
+ * Sprint 180 — Cyber-Dashboard auf "CyberSarah Future Glass" uebertragen:
+ * cyber-theme-Palette durch Glass-Tokens ersetzt, Deep-Void-Hintergrund
+ * und transparenter Screen-Container ueber GlassBackdrop. Logik
+ * (8-s-Polling, Task-Ledger, Live-Widgets) unveraendert.
+ */
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { trpc } from "@/lib/trpc";
 
@@ -40,8 +46,6 @@ interface BackendState {
 const BACKEND_OFFLINE: BackendState = { online: false, mode: "…", stopped: false, tasks: [] };
 
 export default function CyberDashboardScreen() {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const [backendState, setBackendState] = React.useState<BackendState>(BACKEND_OFFLINE);
 
   // Autonomes FastAPI-Backend (Sprint 131): 8-s-Polling nur, wenn erreichbar
@@ -96,7 +100,8 @@ export default function CyberDashboardScreen() {
 
   const navDrawer = useNavDrawer();
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <GlassBackdrop accent="purple">
+      <SafeAreaView style={styles.safeTransparent} edges={["top"]}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.menuRow}>
@@ -105,19 +110,19 @@ export default function CyberDashboardScreen() {
           </View>
           <Text style={styles.headerKicker}>CONTROL CENTER</Text>
           <Text style={styles.headerTitle}>
-            CYBER<Text style={{ color: colors.tint }}>SARAH</Text>
+            CYBER<Text style={{ color: glassPalette.cyan }}>SARAH</Text>
           </Text>
-          <View style={[styles.headerLine, { backgroundColor: `${colors.tint}55` }]} />
+          <View style={[styles.headerLine, { backgroundColor: `${glassPalette.cyan}55` }]} />
         </View>
 
         <View style={styles.gridRow}>
-          <LiveWidget title="System-Status" badge="LIVE" accent={systemOnline ? colors.success : colors.tint} style={styles.halfWidget}>
-            <WidgetMetric label="Backend" value={status?.stateLabel ?? "…"} accent={systemOnline ? colors.success : colors.tint} />
+          <LiveWidget title="System-Status" badge="LIVE" accent={systemOnline ? glassPalette.green : glassPalette.cyan} style={styles.halfWidget}>
+            <WidgetMetric label="Backend" value={status?.stateLabel ?? "…"} accent={systemOnline ? glassPalette.green : glassPalette.cyan} />
             <WidgetMetric label="Latenz" value={status?.pingMs != null ? `${status.pingMs} ms` : "…"} />
             <WidgetMetric label="Uptime" value={status ? formatUptime(status.serverUptimeMs) : "…"} />
           </LiveWidget>
 
-          <LiveWidget title="Cloud-Tokens" badge={account.data?.planLabel ?? "FREE"} accent={colors.tint} style={styles.halfWidget}>
+          <LiveWidget title="Cloud-Tokens" badge={account.data?.planLabel ?? "FREE"} accent={glassPalette.cyan} style={styles.halfWidget}>
             <WidgetMetric
               label="Heute"
               value={account.data ? `${account.data.usage.todayTokens.toLocaleString("de-DE")} / ${account.data.limits.dailyCloudTokens.toLocaleString("de-DE")}` : "…"}
@@ -126,11 +131,11 @@ export default function CyberDashboardScreen() {
               label="Monat"
               value={account.data ? `${Math.round(account.data.usage.monthTokens / 1000)}k / ${Math.round(account.data.limits.monthlyCloudTokens / 1000)}k` : "…"}
             />
-            <WidgetMetric label="Guthaben" value={account.data ? `${Math.round(account.data.usage.creditBalanceTokens / 1000)}k` : "…"} accent={colors.success} />
+            <WidgetMetric label="Guthaben" value={account.data ? `${Math.round(account.data.usage.creditBalanceTokens / 1000)}k` : "…"} accent={glassPalette.green} />
           </LiveWidget>
         </View>
 
-        <LiveWidget title="Agenten" badge="AUTO" accent={colors.tint}>
+        <LiveWidget title="Agenten" badge="AUTO" accent={glassPalette.cyan}>
           <CyberAgentCard
             name="Leitender Superagent"
             role="Orchestrator — Task-Decomposition & Selbstkorrektur"
@@ -154,12 +159,12 @@ export default function CyberDashboardScreen() {
         <LiveWidget
           title="Autonomes Backend"
           badge={backendState.online ? (backendState.stopped ? "GESTOPPT" : "LIVE") : "OFFLINE"}
-          accent={backendState.online ? (backendState.stopped ? colors.tint : colors.success) : colors.icon}
+          accent={backendState.online ? (backendState.stopped ? glassPalette.cyan : glassPalette.green) : glassSurface.textSecondary}
         >
           {backendState.online ? (
             <>
-              <WidgetMetric label="Executor-Modus" value={backendState.mode.toUpperCase()} accent={colors.success} />
-              <WidgetMetric label="Tasks im Ledger" value={`${backendState.tasks.length}`} accent={backendState.tasks.length > 0 ? colors.tint : undefined} />
+              <WidgetMetric label="Executor-Modus" value={backendState.mode.toUpperCase()} accent={glassPalette.green} />
+              <WidgetMetric label="Tasks im Ledger" value={`${backendState.tasks.length}`} accent={backendState.tasks.length > 0 ? glassPalette.cyan : undefined} />
               <WidgetMetric
                 label="Laufend"
                 value={`${backendState.tasks.filter((task) => task.status === "running").length}`}
@@ -167,7 +172,7 @@ export default function CyberDashboardScreen() {
               <WidgetMetric
                 label="Emergency Stop"
                 value={backendState.stopped ? "AKTIV" : "inaktiv"}
-                accent={backendState.stopped ? colors.tint : colors.success}
+                accent={backendState.stopped ? glassPalette.cyan : glassPalette.green}
               />
             </>
           ) : (
@@ -180,7 +185,7 @@ export default function CyberDashboardScreen() {
         <LiveWidget
           title="Task-Ledger"
           badge={me.data?.role === "admin" ? "ADMIN" : undefined}
-          accent={colors.tint}
+          accent={glassPalette.cyan}
         >
           {me.data?.role !== "admin" ? (
             <Text style={styles.emptyText}>Admin-Zugang erforderlich für das Orchestrator-Ledger.</Text>
@@ -203,38 +208,42 @@ export default function CyberDashboardScreen() {
           )}
         </LiveWidget>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </GlassBackdrop>
   );
 }
 
 const TASK_DOT_COLORS: Record<string, string> = {
-  success: cyber.green,
-  failed: cyber.pink,
-  escalated: cyber.pink,
-  running: cyber.cyan,
+  success: glassPalette.green,
+  failed: glassPalette.red,
+  escalated: glassPalette.red,
+  running: glassPalette.cyan,
 };
 const TASK_DOT_STYLE = (status: string) => ({
   width: 8,
   height: 8,
   borderRadius: 4,
-  backgroundColor: TASK_DOT_COLORS[status] ?? cyber.textDim,
+  backgroundColor: TASK_DOT_COLORS[status] ?? glassSurface.textMuted,
 });
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const createStyles = () => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: glassDepth.void },
+  safeTransparent: { flex:1, backgroundColor: "transparent" },
   screen: { flex: 1 },
   content: { padding: 16, gap: 14, paddingBottom: 32 },
   menuRow: { marginBottom: 4 },
   header: { marginBottom: 8, gap: 2 },
-  headerKicker: { ...cyberTypography.caption, color: colors.tint },
-  headerTitle: { ...cyberTypography.display, color: colors.text },
+  headerKicker: { ...glassType.label, color: glassPalette.cyan },
+  headerTitle: { ...glassType.display, color: glassSurface.textPrimary },
   headerLine: { height: 2, borderRadius: 1, marginTop: 6 },
   gridRow: { flexDirection: "row", gap: 12 },
   halfWidget: { flex: 1 },
-  emptyText: { color: colors.icon, fontSize: 12, lineHeight: 18 },
+  emptyText: { color: glassSurface.textSecondary, fontSize: 12, lineHeight: 18 },
   taskRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
 
   taskTextContainer: { flex: 1 },
-  taskTitle: { color: colors.text, fontSize: 13, fontWeight: "600" },
-  taskMeta: { color: colors.icon, fontSize: 10, marginTop: 1 },
+  taskTitle: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "600" },
+  taskMeta: { color: glassSurface.textSecondary, fontSize: 10, marginTop: 1 },
 });
+
+const styles = createStyles();

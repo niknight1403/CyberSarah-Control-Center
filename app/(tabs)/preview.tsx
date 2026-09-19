@@ -1,5 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import { EmptySurface, PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
+/**
+ * Sprint 180 — Preview-Tab auf "CyberSarah Future Glass" uebertragen
+ * (Fortsetzung der Sprints 168/173-179). Logik unveraendert; visuelle
+ * Schicht auf das Glass-System umgestellt: GlassBackdrop, Glass-Typografie,
+ * StatusChip, GlowButton, Glass-Leerflaeche statt Studio-Primitives.
+ */
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlowButton, StatusChip } from "@/components/glass/glass-primitives";
+import type { GlassAccent } from "@/lib/design/future-glass";
+import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useLiveRuntimeLogs, useLiveRuntimeStatus, useClearRuntimeLogs, usePreviewTargetUrl } from "@/lib/live-runtime-client";
@@ -7,9 +16,8 @@ import { buildPreviewViewModel } from "@/lib/live-runtime-view-logic";
 import { formatLogTime, type LiveRuntimeLogEntry } from "@/lib/live-runtime-sse-logic";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { trpc } from "@/lib/trpc";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
 
 /**
  * Sprint 111 — Preview-Tab mit echter Live-Runtime-Anbindung.
@@ -19,8 +27,6 @@ import { useColors } from "@/hooks/use-colors";
  * ohne Workspace-Service oder Verbindung gelten ehrliche Offline-Zustaende.
  */
 export default function PreviewScreen() {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]);
   const status = useLiveRuntimeStatus();
   const { entries, connection, clearLocal } = useLiveRuntimeLogs(200);
   const clearLogs = useClearRuntimeLogs();
@@ -57,7 +63,8 @@ export default function PreviewScreen() {
   }, [clearBusy, clearLocal, clearLogs, connection]);
 
   return (
-    <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
+    <GlassBackdrop accent="green">
+      <ScreenContainer className="px-5" containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
       <FlatList
                 initialNumToRender={12}
                 maxToRenderPerBatch={8}
@@ -67,7 +74,20 @@ export default function PreviewScreen() {
         keyExtractor={(entry) => entry.id}
         ListHeaderComponent={
           <>
-            <StudioHeader eyebrow="Remote Runtime" title="Vorschau" actionIcon="arrow.clockwise" actionLabel="Laufzeit aktualisieren" onAction={() => void accountQuery.refetch()} />
+            <View style={styles.headerRow}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.eyebrow}>REMOTE RUNTIME</Text>
+                <Text style={styles.screenTitle}>Vorschau</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Laufzeit aktualisieren"
+                accessibilityRole="button"
+                onPress={() => void accountQuery.refetch()}
+                style={styles.headerAction}
+              >
+                <IconSymbol name="arrow.clockwise" size={18} color={glassSurface.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <View style={styles.statusCard}>
               <View style={styles.statusColumn}>
                 <Text style={styles.statusLabel}>AUSFÜHRUNGSUMGEBUNG</Text>
@@ -75,8 +95,8 @@ export default function PreviewScreen() {
                 <Text style={styles.statusText}>{vm.description}</Text>
               </View>
               <View style={styles.badgeColumn}>
-                <StatusBadge label={vm.stateBadge.label} tone={vm.stateBadge.tone} />
-                <StatusBadge label={vm.connectionBadge.label} tone={vm.connectionBadge.tone} />
+                <StatusChip label={vm.stateBadge.label} accent={toneAccent(vm.stateBadge.tone)} />
+                <StatusChip label={vm.connectionBadge.label} accent={toneAccent(vm.connectionBadge.tone)} />
               </View>
             </View>
             <View style={styles.metricsRow}>
@@ -109,25 +129,23 @@ export default function PreviewScreen() {
               </View>
               {hasWorkspaceService ? (
                 <View style={styles.previewBody}>
-                  <EmptySurface
+                  <EmptyGlassSurface
                     description="Die Workspace-Vorschau läuft im Service-Prozess. Status, Protokoll und Preview-URL hierüber bleiben live verbunden."
-                    icon="play.rectangle.fill"
                     title={vm.isLive ? "Live-Verbindung zum Workspace-Service" : "Workspace-Service verbunden"}
                   />
                 </View>
               ) : (
                 <View style={styles.previewBody}>
-                  <EmptySurface
+                  <EmptyGlassSurface
                     description="Ohne Workspace-Service zeigt die Vorschau den Web-Export der produktiven API. Verbinde einen Workspace-Service für Hot Reload und eigene Preview-Prozesse."
-                    icon="play.rectangle.fill"
                     title="Web-Export als Vorschau-Ziel"
                   />
                 </View>
               )}
             </View>
             <View style={styles.actionBlock}>
-              <PrimaryButton
-                icon={clearBusy ? "hourglass" : "trash"}
+              <GlowButton
+                accent="green"
                 label={clearBusy ? "Leert Protokoll …" : "Protokoll leeren"}
                 disabled={!vm.showClearButton || clearBusy}
                 onPress={() => void handleClearLogs()}
@@ -140,12 +158,13 @@ export default function PreviewScreen() {
                   : "Das Leeren ist ab Admin-Rolle mit vorhandenen Ereignissen verfügbar."}
               </Text>
             </View>
-            <StudioSection label="Console" title="Live-Laufzeitprotokoll" />
+            <Text style={styles.sectionLabel}>CONSOLE</Text>
+            <Text style={styles.sectionTitle}>Live-Laufzeitprotokoll</Text>
           </>
         }
         ListEmptyComponent={
           <View style={styles.emptyLogsCard}>
-            <IconSymbol name="terminal.fill" size={26} color={colors.tint} />
+            <IconSymbol name="terminal.fill" size={26} color={glassPalette.cyan} />
             <Text style={styles.emptyLogsTitle}>{vm.isLive ? "Warte auf Ereignisse …" : "Keine Ereignisse empfangen"}</Text>
             <Text style={styles.emptyLogsText}>{vm.isLive ? "Die Live-Verbindung steht — sobald der Server protokolliert, erscheinen die Einträge hier in Echtzeit." : "Sobald eine Live-Verbindung zur Laufzeit besteht, erscheinen hier Server-Ereignisse in Echtzeit."}</Text>
           </View>
@@ -155,7 +174,7 @@ export default function PreviewScreen() {
             <IconSymbol
               name={item.level === "success" ? "checkmark.circle.fill" : item.level === "warn" || item.level === "error" ? "exclamationmark.triangle.fill" : "terminal.fill"}
               size={18}
-              color={item.level === "success" ? colors.success : item.level === "warn" ? colors.warning : item.level === "error" ? colors.error : colors.tint}
+              color={item.level === "success" ? glassPalette.green : item.level === "warn" ? glassPalette.amber : item.level === "error" ? glassPalette.red : glassPalette.cyan}
             />
             <View style={styles.logTextArea}>
               <View style={styles.logMetaRow}>
@@ -168,16 +187,28 @@ export default function PreviewScreen() {
         )}
         showsVerticalScrollIndicator={false}
       />
-    </ScreenContainer>
+      </ScreenContainer>
+    </GlassBackdrop>
   );
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
+function createStyles() {
   return StyleSheet.create({
+  headerRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
+  headerCopy: { flex: 1 },
+  eyebrow: { ...glassType.label, color: glassPalette.cyan },
+  screenTitle: { ...glassType.display, color: glassSurface.textPrimary, marginTop: 4 },
+  headerAction: { alignItems: "center", borderRadius: 10, height: 36, justifyContent: "center", width: 36 },
+  sectionLabel: { ...glassType.label, color: glassSurface.textMuted, marginTop: 18 },
+  sectionTitle: { ...glassType.headline, color: glassSurface.textPrimary, marginTop: 2 },
+  emptyGlass: { alignItems: "center", paddingHorizontal: 18, paddingVertical: 22 },
+  emptyGlassIcon: { alignItems: "center", backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 14, borderWidth: 1, height: 46, justifyContent: "center", marginBottom: 12, width: 46 },
+  emptyGlassTitle: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800", marginBottom: 5, textAlign: "center" },
+  emptyGlassDescription: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16, textAlign: "center" },
   content: { paddingBottom: 20 },
   statusCard: {
-    backgroundColor: "#151C28",
-    borderColor: "#29384A",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
@@ -187,28 +218,28 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     padding: 15,
   },
   statusColumn: { flex: 1, gap: 4 },
-  statusLabel: { color: "#75859B", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
-  statusTitle: { color: "#EAF0F8", flex: 1, flexWrap: "wrap", fontSize: 14, fontWeight: "800" },
-  statusText: { color: "#8493A7", flex: 1, flexWrap: "wrap", fontSize: 11, lineHeight: 16 },
+  statusLabel: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
+  statusTitle: { color: glassSurface.textPrimary, flex: 1, flexWrap: "wrap", fontSize: 14, fontWeight: "800" },
+  statusText: { color: glassSurface.textMuted, flex: 1, flexWrap: "wrap", fontSize: 11, lineHeight: 16 },
   badgeColumn: { alignItems: "flex-end", gap: 6, justifyContent: "flex-start" },
   metricsRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
   metricChip: {
     alignItems: "center",
-    backgroundColor: "#111825",
-    borderColor: "#243248",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 12,
     borderWidth: 1,
     flex: 1,
     paddingHorizontal: 6,
     paddingVertical: 10,
   },
-  metricValue: { color: "#E7EEF7", fontSize: 14, fontWeight: "900" },
-  metricLabel: { color: "#718094", fontSize: 10, fontWeight: "700", marginTop: 3 },
-  previewFrame: { backgroundColor: "#0E131B", borderColor: "#2A3950", borderRadius: 19, borderWidth: 1, overflow: "hidden" },
+  metricValue: { color: glassSurface.textPrimary, fontSize: 14, fontWeight: "900" },
+  metricLabel: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "700", marginTop: 3 },
+  previewFrame: { backgroundColor: glassDepth.deep, borderColor: glassSurface.border, borderRadius: 19, borderWidth: 1, overflow: "hidden" },
   previewBrowserBar: {
     alignItems: "center",
-    backgroundColor: "#161E2B",
-    borderBottomColor: "#29384A",
+    backgroundColor: glassDepth.layer,
+    borderBottomColor: glassSurface.border,
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -216,19 +247,19 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     paddingVertical: 11,
   },
   browserDots: { flexDirection: "row", gap: 4 },
-  browserDot: { backgroundColor: "#536175", borderRadius: 3, height: 6, width: 6 },
-  previewUrl: { color: "#8090A4", flex: 1, fontSize: 11 },
-  liveDot: { backgroundColor: colors.success, borderRadius: 4, height: 8, shadowColor: colors.success, shadowOpacity: 0.7, shadowRadius: 5, width: 8 },
+  browserDot: { backgroundColor: glassSurface.textMuted, borderRadius: 3, height: 6, width: 6 },
+  previewUrl: { color: glassSurface.textMuted, flex: 1, fontSize: 11 },
+  liveDot: { backgroundColor: glassPalette.green, borderRadius: 4, height: 8, shadowColor: glassPalette.green, shadowOpacity: 0.7, shadowRadius: 5, width: 8 },
   previewBody: { padding: 14 },
   actionBlock: { marginBottom: 20, marginTop: 14 },
-  refreshCaption: { color: "#718094", fontSize: 11, lineHeight: 16, marginTop: 9, textAlign: "center" },
-  emptyLogsCard: { alignItems: "center", backgroundColor: "#111B28", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 22 },
-  emptyLogsTitle: { color: "#EAF5FF", fontSize: 15, fontWeight: "900", marginTop: 10 },
-  emptyLogsText: { color: "#9AABBF", fontSize: 12, lineHeight: 18, marginTop: 5, textAlign: "center" },
+  refreshCaption: { color: glassSurface.textMuted, fontSize: 11, lineHeight: 16, marginTop: 9, textAlign: "center" },
+  emptyLogsCard: { alignItems: "center", backgroundColor: glassDepth.layer, borderColor: withAlpha(glassPalette.cyan, 0.16), borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 22 },
+  emptyLogsTitle: { color: glassSurface.textPrimary, fontSize: 15, fontWeight: "900", marginTop: 10 },
+  emptyLogsText: { color: glassSurface.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5, textAlign: "center" },
   logRow: {
     alignItems: "center",
-    backgroundColor: "#121823",
-    borderColor: "#202F44",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 15,
     borderWidth: 1,
     flexDirection: "row",
@@ -239,9 +270,9 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   logTextArea: { flex: 1 },
   logMetaRow: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 3 },
-  logSource: { color: lightenSafe(colors.tint), flex: 1, fontSize: 10, fontWeight: "900" },
-  logTime: { color: "#617187", fontSize: 10, fontWeight: "700" },
-  logDetail: { color: "#8493A7", fontSize: 12, lineHeight: 17 },
+  logSource: { color: lightenSafe(glassPalette.cyan), flex: 1, fontSize: 10, fontWeight: "900" },
+  logTime: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "700" },
+  logDetail: { color: glassSurface.textMuted, fontSize: 12, lineHeight: 17 },
   });
 }
 
@@ -252,3 +283,23 @@ function lightenSafe(tint: string): string {
     return tint;
   }
 }
+
+/** Tone-Mapping Studio-Badge -> Glass-Akzent (Sprint 180). */
+function toneAccent(tone: "ready" | "warning" | "neutral" | "accent"): GlassAccent {
+  return tone === "ready" ? "green" : tone === "warning" ? "amber" : tone === "accent" ? "cyan" : "blue";
+}
+
+/** Glass-Leerflaeche (ersetzt Studio-EmptySurface, Sprint 180). */
+function EmptyGlassSurface({ description, title }: { description: string; title: string }) {
+  return (
+    <View style={styles.emptyGlass}>
+      <View style={styles.emptyGlassIcon}>
+        <IconSymbol name="play.rectangle.fill" size={23} color={glassPalette.cyan} />
+      </View>
+      <Text style={styles.emptyGlassTitle}>{title}</Text>
+      <Text style={styles.emptyGlassDescription}>{description}</Text>
+    </View>
+  );
+}
+
+const styles = createStyles();
