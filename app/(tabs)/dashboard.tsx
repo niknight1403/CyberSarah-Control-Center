@@ -34,7 +34,7 @@ export default function DashboardScreen() {
   if (state === "loading" || vm === null) {
     return (
       <GlassBackdrop>
-        <ScreenContainer style={styles.transparent}>
+        <ScreenContainer style={styles.transparent} containerClassName="bg-transparent">
           <ScrollView contentContainerStyle={styles.content}>
             <GlassHeader name={null} roleBadge={null} online={false} hasAlerts={false} />
             <DashboardSkeleton />
@@ -47,7 +47,7 @@ export default function DashboardScreen() {
   if (state === "error") {
     return (
       <GlassBackdrop>
-        <ScreenContainer style={styles.transparent}>
+        <ScreenContainer style={styles.transparent} containerClassName="bg-transparent">
           <ScrollView contentContainerStyle={styles.content}>
             <GlassHeader name={null} roleBadge={null} online={false} hasAlerts />
             <DashboardErrorState
@@ -64,7 +64,7 @@ export default function DashboardScreen() {
 
   return (
     <GlassBackdrop>
-      <ScreenContainer style={styles.transparent}>
+      <ScreenContainer style={styles.transparent} containerClassName="bg-transparent">
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <GlassHeader name={vm.user.name} roleBadge={roleBadge} online={vm.user.online} hasAlerts={hasAlerts} />
 

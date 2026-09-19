@@ -125,7 +125,7 @@ export default function AccountScreen() {
   const navDrawer = useNavDrawer();
   return (
     <GlassBackdrop accent="purple">
-      <ScreenContainer style={styles.transparent} edges={["top", "left", "right", "bottom"]}>
+      <ScreenContainer style={styles.transparent} containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
         <View style={styles.page}>
           <View style={styles.menuRow}>
             <NavDrawer {...navDrawer.drawerProps} />

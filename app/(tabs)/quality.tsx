@@ -63,7 +63,7 @@ export default function QualityScreen() {
   if (!hasRepository) {
     return (
       <GlassBackdrop accent="cyan">
-        <ScreenContainer style={styles.transparent} edges={["top", "left", "right", "bottom"]}>
+        <ScreenContainer style={styles.transparent} containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
           <Text style={styles.eyebrow}>QUALITÄTSZENTRALE</Text>
           <Text style={styles.title}>Qualität</Text>
           <GlassCard accent="cyan" style={styles.emptyCard}>
@@ -80,7 +80,7 @@ export default function QualityScreen() {
   const ciTone = getTone(quality?.ci.state ?? "unknown");
   return (
     <GlassBackdrop accent="cyan">
-      <ScreenContainer style={styles.transparent} edges={["top", "left", "right", "bottom"]}>
+      <ScreenContainer style={styles.transparent} containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
         <FlatList
           contentContainerStyle={styles.content}
           data={quality?.ci.checks ?? []}

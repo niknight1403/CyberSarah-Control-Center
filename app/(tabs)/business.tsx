@@ -360,7 +360,7 @@ export default function BusinessDashboardScreen() {
   const navDrawer = useNavDrawer();
   return (
     <GlassBackdrop accent="green">
-      <ScreenContainer style={styles.transparent}>
+      <ScreenContainer style={styles.transparent} containerClassName="bg-transparent">
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.header}>
             <NavDrawer {...navDrawer.drawerProps} />
