@@ -16,6 +16,7 @@ import { trpc } from "@/lib/trpc";
 type WixStatus = {
   state: "not_configured" | "site_id_missing" | "site_id_invalid" | "ready";
   tokenConfigured: boolean;
+  tokenSource: "env" | "admin_store" | "none";
   tokenMasked: string | null;
   accountId: string | null;
   siteId: string | null;
@@ -33,9 +34,11 @@ export function WixCard({ isAdmin }: { isAdmin: boolean }) {
   const colors = useColors();
   const [busy, setBusy] = useState(false);
   const [siteIdInput, setSiteIdInput] = useState("");
+  const [tokenInput, setTokenInput] = useState("");
 
   const statusQuery = trpc.wix.status.useQuery(undefined, { enabled: isAdmin, retry: false });
   const setSiteId = trpc.wix.setSiteId.useMutation();
+  const setToken = trpc.wix.setToken.useMutation();
   const sites = trpc.wix.sites.useMutation();
   const properties = trpc.wix.siteProperties.useMutation();
   const orders = trpc.wix.orders.useMutation();
@@ -48,6 +51,20 @@ export function WixCard({ isAdmin }: { isAdmin: boolean }) {
       await action();
     } catch (error) {
       Alert.alert(title, error instanceof Error ? error.message : "Unbekannter Fehler.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveToken = async (apiKey: string) => {
+    setBusy(true);
+    try {
+      await setToken.mutateAsync({ apiKey });
+      setTokenInput("");
+      refresh();
+      Alert.alert("Key gespeichert", "Der Wix-API-Key liegt ab jetzt verschlüsselt auf dem Server (AES-256-GCM).");
+    } catch (error) {
+      Alert.alert("Key ungültig", error instanceof Error ? error.message : "Unbekannter Fehler.");
     } finally {
       setBusy(false);
     }
@@ -90,10 +107,30 @@ export function WixCard({ isAdmin }: { isAdmin: boolean }) {
           Status: {status ? STATE_LABEL[status.state] : "…"}
         </Text>
         {status?.tokenMasked ? (
-          <Text style={[styles.token, { color: colors.muted }]}>{status.tokenMasked}</Text>
+          <Text style={[styles.token, { color: colors.muted }]}>
+            {status.tokenSource === "admin_store" ? "Karte" : "Server-Env"} · {status.tokenMasked}
+          </Text>
         ) : null}
       </View>
       <Text style={[styles.nextStep, { color: colors.text }]}>{status?.nextStep ?? ""}</Text>
+
+      <TextInput
+        style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+        placeholder="Wix-API-Key (JWT aus dem API-Keys-Manager)"
+        placeholderTextColor={colors.muted}
+        value={tokenInput}
+        autoCapitalize="none"
+        autoCorrect={false}
+        secureTextEntry
+        onChangeText={setTokenInput}
+      />
+      <Pressable
+        style={[styles.button, { backgroundColor: colors.tint }]}
+        disabled={busy || tokenInput.trim().length < 20 || setToken.isPending}
+        onPress={() => void saveToken(tokenInput.trim())}
+      >
+        <Text style={styles.buttonText}>{setToken.isPending ? "Speichert…" : "API-Key verschlüsselt speichern"}</Text>
+      </Pressable>
 
       <TextInput
         style={[styles.input, { borderColor: colors.border, color: colors.text }]}

@@ -177,6 +177,7 @@ describe("Sprint 187: Status-Snapshot (ehrliche Zustaende)", () => {
     const snap = buildWixStatusSnapshot({ token: null, accountId: ACCOUNT_ID, siteId: SITE_ID });
     expect(snap.state).toBe("not_configured");
     expect(snap.tokenMasked).toBeNull();
+    expect(snap.tokenSource).toBe("none");
     expect(snap.nextStep).toContain("WIX_API_TOKEN");
   });
 
@@ -205,6 +206,15 @@ describe("Sprint 187: Status-Snapshot (ehrliche Zustaende)", () => {
     });
     expect(snap.state).toBe("ready");
     expect(snap.siteId).toBe(SITE_ID);
+    expect(snap.tokenSource).toBe("env");
+
+    const fromStore = buildWixStatusSnapshot({
+      token: "verylongtokenvalue123",
+      accountId: ACCOUNT_ID,
+      siteId: SITE_ID,
+      tokenSource: "admin_store",
+    });
+    expect(fromStore.tokenSource).toBe("admin_store");
   });
 });
 

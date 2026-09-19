@@ -15,6 +15,7 @@ import {
   fetchWixSites,
   getWixStatus,
   setWixSiteId,
+  setWixToken,
   WixApiError,
 } from "./wix";
 
@@ -35,6 +36,11 @@ async function runWix<T>(action: () => Promise<T>): Promise<T> {
 export const wixRouter = router({
   /** Ehrlicher Konfigurations-Status (Token, Konto, Site-ID, naechster Schritt). */
   status: adminProcedure.query(() => getWixStatus()),
+
+  /** Wix-API-Key zur Laufzeit setzen (AES-verschluesselt im KV, kein Klartext). */
+  setToken: adminProcedure
+    .input(z.object({ apiKey: z.string().trim().min(20).max(8192) }))
+    .mutation(({ input }) => setWixToken(input.apiKey)),
 
   /** Site-ID zur Laufzeit setzen (KV — ohne Redeploy). */
   setSiteId: adminProcedure

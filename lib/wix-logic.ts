@@ -335,10 +335,12 @@ export function normalizeWixSiteProperties(body: unknown): WixSitePropertiesSumm
 }
 
 export type WixStatusState = "not_configured" | "site_id_missing" | "site_id_invalid" | "ready";
+export type WixTokenSource = "env" | "admin_store" | "none";
 
 export interface WixStatusSnapshot {
   state: WixStatusState;
   tokenConfigured: boolean;
+  tokenSource: WixTokenSource;
   tokenMasked: string | null;
   accountId: string | null;
   siteId: string | null;
@@ -351,12 +353,14 @@ export function buildWixStatusSnapshot(input: {
   token: string | null;
   accountId: string | null;
   siteId: string | null;
+  tokenSource?: WixTokenSource;
 }): WixStatusSnapshot {
   const tokenConfigured = Boolean(input.token && input.token.trim().length > 20);
   if (!tokenConfigured) {
     return {
       state: "not_configured",
       tokenConfigured: false,
+      tokenSource: "none",
       tokenMasked: null,
       accountId: input.accountId,
       siteId: input.siteId,
@@ -367,6 +371,7 @@ export function buildWixStatusSnapshot(input: {
     return {
       state: "site_id_missing",
       tokenConfigured: true,
+      tokenSource: input.tokenSource ?? "env",
       tokenMasked: maskWixToken(input.token as string),
       accountId: input.accountId,
       siteId: null,
@@ -378,6 +383,7 @@ export function buildWixStatusSnapshot(input: {
     return {
       state: "site_id_invalid",
       tokenConfigured: true,
+      tokenSource: input.tokenSource ?? "env",
       tokenMasked: maskWixToken(input.token as string),
       accountId: input.accountId,
       siteId: input.siteId,
@@ -387,6 +393,7 @@ export function buildWixStatusSnapshot(input: {
   return {
     state: "ready",
     tokenConfigured: true,
+    tokenSource: input.tokenSource ?? "env",
     tokenMasked: maskWixToken(input.token as string),
     accountId: input.accountId,
     siteId: input.siteId.trim(),

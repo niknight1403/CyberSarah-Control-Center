@@ -16,6 +16,7 @@
  */
 
 import { getModelRouterSetting, setModelRouterSetting } from "./db";
+import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import {
   buildWixRequestHeaders,
   buildWixStatusSnapshot,
@@ -29,11 +30,13 @@ import {
   type WixSitePropertiesSummary,
   type WixSiteSummary,
   type WixStatusSnapshot,
+  type WixTokenSource,
 } from "../lib/wix-logic";
 
 const WIX_API_BASE = "https://www.wixapis.com";
 const WIX_TIMEOUT_MS = 15_000;
 const WIX_SITE_ID_KV_KEY = "wix.siteId";
+const WIX_TOKEN_KV_KEY = "wix.apiToken";
 
 /** Vom Owner bestaetigte Wix-Konto-ID (Sprint 187, mehrfach uebermittelt). */
 export const DEFAULT_WIX_ACCOUNT_ID = "ae403255-f2e1-48b9-91ab-36840f6609fa";
@@ -48,9 +51,73 @@ export class WixApiError extends Error {
   }
 }
 
-export function resolveWixToken(): string | null {
-  const token = process.env.WIX_API_TOKEN?.trim();
-  return token && token.length > 20 ? token : null;
+/** Server-Secret fuer die AES-Vault (identisch zum Provider-Key-Store). */
+function wixEncryptionSecret(): string | null {
+  const secret = (process.env.PROVIDER_KEY_ENCRYPTION_SECRET ?? process.env.JWT_SECRET ?? "").trim();
+  return secret.length > 0 ? secret : null;
+}
+
+/**
+ * Setzt den Wix-API-Key zur Laufzeit (Admin): AES-256-GCM-verschluesselt
+ * im KV — identisch zur Provider-Key-Ablage (keySource admin_store).
+ * Der Klartext wird NIE gespeichert und NIE zurueckgegeben.
+ */
+export async function setWixToken(apiKey: string): Promise<{ stored: true }> {
+  const trimmed = apiKey.trim();
+  if (trimmed.length < 20) {
+    throw new Error("INVALID_TOKEN: Der Wix-API-Key ist zu kurz (JWT erwartet).");
+  }
+  const secret = wixEncryptionSecret();
+  if (!secret) {
+    throw new Error(
+      "VAULT_UNVERFUEGBAR: Kein Server-Secret (JWT_SECRET/PROVIDER_KEY_ENCRYPTION_SECRET) — Token-Ablage deaktiviert.",
+    );
+  }
+  await setModelRouterSetting(WIX_TOKEN_KV_KEY, encryptSecret(trimmed, secret));
+  return { stored: true };
+}
+
+let cachedToken = "";
+let cachedTokenSource: WixTokenSource = "none";
+
+/**
+ * Liefert den Wix-API-Key: vorrangig aus dem verschluesselten KV-Store
+ * (admin_store), sonst aus WIX_API_TOKEN (env). Beides nicht gesetzt → null.
+ * Der Cache haelt den entschluesselten Wert nur im Prozessspeicher.
+ */
+export async function resolveWixToken(): Promise<string | null> {
+  const envToken = process.env.WIX_API_TOKEN?.trim();
+  if (envToken && envToken.length > 20) {
+    cachedToken = envToken;
+    cachedTokenSource = "env";
+    return envToken;
+  }
+  if (cachedToken) return cachedToken;
+  try {
+    const stored = await getModelRouterSetting<string>(WIX_TOKEN_KV_KEY);
+    if (stored) {
+      const secret = wixEncryptionSecret();
+      if (secret) {
+        const token = decryptSecret(stored, secret).trim();
+        if (token.length > 20) {
+          cachedToken = token;
+          cachedTokenSource = "admin_store";
+          return token;
+        }
+      }
+    }
+  } catch {
+    // KV/Defekt — ehrlich auf env/null fallen lassen, kein Fake-Zustand.
+  }
+  cachedToken = "";
+  cachedTokenSource = "none";
+  return null;
+}
+
+/** Nur fuer Diagnose: woher stammt der aktive Key (env/admin_store/none)? */
+export async function resolveWixTokenSource(): Promise<WixTokenSource> {
+  await resolveWixToken();
+  return cachedTokenSource;
 }
 
 export function resolveWixAccountId(): string | null {
@@ -82,8 +149,10 @@ export async function setWixSiteId(siteId: string): Promise<{ siteId: string }> 
 }
 
 export async function getWixStatus(): Promise<WixStatusSnapshot> {
+  const token = await resolveWixToken();
   return buildWixStatusSnapshot({
-    token: resolveWixToken(),
+    token,
+    tokenSource: await resolveWixTokenSource(),
     accountId: resolveWixAccountId(),
     siteId: await resolveWixSiteId(),
   });
@@ -94,7 +163,7 @@ async function wixRequest(
   path: string,
   options: { method: "GET" | "POST"; body?: unknown; siteId?: string | null },
 ): Promise<Record<string, unknown>> {
-  const token = resolveWixToken();
+  const token = await resolveWixToken();
   if (!token) {
     throw new WixApiError({
       kind: "not_configured",
