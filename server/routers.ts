@@ -19,6 +19,7 @@ import { crashReportingRouter, selfHealingRouter } from "./self-healing-router";
 import { projectsRouter } from "./projects-router";
 import { superAgentsRouter } from "./super-agents-router";
 import { providerAdminRouter } from "./provider-admin-router";
+import { autonomousDevRouter } from "./autonomous-dev-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -43,6 +44,7 @@ export const appRouter = router({
   projects: projectsRouter,
   superAgents: superAgentsRouter,
   providerAdmin: providerAdminRouter,
+  autonomousDev: autonomousDevRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.

@@ -20,6 +20,9 @@ import axios from "axios";
 import * as db from "./db";
 import { subscribeRuntimeLogs, getRuntimeLogs } from "./runtime-logger";
 import { runOrchestratorTask } from "./orchestrator/superagent";
+import { applyLiveFix, describeLiveFix, planLiveFix, type LiveFixOutcome } from "../lib/live-fix-logic";
+import { resetBackupWatchState } from "./backup-watch";
+import { clearRuntimeLogs } from "./runtime-logger";
 import { sendOpsDiscordAlert } from "./ops-alerts";
 import {
   buildAnalysisObjective,
@@ -141,12 +144,24 @@ async function handleAnomaly(
   finding: string,
   evidence: string[],
 ): Promise<void> {
+  // Sprint 164 — DIREKTE Live-Behebung: sichere In-Prozess-Aktionen werden
+  // sofort (vor jeder Analyse) ausgefuehrt und am Incident dokumentiert.
+  const liveFixPlan = planLiveFix(signature, evidence.join("\n"));
+  const liveFixOutcome: LiveFixOutcome = await applyLiveFix(liveFixPlan, {
+    restartBackupWatcher: resetBackupWatchState,
+    purgeLogBuffer: clearRuntimeLogs,
+  });
+  if (liveFixOutcome.applied) {
+    console.log(`[self-healing] ${describeLiveFix(liveFixOutcome)}`);
+  }
+
   const { incident, isNew } = await recordIncident({
     source: evidence.length && evidence[0].includes("mobile-crash") ? "mobile_crash" : "server_log",
     signature,
     severity,
     finding,
     evidence,
+    ...(liveFixOutcome.applied ? { appliedRemedy: describeLiveFix(liveFixOutcome) } : {}),
   });
   if (!isNew) return;
 
