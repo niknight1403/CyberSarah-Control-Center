@@ -1,4 +1,11 @@
-import { StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
+/**
+ * Sprint 179 — KI-Operations-Chat auf "CyberSarah Future Glass" uebertragen.
+ * Logik unveraendert; visuelle Schicht auf das Glass-System umgestellt:
+ * GlassBackdrop, Glass-Typografie, StatusChip, Farb-Token statt useColors.
+ */
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { StatusChip } from "@/components/glass/glass-primitives";
+import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
 import { AiOrb } from "@/components/living/living-ui";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
@@ -30,7 +37,6 @@ import { DEFAULT_CONNECTOR_PREFERENCES, enabledConnectorCount, normalizeConnecto
 import { DEFAULT_SKILL_PREFERENCES, enabledSkillCount, normalizeSkillPreferences, SKILL_PREFERENCE_STORAGE_KEY, toggleSkill, type SkillId, type SkillPreferences } from "@/lib/skill-preferences-logic";
 import { FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ListRenderItemInfo } from "react-native";
 import { darken, withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
 import { useNow } from "@/hooks/use-now";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal; timestampMs?: number };
@@ -45,8 +51,6 @@ const EMPTY_SUPER_AGENTS: SuperAgentView[] = [];
 const initialMessages: ChatMessage[] = [{ id: "agent-intro", role: "agent", content: "Willkommen im KI-Operations-Chat. Beschreibe eine Änderung, ein Problem oder ein Refactoring — ich kümmere mich darum." }];
 
 export default function ChatScreen() {
-    const colors = useColors();
-    const s = useMemo(() => createStyles(colors), [colors]);
   const { loadRemoteFiles, selectedFile } = useWorkspace();
   const { attachRepository, listGithubRepositories, loadRepositoryDetails, loadWorkspaceHealth, settings } = useStudioSettings();
   const [activeTab, setActiveTab] = useState<InnerTab>("chat");
@@ -294,7 +298,7 @@ export default function ChatScreen() {
     }
   };
 
-  const statusColor = (st: ConnectorTestStatus) => st === "success" ? colors.success : st === "error" ? colors.error : st === "testing" ? colors.tint : "#8294A8";
+  const statusColor = (st: ConnectorTestStatus) => st === "success" ? glassPalette.green : st === "error" ? glassPalette.red : st === "testing" ? glassPalette.cyan : glassSurface.textMuted;
   const statusIcon = (st: ConnectorTestStatus) => st === "success" ? "OK" : st === "error" ? "X" : st === "testing" ? "…" : "○";
   const canSend = Boolean(prompt.trim()) && !isThinking && readyForChat;
 
@@ -320,15 +324,17 @@ export default function ChatScreen() {
   };
 
   return (
-    <ScreenContainer className="px-4" edges={["top", "left", "right", "bottom"]}>
+    <GlassBackdrop accent="cyan">
+      <ScreenContainer className="px-4" containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
       <ChatBackground>
         <StudioErrorBoundary section="Chat">
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.flex}>
-            <StudioHeader eyebrow="CYBERSARAH · KI-OPERATIONS" title="Chat" />
+            <Text style={s.eyebrow}>CYBERSARAH · KI-OPERATIONS</Text>
+            <Text style={s.screenTitle}>Chat</Text>
             <View style={s.tabBar}>
               {([["chat", "chatbubbles", "Chat"], ["github", "logo-github", "GitHub"], ["skills", "sparkles", "Skills"], ["secrets", "lock-closed", "Secrets"]] as const).map(([tab, icon, label]) => (
                 <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[s.tab, activeTab === tab && s.tabActive]}>
-                  <Ionicons name={icon as never} size={14} color={activeTab === tab ? colors.tint : "#6B7D90"} />
+                  <Ionicons name={icon as never} size={14} color={activeTab === tab ? glassPalette.cyan : glassSurface.textMuted} />
                   <Text style={[s.tabText, activeTab === tab && s.tabTextActive]}>{label}</Text>
                   {tab === "github" && settings.hasGitHubToken ? <View style={s.dot} /> : null}
                   {tab === "skills" ? <Text style={s.badge}>{enabledSkillCount(skillPreferences) + enabledConnectorCount(connectorPreferences)}</Text> : null}
@@ -370,8 +376,8 @@ export default function ChatScreen() {
                         <Text style={[s.statusText, s.statusTextMono]}>{readyForChat ? contextLabel + " · " + providerLabel : "Repository und Workspace in Einstellungen konfigurieren."}</Text>
                       ) : null}
                     </View>
-                    <StatusBadge label={readyForChat ? "Bereit" : "Fehlt"} tone={readyForChat ? "ready" : "warning"} />
-                    <Ionicons name={statusCollapsed ? "chevron-down" : "chevron-up"} size={16} color={colors.muted} style={s.statusChevron} />
+                    <StatusChip label={readyForChat ? "Bereit" : "Fehlt"} accent={readyForChat ? "green" : "amber"} />
+                    <Ionicons name={statusCollapsed ? "chevron-down" : "chevron-up"} size={16} color={glassSurface.textSecondary} style={s.statusChevron} />
                   </TouchableOpacity>
                   {showRepositoryCard && (
                     <RepositoryConnectCard
@@ -395,7 +401,7 @@ export default function ChatScreen() {
                 ListFooterComponent={<>
                   {chatError ? (
                     <View style={s.errorRow}>
-                      <Ionicons name="warning" size={14} color={colors.error} />
+                      <Ionicons name="warning" size={14} color={glassPalette.red} />
                       <Text style={s.error}>{chatError}</Text>
                     </View>
                   ) : null}
@@ -423,7 +429,8 @@ export default function ChatScreen() {
 
             {activeTab === "github" && (
               <ScrollView contentContainerStyle={s.content}>
-                <StudioSection label="Connectoren" title="GitHub und Workspace" />
+                <Text style={s.sectionLabel}>CONNECTOREN</Text>
+                  <Text style={s.sectionTitle}>GitHub und Workspace</Text>
                 {([
                   { id: "github" as ConnectorId, label: "GitHub", detail: settings.hasGitHubToken ? "Token hinterlegt" : "Kein Token" },
                   { id: "workspace" as ConnectorId, label: "Workspace-Service", detail: settings.hasServiceAccessToken ? "Token hinterlegt" : "Nicht konfiguriert" },
@@ -435,7 +442,7 @@ export default function ChatScreen() {
                         <Text style={s.connName}>{label}</Text>
                         <Text style={s.connDetail}>{detail}</Text>
                       </View>
-                      <StatusBadge label={connectorPreferences[id] ? "Aktiv" : "Inaktiv"} tone={connectorPreferences[id] ? "ready" : "warning"} />
+                      <StatusChip label={connectorPreferences[id] ? "Aktiv" : "Inaktiv"} accent={connectorPreferences[id] ? "green" : "amber"} />
                     </View>
                     <View style={s.connActions}>
                       <TouchableOpacity onPress={() => void testConnector(id)} disabled={connectorTests[id].status === "testing"} style={s.testBtn}>
@@ -457,14 +464,16 @@ export default function ChatScreen() {
 
             {activeTab === "secrets" && (
               <ScrollView contentContainerStyle={s.content}>
-                <StudioSection label="Vault" title="Secrets sicher verwalten" />
+                <Text style={s.sectionLabel}>VAULT</Text>
+                  <Text style={s.sectionTitle}>Secrets sicher verwalten</Text>
                 <SecretsPanel />
               </ScrollView>
             )}
 
             {activeTab === "skills" && (
               <ScrollView contentContainerStyle={s.content}>
-                <StudioSection label="Skills" title={enabledSkillCount(skillPreferences) + " aktiv"} />
+                <Text style={s.sectionLabel}>SKILLS</Text>
+                  <Text style={s.sectionTitle}>{enabledSkillCount(skillPreferences) + " aktiv"}</Text>
                 <View style={s.connCard}>
                   {([
                     { id: "agent" as SkillId, label: "Agent-Vorschläge", detail: "KI erstellt reviewbare Code-Vorschläge" },
@@ -518,58 +527,65 @@ export default function ChatScreen() {
           </KeyboardAvoidingView>
         </StudioErrorBoundary>
       </ChatBackground>
-    </ScreenContainer>
+      </ScreenContainer>
+    </GlassBackdrop>
   );
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
+function createStyles() {
   return StyleSheet.create({
+  eyebrow: { ...glassType.label, color: glassPalette.cyan, marginTop: 8 },
+  screenTitle: { ...glassType.display, color: glassSurface.textPrimary, marginTop: 4 },
+  sectionLabel: { ...glassType.label, color: glassSurface.textMuted, marginTop: 18 },
+  sectionTitle: { ...glassType.headline, color: glassSurface.textPrimary, marginTop: 2 },
   flex: { flex: 1 },
   content: { paddingBottom: 28 },
   mono: { fontFamily: "monospace" },
-  tabBar: { backgroundColor: "rgba(13, 21, 32, 0.85)", borderColor: "#1E2F47", borderRadius: 16, borderWidth: 1, flexDirection: "row", marginBottom: 12, padding: 4 },
+  tabBar: { backgroundColor: "rgba(13, 21, 32, 0.85)", borderColor: glassDepth.layer, borderRadius: 16, borderWidth: 1, flexDirection: "row", marginBottom: 12, padding: 4 },
   tab: { alignItems: "center", borderRadius: 12, flex: 1, flexDirection: "row", gap: 5, justifyContent: "center", paddingVertical: 9 },
-  tabActive: { backgroundColor: withAlpha(colors.tint, 0.10), borderColor: withAlpha(colors.tint, 0.35), borderWidth: 1 },
-  tabText: { color: "#6B7D90", fontFamily: "monospace", fontSize: 12, fontWeight: "700" },
-  tabTextActive: { color: colors.tint },
-  statusTitleMono: { color: colors.tint, fontFamily: "monospace", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
-  statusTextMono: { color: colors.muted, fontFamily: "monospace", fontSize: 11 },
-  dot: { backgroundColor: colors.success, borderRadius: 4, height: 6, width: 6 },
-  badge: { backgroundColor: withAlpha(colors.tint, 0.14), borderRadius: 8, color: colors.tint, fontSize: 9, fontWeight: "900", overflow: "hidden", paddingHorizontal: 5, paddingVertical: 1 },
+  tabActive: { backgroundColor: withAlpha(glassPalette.cyan, 0.10), borderColor: withAlpha(glassPalette.cyan, 0.35), borderWidth: 1 },
+  tabText: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 12, fontWeight: "700" },
+  tabTextActive: { color: glassPalette.cyan },
+  statusTitleMono: { color: glassPalette.cyan, fontFamily: "monospace", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  statusTextMono: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 11 },
+  dot: { backgroundColor: glassPalette.green, borderRadius: 4, height: 6, width: 6 },
+  badge: { backgroundColor: withAlpha(glassPalette.cyan, 0.14), borderRadius: 8, color: glassPalette.cyan, fontSize: 9, fontWeight: "900", overflow: "hidden", paddingHorizontal: 5, paddingVertical: 1 },
   statusCard: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 12, overflow: "hidden", padding: 12 },
   statusChevron: { marginLeft: 4 },
-  statusReady: { backgroundColor: withAlpha(colors.success, 0.1), borderColor: darken(colors.success, 0.6) },
-  statusWarn: { backgroundColor: withAlpha(colors.warning, 0.12), borderColor: darken(colors.warning, 0.68) },
-  statusGlow: { backgroundColor: colors.success, borderRadius: 3, height: 8, shadowColor: colors.success, shadowOpacity: 0.8, shadowRadius: 6, width: 8 },
-  statusGlowWarn: { backgroundColor: colors.warning, borderRadius: 3, height: 8, width: 8 },
+  statusReady: { backgroundColor: withAlpha(glassPalette.green, 0.1), borderColor: darken(glassPalette.green, 0.6) },
+  statusWarn: { backgroundColor: withAlpha(glassPalette.amber, 0.12), borderColor: darken(glassPalette.amber, 0.68) },
+  statusGlow: { backgroundColor: glassPalette.green, borderRadius: 3, height: 8, shadowColor: glassPalette.green, shadowOpacity: 0.8, shadowRadius: 6, width: 8 },
+  statusGlowWarn: { backgroundColor: glassPalette.amber, borderRadius: 3, height: 8, width: 8 },
   statusCopy: { flex: 1 },
-    statusTitle: { color: colors.foreground, fontSize: 13, fontWeight: "800" },
-    statusText: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+    statusTitle: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800" },
+    statusText: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 2 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 14 },
-    chip: { backgroundColor: withAlpha(colors.surface, 0.92), borderColor: withAlpha(colors.tint, 0.35), borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
-  chipText: { fontFamily: "monospace", color: "#9FBDD4", fontSize: 12, fontWeight: "700" },
+    chip: { backgroundColor: glassDepth.glass, borderColor: withAlpha(glassPalette.cyan, 0.35), borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+  chipText: { fontFamily: "monospace", color: glassSurface.textSecondary, fontSize: 12, fontWeight: "700" },
   dayDividerRow: { alignItems: "center", flexDirection: "row", gap: 10, marginBottom: 12, marginTop: 4 },
-    dayDividerLine: { backgroundColor: withAlpha(colors.tint, 0.25), flex: 1, height: 1 },
-    dayDividerText: { color: colors.muted, fontFamily: "monospace", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
-  errorRow: { alignItems: "center", backgroundColor: withAlpha(colors.error, 0.12), borderColor: darken(colors.error, 0.6), borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 7, marginBottom: 8, paddingHorizontal: 11, paddingVertical: 9 },
-  error: { color: colors.error, flex: 1, fontSize: 11, lineHeight: 16 },
-  connCard: { backgroundColor: "rgba(15, 22, 31, 0.9)", borderColor: "#243347", borderRadius: 16, borderWidth: 1, marginBottom: 12, padding: 14 },
+    dayDividerLine: { backgroundColor: withAlpha(glassPalette.cyan, 0.25), flex: 1, height: 1 },
+    dayDividerText: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
+  errorRow: { alignItems: "center", backgroundColor: withAlpha(glassPalette.red, 0.12), borderColor: darken(glassPalette.red, 0.6), borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 7, marginBottom: 8, paddingHorizontal: 11, paddingVertical: 9 },
+  error: { color: glassPalette.red, flex: 1, fontSize: 11, lineHeight: 16 },
+  connCard: { backgroundColor: "rgba(15, 22, 31, 0.9)", borderColor: glassDepth.layer, borderRadius: 16, borderWidth: 1, marginBottom: 12, padding: 14 },
   connRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   connInfo: { flex: 1, marginRight: 10 },
-  connName: { color: "#DDE8F4", fontSize: 13, fontWeight: "800" },
-  connDetail: { color: "#8294A8", fontSize: 11, marginTop: 2 },
+  connName: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800" },
+  connDetail: { color: glassSurface.textMuted, fontSize: 11, marginTop: 2 },
   connActions: { alignItems: "center", flexDirection: "row", gap: 8, marginTop: 4 },
-  testBtn: { alignItems: "center", backgroundColor: "#131F2E", borderColor: "#2B3E55", borderRadius: 10, borderWidth: 1, flex: 1, flexDirection: "row", gap: 6, justifyContent: "center", paddingVertical: 9 },
-  testBtnTxt: { color: "#9FBDD4", fontSize: 12, fontWeight: "700" },
-  toggle: { backgroundColor: "#1A2433", borderRadius: 12, height: 24, justifyContent: "center", paddingHorizontal: 2, width: 44 },
-  toggleOn: { backgroundColor: withAlpha(colors.tint, 0.3) },
-  knob: { backgroundColor: "#4A6070", borderRadius: 10, height: 20, width: 20 },
-  knobOn: { backgroundColor: "#ECFBFF", marginLeft: 20 },
-  mgBtn: { alignItems: "center", backgroundColor: "#1A2433", borderColor: "#2B3C52", borderRadius: 10, borderWidth: 1, justifyContent: "center", paddingHorizontal: 10, paddingVertical: 9 },
-  mgBtnTxt: { color: "#9FBDD4", fontSize: 11, fontWeight: "700" },
+  testBtn: { alignItems: "center", backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 10, borderWidth: 1, flex: 1, flexDirection: "row", gap: 6, justifyContent: "center", paddingVertical: 9 },
+  testBtnTxt: { color: glassSurface.textSecondary, fontSize: 12, fontWeight: "700" },
+  toggle: { backgroundColor: glassDepth.layer, borderRadius: 12, height: 24, justifyContent: "center", paddingHorizontal: 2, width: 44 },
+  toggleOn: { backgroundColor: withAlpha(glassPalette.cyan, 0.3) },
+  knob: { backgroundColor: glassSurface.textMuted, borderRadius: 10, height: 20, width: 20 },
+  knobOn: { backgroundColor: glassSurface.textPrimary, marginLeft: 20 },
+  mgBtn: { alignItems: "center", backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 10, borderWidth: 1, justifyContent: "center", paddingHorizontal: 10, paddingVertical: 9 },
+  mgBtnTxt: { color: glassSurface.textSecondary, fontSize: 11, fontWeight: "700" },
   testResult: { fontSize: 11, lineHeight: 16, marginTop: 8 },
-  skillRow: { alignItems: "center", borderTopColor: "#1E2B3B", borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", paddingVertical: 12 },
+  skillRow: { alignItems: "center", borderTopColor: glassSurface.border, borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", paddingVertical: 12 },
   settingsLink: { alignItems: "center", marginTop: 8, paddingVertical: 12 },
-  settingsLinkTxt: { color: colors.tint, fontSize: 13, fontWeight: "700" },
+  settingsLinkTxt: { color: glassPalette.cyan, fontSize: 13, fontWeight: "700" },
   });
 }
+
+const s = createStyles();

@@ -1,4 +1,12 @@
-import { PrimaryButton, StatusBadge, StudioHeader, StudioSection } from "@/components/studio/primitives";
+/**
+ * Sprint 179 — Workspace-Screen auf "CyberSarah Future Glass" uebertragen.
+ * Logik unveraendert; visuelle Schicht auf das Glass-System umgestellt:
+ * GlassBackdrop, Glass-Typografie (inkl. Einstellungs-Aktion im Header),
+ * StatusChip, GlowButton, Farb-Token statt useColors und Hand-Hexes.
+ */
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlowButton, StatusChip } from "@/components/glass/glass-primitives";
+import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { DiffConfirmationSheet } from "@/components/studio/diff-confirmation-sheet";
@@ -18,11 +26,8 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { darken, lighten, withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
 
 export default function WorkspaceScreen() {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]);
   const { changedFileCount, files, hydrateFile, loadRemoteFiles, markFilesSynced, saveDraft, selectFile, selectedFile, selectedFileId, updateFile } = useWorkspace();
   const { commitRepository, createRepositoryPullRequest, loadRepositoryDetails, loadRepositoryQuality, loadWorkspaceHealth, pushRepository, readAttachedFile, settings, switchRepositoryBranch, syncRemoteChanges } = useStudioSettings();
   const hasWorkspaceService = Boolean(settings.workspaceUrl);
@@ -252,7 +257,8 @@ export default function WorkspaceScreen() {
   };
 
   return (
-    <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}>
+    <GlassBackdrop accent="blue">
+      <ScreenContainer className="px-5" containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
       <FlatList
                 initialNumToRender={12}
                 maxToRenderPerBatch={8}
@@ -262,24 +268,37 @@ export default function WorkspaceScreen() {
         keyExtractor={(file) => file.id}
         ListHeaderComponent={
           <>
-            <StudioHeader eyebrow="Custom AI Studio" title="Workspace" actionIcon="gearshape.fill" actionLabel="Workspace-Einstellungen" onAction={() => router.push("/settings" as never)} />
+            <View style={styles.headerRow}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.eyebrow}>CUSTOM AI STUDIO</Text>
+                <Text style={styles.screenTitle}>Workspace</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityLabel="Workspace-Einstellungen"
+                accessibilityRole="button"
+                onPress={() => router.push("/settings" as never)}
+                style={styles.headerAction}
+              >
+                <IconSymbol name="gearshape.fill" size={18} color={glassSurface.textSecondary} />
+              </TouchableOpacity>
+            </View>
             {showGuidance ? <NextStepGuide actionMessage={guidanceFeedback} completion={guidance.completion} guidance={guidance} onAction={requestGuidanceAction} /> : null}
             <View style={styles.projectCard}>
               <View style={styles.projectTopLine}>
                 <View style={styles.projectIdentity}>
                   <View style={styles.projectIcon}>
-                    <IconSymbol name="folder.fill" size={20} color={colors.tint} />
+                    <IconSymbol name="folder.fill" size={20} color={glassPalette.cyan} />
                   </View>
                   <View>
                     <Text style={styles.projectName}>{repositoryLabel}</Text>
                     <Text style={styles.projectPath}>{hasWorkspaceService ? settings.workspaceUrl : "Lokaler Arbeitsbereich"}</Text>
                   </View>
                 </View>
-                <StatusBadge label={currentBranchIsProtected ? `${settings.branch} · geschützt` : settings.branch} tone={currentBranchIsProtected ? "warning" : "accent"} />
+                <StatusChip label={currentBranchIsProtected ? `${settings.branch} · geschützt` : settings.branch} accent={currentBranchIsProtected ? "amber" : "cyan"} />
               </View>
               <View style={styles.projectFooter}>
                 <Text style={styles.projectState}>{syncState.offlineDraftCount ? `${syncState.offlineDraftCount} Offline-Entwurf(e)` : "Keine offenen Änderungen"}</Text>
-                <StatusBadge label={syncState.hasConflictRisk ? "Möglicher Konflikt" : hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} tone={syncState.hasConflictRisk ? "warning" : hasAttachedRepository || hasWorkspaceService ? "ready" : "warning"} />
+                <StatusChip label={syncState.hasConflictRisk ? "Möglicher Konflikt" : hasAttachedRepository ? "Repository verbunden" : hasWorkspaceService ? "Service konfiguriert" : "Remote ausstehend"} accent={syncState.hasConflictRisk ? "amber" : hasAttachedRepository || hasWorkspaceService ? "green" : "amber"} />
               </View>
             </View>
             {hasWorkspaceService && showDiagnosis ? <View style={[styles.healthPanel, healthState === "error" && styles.healthPanelError]}><View style={styles.healthHeader}><View><Text style={styles.healthEyebrow}>SERVICE-DIAGNOSE</Text><Text style={styles.healthTitle}>{healthState === "checking" ? "Verbindung wird geprüft …" : healthState === "ready" && serviceHealth ? serviceHealth.status === "ready" ? "Workspace-Service erreichbar" : "Workspace-Service beschäftigt" : "Verbindungsstatus ausstehend"}</Text></View><TouchableOpacity accessibilityLabel="Workspace-Service prüfen" activeOpacity={0.75} disabled={healthState === "checking"} onPress={() => void refreshHealth()} style={[styles.refreshButton, healthState === "checking" && styles.healthButtonDisabled]}><Text style={styles.refreshButtonText}>{healthState === "checking" ? "Prüft …" : "Prüfen"}</Text></TouchableOpacity></View><Text style={[styles.healthDetail, healthState === "error" && styles.repositoryError]}>{healthState === "ready" && serviceHealth ? `Version ${serviceHealth.version}${serviceHealth.storage ? ` · ${serviceHealth.storage.mode === "postgres" ? "Persistenter Speicher aktiv (kostenloses Postgres-Backup)" : serviceHealth.storage.persistent ? "Persistenter Speicher aktiv" : "Ephemerer Speicher (Free-Tier)"}` : ""}${serviceHealth.previewUrl ? " · Vorschau verfügbar" : " · Keine Laufzeitvorschau gemeldet"}${healthCheckedAt ? ` · geprüft ${formatCommitDate(healthCheckedAt)}` : ""}` : healthState === "error" ? healthError : "Die Diagnose prüft Service-Erreichbarkeit ohne Repository-Daten zu verändern."}</Text></View> : null}
@@ -315,20 +334,21 @@ export default function WorkspaceScreen() {
                 {repositoryState === "error" ? <Text style={styles.repositoryError}>{repositoryError}</Text> : null}
               </View>
             ) : null}</StudioErrorBoundary>
-            <StudioSection label="Explorer" title="Projektdateien" />
+            <Text style={styles.sectionLabel}>EXPLORER</Text>
+            <Text style={styles.sectionTitle}>Projektdateien</Text>
           </>
         }
         ListFooterComponent={
           <>
             <View style={styles.editorHeader}>
               <View style={styles.editorFileIdentity}>
-                <IconSymbol name="doc.text.fill" size={17} color={colors.tint} />
+                <IconSymbol name="doc.text.fill" size={17} color={glassPalette.cyan} />
                 <View>
                   <Text style={styles.editorFileName}>{selectedFile.name}</Text>
                   <Text style={styles.editorPath}>{selectedFile.path}</Text>
                 </View>
               </View>
-              {selectedFile.changed ? <StatusBadge label="Geändert" tone="warning" /> : <StatusBadge label="Gespeichert" tone="ready" />}
+              {selectedFile.changed ? <StatusChip label="Geändert" accent="amber" /> : <StatusChip label="Gespeichert" accent="green" />}
             </View>
             <View style={styles.editorShell}>
               <View style={styles.lineRail}>
@@ -352,14 +372,14 @@ export default function WorkspaceScreen() {
               />
             </View>
             <View style={styles.editorAction}>
-              <PrimaryButton icon="square.and.pencil" label="Entwurf speichern" onPress={saveDraft} disabled={!selectedFile.changed} />
+              <GlowButton accent="cyan" label="Entwurf speichern" onPress={saveDraft} disabled={!selectedFile.changed} />
             </View>
             {hasAttachedRepository ? (
                 <View style={styles.gitBar}>
                   <View style={styles.gitBarHeader}><Text style={styles.gitBarEyebrow}>GIT-ÄNDERUNGEN</Text><Text style={styles.gitBarCount}>{changedFileCount ? `${changedFileCount} Datei(en) bereit` : "Keine lokalen Änderungen"}</Text></View>
                   {syncState.offlineDraftCount ? <Text style={[styles.gitHint, syncState.hasConflictRisk && styles.conflictWarning]}>{syncState.hasConflictRisk ? `Möglicher Konflikt: ${settings.branch} hat neue Remote-Commits. Prüfe Diff und ziehe den Branch vor dem Commit ab.` : remoteCheckAvailable ? "Offline-Entwürfe: Diese Änderungen wurden seit dem letzten Remote-Abgleich noch nicht synchronisiert." : "Offline-Entwürfe: Der Remote-Abgleich ist derzeit nicht verfügbar."}</Text> : null}
                   {diffSummaries.length ? <View style={styles.diffPreview}><Text style={styles.diffPreviewTitle}>SYNCHRONISIERUNGSVORSCHAU</Text>{diffSummaries.slice(0, 4).map((summary) => <View key={summary.path} style={styles.diffRow}><Text numberOfLines={1} style={styles.diffPath}>{summary.path}</Text><Text style={styles.diffCounts}>+{summary.addedLines} / −{summary.removedLines}</Text>{(() => { try { const a = assessConflict({ path: summary.path, localHash: summary.path + "-local", remoteHash: summary.path + "-remote", baseHash: null }); return a.safeAutoResolve ? null : <Text style={styles.conflictKind}>manuell</Text>; } catch { return null; } })()}</View>)}{diffSummaries.length > 4 ? <Text style={styles.diffMore}>+ {diffSummaries.length - 4} weitere Datei(en)</Text> : null}</View> : changedRemoteFiles.length ? <Text style={styles.gitHint}>Dateiinhalte werden geladen, bevor eine zeilenbasierte Vorschau möglich ist.</Text> : null}
-                  <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor="#718196" style={styles.commitInput} value={commitMessage} />
+                  <TextInput accessibilityLabel="Commit-Nachricht" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setCommitMessage(value); if (gitAction !== "pushing") setGitAction("idle"); }} placeholder="Beschreibe deine Änderung" placeholderTextColor={glassSurface.textMuted} style={styles.commitInput} value={commitMessage} />
                 <View style={styles.gitActions}>
                   <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing"} onPress={() => void commitChanges()} style={[styles.gitActionButton, styles.commitButton, (!changedFileCount || commitMessage.trim().length < 3 || gitAction === "saving" || gitAction === "committing" || gitAction === "pushing") && styles.gitActionDisabled]}><Text style={styles.commitButtonText}>{gitAction === "saving" ? "Speichert …" : gitAction === "committing" ? "Commit …" : "Commit erstellen"}</Text></TouchableOpacity>
                   <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={gitAction !== "committed"} onPress={pushChanges} style={[styles.gitActionButton, styles.pushButton, gitAction !== "committed" && styles.gitActionDisabled]}><Text style={styles.pushButtonText}>{gitAction === "pushing" ? "Push …" : currentBranchIsProtected ? "Push bestätigen" : "Push zu GitHub"}</Text></TouchableOpacity>
@@ -369,25 +389,26 @@ export default function WorkspaceScreen() {
                   <View style={styles.pullRequestBar}>
                     <Text style={styles.pullRequestEyebrow}>PULL REQUEST</Text>
                     <Text style={styles.pullRequestHint}>Erstelle aus <Text style={styles.branchInline}>{settings.branch}</Text> einen Pull Request in den Zielbranch.</Text>
-                    <TextInput accessibilityLabel="Pull-Request-Titel" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setPullRequestTitle(value); if (pullRequestState !== "creating") setPullRequestState("idle"); }} placeholder="Pull-Request-Titel" placeholderTextColor="#718196" style={styles.commitInput} value={pullRequestTitle} />
-                    <TextInput accessibilityLabel="Zielbranch des Pull Requests" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setPullRequestBase(value); if (pullRequestState !== "creating") setPullRequestState("idle"); }} placeholder="main" placeholderTextColor="#718196" style={[styles.commitInput, styles.pullRequestInput]} value={pullRequestBase} />
-                    <TextInput accessibilityLabel="Pull-Request-Beschreibung" autoCapitalize="sentences" multiline onChangeText={setPullRequestBody} placeholder="Optionale Beschreibung" placeholderTextColor="#718196" style={[styles.commitInput, styles.pullRequestBody]} textAlignVertical="top" value={pullRequestBody} />
+                    <TextInput accessibilityLabel="Pull-Request-Titel" autoCapitalize="sentences" autoCorrect onChangeText={(value) => { setPullRequestTitle(value); if (pullRequestState !== "creating") setPullRequestState("idle"); }} placeholder="Pull-Request-Titel" placeholderTextColor={glassSurface.textMuted} style={styles.commitInput} value={pullRequestTitle} />
+                    <TextInput accessibilityLabel="Zielbranch des Pull Requests" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setPullRequestBase(value); if (pullRequestState !== "creating") setPullRequestState("idle"); }} placeholder="main" placeholderTextColor={glassSurface.textMuted} style={[styles.commitInput, styles.pullRequestInput]} value={pullRequestBase} />
+                    <TextInput accessibilityLabel="Pull-Request-Beschreibung" autoCapitalize="sentences" multiline onChangeText={setPullRequestBody} placeholder="Optionale Beschreibung" placeholderTextColor={glassSurface.textMuted} style={[styles.commitInput, styles.pullRequestBody]} textAlignVertical="top" value={pullRequestBody} />
                     <TouchableOpacity accessibilityRole="button" activeOpacity={0.75} disabled={pullRequestState === "creating" || pullRequestState === "created" || pullRequestTitle.trim().length < 3 || pullRequestBase.trim() === settings.branch} onPress={() => void createPullRequest()} style={[styles.pullRequestButton, (pullRequestState === "creating" || pullRequestState === "created" || pullRequestTitle.trim().length < 3 || pullRequestBase.trim() === settings.branch) && styles.gitActionDisabled]}><Text style={styles.pullRequestButtonText}>{pullRequestState === "creating" ? "Pull Request wird erstellt …" : pullRequestState === "created" ? "Pull Request erstellt" : "Pull Request erstellen"}</Text></TouchableOpacity>
                     {pullRequestFeedback ? <Text style={[styles.gitFeedback, pullRequestState === "error" ? styles.gitFeedbackError : styles.gitFeedbackSuccess]}>{pullRequestFeedback}</Text> : null}
                   </View>
                 ) : null}
               </View>
             ) : null}
-            <StudioSection label="Console" title="Aktiver Kontext" />
+            <Text style={styles.sectionLabel}>CONSOLE</Text>
+            <Text style={styles.sectionTitle}>Aktiver Kontext</Text>
             <View style={styles.consoleCard}>
               <View style={styles.consolePrompt}>
-                <IconSymbol name="terminal.fill" size={16} color={colors.success} />
+                <IconSymbol name="terminal.fill" size={16} color={glassPalette.green} />
                 <Text style={styles.consolePromptText}>workspace:{settings.branch}</Text>
               </View>
               <Text style={styles.consoleText}>{hasAttachedRepository ? `Verbunden mit ${repositoryLabel} auf ${settings.branch}.` : "Sichere Remote-Verbindung noch nicht konfiguriert."}</Text>
               <TouchableOpacity activeOpacity={0.75} onPress={() => router.push("/settings" as never)} style={styles.consoleLink}>
                 <Text style={styles.consoleLinkText}>Verbindung einrichten</Text>
-                <IconSymbol name="arrow.right" size={14} color={colors.tint} />
+                <IconSymbol name="arrow.right" size={14} color={glassPalette.cyan} />
               </TouchableOpacity>
             </View>
           </>
@@ -407,21 +428,22 @@ export default function WorkspaceScreen() {
               style={[styles.fileRow, isSelected && styles.fileRowSelected]}
             >
               <View style={[styles.fileIcon, isSelected && styles.fileIconSelected]}>
-                <IconSymbol name="doc.text.fill" size={16} color={isSelected ? colors.tint : "#8B9AAE"} />
+                <IconSymbol name="doc.text.fill" size={16} color={isSelected ? glassPalette.cyan : glassSurface.textSecondary} />
               </View>
               <View style={styles.fileTextArea}>
                 <Text style={[styles.fileName, isSelected && styles.fileNameSelected]}>{item.name}</Text>
                 <Text numberOfLines={1} style={styles.filePath}>{item.path}</Text>
               </View>
               {item.changed ? <View style={styles.changedDot} /> : null}
-              <IconSymbol name="chevron.right" size={17} color={isSelected ? colors.tint : "#647388"} />
+              <IconSymbol name="chevron.right" size={17} color={isSelected ? glassPalette.cyan : glassSurface.textMuted} />
             </TouchableOpacity>
           );
         }}
         showsVerticalScrollIndicator={false}
       />
       <DiffConfirmationSheet onCancel={() => setPendingGuidanceStep(null)} onConfirm={confirmGuidanceAction} previews={detailedDiffPreviews} step={pendingGuidanceStep} visible={Boolean(pendingGuidanceStep)} />
-    </ScreenContainer>
+      </ScreenContainer>
+    </GlassBackdrop>
   );
 }
 
@@ -434,8 +456,6 @@ function formatCommitDate(value: string) {
 }
 
 function RepositoryQualityPanel({ quality }: { quality: RepositoryQuality }) {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]);
   const mergeTone = getQualityTone(styles, quality.merge.state);
   const ciTone = getQualityTone(styles, quality.ci.state);
   return (
@@ -459,135 +479,144 @@ function getQualityTone(styles: ReturnType<typeof createStyles>, state: string) 
   return { container: styles.qualityNeutral, dot: styles.dotNeutral, text: styles.textNeutral };
 }
 
-function createStyles(colors: ReturnType<typeof useColors>) {
+function createStyles() {
   return StyleSheet.create({
+  headerRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
+  headerCopy: { flex: 1 },
+  eyebrow: { ...glassType.label, color: glassPalette.cyan },
+  screenTitle: { ...glassType.display, color: glassSurface.textPrimary, marginTop: 4 },
+  headerAction: { alignItems: "center", borderRadius: 10, height: 36, justifyContent: "center", width: 36 },
+  sectionLabel: { ...glassType.label, color: glassSurface.textMuted, marginTop: 18 },
+  sectionTitle: { ...glassType.headline, color: glassSurface.textPrimary, marginTop: 2 },
   content: { paddingBottom: 20 },
-  projectCard: { backgroundColor: "#121A26", borderColor: "#2A3B52", borderRadius: 18, borderWidth: 1, marginBottom: 26, padding: 15 },
+  projectCard: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 18, borderWidth: 1, marginBottom: 26, padding: 15 },
   projectTopLine: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   projectIdentity: { alignItems: "center", flexDirection: "row", gap: 10, flex: 1, marginRight: 8 },
-  projectIcon: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.1), borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
-  projectName: { color: "#F1F5FA", fontSize: 15, fontWeight: "800", marginBottom: 2 },
-  projectPath: { color: "#8493A7", fontSize: 12 },
-  projectFooter: { alignItems: "center", borderTopColor: "#26364B", borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", marginTop: 14, paddingTop: 12 },
-  projectState: { color: "#9BABBE", fontSize: 12 },
-  healthPanel: { backgroundColor: "#101B22", borderColor: withAlpha(colors.tint, 0.2), borderRadius: 16, borderWidth: 1, marginBottom: 25, marginTop: -12, padding: 13 },
-  healthPanelError: { backgroundColor: darken(colors.error, 0.85), borderColor: darken(colors.error, 0.62) },
+  projectIcon: { alignItems: "center", backgroundColor: withAlpha(glassPalette.cyan, 0.1), borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
+  projectName: { color: glassSurface.textPrimary, fontSize: 15, fontWeight: "800", marginBottom: 2 },
+  projectPath: { color: glassSurface.textMuted, fontSize: 12 },
+  projectFooter: { alignItems: "center", borderTopColor: glassSurface.border, borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", marginTop: 14, paddingTop: 12 },
+  projectState: { color: glassSurface.textSecondary, fontSize: 12 },
+  healthPanel: { backgroundColor: glassDepth.layer, borderColor: withAlpha(glassPalette.cyan, 0.2), borderRadius: 16, borderWidth: 1, marginBottom: 25, marginTop: -12, padding: 13 },
+  healthPanelError: { backgroundColor: darken(glassPalette.red, 0.85), borderColor: darken(glassPalette.red, 0.62) },
   healthHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  healthEyebrow: { color: "#7AA6B0", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
-  healthTitle: { color: "#E8F5F8", fontSize: 14, fontWeight: "800" },
-  healthDetail: { color: "#9BB2BD", fontSize: 11, lineHeight: 17, marginTop: 9 },
+  healthEyebrow: { color: glassSurface.textSecondary, fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
+  healthTitle: { color: glassSurface.textPrimary, fontSize: 14, fontWeight: "800" },
+  healthDetail: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 9 },
   healthButtonDisabled: { opacity: 0.55 },
-  repositoryPanel: { backgroundColor: "#101925", borderColor: "#293B51", borderRadius: 17, borderWidth: 1, marginBottom: 25, padding: 14 },
+  repositoryPanel: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 17, borderWidth: 1, marginBottom: 25, padding: 14 },
   repositoryHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  repositoryEyebrow: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
-  repositoryTitle: { color: "#EDF5FC", fontSize: 16, fontWeight: "800" },
-  refreshButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.25), borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
-  refreshButtonText: { color: lighten(colors.tint, 0.15), fontSize: 11, fontWeight: "800" },
-  repositoryHint: { color: "#91A1B5", fontSize: 12, lineHeight: 17, marginTop: 10 },
+  repositoryEyebrow: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 3 },
+  repositoryTitle: { color: glassSurface.textPrimary, fontSize: 16, fontWeight: "800" },
+  refreshButton: { alignItems: "center", backgroundColor: withAlpha(glassPalette.cyan, 0.1), borderColor: withAlpha(glassPalette.cyan, 0.25), borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
+  refreshButtonText: { color: lighten(glassPalette.cyan, 0.15), fontSize: 11, fontWeight: "800" },
+  repositoryHint: { color: glassSurface.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 10 },
   branchList: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 12 },
-  branchChip: { alignItems: "center", backgroundColor: "#172130", borderColor: "#33445B", borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
-  branchChipSelected: { backgroundColor: withAlpha(colors.tint, 0.1), borderColor: colors.tint },
-  branchChipText: { color: "#A6B5C6", fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
-  branchChipTextSelected: { color: lighten(colors.tint, 0.3) },
-  commitDivider: { backgroundColor: "#26384D", height: 1, marginTop: 16 },
-  commitLabel: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 8, marginTop: 14 },
+  branchChip: { alignItems: "center", backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
+  branchChipSelected: { backgroundColor: withAlpha(glassPalette.cyan, 0.1), borderColor: glassPalette.cyan },
+  branchChipText: { color: glassSurface.textSecondary, fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
+  branchChipTextSelected: { color: lighten(glassPalette.cyan, 0.3) },
+  commitDivider: { backgroundColor: glassSurface.border, height: 1, marginTop: 16 },
+  commitLabel: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 1.1, marginBottom: 8, marginTop: 14 },
   commitRow: { alignItems: "center", flexDirection: "row", gap: 9, marginTop: 10 },
-  commitHash: { backgroundColor: withAlpha(colors.tint, 0.12), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
-  commitHashText: { color: lighten(colors.tint, 0.12), fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
+  commitHash: { backgroundColor: withAlpha(glassPalette.cyan, 0.12), borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
+  commitHashText: { color: lighten(glassPalette.cyan, 0.12), fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
   commitTextArea: { flex: 1 },
-  commitMessage: { color: "#DDE7F1", fontSize: 12, fontWeight: "700" },
-  commitMeta: { color: "#7B8B9E", fontSize: 11, marginTop: 2 },
-  emptyRepositoryText: { color: "#8293A8", fontSize: 12, marginTop: 7 },
-  repositoryError: { color: colors.error, fontSize: 12, lineHeight: 17, marginTop: 12 },
-  qualityDivider: { backgroundColor: "#26384D", height: 1, marginTop: 17 },
+  commitMessage: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "700" },
+  commitMeta: { color: glassSurface.textMuted, fontSize: 11, marginTop: 2 },
+  emptyRepositoryText: { color: glassSurface.textMuted, fontSize: 12, marginTop: 7 },
+  repositoryError: { color: glassPalette.red, fontSize: 12, lineHeight: 17, marginTop: 12 },
+  qualityDivider: { backgroundColor: glassSurface.border, height: 1, marginTop: 17 },
   qualityHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 9, marginTop: 14 },
-  qualityLabel: { color: "#7C8EA6", fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
-  qualityRefreshButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.25), borderRadius: 9, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
-  qualityRefresh: { color: lighten(colors.tint, 0.15), fontSize: 10, fontWeight: "800" },
-  qualityPanel: { backgroundColor: "#0C131E", borderColor: "#263950", borderRadius: 13, borderWidth: 1, padding: 11 },
+  qualityLabel: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
+  qualityRefreshButton: { alignItems: "center", backgroundColor: withAlpha(glassPalette.cyan, 0.1), borderColor: withAlpha(glassPalette.cyan, 0.25), borderRadius: 9, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
+  qualityRefresh: { color: lighten(glassPalette.cyan, 0.15), fontSize: 10, fontWeight: "800" },
+  qualityPanel: { backgroundColor: glassDepth.deep, borderColor: glassSurface.border, borderRadius: 13, borderWidth: 1, padding: 11 },
   qualityPillRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   qualityPill: { alignItems: "center", borderRadius: 9, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 8, paddingVertical: 6 },
   qualityPillText: { fontSize: 11, fontWeight: "800" },
   qualityDot: { borderRadius: 4, height: 7, width: 7 },
-  qualityReady: { backgroundColor: withAlpha(colors.success, 0.11), borderColor: withAlpha(colors.success, 0.4) },
+  qualityReady: { backgroundColor: withAlpha(glassPalette.green, 0.11), borderColor: withAlpha(glassPalette.green, 0.4) },
   qualityFailure: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.42)" },
   qualityWarning: { backgroundColor: "rgba(246,186,94,0.10)", borderColor: "rgba(246,186,94,0.38)" },
   qualityNeutral: { backgroundColor: "rgba(140,157,181,0.10)", borderColor: "rgba(140,157,181,0.3)" },
-  dotReady: { backgroundColor: colors.success },
-  dotFailure: { backgroundColor: colors.error },
-  dotWarning: { backgroundColor: colors.warning },
-  dotNeutral: { backgroundColor: "#8A9BB0" },
-  textReady: { color: colors.success },
-  textFailure: { color: colors.error },
-  textWarning: { color: colors.warning },
-  textNeutral: { color: "#A2B1C2" },
-  qualityPrText: { color: "#B0BFCE", fontSize: 11, lineHeight: 16, marginTop: 10 },
+  dotReady: { backgroundColor: glassPalette.green },
+  dotFailure: { backgroundColor: glassPalette.red },
+  dotWarning: { backgroundColor: glassPalette.amber },
+  dotNeutral: { backgroundColor: glassSurface.textSecondary },
+  textReady: { color: glassPalette.green },
+  textFailure: { color: glassPalette.red },
+  textWarning: { color: glassPalette.amber },
+  textNeutral: { color: glassSurface.textSecondary },
+  qualityPrText: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 10 },
   qualityMetrics: { flexDirection: "row", gap: 13, marginTop: 10 },
   reviewMetrics: { flexDirection: "row", flexWrap: "wrap", gap: 11, marginTop: 9 },
-  qualityMetric: { color: "#8294A8", fontSize: 11 },
-  reviewMetric: { color: "#AAB8C8", fontSize: 11 },
-  reviewMetricApproved: { color: colors.success, fontSize: 11 },
-  reviewMetricChanges: { color: colors.warning, fontSize: 11 },
-  qualityMetricStrong: { color: "#DFE9F5", fontWeight: "800" },
-  checkRow: { alignItems: "center", borderTopColor: "#1E2B3B", borderTopWidth: 1, flexDirection: "row", gap: 7, marginTop: 9, paddingTop: 9 },
+  qualityMetric: { color: glassSurface.textMuted, fontSize: 11 },
+  reviewMetric: { color: glassSurface.textSecondary, fontSize: 11 },
+  reviewMetricApproved: { color: glassPalette.green, fontSize: 11 },
+  reviewMetricChanges: { color: glassPalette.amber, fontSize: 11 },
+  qualityMetricStrong: { color: glassSurface.textPrimary, fontWeight: "800" },
+  checkRow: { alignItems: "center", borderTopColor: glassSurface.border, borderTopWidth: 1, flexDirection: "row", gap: 7, marginTop: 9, paddingTop: 9 },
   checkDot: { borderRadius: 4, height: 7, width: 7 },
-  checkName: { color: "#C2CFDC", flex: 1, fontSize: 11, fontWeight: "700" },
-  checkState: { color: "#8294A8", fontFamily: codeFont, fontSize: 10 },
-  qualityEmpty: { color: "#8192A7", fontSize: 11, lineHeight: 16, marginTop: 10 },
+  checkName: { color: glassSurface.textSecondary, flex: 1, fontSize: 11, fontWeight: "700" },
+  checkState: { color: glassSurface.textMuted, fontFamily: codeFont, fontSize: 10 },
+  qualityEmpty: { color: glassSurface.textMuted, fontSize: 11, lineHeight: 16, marginTop: 10 },
   fileRow: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 10, marginBottom: 5, padding: 10 },
-  fileRowSelected: { backgroundColor: "#172A39" },
-  fileIcon: { alignItems: "center", backgroundColor: "#1A2433", borderRadius: 9, height: 33, justifyContent: "center", width: 33 },
-  fileIconSelected: { backgroundColor: withAlpha(colors.tint, 0.12) },
+  fileRowSelected: { backgroundColor: glassDepth.layer },
+  fileIcon: { alignItems: "center", backgroundColor: glassDepth.layer, borderRadius: 9, height: 33, justifyContent: "center", width: 33 },
+  fileIconSelected: { backgroundColor: withAlpha(glassPalette.cyan, 0.12) },
   fileTextArea: { flex: 1 },
-  fileName: { color: "#CCD7E4", fontSize: 13, fontWeight: "700", marginBottom: 2 },
-  fileNameSelected: { color: "#F5FAFF" },
-  filePath: { color: "#758499", fontSize: 11 },
-  changedDot: { backgroundColor: colors.warning, borderRadius: 4, height: 7, width: 7 },
+  fileName: { color: glassSurface.textSecondary, fontSize: 13, fontWeight: "700", marginBottom: 2 },
+  fileNameSelected: { color: glassSurface.textPrimary },
+  filePath: { color: glassSurface.textMuted, fontSize: 11 },
+  changedDot: { backgroundColor: glassPalette.amber, borderRadius: 4, height: 7, width: 7 },
   editorHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 11, marginTop: 21 },
   editorFileIdentity: { alignItems: "center", flexDirection: "row", flex: 1, gap: 9, marginRight: 8 },
-  editorFileName: { color: "#EAF1F9", fontSize: 13, fontWeight: "800", marginBottom: 2 },
-  editorPath: { color: "#758499", fontSize: 10 },
-  editorShell: { backgroundColor: "#0C1118", borderColor: "#27364A", borderRadius: 16, borderWidth: 1, flexDirection: "row", minHeight: 178, overflow: "hidden" },
-  lineRail: { backgroundColor: "#101923", paddingHorizontal: 11, paddingTop: 13 },
-  lineNumber: { color: "#526275", fontFamily: codeFont, fontSize: 11, lineHeight: 19, textAlign: "right" },
-  codeInput: { color: "#DDE8F4", flex: 1, fontFamily: codeFont, fontSize: 12, lineHeight: 19, minHeight: 176, padding: 13 },
+  editorFileName: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800", marginBottom: 2 },
+  editorPath: { color: glassSurface.textMuted, fontSize: 10 },
+  editorShell: { backgroundColor: glassDepth.deep, borderColor: glassSurface.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", minHeight: 178, overflow: "hidden" },
+  lineRail: { backgroundColor: glassDepth.layer, paddingHorizontal: 11, paddingTop: 13 },
+  lineNumber: { color: glassSurface.textMuted, fontFamily: codeFont, fontSize: 11, lineHeight: 19, textAlign: "right" },
+  codeInput: { color: glassSurface.textPrimary, flex: 1, fontFamily: codeFont, fontSize: 12, lineHeight: 19, minHeight: 176, padding: 13 },
   editorAction: { marginBottom: 29, marginTop: 12 },
-  gitBar: { backgroundColor: "#101A26", borderColor: "#2B3E55", borderRadius: 16, borderWidth: 1, marginBottom: 28, padding: 13 },
+  gitBar: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 16, borderWidth: 1, marginBottom: 28, padding: 13 },
   gitBarHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  gitBarEyebrow: { color: "#7B90A8", fontSize: 10, fontWeight: "900", letterSpacing: 1.05 },
-  gitBarCount: { color: "#9FCBDA", fontSize: 11, fontWeight: "700" },
-  diffPreview: { backgroundColor: "#0B141D", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 11, borderWidth: 1, marginBottom: 10, padding: 10 },
-  diffPreviewTitle: { color: "#7794AB", fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: 4 },
-  diffRow: { alignItems: "center", borderTopColor: "#1B2D3D", borderTopWidth: 1, flexDirection: "row", gap: 9, justifyContent: "space-between", paddingVertical: 6 },
-  diffPath: { color: "#C6D9E9", flex: 1, fontFamily: codeFont, fontSize: 10, fontWeight: "700" },
-  diffCounts: { color: colors.success, fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
-  diffMore: { color: "#8C9FB2", fontSize: 10, marginTop: 4 }, conflictKind: { color: colors.warning, fontSize: 9, fontWeight: "900", marginLeft: 6 },
-  commitInput: { backgroundColor: "#0C131E", borderColor: "#2B3C52", borderRadius: 11, borderWidth: 1, color: "#E7F0F9", fontSize: 13, minHeight: 44, paddingHorizontal: 11, paddingVertical: 9 },
+  gitBarEyebrow: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 1.05 },
+  gitBarCount: { color: glassSurface.textPrimary, fontSize: 11, fontWeight: "700" },
+  diffPreview: { backgroundColor: glassDepth.deep, borderColor: withAlpha(glassPalette.cyan, 0.16), borderRadius: 11, borderWidth: 1, marginBottom: 10, padding: 10 },
+  diffPreviewTitle: { color: glassSurface.textSecondary, fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: 4 },
+  diffRow: { alignItems: "center", borderTopColor: glassSurface.border, borderTopWidth: 1, flexDirection: "row", gap: 9, justifyContent: "space-between", paddingVertical: 6 },
+  diffPath: { color: glassSurface.textSecondary, flex: 1, fontFamily: codeFont, fontSize: 10, fontWeight: "700" },
+  diffCounts: { color: glassPalette.green, fontFamily: codeFont, fontSize: 10, fontWeight: "800" },
+  diffMore: { color: glassSurface.textSecondary, fontSize: 10, marginTop: 4 }, conflictKind: { color: glassPalette.amber, fontSize: 9, fontWeight: "900", marginLeft: 6 },
+  commitInput: { backgroundColor: glassDepth.deep, borderColor: glassSurface.border, borderRadius: 11, borderWidth: 1, color: glassSurface.textPrimary, fontSize: 13, minHeight: 44, paddingHorizontal: 11, paddingVertical: 9 },
   gitActions: { flexDirection: "row", gap: 8, marginTop: 10 },
   gitActionButton: { alignItems: "center", borderRadius: 11, flex: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
-  commitButton: { backgroundColor: "#22314A", borderColor: "#6678A8", borderWidth: 1 },
-  pushButton: { backgroundColor: withAlpha(colors.tint, 0.3), borderColor: colors.tint, borderWidth: 1 },
+  commitButton: { backgroundColor: glassDepth.layer, borderColor: glassSurface.textSecondary, borderWidth: 1 },
+  pushButton: { backgroundColor: withAlpha(glassPalette.cyan, 0.3), borderColor: glassPalette.cyan, borderWidth: 1 },
   gitActionDisabled: { opacity: 0.45 },
-  commitButtonText: { color: lighten(colors.tint, 0.35), fontSize: 12, fontWeight: "800" },
-  pushButtonText: { color: "#ECFBFF", fontSize: 12, fontWeight: "800" },
+  commitButtonText: { color: lighten(glassPalette.cyan, 0.35), fontSize: 12, fontWeight: "800" },
+  pushButtonText: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "800" },
   gitFeedback: { fontSize: 12, lineHeight: 17, marginTop: 10 },
-  gitFeedbackSuccess: { color: colors.success },
-  gitFeedbackError: { color: colors.error },
-  gitHint: { color: "#8294AA", fontSize: 11, lineHeight: 16, marginTop: 10 },
-  conflictWarning: { color: colors.warning, fontWeight: "800" },
-  pullRequestBar: { borderTopColor: "#2B3E55", borderTopWidth: 1, marginTop: 14, paddingTop: 14 },
-  pullRequestEyebrow: { color: lighten(colors.tint, 0.12), fontSize: 10, fontWeight: "900", letterSpacing: 1.05, marginBottom: 5 },
-  pullRequestHint: { color: "#94A4B8", fontSize: 11, lineHeight: 16, marginBottom: 9 },
-  branchInline: { color: "#B9EFFF", fontFamily: codeFont, fontWeight: "800" },
+  gitFeedbackSuccess: { color: glassPalette.green },
+  gitFeedbackError: { color: glassPalette.red },
+  gitHint: { color: glassSurface.textMuted, fontSize: 11, lineHeight: 16, marginTop: 10 },
+  conflictWarning: { color: glassPalette.amber, fontWeight: "800" },
+  pullRequestBar: { borderTopColor: glassSurface.border, borderTopWidth: 1, marginTop: 14, paddingTop: 14 },
+  pullRequestEyebrow: { color: lighten(glassPalette.cyan, 0.12), fontSize: 10, fontWeight: "900", letterSpacing: 1.05, marginBottom: 5 },
+  pullRequestHint: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16, marginBottom: 9 },
+  branchInline: { color: glassSurface.textPrimary, fontFamily: codeFont, fontWeight: "800" },
   pullRequestInput: { marginTop: 8 },
   pullRequestBody: { marginTop: 8, minHeight: 76 },
-  pullRequestButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.22), borderColor: colors.tint, borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 10, minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
-  pullRequestButtonText: { color: "#F3F1FF", fontSize: 12, fontWeight: "900" },
-  consoleCard: { backgroundColor: "#0F161F", borderColor: "#243347", borderRadius: 16, borderWidth: 1, padding: 14 },
+  pullRequestButton: { alignItems: "center", backgroundColor: withAlpha(glassPalette.cyan, 0.22), borderColor: glassPalette.cyan, borderRadius: 11, borderWidth: 1, justifyContent: "center", marginTop: 10, minHeight: 44, paddingHorizontal: 8, paddingVertical: 11 },
+  pullRequestButtonText: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "900" },
+  consoleCard: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 16, borderWidth: 1, padding: 14 },
   consolePrompt: { alignItems: "center", flexDirection: "row", gap: 7, marginBottom: 9 },
-  consolePromptText: { color: colors.success, fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
-  consoleText: { color: "#A2B0C1", fontFamily: codeFont, fontSize: 12, lineHeight: 18 },
+  consolePromptText: { color: glassPalette.green, fontFamily: codeFont, fontSize: 11, fontWeight: "700" },
+  consoleText: { color: glassSurface.textSecondary, fontFamily: codeFont, fontSize: 12, lineHeight: 18 },
   consoleLink: { alignItems: "center", flexDirection: "row", gap: 6, marginTop: 12, minHeight: 44 },
-  consoleLinkText: { color: colors.tint, fontSize: 12, fontWeight: "800" },
+  consoleLinkText: { color: glassPalette.cyan, fontSize: 12, fontWeight: "800" },
   });
 }
+
+const styles = createStyles();
