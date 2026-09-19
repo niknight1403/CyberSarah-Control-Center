@@ -20,7 +20,8 @@
 
 export type ProjectKind =
   | "pong" | "snake" | "breakout" | "flappy"
-  | "todo" | "notes" | "calculator" | "timer";
+  | "todo" | "notes" | "calculator" | "timer"
+  | "custom"; // Sprint 166: eigene Idee -> freier LLM-Codegenerator (Stufe 2)
 
 export interface ProjectSpec {
   kind: ProjectKind;
@@ -47,6 +48,7 @@ export interface ArtifactEnhancement {
 export const MAX_FIX_ITERATIONS = 3;
 
 export const PROJECT_CATALOG: Record<ProjectKind, { label: string; description: string }> = {
+  custom: { label: "Custom-Spiel", description: "Eigene Spielidee — freier LLM-Codegenerator (Stufe 2), offline-faehig ueber Template-Fallback." },
   pong: { label: "Pong (Arcade)", description: "Klassisches 2-Spieler-Pong mit Touch/Keyboard-Steuerung." },
   snake: { label: "Snake (Arcade)", description: "Schlange mit Highscore (localStorage), wachsender Schwierigkeit." },
   breakout: { label: "Breakout (Arcade)", description: "Brick-Breaker mit Leben, Level und Punktestand." },
@@ -449,6 +451,7 @@ export function buildArtifact(spec: ProjectSpec, enhancement: ArtifactEnhancemen
     notes: { title: "Notizen", tagline: "Schreiben — der Rest speichert sich selbst." },
     calculator: { title: "Taschenrechner", tagline: "Buttons oder Tastatur — Kettenrechnung inklusive." },
     timer: { title: "Stoppuhr", tagline: "Start, Pause, Reset — auf die Zehntelsekunde." },
+    custom: { title: "Custom-Spiel", tagline: "Freier LLM-Codegenerator (Stufe 2)." },
   };
   const merged: ArtifactEnhancement = { ...defaults[spec.kind], ...cleanEnhancement(enhancement) };
 
@@ -477,6 +480,10 @@ export function buildArtifact(spec: ProjectSpec, enhancement: ArtifactEnhancemen
     case "timer": return htmlShell(merged,
       `<div id="clock" class="score" style="font-size:3rem;font-variant-numeric:tabular-nums">00:00.0</div>
 <div class="row"><button id="start">Start</button><button id="pause" class="secondary">Pause</button><button id="reset" class="secondary">Reset</button></div>`, TIMER_SCRIPT);
+    case "custom":
+      // Custom-Spiele laufen ueber die eigene Pipeline (server/custom-game.ts):
+      // buildArtifact wird fuer den echten Custom-Fall nie mit kind=custom gerufen.
+      throw new Error("CUSTOM_UEBER_EIGENE_PIPELINE: server/custom-game.ts generiert Custom-Spiele.");
   }
 }
 

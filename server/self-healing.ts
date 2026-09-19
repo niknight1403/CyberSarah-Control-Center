@@ -20,7 +20,15 @@ import axios from "axios";
 import * as db from "./db";
 import { subscribeRuntimeLogs, getRuntimeLogs } from "./runtime-logger";
 import { runOrchestratorTask } from "./orchestrator/superagent";
-import { applyLiveFix, describeLiveFix, planLiveFix, type LiveFixOutcome } from "../lib/live-fix-logic";
+import {
+  applyLiveFix,
+  describeLiveFix,
+  noteIncidentOccurrence,
+  planLiveFix,
+  type LiveFixOutcome,
+} from "../lib/live-fix-logic";
+import { invalidateProviderKeyCache } from "./provider-admin";
+import { probeLocalProviders } from "./model-router";
 import { resetBackupWatchState } from "./backup-watch";
 import { clearRuntimeLogs } from "./runtime-logger";
 import { sendOpsDiscordAlert } from "./ops-alerts";
@@ -146,10 +154,18 @@ async function handleAnomaly(
 ): Promise<void> {
   // Sprint 164 — DIREKTE Live-Behebung: sichere In-Prozess-Aktionen werden
   // sofort (vor jeder Analyse) ausgefuehrt und am Incident dokumentiert.
-  const liveFixPlan = planLiveFix(signature, evidence.join("\n"));
+  const occurrences = noteIncidentOccurrence(signature);
+  const liveFixPlan = planLiveFix(signature, evidence.join("\n"), occurrences);
   const liveFixOutcome: LiveFixOutcome = await applyLiveFix(liveFixPlan, {
     restartBackupWatcher: resetBackupWatchState,
     purgeLogBuffer: clearRuntimeLogs,
+    // Sprint 166: erweiterte, risikofreie Live-Fix-Ziele.
+    invalidateRuntimeCaches: () => invalidateProviderKeyCache(),
+    restartSubsystem: async (reason: string) => {
+      console.warn(`[self-healing] Watchdog-Neustart des Model-Router-Probes: ${reason}`);
+      await probeLocalProviders(); // nicht-kritisch: re-Probe localer Provider (0 EUR)
+      return true;
+    },
   });
   if (liveFixOutcome.applied) {
     console.log(`[self-healing] ${describeLiveFix(liveFixOutcome)}`);

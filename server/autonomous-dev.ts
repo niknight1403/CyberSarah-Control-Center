@@ -233,7 +233,8 @@ function relativeToCwd(path: string): string {
   return path.startsWith(cwd) ? path.slice(cwd.length + 1) : path;
 }
 
-async function appendRunToLedger(run: AutonomousDevRun): Promise<void> {
+/** Haengt einen Run an das gemeinsame Ledger (auch custom-game nutzt es). */
+export async function appendRunToLedger(run: AutonomousDevRun): Promise<void> {
   try {
     const ledger = (await db.getModelRouterSetting<AutonomousDevRun[]>(LEDGER_KEY)) ?? [];
     ledger.unshift(run);

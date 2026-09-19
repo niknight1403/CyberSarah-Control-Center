@@ -131,6 +131,12 @@ async function writeKv(key: string, value: unknown): Promise<void> {
   await db.setModelRouterSetting(key, value);
 }
 
+/** Sprint 166 — Live-Fix-Ziel: Runtime-Key-Cache ehrlich neu aufbauen (In-Process). */
+export async function invalidateProviderKeyCache(): Promise<number> {
+  await refreshRuntimeCache();
+  return runtimeKeyCache.size;
+}
+
 async function refreshRuntimeCache(): Promise<void> {
   const store = await readKv<KeyStoreMap>(KV_KEYS.keyStore, {});
   runtimeKeyCache.clear();

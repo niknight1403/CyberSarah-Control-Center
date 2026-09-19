@@ -37,7 +37,11 @@ import {
   quarantineProvider,
 } from "../lib/live-fix-logic";
 
-const KINDS = Object.keys(PROJECT_CATALOG) as ProjectKind[];
+// 'custom' hat eine eigene Pipeline (server/custom-game.ts) und kein Template-HTML.
+const KINDS = (Object.keys(PROJECT_CATALOG) as ProjectKind[]).filter((kind) => kind !== "custom");
+
+/** Custom-Kind: existiert im Catalog, wird aber von der eigenen Pipeline bedient. */
+const CUSTOM_KIND = Object.keys(PROJECT_CATALOG) as ProjectKind[];
 
 describe("free-dev-stack (Zero-Cost-Garantie)", () => {
   it("waehlt mit Groq-Key den kostenlosen Gratis-Endpoint", () => {
@@ -86,6 +90,11 @@ describe("autonome Entwicklungs-Logik (Templates + Verifikation)", () => {
       expect(plan.maxFixIterations).toBeGreaterThan(0);
       expect(plan.slug).toMatch(/^[a-z0-9-]+$/);
     }
+  });
+
+  it("lehnt kind=custom bewusst ab (eigene Pipeline, kein Template-HTML)", () => {
+    expect(CUSTOM_KIND).toContain("custom");
+    expect(() => buildArtifact({ kind: "custom" })).toThrowError(/CUSTOM_UEBER_EIGENE_PIPELINE/);
   });
 
   it("erzeugt fuer jede Art ein vollstaendiges Standalone-HTML", () => {

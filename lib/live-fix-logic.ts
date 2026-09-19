@@ -23,7 +23,13 @@
 
 import type { AnomalySignatureId, SelfHealingIncident } from "./self-healing-logic";
 
-export type LiveFixActionId = "restart_backup_watcher" | "purge_log_buffer" | "quarantine_provider" | "none";
+export type LiveFixActionId =
+  | "restart_backup_watcher"
+  | "purge_log_buffer"
+  | "quarantine_provider"
+  | "invalidate_runtime_caches" // Sprint 166: Latenz/Stale -> In-Process-Caches verwerfen (reine Neuberechnung)
+  | "restart_subsystem" // Sprint 166: 3+ Wiederholungen -> Watchdog-Neustart EINES nicht-kritischen Subsystems
+  | "none";
 
 export interface LiveFixPlan {
   action: LiveFixActionId;
@@ -35,6 +41,10 @@ export interface LiveFixPlan {
 /** Standard-Quarantaene eines limitierten Providers (60s). */
 export const PROVIDER_QUARANTINE_MS = 60_000;
 
+/** Watchdog-Fenster: N Wiederholungen desselben Signatur-Incidents loesen den Subsystem-Neustart aus. */
+export const WATCHDOG_WINDOW_MS = 10 * 60_000;
+export const WATCHDOG_RESTART_THRESHOLD = 3;
+
 const LIMIT_PATTERN = /\b(429|rate.?limit|too many requests|quota|insufficient_quota|resource_exhausted)\b/i;
 const PROVIDER_PATTERN = /\b(groq|openrouter|gemini|cerebras|sambanova|github|forge|openai|ollama|lmstudio|together|huggingface|cloudflare)\b/i;
 
@@ -42,7 +52,7 @@ const PROVIDER_PATTERN = /\b(groq|openrouter|gemini|cerebras|sambanova|github|fo
  * Plant die sofortige Live-Fix-Aktion fuer einen Incident.
  * Reine Funktion — die Ausfuehrung passiert im Server-Adapter.
  */
-export function planLiveFix(signature: AnomalySignatureId, message: string): LiveFixPlan {
+export function planLiveFix(signature: AnomalySignatureId, message: string, occurrences: number = 1): LiveFixPlan {
   const text = message ?? "";
 
   if (LIMIT_PATTERN.test(text)) {
@@ -63,6 +73,18 @@ export function planLiveFix(signature: AnomalySignatureId, message: string): Liv
     return {
       action: "purge_log_buffer",
       reason: "Speicherdruck — Runtime-Log-Ringpuffer wird sofort freigegeben.",
+    };
+  }
+  if (signature === "api_timeout" || signature === "http_5xx") {
+    if (occurrences >= WATCHDOG_RESTART_THRESHOLD) {
+      return {
+        action: "restart_subsystem",
+        reason: `${occurrences} Wiederhol-Incidents (${signature}) in ${WATCHDOG_WINDOW_MS / 60_000} Min — Watchdog startet das betroffene, nicht-kritische Subsystem einzeln neu (kein Redeploy, kein Prozess-Neustart).`,
+      };
+    }
+    return {
+      action: "invalidate_runtime_caches",
+      reason: "Latenz-/Fehler-Signatur — In-Process-Runtime-Caches werden invalidiert (reine Neuberechnung, keine Datenverluste).",
     };
   }
   return { action: "none", reason: "Keine sichere In-Prozess-Live-Fix-Aktion definiert — Analyse-Pfad uebernimmt." };
@@ -102,6 +124,29 @@ export function getProviderQuarantineSnapshot(now: number = Date.now()): Array<{
 }
 
 // ---------------------------------------------------------------------------
+// Watchdog-Wiederholungszaehler (Sprint 166, In-Process, 10-Min-Fenster)
+// ---------------------------------------------------------------------------
+
+const signatureOccurrences = new Map<AnomalySignatureId, number[]>();
+
+/**
+ * Notiert einen Incident des Signatur-Typs und liefert die aktuelle
+ * Wiederholungsanzahl im WATCHDOG_WINDOW_MS-Fenster (fuer den Watchdog).
+ */
+export function noteIncidentOccurrence(signature: AnomalySignatureId, now: number = Date.now()): number {
+  const windowStart = now - WATCHDOG_WINDOW_MS;
+  const stamps = (signatureOccurrences.get(signature) ?? []).filter((t) => t >= windowStart);
+  stamps.push(now);
+  signatureOccurrences.set(signature, stamps);
+  return stamps.length;
+}
+
+/** Test-/Diagnose-Hook: leert die Wiederholungszaehler. */
+export function resetIncidentOccurrences(): void {
+  signatureOccurrences.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Ausfuehrung (Server-Adapter, gegen echte Subsysteme)
 // ---------------------------------------------------------------------------
 
@@ -119,13 +164,18 @@ export interface LiveFixOutcome {
 export async function applyLiveFix(
   plan: LiveFixPlan,
   actions: {
-    restartBackupWatcher: () => void;
-    purgeLogBuffer: () => number;
+    restartBackupWatcher?: () => void;
+    purgeLogBuffer?: () => number;
+    invalidateRuntimeCaches?: () => number | Promise<number>;
+    restartSubsystem?: (reason: string) => boolean | Promise<boolean>;
   },
 ): Promise<LiveFixOutcome> {
   switch (plan.action) {
     case "restart_backup_watcher":
       try {
+        if (!actions.restartBackupWatcher) {
+          return { action: plan.action, applied: false, detail: `${plan.reason} Kein Waechter-Reset angebunden.` };
+        }
         actions.restartBackupWatcher();
         return { action: plan.action, applied: true, detail: plan.reason };
       } catch (error) {
@@ -133,6 +183,9 @@ export async function applyLiveFix(
       }
     case "purge_log_buffer":
       try {
+        if (!actions.purgeLogBuffer) {
+          return { action: plan.action, applied: false, detail: `${plan.reason} Kein Log-Puffer angebunden.` };
+        }
         const purged = actions.purgeLogBuffer();
         return { action: plan.action, applied: true, detail: `${plan.reason} (${purged} Eintraege freigegeben.)` };
       } catch (error) {
@@ -141,6 +194,32 @@ export async function applyLiveFix(
     case "quarantine_provider":
       if (plan.provider) quarantineProvider(plan.provider);
       return { action: plan.action, applied: true, detail: plan.reason };
+    case "invalidate_runtime_caches":
+      try {
+        if (!actions.invalidateRuntimeCaches) {
+          return { action: plan.action, applied: false, detail: `${plan.reason} Kein Cache-Ziel angebunden — Watchdog-Flag dokumentiert.` };
+        }
+        const invalidated = await actions.invalidateRuntimeCaches();
+        return { action: plan.action, applied: true, detail: `${plan.reason} (${invalidated} Caches invalidiert.)` };
+      } catch (error) {
+        return { action: plan.action, applied: false, detail: `Cache-Invalidierung fehlgeschlagen: ${String(error)}` };
+      }
+    case "restart_subsystem":
+      try {
+        if (!actions.restartSubsystem) {
+          return { action: plan.action, applied: false, detail: `${plan.reason} Kein restartfaehiges nicht-kritisches Subsystem registriert — Watchdog-Flag bleibt dokumentiert, Analyse-Pfad uebernimmt.` };
+        }
+        const restarted = await actions.restartSubsystem(plan.reason);
+        return {
+          action: plan.action,
+          applied: restarted,
+          detail: restarted
+            ? plan.reason
+            : `${plan.reason} Kein restartfaehiges nicht-kritisches Subsystem registriert — Watchdog-Flag bleibt dokumentiert, Analyse-Pfad uebernimmt.`,
+        };
+      } catch (error) {
+        return { action: plan.action, applied: false, detail: `Subsystem-Neustart fehlgeschlagen: ${String(error)}` };
+      }
     default:
       return { action: "none", applied: false, detail: plan.reason };
   }

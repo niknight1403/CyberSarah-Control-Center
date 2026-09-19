@@ -7,8 +7,10 @@ import { trpc } from "@/lib/trpc";
 /**
  * Sprint 165 — Autonome Entwicklung: Admin-Karte.
  *
- * Der Administrator waehlt ein Template (Spiel/App), formuliert optional
- * einen Wunsch und startet die vollautonome 0-EUR-Entwicklung:
+ * Der Administrator waehlt ein Template (Spiel/App) — inklusive 'Custom-Spiel'
+ * (Stufe 2: eigene Idee -> freier LLM-Codegenerator) — formuliert optional
+ * einen Wunsch bzw. die Spielidee und startet die vollautonome
+ * 0-EUR-Entwicklung:
  * Plan -> freie LLM-Personalisierung -> node --check-Verifikation ->
  * Lieferung ins Workspace. Danach zeigt die Karte die letzten Laeufe.
  */
@@ -22,11 +24,12 @@ const KIND_LABELS = {
   notes: "Notizen",
   calculator: "Rechner",
   timer: "Timer",
+  custom: "Custom-Spiel (Idee)",
 } as const;
 
 export function AutonomousDevCard({ isAdmin }: { isAdmin: boolean }) {
   const colors = useColors();
-  const [selectedKind, setSelectedKind] = useState<"pong" | "snake" | "breakout" | "flappy" | "todo" | "notes" | "calculator" | "timer">("snake");
+  const [selectedKind, setSelectedKind] = useState<"pong" | "snake" | "breakout" | "flappy" | "todo" | "notes" | "calculator" | "timer" | "custom">("snake");
   const [wish, setWish] = useState("");
 
   const catalogQuery = trpc.autonomousDev.catalog.useQuery(undefined, { enabled: isAdmin, retry: false });
@@ -54,6 +57,10 @@ export function AutonomousDevCard({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const startDevelopment = () => {
+    if (selectedKind === "custom" && wish.trim().length < 3) {
+      Alert.alert("Idee fehlt", "Beim Custom-Spiel beschreibe deine Spielidee (min. 3 Zeichen) im Textfeld.");
+      return;
+    }
     developMutation.mutate({ kind: selectedKind, wish: wish.trim() || undefined });
   };
 
@@ -84,10 +91,10 @@ export function AutonomousDevCard({ isAdmin }: { isAdmin: boolean }) {
         )}
       </ScrollView>
 
-      {/* Wunsch (optional) */}
+      {/* Wunsch (bei Custom: PFLICHT-Idee fuer den LLM-Codegenerator) */}
       <TextInput
-        accessibilityLabel="Wunsch für die autonome Entwicklung"
-        placeholder="Optional: z. B. Neon-Cyberpunk-Stil"
+        accessibilityLabel={selectedKind === "custom" ? "Spielidee für den freien LLM-Codegenerator" : "Wunsch für die autonome Entwicklung"}
+        placeholder={selectedKind === "custom" ? "Pflicht: z. B. Weltraum-Shooter mit Asteroiden" : "Optional: z. B. Neon-Cyberpunk-Stil"}
         placeholderTextColor={colors.muted}
         value={wish}
         onChangeText={setWish}
