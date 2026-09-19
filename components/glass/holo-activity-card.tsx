@@ -9,7 +9,8 @@
  */
 
 import React, { useEffect } from "react";
-import { Animated, StyleSheet, Text, View, useAnimatedValue } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
+import { useAnimatedValue } from "@/lib/use-animated-value";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";

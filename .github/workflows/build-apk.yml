@@ -75,6 +75,11 @@ jobs:
           # Entwicklungs-Guidance und Theme-Lab sichtbar.
           EXPO_PUBLIC_APP_VARIANT: development
 
+      - name: Startup-Shell injizieren + Web-Smoke-Gate (Sprint 195) — Entwicklung
+        run: |
+          node scripts/inject-startup-shell.mjs web-dist
+          node scripts/web-export-smoke.mjs web-dist
+
       - name: Capacitor-Sync — Variante Entwicklung
         run: npx cap sync android
 
@@ -106,6 +111,11 @@ jobs:
           # Sprint 107-Erweiterung: Variante "admin" — Entwicklungsanzeigen
           # werden ueber lib/app-variant-logic.ts ausgeblendet.
           EXPO_PUBLIC_APP_VARIANT: admin
+
+      - name: Startup-Shell injizieren + Web-Smoke-Gate (Sprint 195) — Admin
+        run: |
+          node scripts/inject-startup-shell.mjs web-dist
+          node scripts/web-export-smoke.mjs web-dist
 
       - name: Capacitor-Sync — Variante Admin
         run: npx cap sync android

@@ -5,7 +5,8 @@ import { useMemo , useEffect, useState } from "react";
  * Backend-Status. Zeigt niemals „LIVE · AKTIV" ohne aktiven Agenten und
  * startet keine kostenpflichtigen LLM-Aufrufe beim Oeffnen des Dashboards.
  */
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View, useAnimatedValue } from "react-native";
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { useAnimatedValue } from "@/lib/use-animated-value";
 import { router } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";

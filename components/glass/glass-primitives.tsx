@@ -10,7 +10,8 @@
  */
 
 import React from "react";
-import { Animated, Platform, Pressable, StyleSheet, Text, View, useAnimatedValue, type ViewStyle } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { useAnimatedValue } from "@/lib/use-animated-value";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { accentAlpha, glassDepth, glassMotion, glassOverlay, glassPalette, glassRadii, glassSpacing, glassSurface, glassType, type GlassAccent } from "@/lib/design/future-glass";
