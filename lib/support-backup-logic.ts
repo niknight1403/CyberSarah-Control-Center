@@ -5,6 +5,22 @@ export const SUPPORT_BACKUP_FORMAT = "custom-ai-studio.encrypted-chat-backup";
 export const SUPPORT_BACKUP_VERSION = 1;
 export const SUPPORT_BACKUP_ITERATIONS = 310_000;
 
+/**
+ * Effektive KDF-Iterationszahl (wie Sprint 112 fuer Settings-Backups):
+ * In der Produktion immer 310.000. Nur unter Vitest (NODE_ENV=test) darf die
+ * deterministische Suite eine schnellere Iterationszahl setzen
+ * (SUPPORT_BACKUP_TEST_KDF_ITERATIONS, mindestens 1.000). Die Zahl steht im
+ * Envelope (kdf.iterations) und wird bei Verifikation/Entschluesselung daraus
+ * gelesen — Backups bleiben unabhaengig vom Laufzeit-Kontext lesbar.
+ */
+function getEffectiveSupportKdfIterations(): number {
+  if (process.env.NODE_ENV === "test") {
+    const override = Number.parseInt(process.env.SUPPORT_BACKUP_TEST_KDF_ITERATIONS ?? "", 10);
+    if (Number.isFinite(override) && override >= 1_000) return override;
+  }
+  return SUPPORT_BACKUP_ITERATIONS;
+}
+
 export type EncryptedSupportBackup = {
   format: typeof SUPPORT_BACKUP_FORMAT;
   version: typeof SUPPORT_BACKUP_VERSION;
@@ -26,8 +42,8 @@ function wordArrayToBase64(value: CryptoJS.lib.WordArray) {
   return CryptoJS.enc.Base64.stringify(value);
 }
 
-function deriveKeys(passphrase: string, salt: CryptoJS.lib.WordArray) {
-  const material = CryptoJS.PBKDF2(passphrase, salt, { keySize: 16, iterations: SUPPORT_BACKUP_ITERATIONS, hasher: CryptoJS.algo.SHA256 });
+function deriveKeys(passphrase: string, salt: CryptoJS.lib.WordArray, iterations: number) {
+  const material = CryptoJS.PBKDF2(passphrase, salt, { keySize: 16, iterations, hasher: CryptoJS.algo.SHA256 });
   return {
     encryptionKey: CryptoJS.lib.WordArray.create(material.words.slice(0, 8), 32),
     macKey: CryptoJS.lib.WordArray.create(material.words.slice(8, 16), 32),
@@ -48,7 +64,7 @@ function getVerifiedBackup(backup: unknown, passphrase: string) {
   if (!isEncryptedSupportBackup(backup) || !isValidSupportBackupPassword(passphrase)) return null;
   try {
     const salt = CryptoJS.enc.Base64.parse(backup.kdf.salt);
-    const { macKey } = deriveKeys(passphrase, salt);
+    const { macKey } = deriveKeys(passphrase, salt, backup.kdf.iterations);
     const unsignedBackup = { format: backup.format, version: backup.version, createdAt: backup.createdAt, kdf: backup.kdf, cipher: { name: backup.cipher.name, iv: backup.cipher.iv, ciphertext: backup.cipher.ciphertext } };
     const expectedMac = CryptoJS.HmacSHA256(createMacPayload(unsignedBackup), macKey).toString(CryptoJS.enc.Base64);
     return expectedMac === backup.cipher.mac ? backup : null;
@@ -75,13 +91,14 @@ export function createEncryptedSupportBackup(input: { history: string; passphras
   const plainPayload = JSON.stringify({ scope: "development-chat-history", createdAt: input.createdAt, messages, excluded: ["tokens", "apiKeys", "fullGeneratedFileContents"] });
   const salt = bytesToWordArray(input.salt);
   const iv = bytesToWordArray(input.iv);
-  const { encryptionKey, macKey } = deriveKeys(input.passphrase, salt);
+  const kdfIterations = getEffectiveSupportKdfIterations();
+  const { encryptionKey, macKey } = deriveKeys(input.passphrase, salt, kdfIterations);
   const ciphertext = CryptoJS.AES.encrypt(plainPayload, encryptionKey, { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }).ciphertext;
   const unsignedBackup: Omit<EncryptedSupportBackup, "cipher"> & { cipher: Omit<EncryptedSupportBackup["cipher"], "mac"> } = {
     format: SUPPORT_BACKUP_FORMAT,
     version: SUPPORT_BACKUP_VERSION,
     createdAt: input.createdAt,
-    kdf: { name: "PBKDF2-SHA256" as const, iterations: SUPPORT_BACKUP_ITERATIONS, salt: wordArrayToBase64(salt) },
+    kdf: { name: "PBKDF2-SHA256" as const, iterations: kdfIterations, salt: wordArrayToBase64(salt) },
     cipher: { name: "AES-256-CBC+HMAC-SHA256" as const, iv: wordArrayToBase64(iv), ciphertext: wordArrayToBase64(ciphertext) },
   };
   return { ...unsignedBackup, cipher: { ...unsignedBackup.cipher, mac: CryptoJS.HmacSHA256(createMacPayload(unsignedBackup), macKey).toString(CryptoJS.enc.Base64) } };
@@ -102,7 +119,7 @@ export function getEncryptedSupportBackupPreview(backup: unknown, passphrase: st
     const salt = CryptoJS.enc.Base64.parse(verifiedBackup.kdf.salt);
     const iv = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.iv);
     const ciphertext = CryptoJS.enc.Base64.parse(verifiedBackup.cipher.ciphertext);
-    const { encryptionKey } = deriveKeys(passphrase, salt);
+    const { encryptionKey } = deriveKeys(passphrase, salt, verifiedBackup.kdf.iterations);
     const cipherParams = CryptoJS.lib.CipherParams.create({ ciphertext });
     const plaintext = CryptoJS.AES.decrypt(cipherParams, encryptionKey, { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }).toString(CryptoJS.enc.Utf8);
     const payload = JSON.parse(plaintext) as { createdAt?: unknown; messages?: unknown[] };

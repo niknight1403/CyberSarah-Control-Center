@@ -45,8 +45,25 @@ export default defineConfig({
     // ~20 s und die Suite scheitert am 60-s-Timeout (Flake). Produktion bleibt
     // bei 310.000 (lib/settings-backup-logic.ts, Guard: NODE_ENV=test + >=1000).
     env: {
+      // Sprint 187 (Root-Cause-Fix): NODE_ENV explizit auf "test" setzen.
+      // Vitest setzt NODE_ENV nur, wenn es nicht bereits definiert ist — in
+      // produktiven Umgebungen (NODE_ENV=production) liefen die KDF-Guards
+      // der Backup-Logik sonst ins Leere und die Suite zog 310.000
+      // Iterationen durch (~60 s pro Datei). Auf dem CI-Runner war das nie
+      // sichtbar (dort NODE_ENV=test); lokal/produktiv schon.
+      NODE_ENV: "test",
       SETTINGS_BACKUP_TEST_KDF_ITERATIONS: "10000",
+      // Sprint 187 (Performance): Support-Backups nutzen dasselbe Sprint-112-Muster
+      // (Guard in der Logik: NODE_ENV=test + >= 1000). 310.000 Iterationen je
+      // Ableitung × 2 Ableitungen (MAC + Entschluesselung) × mehrere Tests
+      // waren der Haupttreiber der ~120 s Backup-Suite.
+      SUPPORT_BACKUP_TEST_KDF_ITERATIONS: "10000",
     },
+    // Sprint 187 (Performance): Worker ueber Testdateien hinweg wiederverwenden
+    // (~5 s Ersparnis bei 144 Dateien) und ein Fallback-Timeout von 3 Minuten,
+    // damit langsame CI-Runner nicht an der 5-s-Vorgabe scheitern.
+    isolate: false,
+    testTimeout: 180_000,
     include: ["tests/**/*.test.{ts,tsx}"],
     watch: false,
     coverage: {

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createEncryptedSupportBackup, getEncryptedSupportBackupPreview, getSupportShareConfirmation, isValidSupportBackupPassword, SUPPORT_BACKUP_FORMAT, verifyEncryptedSupportBackup } from "../lib/support-backup-logic";
+import { createEncryptedSupportBackup, getEncryptedSupportBackupPreview, getSupportShareConfirmation, isValidSupportBackupPassword, SUPPORT_BACKUP_FORMAT, SUPPORT_BACKUP_ITERATIONS, verifyEncryptedSupportBackup } from "../lib/support-backup-logic";
 import { serializeDevelopmentChatHistory } from "../lib/development-chat-history-logic";
-// PBKDF2 mit 310k Iterationen ueberschreitet auf ausgelasteten CI-Runnern
-// leicht 60 s — die Krypto-lastigen Tests tragen darum explizite 180-s-Timeouts
-// (Krypto-Parameter/Sicherheitsniveau unveraendert).
+// Produktion bleibt bei 310.000 Iterationen (SUPPORT_BACKUP_ITERATIONS).
+// Unter Vitest (NODE_ENV=test) senkt vitest.config.ts die effektive Zahl auf
+// 10.000 ab (SUPPORT_BACKUP_TEST_KDF_ITERATIONS, Guard >= 1.000) — die
+// Envelope-Assertion prueft darum die effektive Zahl statt der Konstante.
 
 describe("encrypted support backups", () => {
   const history = serializeDevelopmentChatHistory([{ id: "one", role: "user", content: "Please investigate this deployment issue." }]);
@@ -16,7 +17,10 @@ describe("encrypted support backups", () => {
     expect(backup.format).toBe(SUPPORT_BACKUP_FORMAT);
     expect(backup.cipher.mac).toBeTruthy();
     expect(serialized).not.toContain("deployment issue");
-    expect(backup.kdf.iterations).toBeGreaterThan(100_000);
+    expect(SUPPORT_BACKUP_ITERATIONS).toBe(310_000);
+    const override = Number.parseInt(process.env.SUPPORT_BACKUP_TEST_KDF_ITERATIONS ?? "", 10);
+    const expected = process.env.NODE_ENV === "test" && Number.isFinite(override) && override >= 1_000 ? override : SUPPORT_BACKUP_ITERATIONS;
+    expect(backup.kdf.iterations).toBe(expected);
   }, 180_000);
 
   it("requires a sufficiently long export password", () => {
