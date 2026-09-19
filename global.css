@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --companion-bg: #090c13;
+  --companion-surface: #101621;
+  --companion-surface-soft: #0d121c;
+  --companion-border: #283449;
+  --companion-text: #f4f3f9;
+  --companion-muted: #71809b;
+  --companion-accent: #b58cff;
+  --companion-success: #76e3b5;
+}
+
 /* Design-Theme-Effekte (Werte kommen aus dem Theme-Provider als CSS-Variablen) */
 .effect-glow {
   box-shadow: var(--effect-glow-primary);
