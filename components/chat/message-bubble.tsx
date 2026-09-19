@@ -4,9 +4,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { avatarInitialsForRole, formatChatClock, senderLabelForRole } from "@/lib/chat-presentation-logic";
-import { darken, withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
 import { parseMarkdownLite, type InlineSpan } from "@/lib/markdown-lite";
+import { accentAlpha, glassPalette, glassSurface } from "@/lib/design/future-glass";
 
 export type BubbleMessage = {
   id: string;
@@ -16,13 +15,15 @@ export type BubbleMessage = {
   isThinking?: boolean;
 };
 
-type Palette = ReturnType<typeof useColors>;
 type BubbleStyles = ReturnType<typeof createStyles>;
 
 /**
  * Sprint 138 — RenderMarkdownLite: zeigt LLM-Antworten als formatierte
  * Bloecke (Ueberschriften, Listen, Code, Tabellen) statt als Roh-Markdown.
- * Theme-bewusst (Sprint 133/143): alle Farben kommen aus den Theme-Tokens.
+ *
+ * Sprint 168 — Future-Glass: Farben kommen jetzt aus dem zentralen
+ * Glass-Token-System statt aus useColors (einheitlich mit dem Rest der
+ * Neugestaltung, unabhaengig vom bisherigen Light/Dark-Theme-Umschalter).
  */
 function SpanText({ span, base, styles }: { span: InlineSpan; base: object; styles: BubbleStyles }) {
   return (
@@ -33,8 +34,7 @@ function SpanText({ span, base, styles }: { span: InlineSpan; base: object; styl
 }
 
 export function MarkdownLiteContent({ content }: { content: string }) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(), []);
   const blocks = useMemo(() => parseMarkdownLite(content), [content]);
   return (
     <View>
@@ -96,17 +96,13 @@ export function MarkdownLiteContent({ content }: { content: string }) {
 }
 
 /**
- * Sprint 49 — Hochwertige Nachrichten-Blase mit Avatar, Absender, Zeit
- * und sanfter Einblend-Animation.
- *
- * Sprint 133 — Farbschema-Fix: Das alte Amber/Schwarz-Terminal-Schema
- * (#FFB000/#FFD98A/#4D3A00) war ein Retro-Rest und clachte mit dem
- * Cyber-Neon-Design. Alle Farben kommen jetzt aus den Theme-Tokens
- * (useColors) und folgen damit aktiv dem eingestellten Design-Theme.
+ * Sprint 168 — Glass-Chat-Bubble: Nachrichten als semi-transparente
+ * Glasschichten statt flacher Farbflaechen (Referenz §16 "Message
+ * Bubbles als Glass Layers"). User-Bubble: Cyan-Verlauf-Glow-Rand,
+ * rechtsbuendig. Agent-Bubble: Purple-Akzentkante, CyberGlass-Flaeche.
  */
 export function MessageBubble({ message, showTimestamp }: { message: BubbleMessage; showTimestamp: boolean }) {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(), []);
   const isUser = message.role === "user";
   const initials = avatarInitialsForRole(message.role);
   const label = senderLabelForRole(message.role);
@@ -118,7 +114,7 @@ export function MessageBubble({ message, showTimestamp }: { message: BubbleMessa
       </View>
       {isUser ? (
         <LinearGradient
-          colors={[darken(colors.tint, 0.55), darken(colors.tint, 0.72)]}
+          colors={[accentAlpha("cyan", 0.16), accentAlpha("blue", 0.1)]}
           end={{ x: 1, y: 0 }}
           start={{ x: 0, y: 1 }}
           style={[styles.bubble, styles.bubbleUser]}
@@ -143,46 +139,55 @@ export function MessageBubble({ message, showTimestamp }: { message: BubbleMessa
   );
 }
 
-function createStyles(colors: Palette) {
+function createStyles() {
   return StyleSheet.create({
     row: { flexDirection: "row", gap: 9, marginBottom: 12, maxWidth: "100%" },
     rowUser: { alignSelf: "flex-end", flexDirection: "row-reverse", maxWidth: "92%" },
     avatar: { alignItems: "center", borderRadius: 13, height: 26, justifyContent: "center", marginTop: 2, width: 26 },
-    avatarAgent: { backgroundColor: withAlpha(colors.tint, 0.14), borderColor: withAlpha(colors.tint, 0.55), borderWidth: 1 },
-    avatarUser: { backgroundColor: withAlpha(colors.foreground, 0.10), borderColor: withAlpha(colors.tint, 0.30), borderWidth: 1 },
-    avatarText: { color: colors.tint, fontFamily: "monospace", fontSize: 9, fontWeight: "900" },
-    avatarTextUser: { color: colors.foreground },
-    bubble: { borderRadius: 6, flex: 1, flexShrink: 1, paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9 },
-    // Sprint 143 — CyberSarah-Akzent: User-Bubbles mit subtiler
-    // Cyan-Flaeche + Akzent-Border, klar vom Agent-Oberflaechen-Style.
+    avatarAgent: { backgroundColor: accentAlpha("purple", 0.16), borderColor: accentAlpha("purple", 0.55), borderWidth: 1 },
+    avatarUser: { backgroundColor: accentAlpha("cyan", 0.12), borderColor: accentAlpha("cyan", 0.4), borderWidth: 1 },
+    avatarText: { color: glassPalette.purple, fontFamily: "monospace", fontSize: 9, fontWeight: "900" },
+    avatarTextUser: { color: glassPalette.cyan },
+    bubble: { borderRadius: 16, flex: 1, flexShrink: 1, paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9, overflow: "hidden" },
     bubbleUser: {
-      backgroundColor: withAlpha(colors.tint, 0.10),
-      borderColor: withAlpha(colors.tint, 0.30),
+      borderColor: accentAlpha("cyan", 0.35),
       borderWidth: 1,
-      borderTopRightRadius: 2,
+      borderTopRightRadius: 4,
+      shadowColor: glassPalette.cyan,
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 0 },
     },
-    bubbleAgent: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderTopLeftRadius: 2 },
-    agentAccent: { backgroundColor: colors.tint, borderRadius: 0, height: 10, left: -1, opacity: 0.9, position: "absolute", top: 12, width: 3 },
+    bubbleAgent: {
+      backgroundColor: glassSurface.card,
+      borderColor: glassSurface.border,
+      borderWidth: 1,
+      borderTopLeftRadius: 4,
+      shadowColor: glassPalette.purple,
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 0 },
+    },
+    agentAccent: { backgroundColor: glassPalette.purple, borderRadius: 2, height: 10, left: -1, opacity: 0.9, position: "absolute", top: 12, width: 3 },
     bubbleHeader: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 4 },
-    senderAgent: { color: colors.tint, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
-    senderUser: { color: colors.foreground, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4, opacity: 0.9 },
-    time: { color: colors.muted, fontFamily: "monospace", fontSize: 10 },
-    contentAgent: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
-    contentUser: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
-    contentThinking: { color: colors.muted, fontStyle: "italic" },
-    // Sprint 138 — Markdown-Lite-Renderer-Stile (Theme-Token-basiert).
-    contentAgentBase: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5 },
+    senderAgent: { color: glassPalette.purple, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
+    senderUser: { color: glassPalette.cyan, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4, opacity: 0.9 },
+    time: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 10 },
+    contentAgent: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
+    contentUser: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22 },
+    contentThinking: { color: glassSurface.textMuted, fontStyle: "italic" },
+    contentAgentBase: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5 },
     bold: { fontWeight: "800" },
     italic: { fontStyle: "italic" },
     mono: { fontFamily: "monospace", fontSize: 12.5 },
-    headerBase: { color: colors.foreground, fontFamily: "monospace", fontSize: 13.5 },
-    headerText: { color: colors.tint, fontFamily: "monospace", fontSize: 14.5, fontWeight: "800", marginBottom: 6, marginTop: 4 },
+    headerBase: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5 },
+    headerText: { color: glassPalette.cyan, fontFamily: "monospace", fontSize: 14.5, fontWeight: "800", marginBottom: 6, marginTop: 4 },
     bulletRow: { flexDirection: "row", gap: 6, marginBottom: 3 },
-    bulletMarker: { color: colors.tint, fontSize: 13.5, lineHeight: 22 },
-    codeBox: { backgroundColor: withAlpha(colors.foreground, 0.06), borderColor: colors.border, borderRadius: 4, borderWidth: 1, marginVertical: 6, paddingHorizontal: 10, paddingVertical: 8 },
-    codeText: { color: colors.foreground, fontFamily: "monospace", fontSize: 12, lineHeight: 18 },
-    tableText: { color: colors.foreground, fontFamily: "monospace", fontSize: 12.5, lineHeight: 19 },
-    quoteBase: { color: colors.muted, fontFamily: "monospace", fontSize: 13.5 },
-    quoteText: { borderLeftColor: colors.tint, borderLeftWidth: 2, color: colors.muted, fontFamily: "monospace", fontSize: 13.5, fontStyle: "italic", lineHeight: 22, marginBottom: 4, paddingLeft: 8 },
+    bulletMarker: { color: glassPalette.cyan, fontSize: 13.5, lineHeight: 22 },
+    codeBox: { backgroundColor: accentAlpha("purple", 0.08), borderColor: glassSurface.border, borderRadius: 8, borderWidth: 1, marginVertical: 6, paddingHorizontal: 10, paddingVertical: 8 },
+    codeText: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 12, lineHeight: 18 },
+    tableText: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 12.5, lineHeight: 19 },
+    quoteBase: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 13.5 },
+    quoteText: { borderLeftColor: glassPalette.cyan, borderLeftWidth: 2, color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 13.5, fontStyle: "italic", lineHeight: 22, marginBottom: 4, paddingLeft: 8 },
   });
 }

@@ -3,6 +3,7 @@ import { type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { ParticleField, ScanlineOverlay } from "@/components/living/living-ui";
+import { glassDepth } from "@/lib/design/future-glass";
 
 /**
  * Sprint 49 — Premium-Hintergrund für den Chatbereich.
@@ -11,7 +12,7 @@ import { ParticleField, ScanlineOverlay } from "@/components/living/living-ui";
 export function ChatBackground({ children }: { children: ReactNode }) {
   return (
     <View style={styles.root}>
-      <LinearGradient colors={["#0A0E1F", "#150F38", "#062033"]} locations={[0, 0.55, 1]} style={styles.gradient}>
+      <LinearGradient colors={[glassDepth.void, glassDepth.deep, glassDepth.abyss]} locations={[0, 0.55, 1]} style={styles.gradient}>
         <View style={styles.glowCyan} />
         <View style={styles.glowViolet} />
         {/* Sprint 89 — Living Layer: langsam driftende Partikel + dezente
@@ -30,7 +31,7 @@ const styles = StyleSheet.create({
   gradient: { flex: 1 },
   glowCyan: {
     alignSelf: "flex-end",
-    backgroundColor: "rgba(56, 209, 255, 0.12)",
+    backgroundColor: "rgba(0, 229, 255, 0.12)",
     borderRadius: 220,
     height: 320,
     marginRight: -120,
@@ -39,7 +40,7 @@ const styles = StyleSheet.create({
     width: 320,
   },
   glowViolet: {
-    backgroundColor: "rgba(124, 92, 255, 0.10)",
+    backgroundColor: "rgba(139, 92, 246, 0.10)",
     borderRadius: 260,
     bottom: -160,
     height: 340,
