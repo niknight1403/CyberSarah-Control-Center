@@ -46,6 +46,27 @@ export const glassDepth = {
   glassElevated: "rgba(10, 20, 40, 0.82)",
 } as const;
 
+/** Sprint 193 — Overlay- und Interaktions-Tokens: weisse Schleier,
+ *  Scrims, Spuren. Absorbiert die bisher in Komponenten hardcodierten
+ *  rgba()-Werte — Farbwerte bleiben ausschliesslich in dieser Datei. */
+export const glassOverlay = {
+  /** Weisser Lichtschein (Button-Sheen, Karten-Glanz). */
+  whiteSheen: "rgba(255, 255, 255, 0.22)",
+  /** Starke weisse Flaeche (AI-Core-Label-Chip). */
+  whiteStrong: "rgba(255, 255, 255, 0.85)",
+  whiteBright: "rgba(255, 255, 255, 0.9)",
+  /** Haarfeine Cyber-Grid-Linie (GlassBackdrop v2). */
+  gridLine: "rgba(148, 163, 184, 0.05)",
+  /** Scrim fuer Icon-Badges/Flaechen auf Glas. */
+  scrim: "rgba(10, 34, 50, 0.5)",
+  /** Dunkles Panel-Inlay (Chat-Zeilen, Trace-Panel). */
+  dark: "rgba(15, 22, 31, 0.9)",
+  /** Inaktiver Teil eines Fortschrittsbalkens. */
+  track: "rgba(109, 138, 164, 0.25)",
+  /** Weicher Schlagschatten auf Glas. */
+  shadow: "rgba(0, 0, 0, 0.28)",
+} as const;
+
 /** CyberGlass-Flaechen-System. */
 export const glassSurface = {
   background: glassDepth.void,

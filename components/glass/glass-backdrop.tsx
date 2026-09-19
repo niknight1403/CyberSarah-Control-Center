@@ -16,7 +16,7 @@ import React, { useEffect, useMemo } from "react";
 import { Animated, Easing, StyleSheet, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { accentAlpha, glassDepth, glassPalette, type GlassAccent } from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassOverlay, glassPalette, type GlassAccent } from "@/lib/design/future-glass";
 import {
   buildAurora,
   buildGridMesh,
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-evenly",
   },
   gridHorizontal: { flexDirection: "column" },
-  gridLine: { width: 1, height: "100%", backgroundColor: "rgba(148, 163, 184, 0.05)" },
+  gridLine: { width: 1, height: "100%", backgroundColor: glassOverlay.gridLine },
   gridLineH: { width: "100%", height: 1 },
   particle: { position: "absolute" },
 });

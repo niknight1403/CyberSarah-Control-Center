@@ -1,4 +1,4 @@
-import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Superagenten-Modul: breite Neon-Glas-Karte mit ECHTEM
@@ -91,7 +91,7 @@ export function SuperAgentCard({
             style={({ pressed }) => [
               themeStyles.neonButton,
               styles.openButton,
-              { borderColor: "rgba(255, 200, 87, 0.45)" },
+              { borderColor: accentAlpha("amber", 0.45) },
               pressed && styles.pressed,
             ]}
             onPress={onRetry}
@@ -149,7 +149,7 @@ const createStyles = () => StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   detailText: { fontSize: 11, color: glassSurface.textSecondary },
   right: { alignItems: "flex-end" },
-  openButton: { flexDirection: "row", gap: 6, borderWidth: 1, backgroundColor: "rgba(25, 230, 255, 0.1)" },
+  openButton: { flexDirection: "row", gap: 6, borderWidth: 1, backgroundColor: accentAlpha("cyan", 0.1) },
   openButtonText: { fontWeight: "800", fontSize: 13 },
   pressed: { opacity: 0.7 },
 });

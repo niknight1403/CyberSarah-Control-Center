@@ -1,4 +1,4 @@
-import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Dashboard-Header: Logo, Schriftzug, Notification-Bell mit
@@ -63,7 +63,7 @@ const createStyles = () => StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(25, 230, 255, 0.12)",
+    backgroundColor: accentAlpha("cyan", 0.12),
     borderWidth: 1,
     borderColor: glassSurface.border,
   },

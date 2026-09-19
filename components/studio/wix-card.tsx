@@ -12,6 +12,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View 
 
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+import { glassSurface } from "@/lib/design/future-glass";
 
 type WixStatus = {
   state: "not_configured" | "site_id_missing" | "site_id_invalid" | "ready";
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
   input: { borderRadius: 8, borderWidth: 1, fontSize: 13, paddingHorizontal: 10, paddingVertical: 8 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   button: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9 },
-  buttonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
+  buttonText: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "600" },
   buttonSecondary: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
   buttonSecondaryText: { fontSize: 13, fontWeight: "600" },
   siteRow: { borderRadius: 8, borderWidth: 1, gap: 2, padding: 10 },

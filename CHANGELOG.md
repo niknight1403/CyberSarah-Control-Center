@@ -32,6 +32,15 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 ### Changed
 - App-Version 2.3.0 → **2.4.0**.
 
+## [Unreleased — Sprint 193]
+
+### Changed — Komplettes UI-Update: 100% Token-Konformitaet
+- **Token-Sweep ueber alle Screens:** 192 hardcodierte Farbwerte in 31 Dateien (app/ + components/) durch Tokens aus future-glass.ts ersetzt — Akzente einheitlich auf glassPalette (Amber/Cyan/Green/Red/Purple), neutrale Flaechen auf glassDepth/glassSurface, Alphavarianten ueber accentAlpha(). Damit gilt die Design-Regel jetzt verbatim: Farbwerte ausschliesslich in lib/design/.
+- **Neue glassOverlay-Tokens** (Sprint 193) in future-glass.ts: whiteSheen/whiteStrong/whiteBright, gridLine, scrim, dark, track, shadow — absorbieren die bisherigen rgba()-Ausnahmen in Komponenten.
+- Sichtbarkeits-Feinschliff nach dem Sweep: unsichtbare Borders (Chat-TabBar, Dev-Trace, Paywall-Sheet, Error-Boundary) auf glassSurface.border gehoben, unlesbarer Paywall-Fineprint auf textMuted, Warn-Karten-Border auf borderStrong.
+- Dokumentierte Ausnahmen bleiben: app/+html.tsx (Web-Boot-Shell, synchron vor React-Load — Werte spiegeln bewusst design-theme-palettes.ts, Dual-Maintenance-Kommentar) und app/dev/theme-lab.tsx (Dev-Palette-Playground, zeigt Farbwerte als Daten).
+- Keine Logik-Aenderung: reine Praesentationsschicht; Agent-Farbwerte (Daten aus super-agents-logic) unberuehrt.
+
 ## [Unreleased — Sprint 188]
 
 ### Changed

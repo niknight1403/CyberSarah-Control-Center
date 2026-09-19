@@ -47,6 +47,7 @@ import {
 import { normalizeThemePreference, themePreferenceLabel, type ThemePreference } from "@/lib/theme-preference-logic";
 import { useThemeContext } from "@/lib/theme-provider";
 import { withAlpha } from "@/lib/theme-color-utils";
+import { glassSurface } from "@/lib/design/future-glass";
 
 const PREFERENCE_CHOICES: readonly ThemePreference[] = ["system", "light", "dark"] as const;
 
@@ -108,7 +109,7 @@ function DriftingOrb({
 
 /** Mini-Mockup, das die echten Farben/Effekte eines Designs live zeigt. */
 function DesignPreview({ theme, colors }: { theme: DesignTheme; colors: Colors }) {
-  const scheme = colors.background === "#FFFFFF" || colors.background === "#F2F5F8" ? "light" : "dark";
+  const scheme = colors.background === glassSurface.textPrimary || colors.background === glassSurface.textSecondary ? "light" : "dark";
   const palette = resolveDesignPalette(theme, scheme);
   const effects = DesignThemeDefinitions[theme].effects[scheme];
   const hasGlow = effects.glowPrimary !== "none";
@@ -179,7 +180,7 @@ export default function OnboardingScreen() {
       {isWelcome ? (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <DriftingOrb size={140} color={withAlpha(visualColors.tint, 0.55)} top={40} left={-30} duration={5200} delay={80} />
-          <DriftingOrb size={90} color={withAlpha("#FF3DAD", 0.45)} top={220} left={width - 90} duration={4200} delay={220} />
+          <DriftingOrb size={90} color={withAlpha(glassSurface.textMuted, 0.45)} top={220} left={width - 90} duration={4200} delay={220} />
           <DriftingOrb size={60} color={withAlpha(visualColors.tint, 0.4)} top={420} left={30} duration={3600} delay={360} />
         </View>
       ) : null}

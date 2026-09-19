@@ -293,7 +293,7 @@ const createStyles = () => StyleSheet.create({
   statusPill: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: glassSurface.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 5 },
   statusText: { ...glassType.body, fontSize: 10, letterSpacing: 1 },
-  terminal: { flex: 1, backgroundColor: "#05070D" },
+  terminal: { flex: 1, backgroundColor: glassDepth.void },
   terminalContent: { padding: 14, gap: 4 },
   systemLine: { ...glassType.body, color: glassSurface.textSecondary },
   logLine: { ...glassType.body, lineHeight: 18, flexWrap: "wrap" },
@@ -322,7 +322,7 @@ const createStyles = () => StyleSheet.create({
     alignItems: "center",
   },
   buttonPressed: { opacity: 0.85 },
-  stopText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900", letterSpacing: 2 },
+  stopText: { color: glassSurface.textPrimary, fontSize: 15, fontWeight: "900", letterSpacing: 2 },
   resumeText: { color: glassPalette.cyan, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
 });
 

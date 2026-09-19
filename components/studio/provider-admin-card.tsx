@@ -13,6 +13,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View 
 
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 
 type ProviderId = "openai" | "gemini" | "anthropic" | "openrouter" | "groq" | "together" | "huggingface" | "ollama" | "lmstudio" | "custom";
 
@@ -37,20 +38,20 @@ type MatrixRow = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  healthy: "#00FF66",
-  configured: "#00F2FE",
-  missing_key: "#F5A623",
-  invalid: "#FF007F",
-  expired: "#FF007F",
-  revoked: "#FF007F",
-  permission_denied: "#FF007F",
-  rate_limited: "#F5A623",
-  quota: "#F5A623",
-  timeout: "#F5A623",
-  unavailable: "#F5A623",
-  network_error: "#F5A623",
-  disabled: "#64748B",
-  unknown: "#94A3B8",
+  healthy: accentAlpha("green", 0.33),
+  configured: glassPalette.cyan,
+  missing_key: glassPalette.amber,
+  invalid: glassPalette.red,
+  expired: glassPalette.red,
+  revoked: glassPalette.red,
+  permission_denied: glassPalette.red,
+  rate_limited: glassPalette.amber,
+  quota: glassPalette.amber,
+  timeout: glassPalette.amber,
+  unavailable: glassPalette.amber,
+  network_error: glassPalette.amber,
+  disabled: glassDepth.layer,
+  unknown: glassSurface.textMuted,
 };
 
 export function ProviderAdminCard({ isAdmin }: { isAdmin: boolean }) {
@@ -141,10 +142,10 @@ export function ProviderAdminCard({ isAdmin }: { isAdmin: boolean }) {
                 {row.lastCheckedAt ? ` · Geprüft: ${new Date(row.lastCheckedAt).toLocaleString("de-DE")}` : " · Noch nicht geprüft"}
               </Text>
               {row.expiryWarning === "warn_14d" || row.expiryWarning === "warn_7d" || row.expiryWarning === "warn_24h" || row.expiryWarning === "expired" ? (
-                <Text style={[styles.warningText, { color: "#F5A623" }]}>⚠ {row.expiryLabel} — bitte rotieren.</Text>
+                <Text style={[styles.warningText, { color: glassPalette.amber }]}>⚠ {row.expiryLabel} — bitte rotieren.</Text>
               ) : null}
               {row.lastSafeError ? (
-                <Text style={[styles.errorText, { color: "#FF007F" }]}>{row.lastSafeError}</Text>
+                <Text style={[styles.errorText, { color: glassPalette.red }]}>{row.lastSafeError}</Text>
               ) : null}
             </View>
             <View style={styles.rowActions}>
@@ -169,11 +170,11 @@ export function ProviderAdminCard({ isAdmin }: { isAdmin: boolean }) {
               </Pressable>
               {row.standbyStaged ? (
                 <Pressable
-                  style={[styles.smallButton, { borderColor: "#00FF6655" }]}
+                  style={[styles.smallButton, { borderColor: accentAlpha("green", 0.33) }]}
                   disabled={busy || rotate.isPending}
                   onPress={() => void runAction(() => rotate.mutateAsync({ provider: row.id }), "Rotation")}
                 >
-                  <Text style={[styles.smallButtonText, { color: "#00FF66" }]}>Rotieren</Text>
+                  <Text style={[styles.smallButtonText, { color: accentAlpha("green", 0.33) }]}>Rotieren</Text>
                 </Pressable>
               ) : null}
             </View>

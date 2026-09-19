@@ -1,4 +1,4 @@
-import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — Benutzeruebersicht: Avatar mit Neon-Ring, Begruessung,
  * Rollen-Badge NUR bei serverseitig bestaetigter Rolle, Session-Status.
@@ -87,16 +87,16 @@ const createStyles = () => StyleSheet.create({
   name: { color: glassSurface.textPrimary, fontSize: 20, fontWeight: "800" },
   badgeRow: { flexDirection: "row", gap: 6, marginTop: 4, flexWrap: "wrap" },
   badge: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeAdmin: { borderColor: "rgba(168, 85, 247, 0.6)", backgroundColor: "rgba(168, 85, 247, 0.14)" },
+  badgeAdmin: { borderColor: accentAlpha("purple", 0.6), backgroundColor: accentAlpha("purple", 0.14) },
   badgeAdminText: { color: glassPalette.cyan },
-  badgeUser: { borderColor: glassSurface.border, backgroundColor: "rgba(25, 230, 255, 0.08)" },
+  badgeUser: { borderColor: glassSurface.border, backgroundColor: accentAlpha("cyan", 0.08) },
   badgeUserText: { color: glassPalette.cyan },
-  badgeOnline: { borderColor: "rgba(0, 245, 155, 0.5)", backgroundColor: "rgba(0, 245, 155, 0.1)" },
+  badgeOnline: { borderColor: accentAlpha("green", 0.5), backgroundColor: accentAlpha("green", 0.1) },
   badgeOnlineText: { color: glassPalette.green },
-  badgeOffline: { borderColor: "rgba(255, 85, 119, 0.5)", backgroundColor: "rgba(255, 85, 119, 0.1)" },
+  badgeOffline: { borderColor: accentAlpha("red", 0.5), backgroundColor: accentAlpha("red", 0.1) },
   badgeOfflineText: { color: glassPalette.red },
   badgeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
-  profileButton: { backgroundColor: "rgba(25, 230, 255, 0.14)", borderWidth: 1, borderColor: glassSurface.border },
+  profileButton: { backgroundColor: accentAlpha("cyan", 0.14), borderWidth: 1, borderColor: glassSurface.border },
   profileButtonText: { color: glassPalette.cyan, fontWeight: "700", fontSize: 13 },
   pressed: { opacity: 0.75 },
 });

@@ -3,7 +3,7 @@ import { type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { ParticleField, ScanlineOverlay } from "@/components/living/living-ui";
-import { glassDepth } from "@/lib/design/future-glass";
+import { glassDepth, glassSurface } from "@/lib/design/future-glass";
 
 /**
  * Sprint 49 — Premium-Hintergrund für den Chatbereich.
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
   gradient: { flex: 1 },
   glowCyan: {
     alignSelf: "flex-end",
-    backgroundColor: "rgba(0, 229, 255, 0.12)",
+    backgroundColor: glassSurface.textSecondary,
     borderRadius: 220,
     height: 320,
     marginRight: -120,
@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
     width: 320,
   },
   glowViolet: {
-    backgroundColor: "rgba(139, 92, 246, 0.10)",
+    backgroundColor: glassSurface.textMuted,
     borderRadius: 260,
     bottom: -160,
     height: 340,

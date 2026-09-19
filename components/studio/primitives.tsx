@@ -4,6 +4,7 @@ import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from "
 import { withAlpha } from "@/lib/theme-color-utils";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { useColors } from "@/hooks/use-colors";
+import { accentAlpha, glassDepth, glassSurface } from "@/lib/design/future-glass";
 
 type IconName = Parameters<typeof IconSymbol>[0]["name"];
 
@@ -26,7 +27,7 @@ export function StudioHeader({
   return (
     <View style={styles.header}>
       <NavDrawer {...drawerProps} />
-      <NavDrawerButton {...hamburgerProps} tint="#F2F6FC" />
+      <NavDrawerButton {...hamburgerProps} tint={glassSurface.textPrimary} />
       <View style={styles.titleGroup}>
         <Text style={styles.eyebrow}>{eyebrow}</Text>
         <Text style={styles.title}>{title}</Text>
@@ -38,7 +39,7 @@ export function StudioHeader({
           onPress={onAction}
           style={styles.iconButton}
         >
-          <IconSymbol name={actionIcon} size={20} color="#F2F6FC" />
+          <IconSymbol name={actionIcon} size={20} color={glassSurface.textPrimary} />
         </TouchableOpacity>
       ) : null}
     </View>
@@ -121,7 +122,7 @@ export function PrimaryButton({
       onPress={onPress}
       style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
     >
-      {icon ? <IconSymbol name={icon} size={18} color="#061119" /> : null}
+      {icon ? <IconSymbol name={icon} size={18} color={glassDepth.void} /> : null}
       <Text style={styles.primaryButtonText}>{label}</Text>
     </TouchableOpacity>
   );
@@ -159,18 +160,18 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   titleGroup: { flexShrink: 1 },
   eyebrow: {
-    color: "#99A7B8",
+    color: glassSurface.textSecondary,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.4,
     marginBottom: 3,
     textTransform: "uppercase",
   },
-  title: { color: "#F2F6FC", fontSize: 27, fontWeight: "800", letterSpacing: -0.7 },
+  title: { color: glassSurface.textPrimary, fontSize: 27, fontWeight: "800", letterSpacing: -0.7 },
   iconButton: {
     alignItems: "center",
-    backgroundColor: "#1A2330",
-    borderColor: "#29384A",
+    backgroundColor: glassDepth.void,
+    borderColor: glassSurface.borderStrong,
     borderRadius: 14,
     borderWidth: 1,
     height: 44,
@@ -181,12 +182,12 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   badgeText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.2 },
   readyBadge: { backgroundColor: withAlpha(colors.success, 0.13) },
   readyText: { color: colors.success },
-  warningBadge: { backgroundColor: "rgba(246,186,94,0.15)" },
+  warningBadge: { backgroundColor: accentAlpha("amber", 0.15) },
   warningText: { color: colors.warning },
   accentBadge: { backgroundColor: withAlpha(colors.tint, 0.14) },
   accentText: { color: colors.tint },
-  neutralBadge: { backgroundColor: "#202B3A" },
-  neutralText: { color: "#B9C4D1" },
+  neutralBadge: { backgroundColor: glassDepth.void },
+  neutralText: { color: glassSurface.textSecondary },
   sectionHeading: {
     alignItems: "center",
     flexDirection: "row",
@@ -194,14 +195,14 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     marginBottom: 12,
   },
   sectionLabel: {
-    color: "#718094",
+    color: glassSurface.textMuted,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1.2,
     marginBottom: 3,
     textTransform: "uppercase",
   },
-  sectionTitle: { color: "#F2F6FC", fontSize: 17, fontWeight: "700", letterSpacing: -0.2 },
+  sectionTitle: { color: glassSurface.textPrimary, fontSize: 17, fontWeight: "700", letterSpacing: -0.2 },
   primaryButton: {
     alignItems: "center",
     backgroundColor: colors.tint,
@@ -213,11 +214,11 @@ function createStyles(colors: ReturnType<typeof useColors>) {
     paddingHorizontal: 18,
   },
   primaryButtonDisabled: { opacity: 0.45 },
-  primaryButtonText: { color: "#061119", fontSize: 14, fontWeight: "800" },
+  primaryButtonText: { color: glassDepth.void, fontSize: 14, fontWeight: "800" },
   emptySurface: {
     alignItems: "center",
-    backgroundColor: "#121823",
-    borderColor: "#243247",
+    backgroundColor: glassDepth.void,
+    borderColor: glassSurface.border,
     borderRadius: 18,
     borderStyle: "dashed",
     borderWidth: 1,
@@ -226,14 +227,14 @@ function createStyles(colors: ReturnType<typeof useColors>) {
   },
   emptyIcon: {
     alignItems: "center",
-    backgroundColor: "#152837",
+    backgroundColor: glassDepth.void,
     borderRadius: 16,
     height: 48,
     justifyContent: "center",
     marginBottom: 14,
     width: 48,
   },
-  emptyTitle: { color: "#F2F6FC", fontSize: 16, fontWeight: "800", marginBottom: 7 },
-  emptyDescription: { color: "#99A7B8", fontSize: 13, lineHeight: 19, textAlign: "center" },
+  emptyTitle: { color: glassSurface.textPrimary, fontSize: 16, fontWeight: "800", marginBottom: 7 },
+  emptyDescription: { color: glassSurface.textSecondary, fontSize: 13, lineHeight: 19, textAlign: "center" },
   });
 }

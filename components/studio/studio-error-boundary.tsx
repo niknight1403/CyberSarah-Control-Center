@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { glassDepth, glassSurface } from "@/lib/design/future-glass";
 
 type StudioErrorBoundaryProps = { section: string; children: ReactNode };
 type StudioErrorBoundaryState = { failed: boolean };
@@ -22,9 +23,9 @@ export class StudioErrorBoundary extends Component<StudioErrorBoundaryProps, Stu
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: "#21161C", borderColor: "#744352", borderRadius: 16, borderWidth: 1, marginBottom: 22, padding: 14 },
-  title: { color: "#FFD0D6", fontSize: 13, fontWeight: "900" },
-  text: { color: "#C7A8AF", fontSize: 11, lineHeight: 16, marginTop: 5 },
-  button: { alignItems: "center", borderColor: "#A55A6B", borderRadius: 10, borderWidth: 1, justifyContent: "center", marginTop: 11, minHeight: 44, paddingHorizontal: 12 },
-  buttonText: { color: "#FFB4BE", fontSize: 12, fontWeight: "900" },
+  card: { backgroundColor: glassDepth.void, borderColor: glassSurface.border, borderRadius: 16, borderWidth: 1, marginBottom: 22, padding: 14 },
+  title: { color: glassSurface.textSecondary, fontSize: 13, fontWeight: "900" },
+  text: { color: glassSurface.textMuted, fontSize: 11, lineHeight: 16, marginTop: 5 },
+  button: { alignItems: "center", borderColor: glassSurface.border, borderRadius: 10, borderWidth: 1, justifyContent: "center", marginTop: 11, minHeight: 44, paddingHorizontal: 12 },
+  buttonText: { color: glassSurface.textSecondary, fontSize: 12, fontWeight: "900" },
 });

@@ -1,4 +1,4 @@
-import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { accentAlpha, glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — Aktivitaetskarte (NICHT „Neueste Aktivitaeten"): kompakte
  * System-/Nutzungsuebersicht der letzten 24 h. Nur echte Zaehlwerte;
@@ -63,7 +63,7 @@ export function ActivitySummaryCard({
 const createStyles = () => StyleSheet.create({
   card: { gap: 12 },
   header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: "rgba(37, 168, 255, 0.55)", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: glassSurface.textSecondary, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
   titleWrap: { flex: 1, gap: 2 },
   valueWrap: { alignItems: "flex-end" },
   value: { fontSize: 26, fontWeight: "900", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
@@ -71,7 +71,7 @@ const createStyles = () => StyleSheet.create({
   sparkArea: { height: 40, justifyContent: "flex-end" },
   sparkRow: { flexDirection: "row", alignItems: "flex-end", gap: 3, height: 40 },
   sparkBar: { flex: 1, borderRadius: 2, backgroundColor: glassPalette.cyan, opacity: 0.85 },
-  sparkEmpty: { height: 34, borderRadius: 8, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.14)", borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  sparkEmpty: { height: 34, borderRadius: 8, borderWidth: 1, borderColor: accentAlpha("cyan", 0.14), borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
   sparkEmptyText: { fontSize: 11, color: glassSurface.textSecondary },
 });
 

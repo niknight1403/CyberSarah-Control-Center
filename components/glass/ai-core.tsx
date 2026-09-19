@@ -20,13 +20,7 @@ import React, { useEffect, useMemo } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import {
-  accentAlpha,
-  aiCoreStates,
-  glassMotion,
-  glassPalette,
-  type AiCoreState,
-} from "@/lib/design/future-glass";
+import { accentAlpha, aiCoreStates, glassMotion, glassOverlay, glassPalette, type AiCoreState } from "@/lib/design/future-glass";
 
 interface AiCoreProps {
   /** Durchmesser in px (Default 44 — kompakt fuer Header). */
@@ -240,7 +234,7 @@ function innerCoreStyle(accent: keyof typeof glassPalette, coreSize: number) {
     width: coreSize * 0.34,
     height: coreSize * 0.34,
     borderRadius: (coreSize * 0.34) / 2,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    backgroundColor: glassOverlay.whiteStrong,
     shadowColor: glassPalette[accent],
     shadowOpacity: 0.9,
     shadowRadius: 8,
@@ -263,7 +257,7 @@ function particleDotStyle(accent: string) {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    backgroundColor: glassOverlay.whiteBright,
     shadowColor: accent,
     shadowOpacity: 1,
     shadowRadius: 4,

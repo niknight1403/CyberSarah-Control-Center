@@ -6,7 +6,7 @@
  */
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlowButton, StatusChip } from "@/components/glass/glass-primitives";
-import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { DiffConfirmationSheet } from "@/components/studio/diff-confirmation-sheet";
@@ -537,9 +537,9 @@ function createStyles() {
   qualityPillText: { fontSize: 11, fontWeight: "800" },
   qualityDot: { borderRadius: 4, height: 7, width: 7 },
   qualityReady: { backgroundColor: withAlpha(glassPalette.green, 0.11), borderColor: withAlpha(glassPalette.green, 0.4) },
-  qualityFailure: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.42)" },
-  qualityWarning: { backgroundColor: "rgba(246,186,94,0.10)", borderColor: "rgba(246,186,94,0.38)" },
-  qualityNeutral: { backgroundColor: "rgba(140,157,181,0.10)", borderColor: "rgba(140,157,181,0.3)" },
+  qualityFailure: { backgroundColor: accentAlpha("red", 0.1), borderColor: accentAlpha("red", 0.42) },
+  qualityWarning: { backgroundColor: accentAlpha("amber", 0.1), borderColor: accentAlpha("amber", 0.38) },
+  qualityNeutral: { backgroundColor: glassSurface.textSecondary, borderColor: glassSurface.textSecondary },
   dotReady: { backgroundColor: glassPalette.green },
   dotFailure: { backgroundColor: glassPalette.red },
   dotWarning: { backgroundColor: glassPalette.amber },

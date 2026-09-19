@@ -13,16 +13,7 @@ import React from "react";
 import { Animated, Platform, Pressable, StyleSheet, Text, View, useAnimatedValue, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import {
-  accentAlpha,
-  glassMotion,
-  glassPalette,
-  glassRadii,
-  glassSpacing,
-  glassSurface,
-  glassType,
-  type GlassAccent,
-} from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassMotion, glassOverlay, glassPalette, glassRadii, glassSpacing, glassSurface, glassType, type GlassAccent } from "@/lib/design/future-glass";
 
 // ---------------------------------------------------------------------------
 // GlassCard — Basis-Flaeche des gesamten Systems.
@@ -122,7 +113,7 @@ export function GlowButton({ label, onPress, accent = "purple", variant = "prima
   const isSecondary = variant === "secondary";
   const background = isPrimary ? accentAlpha(accent, 0.92) : isSecondary ? accentAlpha(accent, 0.14) : "transparent";
   const borderColor = isPrimary ? "transparent" : accentAlpha(accent, 0.5);
-  const textColor = isPrimary ? "#04060B" : glassPalette[accent];
+  const textColor = isPrimary ? glassDepth.void : glassPalette[accent];
 
   return (
     <Pressable
@@ -153,7 +144,7 @@ export function GlowButton({ label, onPress, accent = "purple", variant = "prima
         {/* Vertikaler Lichtschein — primaerer CTA wirkt "beleuchtet" (Sprint 192). */}
         {isPrimary ? (
           <LinearGradient
-            colors={["rgba(255, 255, 255, 0.22)", "transparent"]}
+            colors={[glassOverlay.whiteSheen, "transparent"]}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={[StyleSheet.absoluteFill, { borderTopLeftRadius: glassRadii.pill, borderTopRightRadius: glassRadii.pill }]}

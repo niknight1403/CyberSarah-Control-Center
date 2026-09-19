@@ -1,4 +1,4 @@
-import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — Workspace-Karte: echte Service-Verfuegbarkeit und Anzahl,
  * keine erfundenen Projektzahlen; Empty-State wenn nichts konfiguriert.
@@ -51,7 +51,7 @@ const createStyles = () => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
   state: { fontSize: 15, fontWeight: "800" },
   meta: { fontSize: 12, color: glassSurface.textSecondary, fontVariant: ["tabular-nums"] },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

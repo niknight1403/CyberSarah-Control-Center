@@ -1,3 +1,4 @@
+import { glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 89 — "Living AI Interface": lebendige UI-Bausteine.
  *
@@ -26,7 +27,7 @@ import {
 
 /* ==================== Partikel-Feld ==================== */
 
-const PARTICLE_COLOR = "rgba(157, 140, 255, 0.9)";
+const PARTICLE_COLOR = glassSurface.textSecondary;
 
 export function ParticleField({ seed = 7, count = 24 }: { seed?: number; count?: number }) {
   const particles = useMemo(() => createParticleField(seed, count), [seed, count]);
@@ -86,10 +87,10 @@ export function ParticleField({ seed = 7, count = 24 }: { seed?: number; count?:
 /* ==================== AI-Orb ==================== */
 
 const ORB_COLORS: Record<OrbState, [string, string, string]> = {
-  idle: ["#7C5CFF", "#4A90FF", "#38D1FF"],
-  thinking: ["#9D8CFF", "#38D1FF", "#7C5CFF"],
-  success: ["#22C9A7", "#4ADE96", "#38D1FF"],
-  error: ["#FF7B8A", "#FF4A3A", "#7C5CFF"],
+  idle: [glassPalette.purple, glassPalette.blue, glassPalette.cyan],
+  thinking: [glassSurface.textMuted, glassPalette.cyan, glassPalette.purple],
+  success: [glassPalette.green, glassPalette.green, glassPalette.cyan],
+  error: [glassSurface.textMuted, glassSurface.textMuted, glassPalette.purple],
 };
 
 const ORB_PHASE_SEED_MS = Date.now();
@@ -155,7 +156,7 @@ export function ScanlineOverlay({ intensity = "subtle" as const }: { intensity?:
           style={{
             height: config.lineHeight,
             marginTop: config.gap,
-            backgroundColor: "rgba(200, 220, 255, 1)",
+            backgroundColor: glassSurface.textSecondary,
             opacity: config.opacity,
           }}
         />
@@ -168,6 +169,6 @@ const styles = StyleSheet.create({
   particleRoot: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 },
   particle: { backgroundColor: PARTICLE_COLOR, position: "absolute" },
   orb: { alignItems: "center", justifyContent: "center" },
-  orbCore: { backgroundColor: "rgba(255, 255, 255, 0.85)" },
+  orbCore: { backgroundColor: glassOverlay.whiteStrong },
   scanlineRoot: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 },
 });

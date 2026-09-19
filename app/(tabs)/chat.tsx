@@ -5,7 +5,7 @@
  */
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { StatusChip } from "@/components/glass/glass-primitives";
-import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
+import { glassDepth, glassOverlay, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
 import { AiOrb } from "@/components/living/living-ui";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
@@ -541,7 +541,7 @@ function createStyles() {
   flex: { flex: 1 },
   content: { paddingBottom: 28 },
   mono: { fontFamily: "monospace" },
-  tabBar: { backgroundColor: "rgba(13, 21, 32, 0.85)", borderColor: glassDepth.layer, borderRadius: 16, borderWidth: 1, flexDirection: "row", marginBottom: 12, padding: 4 },
+  tabBar: { backgroundColor: glassOverlay.dark, borderColor: glassSurface.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", marginBottom: 12, padding: 4 },
   tab: { alignItems: "center", borderRadius: 12, flex: 1, flexDirection: "row", gap: 5, justifyContent: "center", paddingVertical: 9 },
   tabActive: { backgroundColor: withAlpha(glassPalette.cyan, 0.10), borderColor: withAlpha(glassPalette.cyan, 0.35), borderWidth: 1 },
   tabText: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 12, fontWeight: "700" },
@@ -567,7 +567,7 @@ function createStyles() {
     dayDividerText: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
   errorRow: { alignItems: "center", backgroundColor: withAlpha(glassPalette.red, 0.12), borderColor: darken(glassPalette.red, 0.6), borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 7, marginBottom: 8, paddingHorizontal: 11, paddingVertical: 9 },
   error: { color: glassPalette.red, flex: 1, fontSize: 11, lineHeight: 16 },
-  connCard: { backgroundColor: "rgba(15, 22, 31, 0.9)", borderColor: glassDepth.layer, borderRadius: 16, borderWidth: 1, marginBottom: 12, padding: 14 },
+  connCard: { backgroundColor: glassOverlay.dark, borderColor: glassSurface.border, borderRadius: 16, borderWidth: 1, marginBottom: 12, padding: 14 },
   connRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   connInfo: { flex: 1, marginRight: 10 },
   connName: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800" },

@@ -1,3 +1,4 @@
+import { accentAlpha, glassDepth, glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { useMemo, useState } from "react";
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,14 +56,14 @@ export function AgentSwitcher({ agents, activeAgent, onSelect, onOpenManager }: 
         onPress={() => setOpen((value) => !value)}
         style={styles.bar}
       >
-        <View style={[styles.dot, { backgroundColor: activeAgent?.color ?? "#FFB000" }]} />
+        <View style={[styles.dot, { backgroundColor: activeAgent?.color ?? glassPalette.amber }]} />
         <Text style={styles.barName} numberOfLines={1}>
           {activeAgent?.name ?? "Superagent"}
         </Text>
         {activeAgent?.status === "pausiert" ? <Text style={styles.barHint}>PAUSIERT</Text> : null}
         <View style={styles.barSpacer} />
         <Text style={styles.barCount}>{selectable.length}</Text>
-        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color="#8A6D1F" />
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={accentAlpha("amber", 0.7)} />
       </TouchableOpacity>
       {open ? (
         <View style={styles.dropdown}>
@@ -103,7 +104,7 @@ export function AgentSwitcher({ agents, activeAgent, onSelect, onOpenManager }: 
             }}
             style={styles.dropdownAction}
           >
-            <Ionicons name="grid-outline" size={13} color="#00F2FE" />
+            <Ionicons name="grid-outline" size={13} color={glassPalette.cyan} />
             <Text style={styles.dropdownActionText}>Alle Agenten anzeigen</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -116,7 +117,7 @@ export function AgentSwitcher({ agents, activeAgent, onSelect, onOpenManager }: 
             }}
             style={styles.dropdownAction}
           >
-            <Ionicons name="add" size={14} color="#37E58C" />
+            <Ionicons name="add" size={14} color={glassPalette.green} />
             <Text style={styles.dropdownActionText}>Neuen Agenten erstellen</Text>
           </TouchableOpacity>
         </View>
@@ -243,7 +244,7 @@ export function AgentManagerModal({
               <Text style={styles.sheetTitle}>{mode === "form" ? (editId != null ? "Agenten bearbeiten" : "Neuen Agenten erstellen") : "Alle Agenten"}</Text>
             </View>
             <TouchableOpacity accessibilityLabel="Verwaltung schließen" accessibilityRole="button" onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={18} color="#8A6D1F" />
+              <Ionicons name="close" size={18} color={accentAlpha("amber", 0.7)} />
             </TouchableOpacity>
           </View>
 
@@ -295,7 +296,7 @@ export function AgentManagerModal({
                 </View>
               ))}
               <TouchableOpacity accessibilityLabel="Neuen Agenten erstellen" accessibilityRole="button" disabled={busy} onPress={startCreate} style={styles.createBtn}>
-                <Ionicons name="add" size={15} color="#37E58C" />
+                <Ionicons name="add" size={15} color={glassPalette.green} />
                 <Text style={styles.createBtnText}>Neuen Agenten erstellen</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -306,7 +307,7 @@ export function AgentManagerModal({
                 autoCapitalize="sentences"
                 onChangeText={setName}
                 placeholder="z. B. Nova"
-                placeholderTextColor="#5D7290"
+                placeholderTextColor={glassSurface.textMuted}
                 style={styles.input}
                 value={name}
               />
@@ -316,7 +317,7 @@ export function AgentManagerModal({
                 multiline
                 onChangeText={setPurpose}
                 placeholder="Wofür ist dieser Superagent zuständig?"
-                placeholderTextColor="#5D7290"
+                placeholderTextColor={glassSurface.textMuted}
                 style={[styles.input, styles.inputMultiline]}
                 value={purpose}
               />
@@ -353,56 +354,56 @@ export function AgentManagerModal({
 const styles = StyleSheet.create({
   switcherWrap: { marginBottom: 10, position: "relative", zIndex: 30 },
   dot: { borderRadius: 5, height: 10, width: 10 },
-  bar: { alignItems: "center", backgroundColor: "rgba(13, 21, 32, 0.9)", borderColor: "#1E2F47", borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingVertical: 9 },
-  barName: { color: "#FFD98A", flexShrink: 1, fontFamily: "monospace", fontSize: 12.5, fontWeight: "800" },
-  barHint: { color: "#8A6D1F", fontFamily: "monospace", fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  bar: { alignItems: "center", backgroundColor: glassOverlay.dark, borderColor: glassSurface.border, borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingVertical: 9 },
+  barName: { color: glassPalette.amber, flexShrink: 1, fontFamily: "monospace", fontSize: 12.5, fontWeight: "800" },
+  barHint: { color: accentAlpha("amber", 0.7), fontFamily: "monospace", fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
   barSpacer: { flex: 1 },
-  barCount: { color: "#8A6D1F", fontFamily: "monospace", fontSize: 11, fontWeight: "900" },
-  dropdown: { backgroundColor: "rgba(7, 12, 20, 0.98)", borderColor: "#1E2F47", borderRadius: 14, borderWidth: 1, left: 0, paddingHorizontal: 10, paddingVertical: 10, position: "absolute", right: 0, top: 44 },
-  dropdownLabel: { color: "#5D7290", fontFamily: "monospace", fontSize: 9, fontWeight: "900", letterSpacing: 0.8, marginBottom: 8 },
-  emptyHint: { color: "#8294A8", fontFamily: "monospace", fontSize: 11, marginBottom: 6 },
+  barCount: { color: accentAlpha("amber", 0.7), fontFamily: "monospace", fontSize: 11, fontWeight: "900" },
+  dropdown: { backgroundColor: glassDepth.abyss, borderColor: glassSurface.border, borderRadius: 14, borderWidth: 1, left: 0, paddingHorizontal: 10, paddingVertical: 10, position: "absolute", right: 0, top: 44 },
+  dropdownLabel: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 9, fontWeight: "900", letterSpacing: 0.8, marginBottom: 8 },
+  emptyHint: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 11, marginBottom: 6 },
   agentRow: { alignItems: "center", borderRadius: 10, flexDirection: "row", gap: 9, paddingVertical: 8 },
-  agentRowActive: { backgroundColor: "rgba(255, 176, 0, 0.08)" },
+  agentRowActive: { backgroundColor: accentAlpha("amber", 0.08) },
   agentMeta: { flex: 1, gap: 1 },
-  agentName: { color: "#DDE8F4", fontFamily: "monospace", fontSize: 12.5, fontWeight: "800" },
-  agentPurpose: { color: "#8294A8", fontFamily: "monospace", fontSize: 10.5, lineHeight: 14 },
-  rowHint: { color: "#8A6D1F", fontFamily: "monospace", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.5 },
-  dropdownAction: { alignItems: "center", borderTopColor: "#132238", borderTopWidth: 1, flexDirection: "row", gap: 8, marginTop: 6, paddingTop: 10 },
-  dropdownActionText: { color: "#9FBDD4", fontFamily: "monospace", fontSize: 11.5, fontWeight: "800" },
-  backdrop: { backgroundColor: "rgba(2, 6, 12, 0.72)", flex: 1, justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#0A1017", borderColor: "#243347", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, maxHeight: "88%" },
-  handle: { alignSelf: "center", backgroundColor: "#3A4C60", borderRadius: 99, height: 4, marginTop: 9, width: 44 },
+  agentName: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 12.5, fontWeight: "800" },
+  agentPurpose: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 10.5, lineHeight: 14 },
+  rowHint: { color: accentAlpha("amber", 0.7), fontFamily: "monospace", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.5 },
+  dropdownAction: { alignItems: "center", borderTopColor: glassSurface.border, borderTopWidth: 1, flexDirection: "row", gap: 8, marginTop: 6, paddingTop: 10 },
+  dropdownActionText: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 11.5, fontWeight: "800" },
+  backdrop: { backgroundColor: glassDepth.glass, flex: 1, justifyContent: "flex-end" },
+  sheet: { backgroundColor: glassDepth.void, borderColor: glassSurface.borderStrong, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, maxHeight: "88%" },
+  handle: { alignSelf: "center", backgroundColor: glassSurface.borderStrong, borderRadius: 99, height: 4, marginTop: 9, width: 44 },
   sheetHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12 },
-  eyebrow: { color: "#8A6D1F", fontFamily: "monospace", fontSize: 9, fontWeight: "900", letterSpacing: 1 },
-  sheetTitle: { color: "#FFD98A", fontFamily: "monospace", fontSize: 16, fontWeight: "900", marginTop: 3 },
-  closeBtn: { alignItems: "center", borderColor: "#243347", borderRadius: 12, borderWidth: 1, height: 34, justifyContent: "center", width: 34 },
+  eyebrow: { color: accentAlpha("amber", 0.7), fontFamily: "monospace", fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  sheetTitle: { color: glassPalette.amber, fontFamily: "monospace", fontSize: 16, fontWeight: "900", marginTop: 3 },
+  closeBtn: { alignItems: "center", borderColor: glassSurface.borderStrong, borderRadius: 12, borderWidth: 1, height: 34, justifyContent: "center", width: 34 },
   sheetContent: { paddingBottom: 26, paddingHorizontal: 16 },
-  card: { backgroundColor: "rgba(15, 22, 31, 0.9)", borderColor: "#243347", borderRadius: 14, borderWidth: 1, marginBottom: 10, padding: 12 },
-  cardActive: { borderColor: "rgba(255, 176, 0, 0.45)" },
+  card: { backgroundColor: glassOverlay.dark, borderColor: glassSurface.borderStrong, borderRadius: 14, borderWidth: 1, marginBottom: 10, padding: 12 },
+  cardActive: { borderColor: accentAlpha("amber", 0.45) },
   cardMain: { alignItems: "center", flexDirection: "row", gap: 10 },
   cardDot: { borderRadius: 7, height: 14, width: 14 },
   cardTitleRow: { alignItems: "center", flexDirection: "row", gap: 7 },
-  cardName: { color: "#DDE8F4", flexShrink: 1, fontFamily: "monospace", fontSize: 13, fontWeight: "800" },
-  defaultBadge: { backgroundColor: "rgba(255, 176, 0, 0.14)", color: "#FFB000", fontFamily: "monospace", fontSize: 8, fontWeight: "900", letterSpacing: 0.6, paddingHorizontal: 5, paddingVertical: 1 },
+  cardName: { color: glassSurface.textPrimary, flexShrink: 1, fontFamily: "monospace", fontSize: 13, fontWeight: "800" },
+  defaultBadge: { backgroundColor: accentAlpha("amber", 0.14), color: glassPalette.amber, fontFamily: "monospace", fontSize: 8, fontWeight: "900", letterSpacing: 0.6, paddingHorizontal: 5, paddingVertical: 1 },
   cardActions: { flexDirection: "row", gap: 8, marginTop: 10 },
-  actionBtn: { alignItems: "center", backgroundColor: "#131F2E", borderColor: "#2B3E55", borderRadius: 9, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
-  actionBtnDanger: { borderColor: "rgba(255, 107, 122, 0.55)" },
-  actionBtnText: { color: "#9FBDD4", fontFamily: "monospace", fontSize: 10.5, fontWeight: "800" },
-  actionBtnTextDanger: { color: "#FF6B7A" },
-  createBtn: { alignItems: "center", borderColor: "rgba(55, 229, 140, 0.4)", borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 8, justifyContent: "center", paddingVertical: 12 },
-  createBtnText: { color: "#37E58C", fontFamily: "monospace", fontSize: 12, fontWeight: "900" },
-  fieldLabel: { color: "#5D7290", fontFamily: "monospace", fontSize: 9.5, fontWeight: "900", letterSpacing: 0.8, marginBottom: 6, marginTop: 14 },
-  input: { backgroundColor: "rgba(15, 22, 31, 0.9)", borderColor: "#243347", borderRadius: 10, borderWidth: 1, color: "#DDE8F4", fontFamily: "monospace", fontSize: 13, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
+  actionBtn: { alignItems: "center", backgroundColor: glassDepth.void, borderColor: glassSurface.borderStrong, borderRadius: 9, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
+  actionBtnDanger: { borderColor: accentAlpha("red", 0.55) },
+  actionBtnText: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 10.5, fontWeight: "800" },
+  actionBtnTextDanger: { color: glassPalette.red },
+  createBtn: { alignItems: "center", borderColor: accentAlpha("green", 0.4), borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 8, justifyContent: "center", paddingVertical: 12 },
+  createBtnText: { color: glassPalette.green, fontFamily: "monospace", fontSize: 12, fontWeight: "900" },
+  fieldLabel: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 9.5, fontWeight: "900", letterSpacing: 0.8, marginBottom: 6, marginTop: 14 },
+  input: { backgroundColor: glassOverlay.dark, borderColor: glassSurface.borderStrong, borderRadius: 10, borderWidth: 1, color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
   inputMultiline: { minHeight: 84, textAlignVertical: "top" },
   colorRow: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   colorDot: { borderRadius: 12, height: 24, width: 24 },
-  colorDotActive: { borderWidth: 2, borderColor: "#FFD98A" },
-  formError: { color: "#FF6B7A", fontFamily: "monospace", fontSize: 11, lineHeight: 16, marginTop: 10 },
+  colorDotActive: { borderWidth: 2, borderColor: glassPalette.amber },
+  formError: { color: glassPalette.red, fontFamily: "monospace", fontSize: 11, lineHeight: 16, marginTop: 10 },
   formErrorList: { marginBottom: 14, marginHorizontal: 16 },
   formActions: { flexDirection: "row", gap: 10, marginTop: 18 },
-  cancelBtn: { alignItems: "center", borderColor: "#33475D", borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 46 },
-  cancelBtnText: { color: "#B8C6D5", fontFamily: "monospace", fontSize: 12.5, fontWeight: "800" },
-  saveBtn: { alignItems: "center", backgroundColor: "#FFB000", borderRadius: 12, flex: 1.25, justifyContent: "center", minHeight: 46 },
-  saveBtnText: { color: "#241A00", fontFamily: "monospace", fontSize: 12.5, fontWeight: "900" },
+  cancelBtn: { alignItems: "center", borderColor: glassSurface.borderStrong, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 46 },
+  cancelBtnText: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 12.5, fontWeight: "800" },
+  saveBtn: { alignItems: "center", backgroundColor: glassPalette.amber, borderRadius: 12, flex: 1.25, justifyContent: "center", minHeight: 46 },
+  saveBtnText: { color: glassDepth.void, fontFamily: "monospace", fontSize: 12.5, fontWeight: "900" },
   btnDisabled: { opacity: 0.55 },
 });

@@ -7,7 +7,7 @@
  */
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlowButton } from "@/components/glass/glass-primitives";
-import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { integrationFixture } from "@/constants/integration-fixture";
@@ -531,9 +531,9 @@ const styles = StyleSheet.create({
   cloudTestButton: { alignItems: "center", alignSelf: "flex-start", borderColor: glassSurface.border, borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 12, minHeight: 44, paddingHorizontal: 12 },
   cloudTestButtonText: { color: glassPalette.cyan, fontSize: 12, fontWeight: "800" },
   endpointFeedback: { alignItems: "flex-start", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
-  endpointFeedbackReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.32)" },
-  endpointFeedbackChecking: { backgroundColor: "rgba(82,216,255,0.09)", borderColor: "rgba(82,216,255,0.30)" },
-  endpointFeedbackError: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.32)" },
+  endpointFeedbackReady: { backgroundColor: accentAlpha("green", 0.1), borderColor: accentAlpha("green", 0.32) },
+  endpointFeedbackChecking: { backgroundColor: accentAlpha("cyan", 0.09), borderColor: accentAlpha("cyan", 0.3) },
+  endpointFeedbackError: { backgroundColor: accentAlpha("red", 0.1), borderColor: accentAlpha("red", 0.32) },
   endpointFeedbackText: { flex: 1, fontSize: 12, lineHeight: 17 },
   endpointFeedbackTextReady: { color: glassPalette.green },
   endpointFeedbackTextChecking: { color: glassPalette.cyan },
@@ -568,9 +568,9 @@ const styles = StyleSheet.create({
   backupButton: { alignItems: "center", backgroundColor: glassPalette.purple, borderRadius: 12, flexDirection: "row", gap: 7, justifyContent: "center", marginTop: 12, minHeight: 48, paddingHorizontal: 12 },
   backupButtonText: { color: glassDepth.deep, fontSize: 12, fontWeight: "900" },
   backupFeedback: { alignItems: "flex-start", borderRadius: 11, borderWidth: 1, flexDirection: "row", gap: 7, marginTop: 8, paddingHorizontal: 10, paddingVertical: 9 },
-  backupFeedbackReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.32)" },
-  backupFeedbackError: { backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.32)" },
-  backupFeedbackChecking: { backgroundColor: "rgba(82,216,255,0.09)", borderColor: "rgba(82,216,255,0.30)" },
+  backupFeedbackReady: { backgroundColor: accentAlpha("green", 0.1), borderColor: accentAlpha("green", 0.32) },
+  backupFeedbackError: { backgroundColor: accentAlpha("red", 0.1), borderColor: accentAlpha("red", 0.32) },
+  backupFeedbackChecking: { backgroundColor: accentAlpha("cyan", 0.09), borderColor: accentAlpha("cyan", 0.3) },
   backupFeedbackText: { flex: 1, fontSize: 12, lineHeight: 17 },
   backupFeedbackTextReady: { color: glassPalette.green },
   backupFeedbackTextError: { color: glassPalette.red },
@@ -605,12 +605,12 @@ const styles = StyleSheet.create({
   protectionRowEnabled: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border },
   protectionIndicator: { alignItems: "center", backgroundColor: glassDepth.layer, borderRadius: 10, height: 34, justifyContent: "center", width: 34 },
   protectionIndicatorEnabled: { backgroundColor: glassDepth.layer },
-  webWarning: { alignItems: "flex-start", backgroundColor: "rgba(246,186,94,0.11)", borderColor: "rgba(246,186,94,0.35)", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 9, marginTop: 26, padding: 13 },
+  webWarning: { alignItems: "flex-start", backgroundColor: accentAlpha("amber", 0.11), borderColor: accentAlpha("amber", 0.35), borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 9, marginTop: 26, padding: 13 },
   webWarningText: { color: glassPalette.amber, flex: 1, fontSize: 12, lineHeight: 18 },
   saveArea: { marginTop: 26 },
   readinessCard: { alignItems: "flex-start", borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginBottom: 11, padding: 12 },
-  readinessCardReady: { backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.36)" },
-  readinessCardPending: { backgroundColor: "rgba(246,186,94,0.10)", borderColor: "rgba(246,186,94,0.32)" },
+  readinessCardReady: { backgroundColor: accentAlpha("green", 0.1), borderColor: accentAlpha("green", 0.36) },
+  readinessCardPending: { backgroundColor: accentAlpha("amber", 0.1), borderColor: accentAlpha("amber", 0.32) },
   readinessText: { flex: 1, fontSize: 12, lineHeight: 18 },
   readinessTextReady: { color: glassPalette.green },
   readinessTextPending: { color: glassPalette.amber },
@@ -619,9 +619,9 @@ const styles = StyleSheet.create({
   fixtureTextArea: { flex: 1 },
   fixtureTitle: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800", marginBottom: 2 },
   fixtureDetail: { color: glassSurface.textSecondary, fontSize: 11 },
-  attachSuccess: { alignItems: "flex-start", backgroundColor: "rgba(69,217,150,0.10)", borderColor: "rgba(69,217,150,0.34)", borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginTop: 10, padding: 12 },
+  attachSuccess: { alignItems: "flex-start", backgroundColor: accentAlpha("green", 0.1), borderColor: accentAlpha("green", 0.34), borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginTop: 10, padding: 12 },
   attachSuccessText: { color: glassPalette.green, flex: 1, fontSize: 12, lineHeight: 18 },
-  attachError: { alignItems: "flex-start", backgroundColor: "rgba(255,107,122,0.10)", borderColor: "rgba(255,107,122,0.32)", borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginTop: 10, padding: 12 },
+  attachError: { alignItems: "flex-start", backgroundColor: accentAlpha("red", 0.1), borderColor: accentAlpha("red", 0.32), borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, marginTop: 10, padding: 12 },
   attachErrorText: { color: glassPalette.red, flex: 1, fontSize: 12, lineHeight: 18 },
   savedLabel: { color: glassPalette.green, fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: "center" },
   notice: { alignItems: "flex-start", flexDirection: "row", gap: 9, marginTop: 20, paddingHorizontal: 5 },

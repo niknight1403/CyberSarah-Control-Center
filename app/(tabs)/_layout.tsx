@@ -9,7 +9,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { GlassTabIcon } from "@/components/glass/glass-tab-icon";
 import { Platform, View, useWindowDimensions } from "react-native";
 import { isWideViewport } from "@/lib/viewport-logic";
-import { glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 
 /**
  * Sprint 168 — Future-Glass-Navigation: schwebende CyberGlass-Bar statt
@@ -52,9 +52,9 @@ export default function TabLayout() {
           marginHorizontal: 12,
           marginBottom: floatMargin,
           borderRadius: 26,
-          backgroundColor: "rgba(8, 18, 35, 0.88)",
+          backgroundColor: glassDepth.abyss,
           borderWidth: 1,
-          borderColor: "rgba(148, 163, 184, 0.18)",
+          borderColor: glassSurface.border,
           shadowColor: glassPalette.purple,
           shadowOpacity: 0.28,
           shadowRadius: 18,

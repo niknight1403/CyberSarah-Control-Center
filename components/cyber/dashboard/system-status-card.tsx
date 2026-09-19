@@ -1,4 +1,4 @@
-import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { accentAlpha, glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — Systemstatus-Karte: echte Werte aus appStatus (Uptime,
  * Workspace-Ping), korrekt abgeleitet — „/api/health != DB-Readiness".
@@ -64,13 +64,13 @@ const createStyles = () => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
   state: { fontSize: 16, fontWeight: "800" },
   uptimeRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  uptimeTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(109, 138, 164, 0.25)", overflow: "hidden" },
+  uptimeTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: glassOverlay.track, overflow: "hidden" },
   uptimeBar: { height: 6, borderRadius: 3 },
   uptimeValue: { fontSize: 13, fontWeight: "800", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
-  retry: { backgroundColor: "rgba(255, 200, 87, 0.12)", borderWidth: 1, borderColor: "rgba(255, 200, 87, 0.4)" },
+  retry: { backgroundColor: accentAlpha("amber", 0.12), borderWidth: 1, borderColor: accentAlpha("amber", 0.4) },
   retryText: { color: glassPalette.amber, fontWeight: "700", fontSize: 12 },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });

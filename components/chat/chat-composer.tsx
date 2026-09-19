@@ -31,7 +31,7 @@ type ChatComposerProps = {
  * leuchtender Senden-Button.
  *
  * Sprint 133 — Farbschema-Fix: Das Amber/Schwarz-Eingabefeld
- * (#000/#4D3A00/#FFB000) war ein Retro-Rest und passte nicht zum
+ * (glassDepth.void/glassDepth.void/glassPalette.amber) war ein Retro-Rest und passte nicht zum
  * Cyber-Neon-Design. Farben kommen jetzt aus den Theme-Tokens und
  * folgen damit aktiv dem eingestellten Design-Theme.
  */

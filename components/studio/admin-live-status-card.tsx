@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+import { glassPalette } from "@/lib/design/future-glass";
 import {
   buildAdminLiveStatusViewModel,
   type AdminLiveStatusLogLine,
@@ -46,10 +47,10 @@ export function AdminLiveStatusCard({ isAdmin }: { isAdmin: boolean }) {
   const dotColor = !viewModel.statusLoaded
     ? colors.muted
     : viewModel.isHealthy
-      ? "#37E58C"
+      ? glassPalette.green
       : viewModel.stateBadge.tone === "warning"
-        ? "#FF007F"
-        : "#F5A623";
+        ? glassPalette.red
+        : glassPalette.amber;
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -78,7 +79,7 @@ export function AdminLiveStatusCard({ isAdmin }: { isAdmin: boolean }) {
               key={`${entry.atMs}-${index}`}
               style={[
                 styles.logLine,
-                { color: entry.level === "error" ? "#FF007F" : "#F5A623" },
+                { color: entry.level === "error" ? glassPalette.red : glassPalette.amber },
               ]}
               numberOfLines={2}
             >

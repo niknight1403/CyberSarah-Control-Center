@@ -1,4 +1,4 @@
-import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — KPI-Karte: Icon, Wert, Label mit ehrlichen Zustaenden —
  * Loading (Skeleton), Fehler (— mit Hinweis), Empty (— statt erfundener 0/99,9).
@@ -60,7 +60,7 @@ const createStyles = () => StyleSheet.create({
   card: { flex: 1, minWidth: 104, gap: 6 },
   inner: { gap: 4 },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  iconWrap: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
   value: { fontSize: 22, fontWeight: "900", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
   status: { fontSize: 10, fontWeight: "700", marginTop: 2 },
   error: { fontSize: 10, fontWeight: "700", color: glassPalette.red, marginTop: 2 },

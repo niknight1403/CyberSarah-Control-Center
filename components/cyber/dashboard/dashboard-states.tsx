@@ -1,4 +1,4 @@
-import { glassDepth,  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { useMemo , useEffect, useState } from "react";
 /**
  * Sprint 156 — Loading-/Empty-/Error-States fuer das Dashboard.
@@ -78,7 +78,7 @@ export function DashboardErrorState({ message, onRetry }: { message: string; onR
 
 const createStyles = () => StyleSheet.create({
   wrap: { gap: 12 },
-  block: { borderRadius: 18, backgroundColor: glassDepth.glass, borderWidth: 1, borderColor: "rgba(91, 219, 255, 0.14)" },
+  block: { borderRadius: 18, backgroundColor: glassDepth.glass, borderWidth: 1, borderColor: accentAlpha("cyan", 0.14) },
   header: { height: 48 },
   user: { height: 96 },
   kpiRow: { flexDirection: "row", gap: 12 },
@@ -89,7 +89,7 @@ const createStyles = () => StyleSheet.create({
   errorCard: { gap: 10 },
   errorTitle: { color: glassPalette.red, fontSize: 15, fontWeight: "800" },
   errorMessage: { color: glassSurface.textSecondary, fontSize: 13 },
-  retry: { backgroundColor: "rgba(25, 230, 255, 0.12)", borderWidth: 1, borderColor: glassSurface.border, alignSelf: "flex-start" },
+  retry: { backgroundColor: accentAlpha("cyan", 0.12), borderWidth: 1, borderColor: glassSurface.border, alignSelf: "flex-start" },
   retryText: { color: glassPalette.cyan, fontWeight: "700", fontSize: 13 },
 });
 

@@ -1,4 +1,4 @@
-import {  glassPalette,  glassSurface } from "@/lib/design/future-glass";
+import { accentAlpha, glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
 /**
  * Sprint 156 — KI-Chat-Karte: Provider-/Modellname nur wenn serverseitig
  * verfuegbar; niemals API-Keys. „Kein Provider verfuegbar" inkl. Pruef-
@@ -63,10 +63,10 @@ const createStyles = () => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(10, 34, 50, 0.5)" },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
   state: { fontSize: 15, fontWeight: "800" },
   meta: { fontSize: 12, color: glassSurface.textSecondary },
-  checkButton: { backgroundColor: "rgba(255, 85, 119, 0.12)", borderWidth: 1, borderColor: "rgba(255, 85, 119, 0.45)" },
+  checkButton: { backgroundColor: accentAlpha("red", 0.12), borderWidth: 1, borderColor: accentAlpha("red", 0.45) },
   checkButtonText: { color: glassPalette.red, fontWeight: "700", fontSize: 12 },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });
