@@ -10,7 +10,7 @@
  * (Erkennung, Maskierung, Namen) ohne Mock.
  */
 
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildSecretStoredNotice,
@@ -21,12 +21,12 @@ import {
   maskSecretsInText,
   normalizeSecretName,
 } from "../lib/secret-vault-logic";
+import { setModelRouterKvForTests } from "../server/db";
 import {
   deleteSecret,
   listSecrets,
   processSecretsInUserMessage,
   resolveSecret,
-  setVaultKvForTests,
   upsertSecret,
 } from "../server/secret-vault";
 
@@ -36,12 +36,10 @@ import {
 // abhaengig; der injizierte Adapter ist auf jedem Rechner deterministisch.
 const kvStore = new Map<string, unknown>();
 beforeAll(() => {
-  setVaultKvForTests({
-    get: async <T>(key: string) => kvStore.get(key) as T | undefined,
-    set: async (key: string, value: unknown) => {
-      kvStore.set(key, value);
-    },
-  });
+  setModelRouterKvForTests(kvStore);
+});
+afterAll(() => {
+  setModelRouterKvForTests(null); // isolate:false: Hook fuer Folgedateien loesen
 });
 
 const USER = "vault-test-user";

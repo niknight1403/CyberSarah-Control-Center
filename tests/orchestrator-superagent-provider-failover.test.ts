@@ -13,8 +13,9 @@
  * versuchte Kandidat) blockiert nicht mehr die gesamte Aufgabe, solange ein
  * weiterer konfigurierter Kandidat verfuegbar ist.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { setModelRouterKvForTests } from "../server/db";
 import { resetManagedKeyPoolForTests } from "../server/_core/llm";
 import { runOrchestratorTask } from "../server/orchestrator/superagent";
 
@@ -22,13 +23,15 @@ import { runOrchestratorTask } from "../server/orchestrator/superagent";
 // (modelRouterSettings) in Neon-Postgres. Fuer diesen reinen Provider-
 // Failover-Test wird eine In-Memory-Fake-DB verwendet, damit der Test ohne
 // Live-Datenbankverbindung deterministisch laeuft.
+// Sprint 191: KV via zentralen Test-Hook (server/db.ts) statt vi.mock —
+// deterministisch unter isolate:false (Sprint 187) auf jedem Rechner.
 const kv = new Map<string, unknown>();
-vi.mock("../server/db", () => ({
-  getModelRouterSetting: vi.fn(async (key: string) => kv.get(key) ?? null),
-  setModelRouterSetting: vi.fn(async (key: string, value: unknown) => {
-    kv.set(key, value);
-  }),
-}));
+beforeAll(() => {
+  setModelRouterKvForTests(kv);
+});
+afterAll(() => {
+  setModelRouterKvForTests(null); // isolate:false: Hook fuer Folgedateien loesen
+});
 
 const fakeResponse = (status: number, body: unknown) =>
   ({

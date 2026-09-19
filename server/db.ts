@@ -299,7 +299,26 @@ export async function getBillingSubscriptionForUser(userId: number) {
 // Sprint 71 — Modell-Router-Persistenz (bevorzugte Reihenfolge, Statuswerte)
 // ---------------------------------------------------------------------------
 
+// Sprint 191 — Deterministischer Test-Hook fuer die generische KV-Schiene.
+// Unter `isolate: false` (Sprint 187) haengt die vi.mock-Aufloesung von der
+// Worker-Belegung und Dateireihenfolge ab — auf Produktiv-VPS mit echter
+// DATABASE_URL liefen KV-gemockte Tests sonst gegen echte Postgres (28P01).
+// Der Hook bindet eine In-Memory-Map DIREKT und ist damit auf jedem Rechner
+// deterministisch. Guard: NODE_ENV=test ODER VITEST-Marker; ausserhalb von
+// Tests lehnt der Hook ab (kein Produktionspfad beruehrt ihn).
+let modelRouterKvOverride: Map<string, unknown> | null = null;
+
+export function setModelRouterKvForTests(kv: Map<string, unknown> | null): void {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error("ModelRouter-KV-Test-Hook ist nur im Test-Modus verfuegbar.");
+  }
+  modelRouterKvOverride = kv;
+}
+
 export async function getModelRouterSetting<T>(key: string): Promise<T | null> {
+  if (modelRouterKvOverride) {
+    return (modelRouterKvOverride.get(key) as T | undefined) ?? null;
+  }
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
   const result = await db
@@ -311,6 +330,10 @@ export async function getModelRouterSetting<T>(key: string): Promise<T | null> {
 }
 
 export async function setModelRouterSetting(key: string, value: unknown): Promise<void> {
+  if (modelRouterKvOverride) {
+    modelRouterKvOverride.set(key, value);
+    return;
+  }
   const db = await getDb();
   if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
   await db

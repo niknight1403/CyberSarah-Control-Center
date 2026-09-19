@@ -58,40 +58,15 @@ function encryptionSecret(): string {
 }
 
 /**
- * Sprint 190 — Test-Hook: injizierbarer KV-Adapter.
- * Der Vault-Test (tests/secret-vault.test.ts) bindet seinen In-Memory-KV
- * hieran, statt auf vi.mock("../server/db") zu vertrauen. Unter
- * `isolate: false` (Sprint 187) ist die Modul-Mock-Auflösung abhaengig
- * von Worker-Belegung und Ausfuehrungsreihenfolge — der Hook ist
- * davon unabhaengig und damit auf jedem Rechner deterministisch.
- * In jedem anderen Modus als NODE_ENV=test lehnt der Hook ab.
+ * Sprint 191 — Der Vault-Test bindet seinen In-Memory-KV jetzt ueber den
+ * zentralen Hook setModelRouterKvForTests (server/db.ts); der Sprint-190-
+ * Adapter hier wurde von diesem abgeloest und entfernt.
  */
-export type VaultKvAdapter = {
-  get: <T>(key: string) => Promise<T | undefined>;
-  set: (key: string, value: unknown) => Promise<void>;
-};
-
-let vaultKvOverride: VaultKvAdapter | null = null;
-
-export function setVaultKvForTests(kv: VaultKvAdapter | null): void {
-  if (process.env.NODE_ENV !== "test") {
-    throw new Error("Vault-KV-Test-Hook ist nur im Test-Modus (NODE_ENV=test) verfuegbar.");
-  }
-  vaultKvOverride = kv;
-}
-
 async function readVault(userOpenId: string): Promise<VaultMap> {
-  if (vaultKvOverride) {
-    return (await vaultKvOverride.get<VaultMap>(vaultKey(userOpenId))) ?? {};
-  }
   return (await db.getModelRouterSetting<VaultMap>(vaultKey(userOpenId))) ?? {};
 }
 
 async function writeVault(userOpenId: string, vault: VaultMap): Promise<void> {
-  if (vaultKvOverride) {
-    await vaultKvOverride.set(vaultKey(userOpenId), vault);
-    return;
-  }
   await db.setModelRouterSetting(vaultKey(userOpenId), vault);
 }
 

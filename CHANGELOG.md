@@ -14,6 +14,11 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 ### Fixed
 - **Sprint 190 — Deterministischer Secret-Vault-Test (28P01 auf Produktiv-VPS):** Der Vault-Test mokierte den KV-Speicher via `vi.mock("../server/db")` — unter `isolate: false` (Sprint 187) haengt die Modul-Mock-Aufloesung jedoch von Worker-Belegung und Dateireihenfolge ab. Auf einem Produktiv-VPS mit echter DATABASE_URL lief der Test dadurch stellenweise gegen die echte Postgres (Fehler 28P01, falsches Passwort fuer User cybersarah). Neu: injizierbarer KV-Adapter `setVaultKvForTests` in server/secret-vault.ts (nur unter NODE_ENV=test aktiv), der Test bindet seinen In-Memory-KV direkt daran. Verifiziert: Suite gruen mit falschem DB-Passwort, ohne DATABASE_URL und unter gezielt vergiftetem Modul-Cache (Einzel-Worker). Keine Produktionsverhaltens-Aenderung — der Hook greift nur im Test-Modus.
 
+## [Unreleased — Sprint 191]
+
+### Changed
+- **Sprint 191 — Deterministische Test-Hooks statt vi.mock ( komplette Fehlerklasse behoben):** Unter `isolate: false` (Sprint 187) haengt die vi.mock-Aufloesung von Worker-Belegung und Dateireihenfolge ab — auf produktiven VPS mit echter DATABASE_URL konnten KV-gemockte Tests real gegen Postgres laufen (28P01). Neu: zentraler Test-Hook `setModelRouterKvForTests` in server/db.ts und `setInvokeLlmForTests` in server/_core/llm.ts (Guard: NODE_ENV=test ODER VITEST-Marker; ausserhalb von Tests abgelehnt). Alle vier betroffenen Tests (secret-vault, wix-vault, orchestrator-failover, development-chat-server) binden ihre In-Memory-Fakes jetzt direkt und loesen den Hook in afterAll wieder (isolate:false-Hygiene). Der Sprint-190-Adapter in server/secret-vault.ts wurde vom zentralen Hook abgeloest und entfernt. Verifiziert: Suite gruen mit falschem DB-Passwort, ohne DATABASE_URL, unter gezielt vergiftetem Modul-Cache im Einzel-Worker (145 Dateien / 1196 Tests) und mit geleaktem NODE_ENV=production. Keine Produktionsverhaltens-Aenderung — die Hooks greifen nur im Test-Modus.
+
 ## [Unreleased — Sprint 188]
 
 ### Changed

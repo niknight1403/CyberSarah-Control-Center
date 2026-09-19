@@ -1,18 +1,24 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { TRPCError } from "@trpc/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { invokeLLM } from "../server/_core/llm";
+import { setInvokeLlmForTests } from "../server/_core/llm";
 import {
   handleDevelopmentChat,
   sanitizeChatError,
   testDevelopmentChatConnection,
 } from "../server/development-chat";
 
-vi.mock("../server/_core/llm", () => ({
-  invokeLLM: vi.fn(),
-}));
+// Sprint 191: invokeLLM via Test-Hook (server/_core/llm.ts) statt vi.mock —
+// deterministisch unter isolate:false (Sprint 187) auf jedem Rechner.
+const invokeLLMMock = vi.fn();
+beforeAll(() => {
+  setInvokeLlmForTests(invokeLLMMock);
+});
+afterAll(() => {
+  setInvokeLlmForTests(null); // isolate:false: Hook fuer Folgedateien loesen
+});
 
 const ENV_KEYS = [
   "AI_CUSTOM_BASE_URL",
@@ -96,7 +102,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  vi.mocked(invokeLLM).mockReset();
+  invokeLLMMock.mockReset();
   for (const [key, value] of Object.entries(originalEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -224,7 +230,7 @@ describe("development chat server chain", () => {
   });
 
   it("übersetzt den fehlenden On-Server-LLM in eine handlungsfähige Meldung", async () => {
-    vi.mocked(invokeLLM).mockRejectedValue(
+    invokeLLMMock.mockRejectedValue(
       new Error("OPENAI_API_KEY is not configured"),
     );
 
@@ -241,7 +247,7 @@ describe("development chat server chain", () => {
   });
 
   it("beantwortet den Managed-Provider über invokeLLM", async () => {
-    vi.mocked(invokeLLM).mockResolvedValue({
+    invokeLLMMock.mockResolvedValue({
       id: "chatcmpl-test",
       created: 1_788_000_000,
       model: "managed-model",

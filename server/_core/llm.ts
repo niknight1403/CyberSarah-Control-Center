@@ -540,7 +540,25 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
     : new Error("LLM request failed after exhausting retries");
 };
 
+// Sprint 191 — Deterministischer Test-Hook: invokeLLM gezielt ueberschreibbar
+// (ersetzt vi.mock in development-chat-server.test.ts — unter isolate:false
+// ist Modul-Mocking reihenfolgeabhaengig; der Hook ist es nicht).
+// Guard: nur im Test-Modus (NODE_ENV=test ODER VITEST-Marker) aktivierbar.
+let invokeLlmOverride: ((params: InvokeParams) => Promise<InvokeResult>) | null = null;
+
+export function setInvokeLlmForTests(
+  fn: ((params: InvokeParams) => Promise<InvokeResult>) | null,
+): void {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error("invokeLLM-Test-Hook ist nur im Test-Modus verfuegbar.");
+  }
+  invokeLlmOverride = fn;
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  if (invokeLlmOverride) {
+    return invokeLlmOverride(params);
+  }
   let candidates: ManagedLlmEndpoint[];
   try {
     candidates = resolveManagedCandidates();

@@ -4,17 +4,20 @@
  * WIX_API_TOKEN (env) hat Vorrang, Klartext wird nie zurueckgegeben.
  * KV gemockt (wie secret-vault.test.ts), Env via vi.stubEnv.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveWixToken, resolveWixTokenSource, setWixToken } from "../server/wix";
+import { setModelRouterKvForTests } from "../server/db";
 
+// Sprint 191: KV via zentralen Test-Hook (server/db.ts) statt vi.mock —
+// deterministisch unter isolate:false (Sprint 187) auf jedem Rechner.
 const kvStore = new Map<string, unknown>();
-vi.mock("../server/db", () => ({
-  setModelRouterSetting: async (key: string, value: unknown) => {
-    kvStore.set(key, value);
-  },
-  getModelRouterSetting: async <T>(key: string) => kvStore.get(key) as T | undefined,
-}));
+beforeAll(() => {
+  setModelRouterKvForTests(kvStore);
+});
+afterAll(() => {
+  setModelRouterKvForTests(null); // isolate:false: Hook fuer Folgedateien loesen
+});
 
 // Hint fuer Gitleaks: bewusst KEIN "secret"-Keyword neben dem Literal (generic-api-key-Regel).
 // Es ist ein rein deterministischer Test-Passphrase, kein echtes Geheimnis.
