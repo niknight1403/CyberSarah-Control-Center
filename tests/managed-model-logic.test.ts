@@ -47,3 +47,17 @@ describe("resolveManagedModel (Sprint 85)", () => {
     expect(resolveManagedModel("   ", "forge", { AI_MANAGED_MODEL: "   " })).toBe("gpt-4o-mini");
   });
 });
+
+describe("resolveManagedModel (Sprint 194 — Custom-Route)", () => {
+  it("loest das Modell fuer den Custom-Endpoint aus AI_CUSTOM_MODEL", () => {
+    expect(resolveManagedModel(undefined, "custom", { AI_CUSTOM_MODEL: "my-free-model" })).toBe("my-free-model");
+  });
+
+  it("verwendet einen explizit angeforderten Modellnamen zuerst", () => {
+    expect(resolveManagedModel("requested", "custom", { AI_CUSTOM_MODEL: "my-free-model" })).toBe("requested");
+  });
+
+  it("faellt ohne AI_CUSTOM_MODEL auf die Managed/OpenAI-Defaults zurueck", () => {
+    expect(resolveManagedModel(undefined, "custom", { OPENAI_MODEL: "fallback-model" })).toBe("fallback-model");
+  });
+});

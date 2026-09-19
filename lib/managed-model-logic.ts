@@ -8,7 +8,15 @@
  * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
  * KOSTENFREIES Modell pro Source waehlt.
  */
-export type ManagedModelSource = "forge" | "gemini" | "openai" | "groq" | "openrouter" | "local-ollama" | "local-lmstudio";
+export type ManagedModelSource =
+  | "forge"
+  | "gemini"
+  | "openai"
+  | "groq"
+  | "openrouter"
+  | "custom"
+  | "local-ollama"
+  | "local-lmstudio";
 
 export function resolveManagedModel(
   requestedModel: string | undefined,
@@ -32,6 +40,13 @@ export function resolveManagedModel(
 
   if (source === "local-lmstudio") {
     return env.AI_LMSTUDIO_MODEL?.trim() || "local-model";
+  }
+
+  if (source === "custom") {
+    // Sprint 194 — Custom-Endpoint: Modell aus AI_CUSTOM_MODEL, sonst wie
+    // Managed/OpenAI aufloesen (offene Schnittstelle, Admin bestimmt).
+    const customModel = env.AI_CUSTOM_MODEL?.trim();
+    if (customModel) return customModel;
   }
 
   if (source === "openrouter") {

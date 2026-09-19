@@ -267,6 +267,9 @@ const normalizeToolChoice = (
 const managedLlmEnv = () => ({
   forgeApiUrl: ENV.forgeApiUrl,
   forgeApiKey: ENV.forgeApiKey,
+  // Sprint 194 — Custom-Endpoint (Admin-Route, leitet die Gratis-Kette).
+  customApiKey: process.env.AI_CUSTOM_API_KEY?.trim() || undefined,
+  customBaseUrl: process.env.AI_CUSTOM_BASE_URL?.trim() || undefined,
   openaiBaseUrl: process.env.AI_OPENAI_BASE_URL?.trim() || undefined,
   geminiApiKey: process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || undefined,
   openaiApiKey: process.env.AI_OPENAI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim() || undefined,

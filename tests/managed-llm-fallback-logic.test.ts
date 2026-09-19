@@ -184,3 +184,59 @@ describe("MANAGED_LLM_NO_KEY_MESSAGE", () => {
     expect(MANAGED_LLM_NO_KEY_MESSAGE).toContain("OpenRouter");
   });
 });
+
+describe("resolveManagedLlmEndpoint (Sprint 194 — Custom-Dev-Route)", () => {
+  it("bevorzugt den Custom-Endpoint vor allen Cloud-Keys (Admin-Entscheidung)", () => {
+    const env: ManagedLlmEnv = {
+      customApiKey: "cus-key",
+      customBaseUrl: "https://free-llm.example.com/v1",
+      groqApiKey: "gsk-key",
+      openaiApiKey: "sk-openai-key",
+    };
+    expect(resolveManagedLlmEndpoint(env)).toEqual({
+      url: "https://free-llm.example.com/v1/chat/completions",
+      apiKey: "cus-key",
+      source: "custom",
+    });
+  });
+
+  it("normalisiert trailing slashes in der Custom-Base-URL", () => {
+    const env: ManagedLlmEnv = { customApiKey: "cus-key", customBaseUrl: "https://free-llm.example.com/v1///" };
+    expect(resolveManagedLlmEndpoint(env)?.url).toBe("https://free-llm.example.com/v1/chat/completions");
+  });
+
+  it("ignoriert Custom-Key ohne Base-URL (halbkonfiguriert = unkonfiguriert)", () => {
+    expect(resolveManagedLlmEndpoint({ customApiKey: "cus-key", groqApiKey: "gsk-key" })?.source).toBe("groq");
+  });
+});
+
+describe("resolveManagedLlmEndpoints (Sprint 194 — Custom-Dev-Route)", () => {
+  it("leitet die Gratis-Kette mit Custom: Custom > Groq > OpenRouter > Gemini", () => {
+    const env: ManagedLlmEnv = {
+      customApiKey: "cus-key",
+      customBaseUrl: "https://free-llm.example.com/v1",
+      groqApiKey: "gsk-key",
+      openrouterApiKey: "sk-or-key",
+      geminiApiKey: "gem-key",
+      forgeApiKey: "forge-key",
+      openaiApiKey: "sk-openai-key",
+    };
+    const chain = resolveManagedLlmEndpoints(env);
+    expect(chain.map((e) => e.source)).toEqual(["custom", "groq", "openrouter", "gemini"]);
+    expect(chain.every((e) => isFreeManagedSource(e.source))).toBe(true);
+  });
+
+  it("liefert Custom allein, wenn keine weiteren Gratis-Keys existieren", () => {
+    const env: ManagedLlmEnv = {
+      customApiKey: "cus-key",
+      customBaseUrl: "https://free-llm.example.com/v1",
+      forgeApiKey: "forge-key",
+      openaiApiKey: "sk-openai-key",
+    };
+    expect(resolveManagedLlmEndpoints(env).map((e) => e.source)).toEqual(["custom"]);
+  });
+
+  it("list Custom in der No-Key-Fehlermeldung", () => {
+    expect(MANAGED_LLM_NO_KEY_MESSAGE).toContain("Custom");
+  });
+});

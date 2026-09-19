@@ -24,7 +24,7 @@
 export type ManagedLlmEndpoint = {
   url: string;
   apiKey: string;
-  source: "forge" | "gemini" | "openai" | "groq" | "openrouter" | "local-ollama" | "local-lmstudio";
+  source: "forge" | "gemini" | "openai" | "groq" | "openrouter" | "custom" | "local-ollama" | "local-lmstudio";
   /** Zusatz-Header pro Endpoint (z. B. OpenRouter-Ranking-Header). */
   headers?: Record<string, string>;
 };
@@ -40,6 +40,14 @@ export type ManagedLlmEnv = {
   openrouterApiKey?: string;
   openrouterBaseUrl?: string;
   openrouterReferer?: string;
+  /**
+   * Sprint 194 — Eigener OpenAI-kompatibler Endpoint (AI_CUSTOM_BASE_URL +
+   * AI_CUSTOM_API_KEY): der vom Administrator bewusst konfigurierte (kosten-
+   * freie) Dev-Endpoint. Er leitet die Kette, weil er die explizite Admin-
+   * Entscheidung ist.
+   */
+  customApiKey?: string;
+  customBaseUrl?: string;
   /**
    * Expliziter Admin-Override (AI_ALLOW_PAID_LLM_FALLBACK=true): haengt die
    * kostenpflichtige Kette (Forge > OpenAI) hinter die Gratis-Kette.
@@ -62,7 +70,7 @@ const clean = (value: string | undefined): string | undefined => {
 
 /** Kostenvorbehalt eines Sources: 'free' = dauerhaft kostenfreies Kontingent. */
 export function isFreeManagedSource(source: ManagedLlmEndpoint["source"]): boolean {
-  return source === "groq" || source === "openrouter" || source === "gemini" || source === "local-ollama" || source === "local-lmstudio";
+  return source === "custom" || source === "groq" || source === "openrouter" || source === "gemini" || source === "local-ollama" || source === "local-lmstudio";
 }
 
 /**
@@ -75,6 +83,18 @@ export function isFreeManagedSource(source: ManagedLlmEndpoint["source"]): boole
  * 6. sonst null mit Grundmeldung (Aufrufer entscheidet ueber die Fehler-Semantik)
  */
 export function resolveManagedLlmEndpoint(env: ManagedLlmEnv): ManagedLlmEndpoint | null {
+  // Sprint 194 — Custom-Endpoint zuerst: explizite Admin-Konfiguration leitet
+  // die Kette (OpenAI-kompatibel, base-URL ohne /chat/completions-Suffix).
+  const customKey = clean(env.customApiKey);
+  const customUrl = clean(env.customBaseUrl);
+  if (customKey && customUrl) {
+    return {
+      url: `${customUrl.replace(/\/+$/, "")}/chat/completions`,
+      apiKey: customKey,
+      source: "custom",
+    };
+  }
+
   const groqKey = clean(env.groqApiKey);
   if (groqKey) {
     return {
@@ -127,6 +147,8 @@ export function resolveManagedLlmEndpoint(env: ManagedLlmEnv): ManagedLlmEndpoin
  */
 export function resolveManagedLlmEndpoints(env: ManagedLlmEnv): ManagedLlmEndpoint[] {
   const freeEnv: ManagedLlmEnv = {
+    customApiKey: env.customApiKey,
+    customBaseUrl: env.customBaseUrl,
     groqApiKey: env.groqApiKey,
     groqBaseUrl: env.groqBaseUrl,
     openrouterApiKey: env.openrouterApiKey,
@@ -138,12 +160,13 @@ export function resolveManagedLlmEndpoints(env: ManagedLlmEnv): ManagedLlmEndpoi
   const freeEndpoints: ManagedLlmEndpoint[] = [];
   const seenFreeSources = new Set<ManagedLlmEndpoint["source"]>();
   const freeKeyBySource: Record<string, keyof ManagedLlmEnv> = {
+    custom: "customApiKey",
     groq: "groqApiKey",
     openrouter: "openrouterApiKey",
     gemini: "geminiApiKey",
   };
-  // Gratis-Kette in Zero-Cost-Prioritaet: Groq > OpenRouter > Gemini.
-  for (let i = 0; i < 3; i += 1) {
+  // Gratis-Kette in Zero-Cost-Prioritaet: Custom > Groq > OpenRouter > Gemini.
+  for (let i = 0; i < 4; i += 1) {
     const endpoint = resolveManagedLlmEndpoint({ ...freeEnv });
     if (!endpoint || !isFreeManagedSource(endpoint.source)) break;
     if (seenFreeSources.has(endpoint.source)) break; // Key nicht entfernbar → Kette vollstaendig
@@ -184,4 +207,4 @@ export function resolveManagedLlmEndpoints(env: ManagedLlmEnv): ManagedLlmEndpoi
 
 /** Fehlermeldung, wenn gar kein Key konfiguriert ist. */
 export const MANAGED_LLM_NO_KEY_MESSAGE =
-  "OPENAI_API_KEY is not configured (weder Groq-, OpenRouter-, Gemini-, Forge- noch OpenAI-Key serverseitig gesetzt).";
+  "OPENAI_API_KEY is not configured (weder Custom-, Groq-, OpenRouter-, Gemini-, Forge- noch OpenAI-Key serverseitig gesetzt).";
