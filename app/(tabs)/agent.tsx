@@ -10,7 +10,7 @@
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import type { GlassAccent } from "@/lib/design/future-glass";
-import { glassPalette, glassType } from "@/lib/design/future-glass";
+import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { MarkdownLiteContent } from "@/components/chat/message-bubble";
 import { AgentAvatar } from "@/components/living/agent-avatar";
 import { resolveAvatarMood } from "@/lib/agent-avatar-logic";
@@ -1569,7 +1569,7 @@ export default function AgentScreen() {
                     multiline
                     onChangeText={setPrompt}
                     placeholder="Beschreibe eine Änderung, einen Fehler oder ein Refactoring …"
-                    placeholderTextColor="#708095"
+                    placeholderTextColor={glassSurface.textMuted}
                     style={styles.composerInput}
                     textAlignVertical="top"
                     value={prompt}
@@ -1612,7 +1612,7 @@ export default function AgentScreen() {
                     autoCapitalize="none"
                     onChangeText={setBackupPassword}
                     placeholder="Mindestens 12 Zeichen"
-                    placeholderTextColor="#708095"
+                    placeholderTextColor={glassSurface.textMuted}
                     secureTextEntry
                     style={styles.backupInput}
                     value={backupPassword}
@@ -1622,7 +1622,7 @@ export default function AgentScreen() {
                     autoCapitalize="none"
                     onChangeText={setBackupPasswordRepeat}
                     placeholder="Passwort wiederholen"
-                    placeholderTextColor="#708095"
+                    placeholderTextColor={glassSurface.textMuted}
                     secureTextEntry
                     style={styles.backupInput}
                     value={backupPasswordRepeat}
@@ -1806,7 +1806,7 @@ export default function AgentScreen() {
                         <IconSymbol
                           name="arrow.right"
                           size={14}
-                          color="#DFF7FF"
+                          color={glassSurface.textPrimary}
                         />
                       </TouchableOpacity>
                     ) : null}
@@ -1865,9 +1865,9 @@ export default function AgentScreen() {
 function createStyles() {
   return StyleSheet.create({
   eyebrow: { ...glassType.label, color: glassPalette.cyan, marginTop: 8 },
-  screenTitle: { ...glassType.display, color: "#F2F6FC", marginTop: 4 },
-  sectionLabel: { ...glassType.label, color: "#6E7B8C", marginTop: 18 },
-  sectionTitle: { ...glassType.headline, color: "#F2F6FC", marginTop: 2 },
+  screenTitle: { ...glassType.display, color: glassSurface.textPrimary, marginTop: 4 },
+  sectionLabel: { ...glassType.label, color: glassSurface.textMuted, marginTop: 18 },
+  sectionTitle: { ...glassType.headline, color: glassSurface.textPrimary, marginTop: 2 },
   flex: { flex: 1 },
   content: { paddingBottom: 20 },
   chatHero: {
@@ -1891,12 +1891,12 @@ function createStyles() {
   },
   chatHeroCopy: { flex: 1 },
   chatHeroTitle: {
-    color: "#F5F2FF",
+    color: glassSurface.textPrimary,
     fontSize: 16,
     fontWeight: "900",
     marginBottom: 4,
   },
-  chatHeroText: { color: "#A7A5BC", fontSize: 11, lineHeight: 16 },
+  chatHeroText: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
   promptChips: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1904,15 +1904,15 @@ function createStyles() {
     marginBottom: 16,
   },
   promptChip: {
-    backgroundColor: "#121827",
-    borderColor: "#2E3C55",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 999,
     borderWidth: 1,
     minHeight: 36,
     justifyContent: "center",
     paddingHorizontal: 12,
   },
-  promptChipText: { color: "#B8C7DB", fontSize: 10, fontWeight: "800" },
+  promptChipText: { color: glassSurface.textSecondary, fontSize: 10, fontWeight: "800" },
   readinessCard: {
     alignItems: "center",
     borderRadius: 16,
@@ -1934,12 +1934,12 @@ function createStyles() {
   },
   readinessCopy: { flex: 1 },
   readinessTitle: {
-    color: "#EDF4FC",
+    color: glassSurface.textPrimary,
     fontSize: 13,
     fontWeight: "900",
     marginBottom: 3,
   },
-  readinessText: { color: "#9CAABD", fontSize: 11, lineHeight: 16 },
+  readinessText: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
   providerStatusCard: {
     alignItems: "center",
     borderRadius: 15,
@@ -1950,11 +1950,11 @@ function createStyles() {
     padding: 11,
   },
   providerStatusLocal: { backgroundColor: darken(glassPalette.green, 0.78), borderColor: darken(glassPalette.green, 0.55) },
-  providerStatusCloud: { backgroundColor: "#17253A", borderColor: withAlpha(glassPalette.cyan, 0.25) },
+  providerStatusCloud: { backgroundColor: glassDepth.layer, borderColor: withAlpha(glassPalette.cyan, 0.25) },
   providerStatusWarning: { backgroundColor: darken(glassPalette.amber, 0.85), borderColor: darken(glassPalette.amber, 0.55) },
   providerStatusIcon: {
     alignItems: "center",
-    backgroundColor: "#0D151E",
+    backgroundColor: glassDepth.layer,
     borderRadius: 12,
     height: 30,
     justifyContent: "center",
@@ -1966,15 +1966,15 @@ function createStyles() {
   providerStatusDotWarning: { backgroundColor: glassPalette.amber },
   providerStatusCopy: { flex: 1, minWidth: 0 },
   providerStatusEyebrow: {
-    color: "#8E9CAF",
+    color: glassSurface.textSecondary,
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 1.1,
     marginBottom: 2,
   },
-  providerStatusTitle: { color: "#EFF6FF", fontSize: 12, fontWeight: "900" },
+  providerStatusTitle: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "900" },
   providerStatusText: {
-    color: "#AAB8C9",
+    color: glassSurface.textSecondary,
     fontSize: 10,
     lineHeight: 14,
     marginTop: 2,
@@ -1987,7 +1987,7 @@ function createStyles() {
     marginBottom: 25,
   },
   connectionTestText: {
-    color: "#AEB8CC",
+    color: glassSurface.textSecondary,
     flexShrink: 1,
     fontFamily: "WixMadeforText",
     fontSize: 12,
@@ -2004,8 +2004,8 @@ function createStyles() {
   },
   contextChip: {
     alignItems: "center",
-    backgroundColor: "#171C29",
-    borderColor: "#2A3449",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 999,
     borderWidth: 1,
     flex: 1,
@@ -2016,7 +2016,7 @@ function createStyles() {
     paddingVertical: 8,
   },
   contextText: {
-    color: "#C9D4E2",
+    color: glassSurface.textSecondary,
     flexShrink: 1,
     fontSize: 12,
     fontWeight: "700",
@@ -2029,29 +2029,29 @@ function createStyles() {
     marginTop: -12,
   },
   historyText: {
-    color: "#8294A9",
+    color: glassSurface.textSecondary,
     flex: 1,
     fontSize: 10,
     lineHeight: 14,
     marginRight: 8,
   },
   proposalQueueCard: {
-    backgroundColor: "#101824",
-    borderColor: "#283A50",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 12,
   },
   proposalQueueMeta: {
-    color: "#98AABE",
+    color: glassSurface.textSecondary,
     fontSize: 10,
     fontWeight: "800",
     marginBottom: 8,
   },
   proposalQueueRow: {
     alignItems: "center",
-    borderTopColor: "#1B2D3D",
+    borderTopColor: glassSurface.border,
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -2060,12 +2060,12 @@ function createStyles() {
   },
   proposalQueueRowMain: { flex: 1 },
   proposalQueueTitle: {
-    color: "#D3DFEC",
+    color: glassSurface.textPrimary,
     fontSize: 11,
     fontWeight: "900",
   },
   proposalQueueMetaSmall: {
-    color: "#8496AA",
+    color: glassSurface.textSecondary,
     fontSize: 9,
     lineHeight: 13,
     marginTop: 2,
@@ -2079,7 +2079,7 @@ function createStyles() {
   },
   proposalQueueAction: {
     alignItems: "center",
-    borderColor: "#2B3C52",
+    borderColor: glassSurface.border,
     borderRadius: 9,
     borderWidth: 1,
     minHeight: 28,
@@ -2088,29 +2088,29 @@ function createStyles() {
   },
   proposalQueueActionPrimary: {
     backgroundColor: withAlpha(glassPalette.cyan, 0.16),
-    borderColor: "#3D5A85",
+    borderColor: glassSurface.borderStrong,
   },
   proposalQueueActionText: {
-    color: "#BCCCE0",
+    color: glassSurface.textPrimary,
     fontSize: 10,
     fontWeight: "800",
   },
-  proposalQueueActionTextPrimary: { color: "#D8EFFF" },
+  proposalQueueActionTextPrimary: { color: glassSurface.textPrimary },
   proposalQueueMore: {
-    color: "#8C9FB2",
+    color: glassSurface.textSecondary,
     fontSize: 10,
     marginTop: 6,
   },
   clearHistoryButton: {
     alignItems: "center",
-    borderColor: "#3A4659",
+    borderColor: glassSurface.border,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 44,
     paddingHorizontal: 8,
   },
-  clearHistoryText: { color: "#AAB8C8", fontSize: 10, fontWeight: "800" },
+  clearHistoryText: { color: glassSurface.textSecondary, fontSize: 10, fontWeight: "800" },
   messageRow: {
     alignItems: "flex-start",
     flexDirection: "row",
@@ -2133,8 +2133,8 @@ function createStyles() {
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  agentBubble: { backgroundColor: "#151C29", borderTopLeftRadius: 5 },
-  userBubble: { backgroundColor: "#20354A", borderTopRightRadius: 5 },
+  agentBubble: { backgroundColor: glassDepth.layer, borderTopLeftRadius: 5 },
+  userBubble: { backgroundColor: glassDepth.layer, borderTopRightRadius: 5 },
   messageRole: {
     color: lighten(glassPalette.cyan, 0.12),
     fontSize: 10,
@@ -2143,15 +2143,15 @@ function createStyles() {
     marginBottom: 5,
   },
   userMessageRole: { color: lighten(glassPalette.cyan, 0.15) },
-  messageText: { color: "#E5ECF5", fontSize: 14, lineHeight: 20 },
+  messageText: { color: glassSurface.textPrimary, fontSize: 14, lineHeight: 20 },
   changeList: {
-    borderTopColor: "#2A3548",
+    borderTopColor: glassSurface.border,
     borderTopWidth: 1,
     marginTop: 11,
     paddingTop: 4,
   },
   selectionHint: {
-    color: "#9DACBD",
+    color: glassSurface.textSecondary,
     fontSize: 10,
     lineHeight: 15,
     marginTop: 7,
@@ -2169,7 +2169,7 @@ function createStyles() {
   changeRowSelected: { backgroundColor: withAlpha(glassPalette.cyan, 0.13) },
   changeSelection: {
     alignItems: "center",
-    borderColor: "#63718A",
+    borderColor: glassSurface.borderStrong,
     borderRadius: 5,
     borderWidth: 1,
     height: 18,
@@ -2181,7 +2181,7 @@ function createStyles() {
     borderColor: glassPalette.cyan,
   },
   changeSelectionMark: {
-    color: "#071218",
+    color: glassDepth.void,
     fontSize: 13,
     fontWeight: "900",
     lineHeight: 16,
@@ -2194,7 +2194,7 @@ function createStyles() {
     fontWeight: "800",
   },
   changeExplanation: {
-    color: "#9DACBD",
+    color: glassSurface.textSecondary,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 2,
@@ -2213,7 +2213,7 @@ function createStyles() {
     paddingVertical: 10,
   },
   applyButtonDisabled: { opacity: 0.55 },
-  applyText: { color: "#E6FAFF", fontSize: 12, fontWeight: "900" },
+  applyText: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "900" },
   undoButton: {
     alignItems: "center",
     borderColor: darken(glassPalette.amber, 0.35),
@@ -2238,8 +2238,8 @@ function createStyles() {
     marginTop: 12,
   },
   composerCard: {
-    backgroundColor: "#151A25",
-    borderColor: "#303D53",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 22,
     borderWidth: 1,
     marginTop: 8,
@@ -2253,7 +2253,7 @@ function createStyles() {
   },
   plusButton: {
     alignItems: "center",
-    borderColor: "#3D536B",
+    borderColor: glassSurface.borderStrong,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: "row",
@@ -2264,7 +2264,7 @@ function createStyles() {
     paddingHorizontal: 10,
   },
   plusButtonText: { color: glassPalette.cyan, fontSize: 25, lineHeight: 28 },
-  toolbarButtonText: { color: "#C7D4E4", fontSize: 11, fontWeight: "800" },
+  toolbarButtonText: { color: glassSurface.textSecondary, fontSize: 11, fontWeight: "800" },
   toolsButton: {
     alignItems: "center",
     borderColor: withAlpha(glassPalette.cyan, 0.22),
@@ -2277,8 +2277,8 @@ function createStyles() {
   },
   toolsButtonText: { color: lighten(glassPalette.cyan, 0.25), fontSize: 11, fontWeight: "800" },
   attachMenu: {
-    backgroundColor: "#0E151F",
-    borderColor: "#33445B",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -2288,7 +2288,7 @@ function createStyles() {
   },
   attachOption: {
     alignItems: "center",
-    borderColor: "#2E4057",
+    borderColor: glassSurface.border,
     borderRadius: 10,
     borderWidth: 1,
     flex: 1,
@@ -2298,13 +2298,13 @@ function createStyles() {
   },
   attachOptionIcon: { color: glassPalette.cyan, fontSize: 20, marginBottom: 2 },
   attachOptionText: {
-    color: "#C9D6E5",
+    color: glassSurface.textSecondary,
     fontSize: 10,
     fontWeight: "800",
     textAlign: "center",
   },
   toolsMenu: {
-    backgroundColor: "#111622",
+    backgroundColor: glassDepth.layer,
     borderColor: withAlpha(glassPalette.cyan, 0.22),
     borderRadius: 14,
     borderWidth: 1,
@@ -2320,20 +2320,20 @@ function createStyles() {
   },
   toolStatusRow: {
     alignItems: "center",
-    borderBottomColor: "#2B3448",
+    borderBottomColor: glassSurface.border,
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 38,
   },
-  toolName: { color: "#D7E1EE", fontSize: 12, fontWeight: "700" },
+  toolName: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "700" },
   toolStatusActive: { color: glassPalette.green, fontSize: 10, fontWeight: "900" },
   toolNameBlock: { flex: 1, paddingVertical: 7 },
-  toolDetail: { color: "#8798AD", fontSize: 10, marginTop: 2 },
+  toolDetail: { color: glassSurface.textMuted, fontSize: 10, marginTop: 2 },
   connectorActions: { alignItems: "center", flexDirection: "row", gap: 7 },
   configureButton: {
     alignItems: "center",
-    borderColor: "#3D536B",
+    borderColor: glassSurface.borderStrong,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -2352,15 +2352,15 @@ function createStyles() {
   },
   testButtonText: { color: glassPalette.cyan, fontSize: 10, fontWeight: "800" },
   connectorTestText: {
-    color: "#8293A8",
+    color: glassSurface.textMuted,
     fontSize: 9,
     marginLeft: 8,
     marginTop: -1,
   },
   skillToggle: {
     alignItems: "flex-start",
-    backgroundColor: "#2A3548",
-    borderColor: "#53627A",
+    backgroundColor: glassDepth.glass,
+    borderColor: glassSurface.borderStrong,
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: "center",
@@ -2374,14 +2374,14 @@ function createStyles() {
     borderColor: glassPalette.cyan,
   },
   skillToggleKnob: {
-    backgroundColor: "#9EACBD",
+    backgroundColor: glassSurface.textSecondary,
     borderRadius: 11,
     height: 22,
     width: 22,
   },
-  skillToggleKnobOn: { backgroundColor: "#DFFAFF" },
-  toolStatusMuted: { color: "#8293A8", fontSize: 10, fontWeight: "900" },
-  toolsHint: { color: "#8798AD", fontSize: 10, lineHeight: 15, marginTop: 8 },
+  skillToggleKnobOn: { backgroundColor: glassPalette.cyan },
+  toolStatusMuted: { color: glassSurface.textMuted, fontSize: 10, fontWeight: "900" },
+  toolsHint: { color: glassSurface.textMuted, fontSize: 10, lineHeight: 15, marginTop: 8 },
   attachmentList: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2389,8 +2389,8 @@ function createStyles() {
     marginBottom: 10,
   },
   attachmentPreviewCard: {
-    backgroundColor: "#101925",
-    borderColor: "#30445D",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.border,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -2399,7 +2399,7 @@ function createStyles() {
     width: "100%",
   },
   previewImageFrame: {
-    backgroundColor: "#0A111B",
+    backgroundColor: glassDepth.deep,
     height: 74,
     justifyContent: "center",
     overflow: "hidden",
@@ -2409,7 +2409,7 @@ function createStyles() {
   previewImage: { height: "100%", width: "100%" },
   previewLoading: {
     alignItems: "center",
-    backgroundColor: "#0A111B",
+    backgroundColor: glassDepth.deep,
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -2419,21 +2419,21 @@ function createStyles() {
     zIndex: 1,
   },
   previewLoadingText: {
-    color: "#A7B8CB",
+    color: glassSurface.textSecondary,
     fontSize: 8,
     marginTop: 3,
     textAlign: "center",
   },
   previewFallback: {
     alignItems: "center",
-    backgroundColor: "#16253A",
+    backgroundColor: glassDepth.layer,
     height: 74,
     justifyContent: "center",
     width: 88,
   },
   previewFallbackIcon: { color: glassPalette.cyan, fontSize: 23, fontWeight: "900" },
   previewFallbackKind: {
-    color: "#829DB8",
+    color: glassSurface.textSecondary,
     fontSize: 8,
     fontWeight: "900",
     letterSpacing: 1,
@@ -2444,11 +2444,11 @@ function createStyles() {
     minWidth: 0,
     paddingHorizontal: 10,
   },
-  previewKind: { color: "#8293A8", fontSize: 9, marginTop: 4 },
+  previewKind: { color: glassSurface.textMuted, fontSize: 9, marginTop: 4 },
   attachmentChip: {
     alignItems: "center",
-    backgroundColor: "#1B2B3C",
-    borderColor: "#3A6A80",
+    backgroundColor: glassDepth.layer,
+    borderColor: glassSurface.borderStrong,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
@@ -2459,7 +2459,7 @@ function createStyles() {
     paddingRight: 4,
   },
   attachmentName: {
-    color: "#BFEAF6",
+    color: glassSurface.textPrimary,
     flexShrink: 1,
     fontSize: 10,
     fontWeight: "700",
@@ -2470,16 +2470,16 @@ function createStyles() {
     minHeight: 28,
     minWidth: 28,
   },
-  removeAttachmentText: { color: "#9CB4C6", fontSize: 20, lineHeight: 22 },
+  removeAttachmentText: { color: glassSurface.textSecondary, fontSize: 20, lineHeight: 22 },
   composerLabel: {
-    color: "#75859B",
+    color: glassSurface.textMuted,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1.2,
     marginBottom: 9,
   },
   composerInput: {
-    color: "#EEF4FC",
+    color: glassSurface.textPrimary,
     fontSize: 14,
     lineHeight: 20,
     maxHeight: 120,
@@ -2487,7 +2487,7 @@ function createStyles() {
     padding: 0,
   },
   composerHint: {
-    color: "#8293A8",
+    color: glassSurface.textMuted,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 10,
@@ -2520,11 +2520,11 @@ function createStyles() {
     marginBottom: 11,
   },
   backupInput: {
-    backgroundColor: "#121823",
+    backgroundColor: glassDepth.layer,
     borderColor: darken(glassPalette.amber, 0.65),
     borderRadius: 10,
     borderWidth: 1,
-    color: "#EDF4FC",
+    color: glassSurface.textPrimary,
     fontSize: 13,
     marginBottom: 8,
     minHeight: 44,
@@ -2551,7 +2551,7 @@ function createStyles() {
   },
   backupVerificationText: { color: darken(glassPalette.amber, 0.2), fontSize: 10, lineHeight: 15 },
   backupPreviewExcerpt: {
-    color: "#E2D9C0",
+    color: glassSurface.textSecondary,
     fontSize: 10,
     fontStyle: "italic",
     lineHeight: 15,
