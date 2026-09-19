@@ -1,4 +1,14 @@
-import { useColors } from "@/hooks/use-colors";
+/**
+ * Sprint 176 — Superagenten-Chat auf "CyberSarah Future Glass" umgebaut
+ * (Fortsetzung der Sprints 168/173-175).
+ *
+ * Logik (Orchestrator-Run, Live-Polling, Optimistic Rows, Schritt-Details,
+ * Secrets-Vault-Modal, Optimizer-Trigger, Chat-Composer mit Enter-Send)
+ * bleibt unveraendert; nur die visuelle Schicht wechselt auf das
+ * verbindliche Glass-System: GlassBackdrop statt Flachhintergrund,
+ * GlassCard-Bubbles, Palette/Token aus lib/design/future-glass statt
+ * cyber-theme/useColors-Hartkodierungen.
+ */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,37 +25,24 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { cyber, cyberTypography } from "@/lib/cyber-theme";
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlassCard } from "@/components/glass/glass-primitives";
+import { AiCore } from "@/components/glass/ai-core";
+import { accentAlpha, glassDepth, glassPalette, glassRadii, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
 import { coerceLedgerTask, type LedgerTask } from "@/lib/task-ledger-logic";
 import { buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { SecretsPanel } from "@/components/secrets/secrets-panel";
 
-/**
- * Sprint 149 — Superagent-Tab als echtes Chatfenster.
- *
- * Vorher war der Tab ein langes Scroll-Formular: Ziel oben eingeben,
- * Antwort unten im Task-Ledger suchen. Jetzt funktioniert er wie ein
- * Messenger:
- *  - Ziel eintippen → erscheint als Nutzer-Nachricht (rechts)
- *  - Der Superagent antwortet direkt darunter im Chat-Strom (links):
- *    Live-Schritte, Selbstkorrektur-Runden und die finale Antwort —
- *    die Liste scrollt automatisch auf die neueste Nachricht.
- *  - Eingabefeld ist fixiert unten, Netz oben kompakt.
- *
- * Zugrundeliegende Runtime: server/orchestrator/superagent.ts —
- * Task-Decomposition, Tool-Ausfuehrung, Selbstkorrektur. Admin-gated.
- */
-
 type TaskStatus = "pending" | "running" | "success" | "failed" | "escalated";
 
 const STATUS_META: Record<TaskStatus, { label: string; color: string }> = {
-  pending: { label: "WARTE", color: cyber.textDim },
-  running: { label: "LÄUFT", color: cyber.cyan },
-  success: { label: "GRÜN", color: cyber.green },
-  failed: { label: "FEHLER", color: cyber.pink },
-  escalated: { label: "ESKALIERT", color: cyber.pink },
+  pending: { label: "WARTE", color: glassPalette.blue },
+  running: { label: "LÄUFT", color: glassPalette.cyan },
+  success: { label: "GRÜN", color: glassPalette.green },
+  failed: { label: "FEHLER", color: glassPalette.red },
+  escalated: { label: "ESKALIERT", color: glassPalette.magenta },
 };
 
 function formatTime(iso: string): string {
@@ -57,8 +54,6 @@ function formatTime(iso: string): string {
 }
 
 export default function SuperagentScreen() {
-  const colors = useColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const isAdmin = accountQuery.data?.role === "admin";
 
@@ -196,88 +191,95 @@ export default function SuperagentScreen() {
 
   if (!isAdmin) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <View style={styles.center}>
-          <Text style={styles.lockTitle}>Admin-Zugang erforderlich</Text>
-          <Text style={styles.lockText}>
-            Die autonome Ausführung (Git, Render, Infrastruktur) ist vertrauensvoll und nur für Administratoren freigeschaltet. Melde dich mit deinem Admin-Konto an.
-          </Text>
-        </View>
-      </SafeAreaView>
+      <GlassBackdrop accent="purple">
+        <SafeAreaView style={styles.safe} edges={["top"]}>
+          <View style={styles.center}>
+            <AiCore state="idle" size={44} />
+            <Text style={styles.lockTitle}>Admin-Zugang erforderlich</Text>
+            <Text style={styles.lockText}>
+              Die autonome Ausführung (Git, Render, Infrastruktur) ist vertrauensvoll und nur für Administratoren freigeschaltet. Melde dich mit deinem Admin-Konto an.
+            </Text>
+          </View>
+        </SafeAreaView>
+      </GlassBackdrop>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={styles.root}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
-      >
-        {/* Kompakter Netz-Kopf */}
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <View style={styles.menuRow}>
-              <NavDrawer {...navDrawer.drawerProps} />
-              <NavDrawerButton {...navDrawer.hamburgerProps} />
-            </View>
-            <Text style={styles.headerTitle}>
-              SUPER<Text style={{ color: colors.tint }}>AGENT</Text>
-            </Text>
-          </View>
-          <Pressable
-            style={styles.optimizerChip}
-            onPress={() => {
-              void optimizerTrigger.mutateAsync().catch((e: unknown) =>
-                setError(e instanceof Error ? e.message : "Optimizer-Start fehlgeschlagen."),
-              );
-            }}
-          >
-            {optimizerTrigger.isPending ? (
-              <ActivityIndicator size="small" color={optimizerQuery.data?.enabled ? colors.success : colors.icon} />
-            ) : (
-              <Text
-                style={[
-                  styles.optimizerChipText,
-                  { color: optimizerQuery.data?.enabled ? colors.success : colors.icon },
-                ]}
-              >
-                ⟲ OPTIMIZER {optimizerQuery.data?.enabled ? "AKTIV" : "AUS"} · {toolCount > 0 ? `${toolCount} TOOLS` : "TOOLS"}
-              </Text>
-            )}
-          </Pressable>
-          {optimizerQuery.data?.lastError ? (
-            <Text style={styles.optimizerError} numberOfLines={1}>{optimizerQuery.data.lastError}</Text>
-          ) : null}
-          <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
-            <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
-          </Pressable>
-        </View>
-
-        {/* Sprint 167: Secrets-Bereich des Superagenten-Chats */}
-        <Modal
-          visible={vaultOpen}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setVaultOpen(false)}
+    <GlassBackdrop accent="purple">
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        <KeyboardAvoidingView
+          style={styles.root}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
         >
-          <View style={[styles.vaultModal, { backgroundColor: colors.background }]}>
-            <View style={styles.vaultModalHeader}>
-              <Text style={styles.vaultModalTitle}>
-                VAULT<Text style={{ color: colors.tint }}>SECRETS</Text>
-              </Text>
-              <Pressable onPress={() => setVaultOpen(false)} style={styles.vaultClose}>
-                <Text style={styles.vaultCloseText}>Schließen</Text>
-              </Pressable>
+          {/* Kompakter Netz-Kopf */}
+          <View style={styles.header}>
+            <View style={styles.headerRow}>
+              <View style={styles.menuRow}>
+                <NavDrawer {...navDrawer.drawerProps} />
+                <NavDrawerButton {...navDrawer.hamburgerProps} />
+              </View>
+              <View style={styles.headerTitleRow}>
+                <AiCore state={activeId != null ? "executing" : "idle"} size={24} />
+                <Text style={styles.headerTitle}>
+                  SUPER<Text style={styles.headerTitleAccent}>AGENT</Text>
+                </Text>
+              </View>
             </View>
-            <ScrollView contentContainerStyle={styles.vaultContent}>
-              <SecretsPanel />
-            </ScrollView>
+            <Pressable
+              style={styles.optimizerChip}
+              onPress={() => {
+                void optimizerTrigger.mutateAsync().catch((e: unknown) =>
+                  setError(e instanceof Error ? e.message : "Optimizer-Start fehlgeschlagen."),
+                );
+              }}
+            >
+              {optimizerTrigger.isPending ? (
+                <ActivityIndicator size="small" color={optimizerQuery.data?.enabled ? glassPalette.green : glassPalette.cyan} />
+              ) : (
+                <Text
+                  style={[
+                    styles.optimizerChipText,
+                    { color: optimizerQuery.data?.enabled ? glassPalette.green : glassPalette.cyan },
+                  ]}
+                >
+                  ⟲ OPTIMIZER {optimizerQuery.data?.enabled ? "AKTIV" : "AUS"} · {toolCount > 0 ? `${toolCount} TOOLS` : "TOOLS"}
+                </Text>
+              )}
+            </Pressable>
+            {optimizerQuery.data?.lastError ? (
+              <Text style={styles.optimizerError} numberOfLines={1}>{optimizerQuery.data.lastError}</Text>
+            ) : null}
+            <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
+              <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
+            </Pressable>
           </View>
-        </Modal>
 
-        {/* Chat-Strom */}
-        <FlatList
+          {/* Sprint 167: Secrets-Bereich des Superagenten-Chats */}
+          <Modal
+            visible={vaultOpen}
+            animationType="slide"
+            presentationStyle="pageSheet"
+            onRequestClose={() => setVaultOpen(false)}
+          >
+            <View style={styles.vaultModal}>
+              <View style={styles.vaultModalHeader}>
+                <Text style={styles.vaultModalTitle}>
+                  VAULT<Text style={styles.headerTitleAccent}>SECRETS</Text>
+                </Text>
+                <Pressable onPress={() => setVaultOpen(false)} style={styles.vaultClose}>
+                  <Text style={styles.vaultCloseText}>Schließen</Text>
+                </Pressable>
+              </View>
+              <ScrollView contentContainerStyle={styles.vaultContent}>
+                <SecretsPanel />
+              </ScrollView>
+            </View>
+          </Modal>
+
+          {/* Chat-Strom */}
+          <FlatList
                 initialNumToRender={12}
                 maxToRenderPerBatch={8}
                 windowSize={9}
@@ -290,32 +292,34 @@ export default function SuperagentScreen() {
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <View style={styles.emptyBubble}>
-              <Text style={styles.emptyTitle}>AUTONOME AUSFÜHRUNG BEREIT</Text>
-              <Text style={styles.emptyText}>
-                Gib ein Ziel ein — der Superagent zerlegt es selbst in Schritte, nutzt seine Tools und korrigiert sich eigenständig. Der Verlauf läuft hier wie ein Chat.
-              </Text>
+            <View style={styles.emptyBubbleWrap}>
+              <GlassCard accent="purple" glow={1} style={styles.emptyBubble}>
+                <Text style={styles.emptyTitle}>AUTONOME AUSFÜHRUNG BEREIT</Text>
+                <Text style={styles.emptyText}>
+                  Gib ein Ziel ein — der Superagent zerlegt es selbst in Schritte, nutzt seine Tools und korrigiert sich eigenständig. Der Verlauf läuft hier wie ein Chat.
+                </Text>
+              </GlassCard>
             </View>
           }
           renderItem={({ item }) =>
             item.kind === "objective" ? (
               <View style={styles.objectiveBubbleWrap}>
-                <View style={styles.objectiveBubble}>
+                <GlassCard accent="cyan" style={styles.objectiveBubble}>
                   <Text style={styles.objectiveTitle} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.objectiveText}>{item.objective}</Text>
                   <Text style={styles.objectiveMeta}>{formatTime(item.createdAt)}</Text>
-                </View>
+                </GlassCard>
               </View>
             ) : (
               <View style={styles.answerBubbleWrap}>
-                <Pressable style={styles.answerBubble} onPress={() => toggleExpanded(item.key)}>
+                <GlassCard accent="purple" onPress={() => toggleExpanded(item.key)} style={styles.answerBubble} testID="superagent-answer-bubble">
                   <View style={styles.answerHead}>
                     <Text
                       style={[
                         styles.statusBadge,
                         {
                           color: STATUS_META[item.status].color,
-                          borderColor: `${STATUS_META[item.status].color}66`,
+                          borderColor: glassSurface.borderStrong,
                         },
                       ]}
                     >
@@ -329,7 +333,7 @@ export default function SuperagentScreen() {
 
                   {item.status === "running" || item.status === "pending" ? (
                     <View style={styles.progressRow}>
-                      <ActivityIndicator size="small" color={colors.tint} />
+                      <ActivityIndicator size="small" color={glassPalette.cyan} />
                       <Text style={styles.progressText}>
                         {item.steps.length > 0 ? item.steps[item.steps.length - 1].name : "Ziel wird zerlegt …"}
                       </Text>
@@ -340,12 +344,12 @@ export default function SuperagentScreen() {
                     <View style={styles.stepBox}>
                       {item.steps.map((step) => {
                         const sm = step.status === "success"
-                          ? { dot: "●", color: colors.success }
+                          ? { dot: "●", color: glassPalette.green }
                           : step.status === "failed"
-                            ? { dot: "✕", color: colors.tint }
+                            ? { dot: "✕", color: glassPalette.red }
                             : step.status === "running"
-                              ? { dot: "◐", color: colors.tint }
-                              : { dot: "○", color: colors.icon };
+                              ? { dot: "◐", color: glassPalette.cyan }
+                              : { dot: "○", color: glassPalette.blue };
                         return (
                           <View key={step.id} style={styles.stepRow}>
                             <Text style={[styles.stepDot, { color: sm.color }]}>{sm.dot}</Text>
@@ -379,7 +383,7 @@ export default function SuperagentScreen() {
                       Kein finales Ergebnis — tippe für die Schritt-Details und Logs.
                     </Text>
                   ) : null}
-                </Pressable>
+                </GlassCard>
               </View>
             )
           }
@@ -392,7 +396,7 @@ export default function SuperagentScreen() {
             <TextInput
               style={styles.composerInput}
               placeholder="Ziel eingeben — z. B. Prüfe den Produktiv-Deploy …"
-              placeholderTextColor={colors.icon}
+              placeholderTextColor={glassSurface.textMuted}
               value={objective}
               onChangeText={setObjective}
               multiline
@@ -409,9 +413,11 @@ export default function SuperagentScreen() {
               style={[styles.sendButton, (objective.trim().length < 3 || runMutation.isPending) && styles.sendButtonDisabled]}
               disabled={objective.trim().length < 3 || runMutation.isPending}
               onPress={() => void startRun()}
+              accessibilityRole="button"
+              accessibilityLabel="Ziel an den Superagenten senden"
             >
               {runMutation.isPending ? (
-                <ActivityIndicator color={colors.background} size="small" />
+                <ActivityIndicator color={glassDepth.void} size="small" />
               ) : (
                 <Text style={styles.sendButtonText}>▶</Text>
               )}
@@ -420,95 +426,99 @@ export default function SuperagentScreen() {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+      </GlassBackdrop>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const styles = StyleSheet.create({
+  safe: { flex: 1 },
   root: { flex: 1 },
   list: { flex: 1 },
-  listContent: { padding: 16, paddingBottom: 24, gap: 10 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 10 },
-  lockTitle: { color: colors.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  lockText: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: "center" },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 6, borderBottomWidth: 1, borderBottomColor: `${colors.tint}18` },
+  listContent: { padding: glassSpacing.lg, paddingBottom: glassSpacing.xxl, gap: glassSpacing.sm },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: glassSpacing.xxxl, gap: glassSpacing.md },
+  lockTitle: { ...glassType.title, color: glassSurface.textPrimary, textAlign: "center" },
+  lockText: { ...glassType.body, color: glassSurface.textSecondary, lineHeight: 19, textAlign: "center" },
+  header: { paddingHorizontal: glassSpacing.lg, paddingTop: glassSpacing.sm, paddingBottom: glassSpacing.sm, gap: 6, borderBottomWidth: 1, borderBottomColor: glassSurface.border },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  menuRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerTitle: { ...cyberTypography.display, color: colors.text, fontSize: 22 },
-  optimizerChip: { alignSelf: "flex-start", borderWidth: 1, borderColor: `${colors.tint}33`, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: colors.surface },
-  optimizerChipText: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5 },
-  optimizerError: { color: colors.tint, fontSize: 11 },
+  menuRow: { flexDirection: "row", alignItems: "center", gap: glassSpacing.sm },
+  headerTitleRow: { flexDirection: "row", alignItems: "center", gap: glassSpacing.sm },
+  headerTitle: { ...glassType.headline, fontSize: 22, color: glassSurface.textPrimary },
+  headerTitleAccent: { color: glassPalette.purple },
+  optimizerChip: { alignSelf: "flex-start", borderWidth: 1, borderColor: accentAlpha("cyan", 0.4), borderRadius: glassRadii.pill, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: glassDepth.glass },
+  optimizerChipText: { ...glassType.label, letterSpacing: 1.5 },
+  optimizerError: { ...glassType.caption, color: glassPalette.amber },
   objectiveBubbleWrap: { flexDirection: "row", justifyContent: "flex-end" },
-  objectiveBubble: { backgroundColor: `${colors.tint}26`, borderWidth: 1, borderColor: `${colors.tint}55`, borderRadius: 14, borderBottomRightRadius: 4, padding: 12, maxWidth: "82%", gap: 4 },
-  objectiveTitle: { color: colors.tint, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
-  objectiveText: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  objectiveMeta: { color: colors.icon, fontSize: 10, alignSelf: "flex-end" },
+  objectiveBubble: { borderBottomRightRadius: 4, padding: glassSpacing.md, maxWidth: "82%", gap: glassSpacing.xs },
+  objectiveTitle: { ...glassType.label, color: glassPalette.cyan, letterSpacing: 1 },
+  objectiveText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 20 },
+  objectiveMeta: { ...glassType.label, color: glassSurface.textMuted, alignSelf: "flex-end" },
   answerBubbleWrap: { flexDirection: "row", justifyContent: "flex-start" },
-  answerBubble: { backgroundColor: colors.surface, borderWidth: 1, borderColor: `${colors.tint}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 12, maxWidth: "92%", flex: 1, gap: 8 },
-  answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  statusBadge: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  answerMeta: { color: colors.icon, fontSize: 11 },
-  progressRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  progressText: { color: colors.tint, fontSize: 12 },
-  stepBox: { gap: 8, borderTopWidth: 1, borderTopColor: `${colors.tint}18`, paddingTop: 8 },
-  stepRow: { flexDirection: "row", gap: 8 },
+  answerBubble: { borderBottomLeftRadius: 4, padding: glassSpacing.md, maxWidth: "92%", flex: 1, gap: glassSpacing.sm },
+  answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: glassSpacing.sm },
+  statusBadge: { ...glassType.label, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, letterSpacing: 1.5 },
+  answerMeta: { ...glassType.caption, color: glassSurface.textMuted, fontSize: 11 },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: glassSpacing.md },
+  progressText: { ...glassType.caption, color: glassPalette.cyan },
+  stepBox: { gap: glassSpacing.sm, borderTopWidth: 1, borderTopColor: glassSurface.border, paddingTop: glassSpacing.sm },
+  stepRow: { flexDirection: "row", gap: glassSpacing.sm },
   stepDot: { fontSize: 12, lineHeight: 18 },
   stepMain: { flex: 1, gap: 2 },
-  stepName: { color: colors.text, fontSize: 12, fontWeight: "600" },
-  stepMeta: { color: colors.icon, fontSize: 10 },
-  stepError: { color: colors.tint, fontSize: 10 },
-  logBox: { backgroundColor: colors.surface, borderRadius: 6, padding: 6, gap: 2 },
-  logLine: { color: colors.muted, fontSize: 10, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }) },
-  finalBox: { borderTopWidth: 1, borderTopColor: `${colors.tint}18`, paddingTop: 8, gap: 2 },
-  finalLabel: { color: colors.success, fontSize: 10, fontWeight: "800", letterSpacing: 2 },
-  finalText: { color: colors.text, fontSize: 13, lineHeight: 19 },
-  noAnswerText: { color: colors.icon, fontSize: 11, fontStyle: "italic" },
-  emptyBubble: { backgroundColor: colors.surface, borderWidth: 1, borderColor: `${colors.tint}22`, borderRadius: 14, borderBottomLeftRadius: 4, padding: 14, gap: 6, marginTop: 24 },
-  emptyTitle: { color: colors.tint, fontSize: 12, fontWeight: "800", letterSpacing: 2 },
-  emptyText: { color: colors.muted, fontSize: 13, lineHeight: 19 },
-  composer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, borderTopWidth: 1, borderTopColor: `${colors.tint}18`, backgroundColor: colors.background, gap: 6 },
-  composerRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  stepName: { ...glassType.caption, color: glassSurface.textPrimary, fontWeight: "600" },
+  stepMeta: { ...glassType.label, color: glassSurface.textMuted, letterSpacing: 0 },
+  stepError: { ...glassType.label, color: glassPalette.red, letterSpacing: 0 },
+  logBox: { backgroundColor: glassDepth.layer, borderRadius: 6, padding: 6, gap: 2 },
+  logLine: { ...glassType.label, color: glassSurface.textMuted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), letterSpacing: 0 },
+  finalBox: { borderTopWidth: 1, borderTopColor: glassSurface.border, paddingTop: glassSpacing.sm, gap: 2 },
+  finalLabel: { ...glassType.label, color: glassPalette.green, letterSpacing: 2 },
+  finalText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 19, fontSize: 13 },
+  noAnswerText: { ...glassType.caption, color: glassSurface.textMuted, fontStyle: "italic" },
+  emptyBubbleWrap: { marginTop: glassSpacing.xl },
+  emptyBubble: { padding: glassSpacing.lg, gap: glassSpacing.xs },
+  emptyTitle: { ...glassType.label, color: glassPalette.purple, letterSpacing: 2 },
+  emptyText: { ...glassType.body, color: glassSurface.textSecondary, lineHeight: 19 },
+  composer: { paddingHorizontal: glassSpacing.md, paddingTop: glassSpacing.sm, paddingBottom: 6, borderTopWidth: 1, borderTopColor: glassSurface.border, backgroundColor: glassDepth.void, gap: 6 },
+  composerRow: { flexDirection: "row", alignItems: "flex-end", gap: glassSpacing.sm },
   composerInput: {
     flex: 1,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    borderRadius: 12,
+    backgroundColor: glassDepth.layer,
+    color: glassSurface.textPrimary,
+    borderRadius: glassRadii.md,
     borderWidth: 1,
-    borderColor: `${colors.tint}33`,
-    paddingHorizontal: 12,
+    borderColor: accentAlpha("cyan", 0.32),
+    paddingHorizontal: glassSpacing.md,
     paddingTop: 10,
     paddingBottom: 10,
     fontSize: 14,
     maxHeight: 120,
     textAlignVertical: "top",
   },
-  sendButton: { backgroundColor: colors.tint, borderRadius: 12, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  sendButton: { backgroundColor: accentAlpha("cyan", 0.92), borderRadius: glassRadii.md, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
   sendButtonDisabled: { opacity: 0.45 },
+  sendButtonText: { color: glassDepth.void, fontWeight: "900", fontSize: 16 },
   vaultChip: {
     alignSelf: "flex-start",
-    borderRadius: 999,
+    borderRadius: glassRadii.pill,
     borderWidth: 1,
-    borderColor: `${colors.tint}55`,
+    borderColor: accentAlpha("purple", 0.5),
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginTop: 6,
     marginLeft: 8,
   },
-  vaultChipText: { fontSize: 10, letterSpacing: 1, color: colors.tint, fontWeight: "700" },
-  vaultModal: { flex: 1, paddingTop: 16 },
+  vaultChipText: { ...glassType.label, color: glassPalette.purple, letterSpacing: 1 },
+  vaultModal: { flex: 1, paddingTop: glassSpacing.lg, backgroundColor: glassDepth.void },
   vaultModalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: glassSpacing.lg,
+    paddingBottom: glassSpacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: glassSurface.border,
   },
-  vaultModalTitle: { fontSize: 16, fontWeight: "800", letterSpacing: 1, color: colors.text },
+  vaultModalTitle: { ...glassType.title, letterSpacing: 1, color: glassSurface.textPrimary },
   vaultClose: { paddingVertical: 6, paddingHorizontal: 10 },
-  vaultCloseText: { color: colors.tint, fontSize: 13, fontWeight: "600" },
-  vaultContent: { padding: 16, paddingBottom: 40 },
-  sendButtonText: { color: colors.background, fontWeight: "900", fontSize: 16 },
-  errorText: { color: colors.tint, fontSize: 12 },
+  vaultCloseText: { ...glassType.body, color: glassPalette.cyan },
+  vaultContent: { padding: glassSpacing.lg, paddingBottom: 40 },
+  errorText: { ...glassType.caption, color: glassPalette.red },
 });
