@@ -19,7 +19,8 @@
     "build:android": "npx eas-cli@latest build --platform android --profile production",
     "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "verify:system": "tsx scripts/system-verify.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

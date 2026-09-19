@@ -26,6 +26,8 @@ import os from "os";
 import path from "path";
 import { randomUUID } from "crypto";
 
+import { evaluateHITLRisk } from "../../lib/hitl-guard-logic";
+
 export interface ToolResult {
   ok: boolean;
   result?: unknown;
@@ -309,6 +311,20 @@ export async function executeTool(name: string, args: Record<string, unknown> = 
   }
   const confirmationError = requireConfirmation(tool, args);
   if (confirmationError) return confirmationError;
+
+  // HITL-Guardrail (Sprint 161): Zweite Safety-Schicht nach der Registry-
+  // Allowlist. Bewertung ueber die zentrale Risiko-Logik — bei
+  // OPERATOR_CONFIRM_REQUIRED blockiert der Aufruf, bis der Operator ihn
+  // mit confirm=true dokumentiert bestaetigt.
+  const hitlAssessment = evaluateHITLRisk(tool.name, args);
+  if (hitlAssessment.requiresConfirmation && args.confirm !== true) {
+    return {
+      ok: false,
+      error:
+        `HITL ${hitlAssessment.status} (${hitlAssessment.category}): ${hitlAssessment.reason} ` +
+        `Operator-Bestaetigung erforderlich — Parameter confirm=true setzen.`,
+    };
+  }
   return tool.handler(args);
 }
 
