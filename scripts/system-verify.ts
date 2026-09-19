@@ -62,6 +62,7 @@ const requiredModules: { file: string; label: string }[] = [
   { file: "lib/key-rotation-logic.ts", label: "Multi-LLM Key-Rotation" },
   { file: "lib/managed-llm-fallback-logic.ts", label: "Managed LLM-Fallback (Ollama-Notfall) " },
   { file: "lib/vector-memory-logic.ts", label: "Vector Memory" },
+  { file: "server/vector-memory-store.ts", label: "Vector Memory Store-Adapter (Drizzle)" },
   { file: "lib/repo-chat-logic.ts", label: "Repo Chat" },
   { file: "lib/payment-fallback-logic.ts", label: "Multi-PSP Fallback" },
   { file: "lib/mcp-client-logic.ts", label: "MCP Netzwerk-Client" },

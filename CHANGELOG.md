@@ -1,3 +1,15 @@
+## Sprint 162 (2026-09-19) — Vektor-Gedaechtnis produktiv: Tabelle, Store-Adapter, Prompt-Injektion
+
+### Memory
+- Neue Drizzle-Tabelle `agentMemoryVectors` (Migration 0007: userOpenId, source, refId, text, vector jsonb, metadata, Index auf (userOpenId, createdAt)) — laeuft ohne Erweiterung, pgvector-ready dokumentiert; Migration zieht die in Sprint 160 fehlende `users.designTheme`-Spalte nach.
+- `server/vector-memory-store.ts`: VectorMemoryStore-Vertrag produktiv gebunden — save/query (Kosinus-Ranking anwendungsseitig, 200 Kandidaten), `queryUserBestPractices()`, `persistLearningVector()`; ehrlicher No-DB-Pfad.
+- `server/development-chat.ts`: Agenten fragen vor neuen Aktionen historische Best-Practices aus dem Vektor-Gedaechtnis ab (Kontext-Injektion neben den keyword-gerankten Learnings); save_learning und Auto-Learnings werden parallel als Vektor-Erinnerung persistiert (Best-Effort, nie blockierend).
+- `lib/vector-memory-logic.ts`: `formatBestPracticesForContext()` — deduplizierte, gekapte, nummerierte Snippets (max. 3) fuer den System-Prompt.
+
+### Verifikation
+- 1127 Tests gruen (4 neu), tsc sauber, 0 Lint-Errors, verify:system GREEN mit 10 Kernmodulen. Bericht: `docs/SPRINT_162_VEKTOR_GEDAECHTNIS.md`. Offen: Migration 0007 auf Neon anwenden (Owner), repo.searchCode-Tool (Sprint 163).
+
+
 ## Sprint 161 (2026-09-19) — V4.0-Integration: HITL, Vector Memory, Repo Chat, Multi-PSP & System-Verify
 
 ### Sicherheit

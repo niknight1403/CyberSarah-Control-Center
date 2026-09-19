@@ -9,6 +9,8 @@ import {
   users,
   InsertAgentLearning,
   agentLearnings,
+  agentMemoryVectors,
+  InsertAgentMemoryVector,
   agentMemoryConsolidations,
   InsertAgentMemoryConsolidation,
   projects,
@@ -515,6 +517,32 @@ export async function listRecentAgentLearnings(userOpenId: string, limit = 50) {
     .limit(Math.max(1, Math.min(limit, 200)));
 }
 
+
+/* ============================================================
+ * Sprint 162 — Vektor-Gedaechtnis (Datenbankzugriff).
+ * Reine Regeln liegen in lib/vector-memory-logic.ts; der
+ * Store-Vertrag wird in server/vector-memory-store.ts gebunden.
+ * ============================================================ */
+
+/** Vektor-Erinnerung speichern (Einbettung aus lib/vector-memory-logic). */
+export async function insertAgentMemoryVectorRecord(input: InsertAgentMemoryVector) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Vektor-Erinnerung nicht speicherbar.");
+  const [saved] = await db.insert(agentMemoryVectors).values(input).returning();
+  return saved;
+}
+
+/** Letzte Vektor-Erinnerungen eines Nutzers (Neueste zuerst, gekappt). */
+export async function listRecentAgentMemoryVectors(userOpenId: string, limit = 200) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Vektor-Erinnerungen nicht lesbar.");
+  return db
+    .select()
+    .from(agentMemoryVectors)
+    .where(eq(agentMemoryVectors.userOpenId, userOpenId))
+    .orderBy(desc(agentMemoryVectors.createdAt), desc(agentMemoryVectors.id))
+    .limit(Math.max(1, Math.min(limit, 1000)));
+}
 
 /* ============================================================
  * Sprint 113 — Memory-Konsolidierung (Datenbankzugriff).

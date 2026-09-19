@@ -9,6 +9,8 @@ import {
   turnDeservesLearning,
 } from "../lib/agent-memory-logic";
 import { measureRetrievalOnUserMessage, recordLearningInjection } from "./retrieval-metrics";
+import { formatBestPracticesForContext } from "../lib/vector-memory-logic";
+import { persistLearningVector, queryUserBestPractices } from "./vector-memory-store";
 import { sanitizeSessionId } from "../lib/chat-session-logic";
 import {
   DEFAULT_DAILY_CHAT_LIMIT,
@@ -69,6 +71,8 @@ import {
   probeLocalProviders,
 } from "./model-router";
 
+import { autonomousKeyRecovery, getRuntimeApiKey, isProviderDisabledRuntime } from "./provider-admin";
+
 const providerSchema = z.enum([
   "auto",
   "managed",
@@ -124,8 +128,6 @@ Sprache und Verständlichkeit (Sprint 138):
 - Gib niemals rohe JSON-Objekte, Tool-Protokolle, Log-Auszüge oder interne Statusmeldungen aus — fasse Ergebnisse immer in normalen Worten zusammen. Wenn du Werkzeuge benutzt hast, beschreibe in einem kurzen Satz, was du getan hast.
 
 Entwicklungsaufträge: Analysiere Code und Architektur nachvollziehbar, benenne Annahmen klar und schlage sichere, überprüfbare nächste Schritte vor. Erfinde keine ausgeführten Änderungen. Gib bei Code-Vorschlägen nur die relevanten Dateien und Abschnitte an.`;
-
-import { autonomousKeyRecovery, getRuntimeApiKey, isProviderDisabledRuntime } from "./provider-admin";
 
 function getEnv(name: string) {
   return process.env[name]?.trim() || undefined;
@@ -711,7 +713,11 @@ async function loadLearningContext(userOpenId: string | undefined, prompt: strin
       sessionId ?? "",
       selected.map((learning) => learning.keywords.split(",").map((word) => word.trim()).filter(Boolean)),
     );
-    return formatLearningsForContext(selected);
+    // Sprint 162: zusaetzliche aehnlichkeitsbasierte Best-Practices aus dem
+    // Vektor-Gedaechtnis (pgvector-faehiger Store, Best-Effort, bei DB-
+    // Problemen bleibt der Kontext unveraendert).
+    const bestPractices = await queryUserBestPractices(userOpenId, prompt, 3);
+    return `${formatLearningsForContext(selected)}${formatBestPracticesForContext(bestPractices)}`;
   } catch (error) {
     console.warn("[agentMemory] Learnings nicht geladen:", error instanceof Error ? error.message.slice(0, 120) : error);
     return "";
@@ -731,7 +737,10 @@ async function executeSaveLearningTool(userOpenId: string | undefined, args: Rec
     kind: rawKind && isAgentLearningKind(rawKind) ? rawKind : undefined,
   });
   try {
-    await insertAgentLearningRecord({ userOpenId, ...record });
+    const saved = await insertAgentLearningRecord({ userOpenId, ...record });
+    // Sprint 162: zusaetzlich als Vektor-Erinnerung ablegen (Best-Effort,
+    // niemals blockierend — der Learning-Datensatz steht bereits).
+    await persistLearningVector(userOpenId, record, { source: "agentLearning", refId: String(saved.id) });
     return `Learning gespeichert [${record.kind}]: ${record.title}`;
   } catch (error) {
     console.warn("[agentMemory] Learning nicht gespeichert:", error instanceof Error ? error.message.slice(0, 120) : error);
@@ -744,7 +753,9 @@ async function storeAutoLearning(input: AgentToolChatInput, userMessage: string,
   if (!input.userOpenId || !turnDeservesLearning(toolsUsed)) return;
   try {
     const record = buildLearningRecord(deriveLearningFromTurn(userMessage, assistantSummary, toolsUsed));
-    await insertAgentLearningRecord({ userOpenId: input.userOpenId, ...record });
+    const saved = await insertAgentLearningRecord({ userOpenId: input.userOpenId, ...record });
+    // Sprint 162: Auto-Learning parallel als Vektor-Erinnerung (Best-Effort).
+    await persistLearningVector(input.userOpenId, record, { source: "autoLearning", refId: String(saved.id) });
     console.log(`[agentMemory] Auto-Learning gespeichert [${record.kind}]`);
   } catch (error) {
     console.warn("[agentMemory] Auto-Learning nicht gespeichert:", error instanceof Error ? error.message.slice(0, 120) : error);

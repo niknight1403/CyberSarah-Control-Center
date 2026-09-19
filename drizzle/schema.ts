@@ -131,6 +131,36 @@ export type AgentLearning = typeof agentLearnings.$inferSelect;
 export type InsertAgentLearning = typeof agentLearnings.$inferInsert;
 
 /**
+ * Sprint 162 — Vektor-Gedaechtnis: Einbettungen der Langzeit-Erinnerungen
+ * (Learnings, Posting-Erfolge, Analytics-Notizen) als normalisierte
+ * 256-dim-Vektoren. Storage bewusst als jsonb: die Tabelle laeuft auf jedem
+ * Postgres/Neon ohne Erweiterung; sobald der Owner pgvector aktiviert,
+ * kann dieselbe Spalte auf `vector(256)` umgestellt werden (Kosinus-Ranking
+ * in SQL via <=>) — die Anwendungslogik (lib/vector-memory-logic.ts) bleibt
+ * unveraendert, weil der Store-Vertrag identisch bleibt.
+ */
+export const agentMemoryVectors = pgTable("agentMemoryVectors", {
+  id: serial("id").primaryKey(),
+  userOpenId: varchar("userOpenId", { length: 64 }).notNull(),
+  /** Herkunft der Erinnerung (z. B. "agentLearning", "autoLearning", "posting"). */
+  source: varchar("source", { length: 32 }).notNull().default("agentLearning"),
+  /** Optionale Rueckreferenz (z. B. Learning-Id) fuer Nachvollziehbarkeit. */
+  refId: varchar("refId", { length: 128 }),
+  /** Rohtext der Erinnerung — Grundlage fuer Einbettung und Kontext. */
+  text: text("text").notNull(),
+  /** 256-dim L2-normalisierter Vektor (jsonb, pgvector-ready). */
+  vector: jsonb("vector").notNull(),
+  /** Frei verwendbare Metadaten (Quelle, Kategorie, ROI, ...). */
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("agentMemoryVectors_user_idx").on(table.userOpenId, table.createdAt),
+]);
+
+export type AgentMemoryVector = typeof agentMemoryVectors.$inferSelect;
+export type InsertAgentMemoryVector = typeof agentMemoryVectors.$inferInsert;
+
+/**
  * Sprint 113 — Memory-Konsolidierung: eine Zeile je Konsolidierungslauf
  * (naechtlicher Workflow oder Admin-Trigger). Traegt die Metriken des
  * Laufs und die aggregierten Retrieval-Metriken zum Laufzeitpunkt —

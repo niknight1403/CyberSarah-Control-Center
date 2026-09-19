@@ -122,6 +122,39 @@ export async function bestPracticesFor(
   return hits.map((hit) => ({ text: hit.text, score: cosineSimilarity(queryVector, hit.vector), metadata: hit.metadata }));
 }
 
+/** Maximale Zeichen je Best-Practice-Snippet im System-Prompt (Prompt-Budget). */
+export const BEST_PRACTICE_SNIPPET_MAX_CHARS = 200;
+
+/** Maximale Best-Practices im injizierten Kontext. */
+export const BEST_PRACTICE_CONTEXT_LIMIT = 3;
+
+/**
+ * Formatiert Vektor-Treffer als kompaktes Kontext-Snippet fuer den
+ * System-Prompt (deterministisch: dedupliziert, gekappt, nummeriert).
+ * Leere Treffer liefern einen leeren String (Prompt bleibt unveraendert).
+ */
+export function formatBestPracticesForContext(
+  hits: { text: string; score: number }[],
+  limit: number = BEST_PRACTICE_CONTEXT_LIMIT
+): string {
+  const seen = new Set<string>();
+  const snippets: string[] = [];
+  for (const hit of hits) {
+    const text = (hit?.text ?? "").replace(/\s+/g, " ").trim();
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    const clipped = text.length > BEST_PRACTICE_SNIPPET_MAX_CHARS
+      ? `${text.slice(0, BEST_PRACTICE_SNIPPET_MAX_CHARS - 1).trimEnd()}…`
+      : text;
+    snippets.push(clipped);
+    if (snippets.length >= limit) break;
+  }
+  if (snippets.length === 0) return "";
+  return `\n\nHistorische Best-Practices aus dem Vektor-Gedaechtnis (vor neuen Aktionen beruecksichtigen):\n${snippets
+    .map((snippet, index) => `${index + 1}. ${snippet}`)
+    .join("\n")}`;
+}
+
 /** In-Memory-Implementierung des Speicher-Vertrags (Tests, Sandbox, Fallback). */
 export function createInMemoryVectorMemoryStore(): VectorMemoryStore & {
   all(): VectorMemoryRecord[];

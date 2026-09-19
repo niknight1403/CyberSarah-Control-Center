@@ -50,6 +50,13 @@
       "when": 1789576625575,
       "tag": "0006_quick_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789801109642,
+      "tag": "0007_sharp_sage",
+      "breakpoints": true
     }
   ]
 }

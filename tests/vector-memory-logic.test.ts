@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   bestPracticesFor,
+  BEST_PRACTICE_SNIPPET_MAX_CHARS,
+  formatBestPracticesForContext,
   cosineSimilarity,
   createInMemoryVectorMemoryStore,
   deterministicLocalEmbedding,
@@ -115,5 +117,38 @@ describe("In-Memory-Store & bestPracticesFor", () => {
     const store = createInMemoryVectorMemoryStore();
     const best = await bestPracticesFor("irgendetwas", store);
     expect(best).toEqual([]);
+  });
+});
+
+describe("formatBestPracticesForContext (Sprint 162 — Prompt-Injektion)", () => {
+  it("formattiert Treffer als nummerierte, deduplizierte Snippet-Liste", () => {
+    const formatted = formatBestPracticesForContext([
+      { text: "TikTok-Comedy um 18 Uhr brachte 12 % Conversion", score: 0.9 },
+      { text: "Server auf Render umstellen", score: 0.5 },
+      { text: "TikTok-Comedy um 18 Uhr brachte 12 % Conversion", score: 0.4 },
+    ]);
+    expect(formatted).toContain("Historische Best-Practices");
+    expect(formatted).toContain("1. TikTok-Comedy um 18 Uhr brachte 12 % Conversion");
+    expect(formatted).toContain("2. Server auf Render umstellen");
+    expect(formatted).not.toContain("3.");
+  });
+
+  it("kappt zu lange Snippets prompt-budget-sicher", () => {
+    const long = "x".repeat(BEST_PRACTICE_SNIPPET_MAX_CHARS + 50);
+    const formatted = formatBestPracticesForContext([{ text: long, score: 1 }]);
+    const snippet = formatted.split("\n")[1] ?? "";
+    expect(snippet.length).toBeLessThanOrEqual(BEST_PRACTICE_SNIPPET_MAX_CHARS + 3);
+    expect(formatted).toContain("…");
+  });
+
+  it("leere oder ungültige Treffer liefern einen leeren String (Prompt unveraendert)", () => {
+    expect(formatBestPracticesForContext([])).toBe("");
+    expect(formatBestPracticesForContext([{ text: "   ", score: 1 }])).toBe("");
+  });
+
+  it("respektiert das Limit (Default 3)", () => {
+    const hits = [1, 2, 3, 4, 5].map((n) => ({ text: `Erinnerung ${n}`, score: 0.9 - n * 0.01 }));
+    const formatted = formatBestPracticesForContext(hits);
+    expect((formatted.match(/^\d+\./gm) ?? []).length).toBe(3);
   });
 });
