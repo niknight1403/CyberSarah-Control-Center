@@ -10,7 +10,7 @@
  * (Erkennung, Maskierung, Namen) ohne Mock.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildSecretStoredNotice,
@@ -26,17 +26,23 @@ import {
   listSecrets,
   processSecretsInUserMessage,
   resolveSecret,
+  setVaultKvForTests,
   upsertSecret,
 } from "../server/secret-vault";
 
-// KV-Mock: In-Memory-Map (Vault laeuft ueber setModelRouterSetting).
+// KV-Mock (Sprint 190): In-Memory-Map, gebunden ueber den Test-Hook
+// setVaultKvForTests statt vi.mock("../server/db") — unter isolate:false
+// (Sprint 187) ist die vi.mock-Auflösung von der Worker-/Ausfuehrungsreihenfolge
+// abhaengig; der injizierte Adapter ist auf jedem Rechner deterministisch.
 const kvStore = new Map<string, unknown>();
-vi.mock("../server/db", () => ({
-  setModelRouterSetting: async (key: string, value: unknown) => {
-    kvStore.set(key, value);
-  },
-  getModelRouterSetting: async <T>(key: string) => kvStore.get(key) as T | undefined,
-}));
+beforeAll(() => {
+  setVaultKvForTests({
+    get: async <T>(key: string) => kvStore.get(key) as T | undefined,
+    set: async (key: string, value: unknown) => {
+      kvStore.set(key, value);
+    },
+  });
+});
 
 const USER = "vault-test-user";
 

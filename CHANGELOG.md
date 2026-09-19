@@ -9,6 +9,11 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 ### Changed
 - **Sprint 189 (Chat-Qualität) — Übersichtlichere Antworten in beiden Chatbereichen:** Der Leitende Superagent nutzt jetzt ein festes Antwortformat (### Ergebnis mit Kernantwort zuerst, ### Was ich getan habe als max. 5 Stichpunkte, ### Naechste Schritte max. 3) mit Praegnanz-Regeln (keine Floskeln, keine Rohdaten, ehrliche Zahlen). Der Superagent-Tab rendert finale Antworten ab sofort mit Markdown-Lite (Ueberschriften, Listen, Code) statt Fliesstext. Der Repo-Chat erhaelt die Kernantwort-zuerst-Regel plus klare Themen-Ueberschriften und Stichpunkt-Limits. Live verifiziert: beide Chatbereiche end-to-end gegen einen lokalen Server mit echter Postgres-DB, Admin-Login und Mock-LLM getestet (Orchestrator-Run inkl. Task-Ledger, Repo-Chat inkl. Historie-Persistenz).
 
+## [Unreleased — Sprint 190]
+
+### Fixed
+- **Sprint 190 — Deterministischer Secret-Vault-Test (28P01 auf Produktiv-VPS):** Der Vault-Test mokierte den KV-Speicher via `vi.mock("../server/db")` — unter `isolate: false` (Sprint 187) haengt die Modul-Mock-Aufloesung jedoch von Worker-Belegung und Dateireihenfolge ab. Auf einem Produktiv-VPS mit echter DATABASE_URL lief der Test dadurch stellenweise gegen die echte Postgres (Fehler 28P01, falsches Passwort fuer User cybersarah). Neu: injizierbarer KV-Adapter `setVaultKvForTests` in server/secret-vault.ts (nur unter NODE_ENV=test aktiv), der Test bindet seinen In-Memory-KV direkt daran. Verifiziert: Suite gruen mit falschem DB-Passwort, ohne DATABASE_URL und unter gezielt vergiftetem Modul-Cache (Einzel-Worker). Keine Produktionsverhaltens-Aenderung — der Hook greift nur im Test-Modus.
+
 ## [Unreleased — Sprint 188]
 
 ### Changed
