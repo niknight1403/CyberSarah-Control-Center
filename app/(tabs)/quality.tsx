@@ -1,6 +1,17 @@
+/**
+ * Sprint 174 — Qualitaetszentrale auf "CyberSarah Future Glass" umgebaut.
+ *
+ * Logik (Repository-Qualitaet, CI-Checks, Review-Zahlen, Sync-Risiko,
+ * Nutzungsbudget) bleibt unveraendert; nur die visuelle Schicht wechselt auf
+ * das verbindliche Glass-System aus Sprint 168: GlassBackdrop, GlassCard,
+ * GlowButton, StatusChip und Typography/Token aus lib/design/future-glass.
+ */
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { StudioHeader, StatusBadge, StudioSection } from "@/components/studio/primitives";
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
+import type { GlassAccent } from "@/lib/design/future-glass";
+import { accentAlpha, glassPalette, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
 import type { RepositoryQuality } from "@/lib/remote-workspace-client";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { getWorkspaceSyncState } from "@/lib/workspace-sync-logic";
@@ -8,13 +19,13 @@ import { loadUsageEntries } from "@/lib/usage-budget-store";
 import { buildUsageBudgetView, getUsageBudgetConfig, type UsageBudgetView } from "@/lib/usage-budget-view-logic";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { lighten, withAlpha } from "@/lib/theme-color-utils";
-import { useColors } from "@/hooks/use-colors";
+import { FlatList, StyleSheet, Text, View } from "react-native";
+
+type Tone = "ready" | "warning" | "neutral";
+
+const toneAccent: Record<Tone, GlassAccent> = { ready: "green", warning: "amber", neutral: "blue" };
 
 export default function QualityScreen() {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]);
   const { files } = useWorkspace();
   const { loadRepositoryDetails, loadRepositoryQuality, settings } = useStudioSettings();
   const [quality, setQuality] = useState<RepositoryQuality | null>(null);
@@ -49,20 +60,161 @@ export default function QualityScreen() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh(); }, [refresh]);
 
-  if (!hasRepository) return <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}><StudioHeader eyebrow="QUALITÄTSZENTRALE" title="Qualität" /><View style={styles.emptyCard}><IconSymbol name="chart.bar.fill" size={26} color={colors.tint} /><Text style={styles.emptyTitle}>Repository verbinden</Text><Text style={styles.emptyText}>Verbinde zuerst einen Workspace, um Merge-, Review-, CI- und Konfliktsignale konsolidiert zu sehen.</Text></View></ScreenContainer>;
+  if (!hasRepository) {
+    return (
+      <GlassBackdrop accent="cyan">
+        <ScreenContainer style={styles.transparent} edges={["top", "left", "right", "bottom"]}>
+          <Text style={styles.eyebrow}>QUALITÄTSZENTRALE</Text>
+          <Text style={styles.title}>Qualität</Text>
+          <GlassCard accent="cyan" style={styles.emptyCard}>
+            <IconSymbol name="chart.bar.fill" size={26} color={glassPalette.cyan} />
+            <Text style={styles.emptyTitle}>Repository verbinden</Text>
+            <Text style={styles.emptyText}>Verbinde zuerst einen Workspace, um Merge-, Review-, CI- und Konfliktsignale konsolidiert zu sehen.</Text>
+          </GlassCard>
+        </ScreenContainer>
+      </GlassBackdrop>
+    );
+  }
 
   const mergeTone = getTone(quality?.merge.state ?? "unknown");
   const ciTone = getTone(quality?.ci.state ?? "unknown");
-  return <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}><FlatList contentContainerStyle={styles.content} data={quality?.ci.checks ?? []} keyExtractor={(check, index) => `${check.name}-${index}`} ListHeaderComponent={<><StudioHeader eyebrow="QUALITÄTSZENTRALE" title="Qualität" /><View style={styles.overviewCard}><View style={styles.overviewTop}><View><Text style={styles.overviewTitle}>{settings.branch}</Text><Text style={styles.overviewText}>Konsolidierter Stand von Merge, Review, CI und lokalem Arbeitsbereich.</Text></View><TouchableOpacity accessibilityRole="button" accessibilityLabel="Qualitätsübersicht aktualisieren" activeOpacity={0.75} disabled={state === "loading"} onPress={() => void refresh()} style={[styles.refreshButton, state === "loading" && styles.disabled]}><Text style={styles.refreshText}>{state === "loading" ? "Prüft …" : "Aktualisieren"}</Text></TouchableOpacity></View><View style={styles.signalRow}><StatusBadge label={quality?.merge.label ?? "Merge unbekannt"} tone={mergeTone} /><StatusBadge label={quality?.ci.label ?? "CI unbekannt"} tone={ciTone} /><StatusBadge label={budgetView?.badgeLabel ?? "Budget unbekannt"} tone={budgetView?.tone ?? "neutral"} /><StatusBadge label={syncState.hasConflictRisk ? "Möglicher Konflikt" : syncState.offlineDraftCount ? "Offline-Entwurf" : "Synchron"} tone={syncState.hasConflictRisk || syncState.offlineDraftCount ? "warning" : "ready"} /></View>{state === "error" ? <Text style={styles.errorText}>{error}</Text> : null}</View><StudioSection label="Zusammenfassung" title="Entscheidungssignale" /><View style={styles.metricsCard}><Metric label="Checks bestanden" value={quality?.ci.passed ?? 0} color={colors.success} /><Metric label="Checks offen" value={quality?.ci.pending ?? 0} color={colors.warning} /><Metric label="Checks fehlerhaft" value={quality?.ci.failed ?? 0} color={colors.error} /><Metric label="Reviewer" value={quality?.reviews.reviewerCount ?? 0} color="#B8C7D8" /><Metric label="Genehmigt" value={quality?.reviews.approvedCount ?? 0} color={colors.success} /><Metric label="Änderungen" value={quality?.reviews.requestedChangesCount ?? 0} color={colors.warning} /></View><View style={styles.syncCard}><IconSymbol name={syncState.hasConflictRisk ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"} size={18} color={syncState.hasConflictRisk ? colors.warning : colors.tint} /><View style={styles.syncCopy}><Text style={styles.syncTitle}>{syncState.hasConflictRisk ? "Vor Synchronisierung prüfen" : syncState.offlineDraftCount ? "Lokale Entwürfe vorhanden" : "Arbeitsbereich synchron"}</Text><Text style={styles.syncText}>{syncState.hasConflictRisk ? "Remote-Commits und lokale Entwürfe bestehen gleichzeitig. Prüfe den Diff vor Commit oder Pull." : syncState.offlineDraftCount ? `${syncState.offlineDraftCount} Datei(en) warten noch auf Remote-Synchronisierung.` : "Keine lokalen Remote-Dateiänderungen ausstehend."}</Text></View></View><StudioSection label="NUTZUNG" title="Nutzungsbudget" /><View style={styles.budgetCard}><View style={styles.budgetTop}><View><Text style={styles.budgetPercent}>{budgetView ? `${budgetView.usagePercent} %` : "–"}</Text><Text style={styles.budgetWindow}>{budgetView ? `Verbraucht ${budgetView.usedCostUnits} von ${budgetView.usedCostUnits + budgetView.remainingCostUnits} Einheiten im 30-Tage-Fenster.` : "Nutzungseinträge werden geladen …"}</Text></View><StatusBadge label={budgetView?.badgeLabel ?? "Budget unbekannt"} tone={budgetView?.tone ?? "neutral"} /></View><View style={styles.budgetProgress}><View style={[styles.budgetProgressBar, { width: `${budgetView?.usagePercent ?? 0}%` }, budgetView?.level === "exhausted" && styles.budgetProgressExhausted]} /></View><Text style={styles.budgetSummary}>{budgetView?.summary ?? "Es liegen noch keine Nutzungseinträge vor."}</Text>{budgetView?.level === "exhausted" ? <Text style={styles.budgetAdmission}>{budgetView.admissionReason}</Text> : null}</View><StudioSection label="CI-DETAILS" title="Check-Runs" /></>} ListEmptyComponent={<Text style={styles.emptyChecks}>{state === "loading" ? "CI-Prüfungen werden geladen …" : "Für diesen Branch liegen noch keine Check-Runs vor."}</Text>} renderItem={({ item }) => <View style={styles.checkRow}><View style={[styles.dot, getTone(item.conclusion ?? item.status) === "ready" ? styles.dotReady : getTone(item.conclusion ?? item.status) === "warning" ? styles.dotWarning : styles.dotNeutral]} /><Text numberOfLines={1} style={styles.checkName}>{item.name}</Text><Text style={styles.checkState}>{item.conclusion ?? item.status}</Text></View>} showsVerticalScrollIndicator={false} /></ScreenContainer>;
+  return (
+    <GlassBackdrop accent="cyan">
+      <ScreenContainer style={styles.transparent} edges={["top", "left", "right", "bottom"]}>
+        <FlatList
+          contentContainerStyle={styles.content}
+          data={quality?.ci.checks ?? []}
+          keyExtractor={(check, index) => `${check.name}-${index}`}
+          ListHeaderComponent={<>
+            <Text style={styles.eyebrow}>QUALITÄTSZENTRALE</Text>
+            <Text style={styles.title}>Qualität</Text>
+            <GlassCard accent="cyan" glow={1} style={styles.overviewCard}>
+              <View style={styles.overviewTop}>
+                <View>
+                  <Text style={styles.overviewTitle}>{settings.branch}</Text>
+                  <Text style={styles.overviewText}>Konsolidierter Stand von Merge, Review, CI und lokalem Arbeitsbereich.</Text>
+                </View>
+                <GlowButton
+                  label={state === "loading" ? "Prüft …" : "Aktualisieren"}
+                  onPress={() => void refresh()}
+                  disabled={state === "loading"}
+                  accent="cyan"
+                  variant="secondary"
+                  testID="quality-refresh"
+                />
+              </View>
+              <View style={styles.signalRow}>
+                <StatusChip label={quality?.merge.label ?? "Merge unbekannt"} accent={toneAccent[mergeTone]} />
+                <StatusChip label={quality?.ci.label ?? "CI unbekannt"} accent={toneAccent[ciTone]} />
+                <StatusChip label={budgetView?.badgeLabel ?? "Budget unbekannt"} accent={toneAccent[budgetView?.tone === "ready" ? "ready" : budgetView?.tone === "warning" ? "warning" : "neutral"]} />
+                <StatusChip label={syncState.hasConflictRisk ? "Möglicher Konflikt" : syncState.offlineDraftCount ? "Offline-Entwurf" : "Synchron"} accent={syncState.hasConflictRisk || syncState.offlineDraftCount ? "amber" : "green"} />
+              </View>
+              {state === "error" ? <Text style={styles.errorText}>{error}</Text> : null}
+            </GlassCard>
+            <Text style={styles.sectionLabel}>ZUSAMMENFASSUNG</Text>
+            <Text style={styles.sectionTitle}>Entscheidungssignale</Text>
+            <GlassCard style={styles.metricsCard}>
+              <Metric label="Checks bestanden" value={quality?.ci.passed ?? 0} accent="green" />
+              <Metric label="Checks offen" value={quality?.ci.pending ?? 0} accent="amber" />
+              <Metric label="Checks fehlerhaft" value={quality?.ci.failed ?? 0} accent="red" />
+              <Metric label="Reviewer" value={quality?.reviews.reviewerCount ?? 0} accent="blue" />
+              <Metric label="Genehmigt" value={quality?.reviews.approvedCount ?? 0} accent="green" />
+              <Metric label="Änderungen" value={quality?.reviews.requestedChangesCount ?? 0} accent="amber" />
+            </GlassCard>
+            <GlassCard accent={syncState.hasConflictRisk ? "amber" : "green"} style={styles.syncCard}>
+              <IconSymbol
+                name={syncState.hasConflictRisk ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"}
+                size={18}
+                color={syncState.hasConflictRisk ? glassPalette.amber : glassPalette.green}
+              />
+              <View style={styles.syncCopy}>
+                <Text style={styles.syncTitle}>{syncState.hasConflictRisk ? "Vor Synchronisierung prüfen" : syncState.offlineDraftCount ? "Lokale Entwürfe vorhanden" : "Arbeitsbereich synchron"}</Text>
+                <Text style={styles.syncText}>{syncState.hasConflictRisk ? "Remote-Commits und lokale Entwürfe bestehen gleichzeitig. Prüfe den Diff vor Commit oder Pull." : syncState.offlineDraftCount ? `${syncState.offlineDraftCount} Datei(en) warten noch auf Remote-Synchronisierung.` : "Keine lokalen Remote-Dateiänderungen ausstehend."}</Text>
+              </View>
+            </GlassCard>
+            <Text style={styles.sectionLabel}>NUTZUNG</Text>
+            <Text style={styles.sectionTitle}>Nutzungsbudget</Text>
+            <GlassCard accent="green" style={styles.budgetCard}>
+              <View style={styles.budgetTop}>
+                <View>
+                  <Text style={styles.budgetPercent}>{budgetView ? `${budgetView.usagePercent} %` : "–"}</Text>
+                  <Text style={styles.budgetWindow}>{budgetView ? `Verbraucht ${budgetView.usedCostUnits} von ${budgetView.usedCostUnits + budgetView.remainingCostUnits} Einheiten im 30-Tage-Fenster.` : "Nutzungseinträge werden geladen …"}</Text>
+                </View>
+                <StatusChip label={budgetView?.badgeLabel ?? "Budget unbekannt"} accent={toneAccent[budgetView?.tone === "ready" ? "ready" : budgetView?.tone === "warning" ? "warning" : "neutral"]} />
+              </View>
+              <View style={styles.budgetProgress}>
+                <View style={[styles.budgetProgressBar, { width: `${budgetView?.usagePercent ?? 0}%`, backgroundColor: budgetView?.level === "exhausted" ? glassPalette.red : accentAlpha("green", 0.8) }]} />
+              </View>
+              <Text style={styles.budgetSummary}>{budgetView?.summary ?? "Es liegen noch keine Nutzungseinträge vor."}</Text>
+              {budgetView?.level === "exhausted" ? <Text style={styles.budgetAdmission}>{budgetView.admissionReason}</Text> : null}
+            </GlassCard>
+            <Text style={styles.sectionLabel}>CI-DETAILS</Text>
+            <Text style={styles.sectionTitle}>Check-Runs</Text>
+          </>}
+          ListEmptyComponent={<Text style={styles.emptyChecks}>{state === "loading" ? "CI-Prüfungen werden geladen …" : "Für diesen Branch liegen noch keine Check-Runs vor."}</Text>}
+          renderItem={({ item }) => (
+            <GlassCard style={styles.checkRow} testID="quality-check-row">
+              <View style={[styles.dot, { backgroundColor: getTone(item.conclusion ?? item.status) === "ready" ? glassPalette.green : getTone(item.conclusion ?? item.status) === "warning" ? glassPalette.amber : glassPalette.blue }]} />
+              <Text numberOfLines={1} style={styles.checkName}>{item.name}</Text>
+              <Text style={styles.checkState}>{item.conclusion ?? item.status}</Text>
+            </GlassCard>
+          )}
+          showsVerticalScrollIndicator={false}
+        />
+      </ScreenContainer>
+    </GlassBackdrop>
+  );
 }
 
-function Metric({ label, value, color }: { label: string; value: number; color: string }) {
-    const colors = useColors();
-    const styles = useMemo(() => createStyles(colors), [colors]); return <View style={styles.metric}><Text style={[styles.metricValue, { color }]}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>; }
-function getTone(state: string): "ready" | "warning" | "neutral" { if (["ready", "passed", "success", "merged"].includes(state)) return "ready"; if (["failing", "blocked", "failure", "error", "cancelled", "timed_out", "running", "checking", "attention", "draft"].includes(state)) return "warning"; return "neutral"; }
-
-function createStyles(colors: ReturnType<typeof useColors>) {
-  return StyleSheet.create({
-  content: { paddingBottom: 24 }, emptyCard: { alignItems: "center", backgroundColor: "#111B28", borderColor: withAlpha(colors.tint, 0.16), borderRadius: 18, borderWidth: 1, marginTop: 22, padding: 22 }, emptyTitle: { color: "#EAF5FF", fontSize: 16, fontWeight: "900", marginTop: 10 }, emptyText: { color: "#9AABBF", fontSize: 12, lineHeight: 18, marginTop: 5, textAlign: "center" }, overviewCard: { backgroundColor: "#111B28", borderColor: withAlpha(colors.tint, 0.2), borderRadius: 18, borderWidth: 1, marginBottom: 22, padding: 14 }, overviewTop: { alignItems: "flex-start", flexDirection: "row", gap: 10, justifyContent: "space-between" }, overviewTitle: { color: "#EDF6FD", fontFamily: "monospace", fontSize: 15, fontWeight: "900", marginBottom: 4 }, overviewText: { color: "#98AABE", flex: 1, fontSize: 11, lineHeight: 16, maxWidth: 205 }, refreshButton: { alignItems: "center", backgroundColor: withAlpha(colors.tint, 0.1), borderColor: withAlpha(colors.tint, 0.28), borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 }, refreshText: { color: lighten(colors.tint, 0.2), fontSize: 11, fontWeight: "900" }, disabled: { opacity: 0.55 }, signalRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 13 }, errorText: { color: colors.error, fontSize: 11, lineHeight: 16, marginTop: 10 }, metricsCard: { backgroundColor: "#101824", borderColor: "#283A50", borderRadius: 16, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", marginBottom: 12, padding: 8 }, metric: { minHeight: 64, paddingHorizontal: 8, paddingVertical: 7, width: "33%" }, metricValue: { fontSize: 18, fontWeight: "900" }, metricLabel: { color: "#8FA1B5", fontSize: 9, lineHeight: 13, marginTop: 2 }, syncCard: { alignItems: "flex-start", backgroundColor: "#171B22", borderColor: "#394456", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, marginBottom: 21, padding: 12 }, syncCopy: { flex: 1 }, syncTitle: { color: "#E0EAF3", fontSize: 12, fontWeight: "900", marginBottom: 3 }, syncText: { color: "#94A5B9", fontSize: 11, lineHeight: 16 }, budgetCard: { backgroundColor: "#101824", borderColor: "#283A50", borderRadius: 16, borderWidth: 1, marginBottom: 21, padding: 14 }, budgetTop: { alignItems: "flex-start", flexDirection: "row", gap: 10, justifyContent: "space-between" }, budgetPercent: { color: "#EDF6FD", fontSize: 22, fontWeight: "900", marginBottom: 4 }, budgetWindow: { color: "#98AABE", flex: 1, fontSize: 11, lineHeight: 16, maxWidth: 205 }, budgetProgress: { backgroundColor: "#1B2A3C", borderRadius: 6, height: 8, marginTop: 12, overflow: "hidden" }, budgetProgressBar: { backgroundColor: colors.tint, borderRadius: 6, height: 8 }, budgetProgressExhausted: { backgroundColor: colors.error }, budgetSummary: { color: "#D3DFEC", fontSize: 11, fontWeight: "800", lineHeight: 16, marginTop: 10 }, budgetAdmission: { color: colors.error, fontSize: 11, lineHeight: 16, marginTop: 6 }, checkRow: { alignItems: "center", backgroundColor: "#101824", borderColor: "#27384C", borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 8, marginBottom: 7, minHeight: 50, paddingHorizontal: 11 }, dot: { borderRadius: 4, height: 8, width: 8 }, dotReady: { backgroundColor: colors.success }, dotWarning: { backgroundColor: colors.warning }, dotNeutral: { backgroundColor: "#8A9BB0" }, checkName: { color: "#D3DFEC", flex: 1, fontSize: 11, fontWeight: "800" }, checkState: { color: "#8FA1B5", fontFamily: "monospace", fontSize: 10 }, emptyChecks: { color: "#8496AA", fontSize: 12, lineHeight: 17, marginTop: 8 },
-  });
+function Metric({ label, value, accent }: { label: string; value: number; accent: GlassAccent }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={[glassType.headline, { color: glassPalette[accent] }]}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
 }
+
+function getTone(state: string): Tone {
+  if (["ready", "passed", "success", "merged"].includes(state)) return "ready";
+  if (["failing", "blocked", "failure", "error", "cancelled", "timed_out", "running", "checking", "attention", "draft"].includes(state)) return "warning";
+  return "neutral";
+}
+
+const styles = StyleSheet.create({
+  transparent: { backgroundColor: "transparent" },
+  content: { paddingBottom: glassSpacing.xxl },
+  eyebrow: { ...glassType.label, color: accentAlpha("cyan", 0.9), marginTop: glassSpacing.xl },
+  title: { ...glassType.display, color: glassSurface.textPrimary, marginTop: glassSpacing.xs },
+  sectionLabel: { ...glassType.label, color: glassSurface.textMuted, marginTop: glassSpacing.xxl },
+  sectionTitle: { ...glassType.headline, color: glassSurface.textPrimary, marginTop: glassSpacing.xs },
+  emptyCard: { alignItems: "center", marginTop: glassSpacing.xl, padding: glassSpacing.xxl },
+  emptyTitle: { ...glassType.title, color: glassSurface.textPrimary, marginTop: glassSpacing.sm },
+  emptyText: { ...glassType.caption, color: glassSurface.textSecondary, lineHeight: 18, marginTop: glassSpacing.xs, textAlign: "center" },
+  overviewCard: { marginBottom: glassSpacing.xl, padding: glassSpacing.lg },
+  overviewTop: { alignItems: "flex-start", flexDirection: "row", gap: glassSpacing.md, justifyContent: "space-between" },
+  overviewTitle: { ...glassType.title, color: glassPalette.cyan, fontFamily: "monospace" },
+  overviewText: { ...glassType.caption, color: glassSurface.textSecondary, flex: 1, fontSize: 11, lineHeight: 16, maxWidth: 205 },
+  signalRow: { flexDirection: "row", flexWrap: "wrap", gap: glassSpacing.sm, marginTop: glassSpacing.lg },
+  errorText: { ...glassType.caption, color: glassPalette.red, lineHeight: 16, marginTop: glassSpacing.md },
+  metricsCard: { flexDirection: "row", flexWrap: "wrap", marginBottom: glassSpacing.md, padding: glassSpacing.md },
+  metric: { minHeight: 64, paddingHorizontal: glassSpacing.sm, paddingVertical: 7, width: "33%" },
+  metricLabel: { ...glassType.label, fontSize: 9, lineHeight: 13, color: glassSurface.textMuted, marginTop: 2 },
+  syncCard: { flexDirection: "row", gap: glassSpacing.md, marginBottom: glassSpacing.xl, padding: glassSpacing.md },
+  syncCopy: { flex: 1 },
+  syncTitle: { ...glassType.caption, color: glassSurface.textPrimary, marginBottom: 3 },
+  syncText: { ...glassType.caption, color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
+  budgetCard: { marginBottom: glassSpacing.xl, padding: glassSpacing.lg },
+  budgetTop: { alignItems: "flex-start", flexDirection: "row", gap: glassSpacing.md, justifyContent: "space-between" },
+  budgetPercent: { ...glassType.headline, fontSize: 22, color: glassSurface.textPrimary, marginBottom: glassSpacing.xs },
+  budgetWindow: { ...glassType.caption, color: glassSurface.textSecondary, flex: 1, fontSize: 11, lineHeight: 16, maxWidth: 205 },
+  budgetProgress: { backgroundColor: accentAlpha("blue", 0.14), borderRadius: 6, height: 8, marginTop: glassSpacing.md, overflow: "hidden" },
+  budgetProgressBar: { borderRadius: 6, height: 8 },
+  budgetSummary: { ...glassType.caption, color: glassSurface.textPrimary, fontSize: 11, lineHeight: 16, marginTop: glassSpacing.md },
+  budgetAdmission: { ...glassType.caption, color: glassPalette.red, fontSize: 11, lineHeight: 16, marginTop: glassSpacing.xs },
+  checkRow: { alignItems: "center", flexDirection: "row", gap: glassSpacing.sm, marginBottom: 7, minHeight: 50, paddingHorizontal: glassSpacing.lg, paddingVertical: glassSpacing.sm },
+  dot: { borderRadius: 4, height: 8, width: 8 },
+  checkName: { ...glassType.caption, color: glassSurface.textPrimary, flex: 1 },
+  checkState: { ...glassType.label, color: glassSurface.textMuted, fontFamily: "monospace" },
+  emptyChecks: { ...glassType.caption, color: glassSurface.textMuted, lineHeight: 17, marginTop: glassSpacing.sm },
+});
