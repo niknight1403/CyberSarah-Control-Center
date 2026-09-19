@@ -1,5 +1,5 @@
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
@@ -26,17 +26,16 @@ export function AdminLiveStatusCard({ isAdmin }: { isAdmin: boolean }) {
     { levels: ["error", "warn"], limit: 3 },
     { refetchInterval: 5_000, refetchOnWindowFocus: false },
   );
+  const [clearedAt, setClearedAt] = useState<number | null>(null);
+  // Sprint 171: Zeitstempel direkt im Mutation-Callback setzen statt
+  // nachtraeglich per Effect zu spiegeln.
   const clearLogsMutation = trpc.appStatus.clearLogs.useMutation({
     onSuccess: () => {
+      setClearedAt(Date.now());
       void statusQuery.refetch();
       void issuesQuery.refetch();
     },
   });
-  const [clearedAt, setClearedAt] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (clearLogsMutation.isSuccess) setClearedAt(Date.now());
-  }, [clearLogsMutation.isSuccess]);
 
   const viewModel = buildAdminLiveStatusViewModel({
     status: statusQuery.data ?? null,

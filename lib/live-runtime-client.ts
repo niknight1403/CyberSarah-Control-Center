@@ -59,9 +59,12 @@ export function useLiveRuntimeLogs(maxEntries = 200) {
     },
   );
 
+  // Live-Polling-Akkumulation: Eintraege werden ueber Zeit in lokalen Zustand
+  // gemergt — Ableitung beim Rendern ist hier unmoeglich. Dokumentierte Ausnahme.
   useEffect(() => {
     if (Platform.OS !== "web") {
       if (pollQuery.data?.entries) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Live-Polling-Akkumulation: Mergen ueber Zeit nicht beim Rendern ableitbar.
         setEntries((current) =>
           mergeRuntimeLogs(
             current,

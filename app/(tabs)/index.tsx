@@ -116,7 +116,11 @@ export default function WorkspaceScreen() {
     }
   }, [hasAttachedRepository, loadRepositoryQuality]);
 
+  // Fetch-on-Mount: Refresh-Callbacks setzen synchron "loading" — das ist hier
+  // gewollt (initialer Ladezustand), daher dokumentierte Ausnahme statt Refactor.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refreshRepository(); }, [refreshRepository]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refreshHealth(); }, [refreshHealth]);
 
   const chooseBranch = async (branch: string) => {

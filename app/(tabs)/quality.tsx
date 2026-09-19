@@ -44,6 +44,9 @@ export default function QualityScreen() {
     setState(qualityResult.status === "fulfilled" ? "ready" : "error");
   }, [hasRepository, loadRepositoryDetails, loadRepositoryQuality]);
 
+  // Fetch-on-Mount: Der Refresh-Callback setzt synchron "loading"/"error" —
+  // gewollter initialer Ladezustand, dokumentierte Ausnahme.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh(); }, [refresh]);
 
   if (!hasRepository) return <ScreenContainer className="px-5" edges={["top", "left", "right", "bottom"]}><StudioHeader eyebrow="QUALITÄTSZENTRALE" title="Qualität" /><View style={styles.emptyCard}><IconSymbol name="chart.bar.fill" size={26} color={colors.tint} /><Text style={styles.emptyTitle}>Repository verbinden</Text><Text style={styles.emptyText}>Verbinde zuerst einen Workspace, um Merge-, Review-, CI- und Konfliktsignale konsolidiert zu sehen.</Text></View></ScreenContainer>;

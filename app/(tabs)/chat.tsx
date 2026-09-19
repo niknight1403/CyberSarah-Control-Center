@@ -39,6 +39,7 @@ type ConnectorTestState = { status: ConnectorTestStatus; message?: string };
 type InnerTab = "chat" | "github" | "skills" | "secrets";
 
 const ACTIVE_AGENT_STORAGE_KEY = "custom-ai-studio.superagents.active.v1";
+const EMPTY_SUPER_AGENTS: SuperAgentView[] = [];
 
 const initialMessages: ChatMessage[] = [{ id: "agent-intro", role: "agent", content: "Willkommen im KI-Operations-Chat. Beschreibe eine Änderung, ein Problem oder ein Refactoring — ich kümmere mich darum." }];
 
@@ -65,8 +66,18 @@ export default function ChatScreen() {
   const updateAgentMutation = trpc.superAgents.update.useMutation();
   const setActiveAgentMutation = trpc.superAgents.setActive.useMutation();
   const removeAgentMutation = trpc.superAgents.remove.useMutation();
-  const [agents, setAgents] = useState<SuperAgentView[]>([]);
+  // Sprint 171: Agentenliste direkt aus den Abfragedaten ableiten — kein
+  // Spiegel-State via Effect mehr (React-Compiler-konform). Leere Liste als
+  // Modul-Konstante, damit die Identitaet stabil bleibt.
+  const agents = (superAgentsQuery.data?.length ? superAgentsQuery.data : EMPTY_SUPER_AGENTS) as SuperAgentView[];
   const [activeAgentId, setActiveAgentId] = useState<number | null>(null);
+  // Anfangs-Auswahl idempotent beim Rendern korrigieren (Adjust-Pattern).
+  const agentsKey = agents.map((agent) => agent.id).join("|");
+  const [seenAgentsKey, setSeenAgentsKey] = useState("");
+  if (agentsKey !== seenAgentsKey) {
+    setSeenAgentsKey(agentsKey);
+    setActiveAgentId((current) => (current != null && agents.some((agent) => agent.id === current) ? current : agents[0]?.id ?? null));
+  }
   const [managerVisible, setManagerVisible] = useState(false);
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
@@ -143,13 +154,6 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    const rows = superAgentsQuery.data;
-    if (!rows?.length) return;
-    setAgents(rows as SuperAgentView[]);
-    setActiveAgentId((current) => (current != null && rows.some((agent) => agent.id === current) ? current : rows[0]?.id ?? null));
-  }, [superAgentsQuery.data]);
-
-  useEffect(() => {
     let restoreActive = true;
     void AsyncStorage.getItem(ACTIVE_AGENT_STORAGE_KEY).then((stored) => {
       if (!restoreActive || !stored) return;
@@ -176,14 +180,19 @@ export default function ChatScreen() {
     { limit: 100, sessionId: activeSessionId },
     { retry: false },
   );
-  useEffect(() => {
-    const rows = serverHistoryQuery.data?.messages;
-    if (!rows?.length) return;
-    setMessages((current) => {
-      if (current.some((message) => message.role === "user")) return current;
-      return [...initialMessages, ...serverHistoryToChatRows(rows)];
-    });
-  }, [serverHistoryQuery.data]);
+  // Sprint 171: Server-Historie einmalig pro Datenaenderung hydratisieren —
+  // idempotentes Adjust-Pattern beim Rendern statt synchronem setState im Effect.
+  const [seenHistoryData, setSeenHistoryData] = useState<{ data: unknown } | null>(null);
+  if (serverHistoryQuery.data !== undefined && seenHistoryData?.data !== serverHistoryQuery.data) {
+    setSeenHistoryData({ data: serverHistoryQuery.data });
+    const rows = serverHistoryQuery.data.messages;
+    if (rows?.length) {
+      setMessages((current) => {
+        if (current.some((message) => message.role === "user")) return current;
+        return [...initialMessages, ...serverHistoryToChatRows(rows)];
+      });
+    }
+  }
 
   // Sprint 137 — Agentenwechsel: Auswahl persistieren, Agent als "zuletzt
   // verwendet" markieren und den Chat auf den isolierten Verlauf des

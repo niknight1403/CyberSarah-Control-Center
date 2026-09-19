@@ -6,7 +6,7 @@
  * Owners: ruhige Grundanimation (Atem >= 1,6 s), Glow nur bei wichtigen
  * Zustaenden (success/error/aktiv), Rotation langsam — nichts Tackern.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -86,11 +86,9 @@ export function AgentAvatar({
   const coreStyle = useAnimatedStyle(() => ({ transform: [{ scale: breath.value }] }));
   const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${ringSpin.value}deg` }] }));
 
-  const [glow, setGlow] = useState(0);
-  useEffect(() => {
-    // Glow-Intensitaet je Stimmung — nach Design-Regel nur wichtige Zustaende.
-    setGlow(animation.glowIntensity);
-  }, [animation.glowIntensity]);
+  // Sprint 171: Glow-Intensitaet je Stimmung direkt ableiten — nach
+  // Design-Regel nur wichtige Zustaende. Kein Spiegel-State noetig.
+  const glow = animation.glowIntensity;
 
   const styles = useMemo(() => createStyles(colors, accent, glow), [colors, accent, glow]);
 

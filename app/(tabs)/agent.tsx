@@ -282,10 +282,14 @@ export default function AgentScreen() {
     [selectedFile.name, settings.branch],
   );
 
-  useEffect(() => {
+  // Sprint 171: Zuruecksetzen bei Provider-Wechsel als idempotentes
+  // Adjust-Pattern beim Rendern (React-Docs-Muster) statt Effect-Spiegelung.
+  const [seenProvider, setSeenProvider] = useState(settings.provider);
+  if (seenProvider !== settings.provider) {
+    setSeenProvider(settings.provider);
     setProviderActivity("idle");
     setLastProviderUsed(settings.provider);
-  }, [settings.provider]);
+  }
 
   const requestDevelopmentChat = async (
     content: string,
@@ -379,10 +383,17 @@ export default function AgentScreen() {
     });
   };
 
-  useEffect(() => {
-    let active = true;
+  // Sprint 171: Synchroner Reset beim Wechsel von Workspace/Chat-Schutz als
+  // idempotentes Adjust-Pattern; das asynchrone Laden bleibt im Effect.
+  const historyScopeKey = `${chatWorkspaceId}|${settings.protectChatContent}`;
+  const [seenHistoryScopeKey, setSeenHistoryScopeKey] = useState(historyScopeKey);
+  if (historyScopeKey !== seenHistoryScopeKey) {
+    setSeenHistoryScopeKey(historyScopeKey);
     setHistoryLoaded(false);
     setMessages(initialMessages);
+  }
+  useEffect(() => {
+    let active = true;
     loadDevelopmentChatHistory(settings.protectChatContent, chatWorkspaceId)
       .then((raw) => {
         const restored = parseDevelopmentChatHistory(raw);

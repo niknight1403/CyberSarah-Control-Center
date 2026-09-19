@@ -30,12 +30,16 @@ type DataHubDashboardData = RouterOutputs["dataHub"]["dashboard"];
 export function useOfflineDashboard(): OfflineDataState<DataHubDashboardData> & { refresh: () => void } {
   const query = trpc.dataHub.dashboard.useQuery();
   const [cachedEnvelope, setCachedEnvelope] = useState<OfflineCacheEnvelope<DataHubDashboardData> | null>(null);
-  const [cacheLookupDone, setCacheLookupDone] = useState(false);
+  // Sprint 171: Lookup-Guard ist reiner Einmal-Schutz -> Ref statt State
+  // (kein synchrones setState im Effect, kein zusaetzlicher Render).
+  const cacheLookupDoneRef = useRef(false);
   const lastPersistedPayload = useRef<string>("");
 
   // Live-Daten puffern (normalisiert: gleiche Antwort nicht doppelt schreiben).
   useEffect(() => {
     if (query.data === undefined) return;
+    // Frische Live-Daten -> Lookup-Guard fuer den Offline-Puffer zuruecksetzen.
+    cacheLookupDoneRef.current = false;
     const serialized = serializeOfflineCacheEnvelope(query.data, DASHBOARD_CACHE_SECTION, new Date());
     if (serialized === lastPersistedPayload.current) return;
     lastPersistedPayload.current = serialized;
@@ -46,9 +50,9 @@ export function useOfflineDashboard(): OfflineDataState<DataHubDashboardData> & 
 
   // Bei Fehler den Puffer einmalig laden (strikte Validierung in der Logik).
   useEffect(() => {
-    if (!query.isError || cacheLookupDone) return;
+    if (!query.isError || cacheLookupDoneRef.current) return;
     let cancelled = false;
-    setCacheLookupDone(true);
+    cacheLookupDoneRef.current = true;
     void (async () => {
       try {
         const raw = await AsyncStorage.getItem(buildOfflineCacheKey(DASHBOARD_CACHE_SECTION));
@@ -61,15 +65,15 @@ export function useOfflineDashboard(): OfflineDataState<DataHubDashboardData> & 
     return () => {
       cancelled = true;
     };
-  }, [query.isError, cacheLookupDone]);
+  }, [query.isError]);
 
   // Neuer Live-Erfolg nach Fehlzeitpunkt: Puffer-Anzeige zurücksetzen.
-  useEffect(() => {
-    if (query.data !== undefined) {
-      setCachedEnvelope(null);
-      setCacheLookupDone(false);
-    }
-  }, [query.data]);
+  // Sprint 171: idempotentes Adjust-Pattern beim Rendern statt Effect.
+  const [seenLiveData, setSeenLiveData] = useState<{ data: DataHubDashboardData | undefined } | null>(null);
+  if (query.data !== undefined && seenLiveData?.data !== query.data) {
+    setSeenLiveData({ data: query.data });
+    setCachedEnvelope(null);
+  }
 
   const state = useMemo<OfflineDataState<DataHubDashboardData>>(
     () =>

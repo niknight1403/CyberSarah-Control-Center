@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View , useWindowDimensions } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 
@@ -19,11 +18,10 @@ export function AppSidebar() {
   const router = useRouter();
   const colors = useColors();
   const { designTheme } = useThemeContext();
-  const [narrowRail, setNarrowRail] = useState(false);
   const wide = width >= 1100;
-  useEffect(() => {
-    setNarrowRail(!wide);
-  }, [wide]);
+  // Sprint 171: Rail-Breite direkt aus der Fensterbreite ableiten statt
+  // via Effect zu spiegeln — ein Zustand dafuer ist ueberfluessig.
+  const narrowRail = !wide;
 
   const activeItem = resolveActiveSidebarItem(pathname);
 

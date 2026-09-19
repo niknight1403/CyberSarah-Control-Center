@@ -95,13 +95,19 @@ export default function SuperagentScreen() {
   const rowsLengthRef = useRef(0);
 
   // Aktiven Lauf nach Abschluss aus dem Live-Polling nehmen.
+  // Sprint 171: Adjust-Pattern statt Effect — Schlüssel auf id:status, weil
+  // coerceLedgerTask pro Render ein neues Objekt erzeugt (früher lief der
+  // Effect dadurch bei jedem Render erneut, mit neuer Set-Referenz).
   const activeTask = activeQuery.data ? coerceLedgerTask(activeQuery.data) : undefined;
-  useEffect(() => {
+  const activeTaskKey = activeTask ? `${activeTask.id}:${activeTask.status}` : "";
+  const [seenActiveTaskKey, setSeenActiveTaskKey] = useState("");
+  if (activeTaskKey !== seenActiveTaskKey) {
+    setSeenActiveTaskKey(activeTaskKey);
     if (activeTask && (activeTask.status === "success" || activeTask.status === "failed" || activeTask.status === "escalated")) {
       setActiveId(null);
       setExpandedIds((prev) => new Set(prev).add(`${activeTask.id}-answer`));
     }
-  }, [activeTask]);
+  }
 
   const ledger = ((ledgerQuery.data ?? []) as unknown[]).map(coerceLedgerTask);
   const rows = useMemo(

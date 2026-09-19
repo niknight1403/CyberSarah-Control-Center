@@ -55,7 +55,10 @@ export function RepositoryConnectCard({ onConnect, onClose, onListRepositories }
       });
   }, [onListRepositories]);
 
+  // User-getriggerter Load: Beim Oeffnen des Pickers einmalig Repos laden; der
+  // Callback setzt synchron "loading" (gewollter Ladezustand). Dokumentierte Ausnahme.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- User-getriggerter Load: Callback setzt synchron "loading" (gewollt).
     if (mode === "picker") loadRepositories();
   }, [mode, loadRepositories]);
 
