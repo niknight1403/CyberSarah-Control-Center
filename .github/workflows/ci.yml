@@ -44,6 +44,14 @@ jobs:
       - name: TypeScript validation
         run: npm run check
 
+      # Sprint 149-Follow-up: Lint ist seit jeher Bestandteil des lokalen
+      # "Alles-gruen"-Checks, fehlte aber in der CI — dadurch rutschte der
+      # fehlende embedded-postgres-Import (startpg.mjs) unbemerkt durch.
+      # Warnings blockieren nicht (eslint . endet darauf mit Exit 0),
+      # nur harte Fehler lassen den Lauf rot werden.
+      - name: Lint validation
+        run: npm run lint
+
       - name: Workspace-Service Startup-Check (Diagnose, nicht blockierend)
         continue-on-error: true
         run: |
