@@ -103,6 +103,7 @@
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.8",
+    "embedded-postgres": "^18.4.0-beta.17",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.2",
