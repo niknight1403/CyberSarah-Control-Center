@@ -12,15 +12,6 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// KV-Mock: In-Memory-Map (Vault laeuft ueber setModelRouterSetting).
-const kvStore = new Map<string, unknown>();
-vi.mock("../server/db", () => ({
-  setModelRouterSetting: async (key: string, value: unknown) => {
-    kvStore.set(key, value);
-  },
-  getModelRouterSetting: async <T>(key: string) => kvStore.get(key) as T | undefined,
-}));
-
 import {
   buildSecretStoredNotice,
   detectSecretCandidates,
@@ -37,6 +28,15 @@ import {
   resolveSecret,
   upsertSecret,
 } from "../server/secret-vault";
+
+// KV-Mock: In-Memory-Map (Vault laeuft ueber setModelRouterSetting).
+const kvStore = new Map<string, unknown>();
+vi.mock("../server/db", () => ({
+  setModelRouterSetting: async (key: string, value: unknown) => {
+    kvStore.set(key, value);
+  },
+  getModelRouterSetting: async <T>(key: string) => kvStore.get(key) as T | undefined,
+}));
 
 const USER = "vault-test-user";
 

@@ -120,7 +120,6 @@ const initialMessages: ChatMessage[] = [
 export default function AgentScreen() {
     const colors = useColors();
     const styles = useMemo(() => createStyles(colors), [colors]);
-  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const { files, loadRemoteFiles, markFilesSynced, selectedFile, updateFile } =
     useWorkspace();
   const {

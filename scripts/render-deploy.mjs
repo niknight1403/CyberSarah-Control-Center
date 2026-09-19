@@ -93,30 +93,6 @@ async function listServices() {
 }
 
 /**
- * Verfolgt einen konkreten Deploy bis live/failed (fuer explizit
- * angestossene Deploys mit bekannter ID).
- */
-async function watchDeployToLive(serviceId, deploy) {
-  const deadline = Date.now() + 25 * 60 * 1000;
-  let latest = deploy;
-  while (Date.now() - deadline < 0) {
-    const status = latest?.status ?? "unbekannt";
-    log(`Deploy-Status: ${status}`);
-    if (status === "live") return latest;
-    if (status === "build_failed" || status === "update_failed" || status === "pre_deploy_failed") {
-      throw new Error("Build/Update fehlgeschlagen — Render-Logs pruefen.");
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20000));
-    // Sprint-85-Follow-up: gezielt DEN Deploy per ID nachladen (kein list[0]).
-    if (latest?.id) {
-      const fetched = await apiFetch(`/services/${serviceId}/deploys/${latest.id}`);
-      latest = fetched?.deploy ?? fetched ?? latest;
-    }
-  }
-  throw new Error("Timeout beim Warten auf den Live-Deploy (25 Minuten).");
-}
-
-/**
  * Sprint 73 (Stale-Read-Fix) + Sprint-85-Follow-up (False-Green-Fix):
  * Gewartet wird auf einen ECHTEN neuen Deploy. Frueher genuegte "ein Deploy
  * mit anderer ID als der letzte" — das konnte ein BELIEBIGER aelterer aus

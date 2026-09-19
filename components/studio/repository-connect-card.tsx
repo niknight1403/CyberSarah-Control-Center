@@ -38,7 +38,6 @@ export function RepositoryConnectCard({ onConnect, onClose, onListRepositories }
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const validUrl = normalizeRepositoryUrl(repositoryUrl);
-  const normalizedBranch = normalizeBranch(branch);
   const filteredRepos = useMemo(() => filterGithubRepositories(repos, query), [repos, query]);
 
   const loadRepositories = useCallback(() => {

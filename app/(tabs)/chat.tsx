@@ -25,7 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { rankProviders, type LatencySample, type ProviderScore } from "@/lib/provider-latency-logic";
+import { rankProviders, type LatencySample } from "@/lib/provider-latency-logic";
 import { DEFAULT_CONNECTOR_PREFERENCES, enabledConnectorCount, normalizeConnectorPreferences, CONNECTOR_PREFERENCE_STORAGE_KEY, toggleConnector, type ConnectorId, type ConnectorPreferences } from "@/lib/connector-preferences-logic";
 import { DEFAULT_SKILL_PREFERENCES, enabledSkillCount, normalizeSkillPreferences, SKILL_PREFERENCE_STORAGE_KEY, toggleSkill, type SkillId, type SkillPreferences } from "@/lib/skill-preferences-logic";
 import { FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ListRenderItemInfo } from "react-native";
@@ -69,13 +69,7 @@ export default function ChatScreen() {
   const [activeAgentId, setActiveAgentId] = useState<number | null>(null);
   const [managerVisible, setManagerVisible] = useState(false);
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
-  const [latencyScores, setLatencyScores] = useState<ProviderScore[]>([]);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
-  // Sprint 127 — Autonomer Administrator-Autopilot: GitHub-Token, Standard-
-  // Router, Cyber-Neon-Design und Repository-Verbindung werden automatisch
-  // hergestellt, sobald ein Administrator angemeldet ist — kein manueller
-  // Klick in den Einstellungen mehr noetig.
-  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const listRef = useRef<FlatList<ChatMessage>>(null);
   // Sprint 139 — Robustes Auto-Scroll (Owner-Feedback 16.09.2026): Die Antwort
   // muss nach dem Senden sofort im sichtbaren Bereich erscheinen, wie in jedem
@@ -235,7 +229,6 @@ export default function ChatScreen() {
       const endMs = Date.now();
       const sample: LatencySample = { providerId: connector, latencyMs: endMs - startMs, timestampMs: endMs };
       const scores = rankProviders([sample], { nowMs: endMs, maxSampleAgeMs: 300000, degradedThresholdMs: 2000 });
-      setLatencyScores(scores);
       const score = scores.find((s) => s.providerId === connector);
       const rec = score ? " (" + score.recommendation + ", " + Math.round(sample.latencyMs) + "ms)" : "";
       setConnectorTests((c) => ({ ...c, [connector]: { status: "success", message: "Verbindung bestätigt" + rec } }));

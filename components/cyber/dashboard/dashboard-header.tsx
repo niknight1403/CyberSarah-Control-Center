@@ -8,7 +8,6 @@ import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-nati
 import { router } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { createNeonStyles } from "./neon-dashboard-styles";
 
 /** Reduce-Motion sicher abfragen (Web-Polyfill: Promise-API). */
 function useReducedMotion(): boolean {
@@ -27,7 +26,6 @@ function useReducedMotion(): boolean {
 
 export function DashboardHeader({ hasAlerts }: { hasAlerts: boolean }) {
   const colors = useColors();
-  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const reduceMotion = useReducedMotion();
   return (

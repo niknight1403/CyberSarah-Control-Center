@@ -288,7 +288,7 @@ async function runTestSuite() {
     // 4.1 Task scheitert auf Groq mit HTTP 429 -> Rotation zu Gemini,
     //     Re-Execute mit identischem Payload (kein Datenverlust).
     const payload = { prompt: 'Analysiere die Umsatzzahlen von Q3', limit: 512 };
-    const receivedPayloads: Array<Record<string, unknown>> = [];
+    const receivedPayloads: Record<string, unknown>[] = [];
     const task: AgentTask = {
       id: 'task-e2e-429',
       type: 'llm.chat',

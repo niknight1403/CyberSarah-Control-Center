@@ -2,7 +2,6 @@ import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { createReleaseNotification, type ReleaseStatus } from "@/lib/release-notification-logic";
-import { getPushStatusMessage } from "@/lib/push-notifications-logic";
 export { getPushStatusMessage } from "@/lib/push-notifications-logic";
 export { createReleaseNotification, isTerminalReleaseStatus } from "@/lib/release-notification-logic";
 

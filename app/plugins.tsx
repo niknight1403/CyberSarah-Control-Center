@@ -3,7 +3,6 @@ import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Link } from "expo-router";
 
-import { cyber } from "@/lib/cyber-theme";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/components/responsive/drawer-screen";
 

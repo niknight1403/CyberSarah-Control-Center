@@ -68,7 +68,7 @@ export function AutonomousDevCard({ isAdmin }: { isAdmin: boolean }) {
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* Template-Auswahl */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-        {(catalogQuery.data ?? (Object.keys(KIND_LABELS) as Array<keyof typeof KIND_LABELS>).map((kind) => ({ kind, label: KIND_LABELS[kind], description: "" }))).map(
+        {(catalogQuery.data ?? (Object.keys(KIND_LABELS) as (keyof typeof KIND_LABELS)[]).map((kind) => ({ kind, label: KIND_LABELS[kind], description: "" }))).map(
           (entry) => (
             <TouchableOpacity
               key={entry.kind}

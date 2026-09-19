@@ -8,7 +8,6 @@ import { AppSidebar } from "@/components/responsive/app-sidebar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { GlassTabIcon } from "@/components/glass/glass-tab-icon";
 import { Platform, View, useWindowDimensions } from "react-native";
-import { useColors } from "@/hooks/use-colors";
 import { isWideViewport } from "@/lib/viewport-logic";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 
@@ -19,7 +18,6 @@ import { glassPalette, glassSurface } from "@/lib/design/future-glass";
  * (Position, Rand, Glow, aktives Icon) wurde neu aufgebaut.
  */
 export default function TabLayout() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   // Sprint 117: erster Start → Willkommensflow mit Theme-Auswahl, einmalig.
   const { status: onboardingStatus } = useOnboarding();

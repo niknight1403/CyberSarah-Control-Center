@@ -2,11 +2,6 @@ import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
 import { describeNetworkFailure, parseSuccessfulResponse } from "../api-response-logic";
 
-type ApiResponse<T> = {
-  data?: T;
-  error?: string;
-};
-
 export async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -112,7 +107,7 @@ export async function getMe(): Promise<{
   try {
     const result = await apiCall<{ user: any }>("/api/auth/me");
     return result.user || null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -138,7 +133,7 @@ export async function establishSession(token: string): Promise<boolean> {
     }
 
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

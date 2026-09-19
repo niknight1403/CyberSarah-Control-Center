@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 
-import { accentAlpha, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 
 function Dot({ delayMs }: { delayMs: number }) {
   const opacity = useSharedValue(0.25);

@@ -616,7 +616,7 @@ export async function applyConsolidationPlanWrites(plan: {
   let keywordUpdates = 0;
   let deletions = 0;
   for (const merge of plan.merges) {
-    const result = await db
+    await db
       .update(agentLearnings)
       .set({ keywords: merge.mergedKeywords })
       .where(eq(agentLearnings.id, merge.keepId));

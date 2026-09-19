@@ -1,6 +1,6 @@
 import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import { ForbiddenError } from "../../shared/_core/errors.js";
-import axios, { type AxiosInstance } from "axios";
+import { create, type AxiosInstance } from "axios";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
@@ -28,7 +28,7 @@ const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
 
 class OAuthService {
-  constructor(private client: ReturnType<typeof axios.create>) {}
+  constructor(private client: ReturnType<typeof create>) {}
 
   private decodeState(state: string): string {
     const redirectUri = atob(state);
@@ -58,7 +58,7 @@ class OAuthService {
 }
 
 const createOAuthHttpClient = (): AxiosInstance =>
-  axios.create({
+  create({
     baseURL: ENV.oAuthServerUrl,
     timeout: AXIOS_TIMEOUT_MS,
   });

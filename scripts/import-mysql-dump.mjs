@@ -217,9 +217,7 @@ async function counts() {
 async function importTable(table, records) {
   if (!records.length) { console.log(`[import] ${table}: 0 Datensaetze — uebersprungen.`); return 0; }
   const cols = TARGET[table].cols.filter((c) => records.some((r) => c in r));
-  const jsonb = new Set(TARGET[table].jsonb || []);
   const BATCH = 50;
-  let inserted = 0;
   for (let off = 0; off < records.length; off += BATCH) {
     const batch = records.slice(off, off + BATCH);
     const params = [];
@@ -231,8 +229,6 @@ async function importTable(table, records) {
       });
       return `(${vals.join(",")})`;
     });
-    const casts = jsonb.has("value") && cols.includes("value")
-      ? `, value = EXCLUDED.value` : "";
     const text =
       `INSERT INTO "${table}" (${cols.map((c) => `"${c}"`).join(",")}) VALUES ${tuples.join(",")} ` +
       `ON CONFLICT DO NOTHING`;
@@ -257,9 +253,8 @@ if (DRY_RUN) {
 
 const before = await counts();
 console.log("[import] Neon vorher:", JSON.stringify(before));
-let total = 0;
 for (const table of Object.keys(TARGET)) {
-  total += await importTable(table, rows[table].map((r) => convert(table, r)));
+  await importTable(table, rows[table].map((r) => convert(table, r)));
 }
 const after = await counts();
 console.log("[import] Neon nachher:", JSON.stringify(after));

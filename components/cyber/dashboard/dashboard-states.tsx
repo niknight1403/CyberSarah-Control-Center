@@ -26,7 +26,6 @@ function useReducedMotion(): boolean {
 
 export function DashboardSkeleton() {
   const colors = useColors();
-  const themeStyles = useMemo(() => createNeonStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const opacity = useAnimatedValue(0.45);
   const reduceMotion = useReducedMotion();

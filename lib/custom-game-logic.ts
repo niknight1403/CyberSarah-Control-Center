@@ -29,7 +29,7 @@ export interface CustomGameIdea {
 }
 
 /** Vorlagen-Fallback-Matrix (Schluesselwort -> deterministisches Template). */
-const TEMPLATE_KEYWORDS: Array<{ template: "pong" | "snake" | "breakout" | "flappy"; pattern: RegExp; label: string }> = [
+const TEMPLATE_KEYWORDS: { template: "pong" | "snake" | "breakout" | "flappy"; pattern: RegExp; label: string }[] = [
   { template: "snake", pattern: /snake|schlange|wurm|worm|zelle|grid/i, label: "Snake" },
   { template: "pong", pattern: /pong|tennis|paddel|paddle|schlaeger|air.?hockey|2 ?spieler/i, label: "Pong" },
   { template: "breakout", pattern: /breakout|arkanoid|block|stein|brick|ziegel/i, label: "Breakout" },
@@ -72,7 +72,7 @@ export function extractGeneratedGame(raw: string): string | null {
 }
 
 /** Gefaehrliche/verbotene Muster in generiertem Spiel-Code. */
-const FORBIDDEN_GAME_PATTERNS: Array<{ pattern: RegExp; issue: string }> = [
+const FORBIDDEN_GAME_PATTERNS: { pattern: RegExp; issue: string }[] = [
   { pattern: /\beval\s*\(/, issue: "eval() ist verboten" },
   { pattern: /new\s+Function\s*\(/, issue: "new Function() ist verboten" },
   { pattern: /\bfetch\s*\(/, issue: "fetch() ist verboten (kein Netzwerk)" },

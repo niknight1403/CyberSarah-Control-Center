@@ -18,8 +18,7 @@
  *   createExpressMiddleware({ router: appRouter, onError: trpcToolLimitFormatter });
  */
 
-import type { AgentTask } from "../agents/baseAgent";
-import type { AgentTaskResult } from "../agents/baseAgent";
+import type { AgentTask , AgentTaskResult } from "../agents/baseAgent";
 import { taskExecutionPipeline } from "../pipeline/taskExecutionPipeline";
 
 // ---------------------------------------------------------------------------

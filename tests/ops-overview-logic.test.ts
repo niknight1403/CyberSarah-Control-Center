@@ -3,7 +3,6 @@ import {
   buildOpsOverview,
   evaluateOverall,
   summarizeOpsOverview,
-  type OpsCheckInput,
 } from "../lib/ops-overview-logic";
 
 describe("ops-overview-logic", () => {

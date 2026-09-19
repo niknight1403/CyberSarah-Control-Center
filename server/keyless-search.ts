@@ -13,8 +13,7 @@
 
 import axios from "axios";
 import { z } from "zod";
-import { router } from "./_core/trpc";
-import { adminProcedure } from "./_core/trpc";
+import { router , adminProcedure } from "./_core/trpc";
 import {
   buildDuckDuckGoUrl,
   parseDuckDuckGoResults,

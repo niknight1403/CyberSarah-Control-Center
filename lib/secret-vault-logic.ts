@@ -52,7 +52,7 @@ export interface SecretCandidate {
   suggestedName: string;
 }
 
-const SECRET_PATTERNS: Array<{ kind: SecretKind; name: string; pattern: RegExp }> = [
+const SECRET_PATTERNS: { kind: SecretKind; name: string; pattern: RegExp }[] = [
   { kind: "groq", name: "GROQ_API_KEY", pattern: /\bgsk_[A-Za-z0-9]{28,}\b/g },
   { kind: "anthropic", name: "ANTHROPIC_API_KEY", pattern: /\bsk-ant-[A-Za-z0-9-]{32,}\b/g },
   { kind: "openai", name: "OPENAI_API_KEY", pattern: /\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}\b/g },

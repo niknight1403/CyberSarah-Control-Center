@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { createTRPCClient, trpc } from "@/lib/trpc";
-import type { SelfHealingIncident } from "@/lib/self-healing-logic";
+import { createTRPCClient } from "@/lib/trpc";
 import {
   ADMIN_AGENT_SCAN_INTERVAL_MS,
   ADMIN_AGENT_STATE_STORAGE_KEY,

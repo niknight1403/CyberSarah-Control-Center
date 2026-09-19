@@ -114,8 +114,8 @@ export function isProviderQuarantined(provider: string, now: number = Date.now()
 }
 
 /** Diagnose-Snapshot fuer die Admin-Ansicht. */
-export function getProviderQuarantineSnapshot(now: number = Date.now()): Array<{ provider: string; secondsLeft: number }> {
-  const snapshot: Array<{ provider: string; secondsLeft: number }> = [];
+export function getProviderQuarantineSnapshot(now: number = Date.now()): { provider: string; secondsLeft: number }[] {
+  const snapshot: { provider: string; secondsLeft: number }[] = [];
   for (const [provider, until] of [...quarantinedUntil.entries()]) {
     if (until > now) snapshot.push({ provider, secondsLeft: Math.ceil((until - now) / 1000) });
     else quarantinedUntil.delete(provider);

@@ -20,7 +20,7 @@
  *     (Path-Traversal wird blockiert).
  */
 
-import axios, { type AxiosInstance } from "axios";
+import { create, type AxiosInstance } from "axios";
 import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
@@ -53,7 +53,7 @@ const SANDBOX_ROOT = path.join(os.tmpdir(), "cybersarah-orchestrator-workspace")
 function hetznerClient(): AxiosInstance | null {
   const token = process.env.HETZNER_CLOUD_TOKEN;
   if (!token) return null;
-  return axios.create({
+  return create({
     baseURL: HETZNER_API,
     timeout: TOOL_TIMEOUT_MS,
     headers: { Authorization: `Bearer ${token}` },
@@ -63,12 +63,12 @@ function hetznerClient(): AxiosInstance | null {
 function dockerClient(): AxiosInstance | null {
   const baseUrl = process.env.DOCKER_API_URL;
   if (!baseUrl) return null;
-  return axios.create({ baseURL: baseUrl.replace(/\/$/, ""), timeout: TOOL_TIMEOUT_MS });
+  return create({ baseURL: baseUrl.replace(/\/$/, ""), timeout: TOOL_TIMEOUT_MS });
 }
 
 function githubClient(): AxiosInstance | null {
   const token = process.env.GITHUB_TOKEN ?? process.env.ADMIN_GITHUB_TOKEN;
-  return axios.create({
+  return create({
     baseURL: "https://api.github.com",
     timeout: TOOL_TIMEOUT_MS,
     headers: token

@@ -511,8 +511,6 @@ export async function listAuditEvents(): Promise<ProviderAuditEvent[]> {
 // Autonome Key-Recovery (Sprint 155)
 // ---------------------------------------------------------------------------
 
-const RECOVERY_CANDIDATE_KINDS = ["env_pool", "secret_manager"] as const;
-
 /**
  * Autonome Rotations-Pipeline (Spec Phase 3): Markiert den gescheiterten
  * Key, zieht still Kandidaten (ENV-Pool -> Secret-Manager-Refetch) und
@@ -525,7 +523,7 @@ const RECOVERY_CANDIDATE_KINDS = ["env_pool", "secret_manager"] as const;
 export async function autonomousKeyRecovery(provider: ProviderAdminId): Promise<{
   recovered: boolean;
   safeMessage: string;
-  source: (typeof RECOVERY_CANDIDATE_KINDS)[number] | "none";
+  source: "env_pool" | "secret_manager" | "none";
 }> {
   const meta = providerAdminMeta(provider);
 
@@ -543,7 +541,7 @@ export async function autonomousKeyRecovery(provider: ProviderAdminId): Promise<
   const currentPoolIndex = poolIndexMap[provider] ?? 0;
 
   // Kandidat 1: naechster Key aus dem ENV-Pool (Ring).
-  const candidates: { source: (typeof RECOVERY_CANDIDATE_KINDS)[number]; key: string }[] = [];
+  const candidates: { source: "env_pool" | "secret_manager"; key: string }[] = [];
   if (pool.length > 1) {
     const nextIndex = nextPoolIndex(currentPoolIndex, pool.length);
     candidates.push({ source: "env_pool", key: pool[nextIndex] });

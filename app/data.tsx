@@ -2,7 +2,6 @@ import { useColors } from "@/hooks/use-colors";
 import { useMemo } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
-import { cyber } from "@/lib/cyber-theme";
 import { trpc } from "@/lib/trpc";
 import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/components/responsive/drawer-screen";
 

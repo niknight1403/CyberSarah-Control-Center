@@ -12,7 +12,7 @@ import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsiv
  * aus einer Hand, damit alle neuen Seiten wie aus einem Guss wirken.
  */
 export function DrawerScreen({ title, kicker, children, scroll = true }: { title: string; kicker: string; children: ReactNode; scroll?: boolean }) {
-  const { visible, close, hamburgerProps, drawerProps } = useNavDrawer();
+  const { hamburgerProps, drawerProps } = useNavDrawer();
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 

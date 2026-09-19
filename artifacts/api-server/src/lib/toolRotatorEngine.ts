@@ -335,11 +335,6 @@ function readKeyPool(primary: string, fallback?: string): string[] {
 // Engine
 // ---------------------------------------------------------------------------
 
-interface KeyState {
-  key: string;
-  providerId: string;
-  cooldownUntil: number;
-}
 
 /**
  * Zentrale Rotator-Engine fuer Provider-Keys, Provider-Endpoints und

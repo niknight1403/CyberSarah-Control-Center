@@ -18,7 +18,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "crypto";
 import axios from "axios";
 import * as db from "./db";
-import { subscribeRuntimeLogs, getRuntimeLogs } from "./runtime-logger";
+import { subscribeRuntimeLogs, getRuntimeLogs , clearRuntimeLogs } from "./runtime-logger";
 import { runOrchestratorTask } from "./orchestrator/superagent";
 import {
   applyLiveFix,
@@ -30,7 +30,6 @@ import {
 import { invalidateProviderKeyCache } from "./provider-admin";
 import { probeLocalProviders } from "./model-router";
 import { resetBackupWatchState } from "./backup-watch";
-import { clearRuntimeLogs } from "./runtime-logger";
 import { sendOpsDiscordAlert } from "./ops-alerts";
 import {
   buildAnalysisObjective,
