@@ -1,14 +1,14 @@
-# 📡 Tech-Scan 2026-09-19
+# 📡 Tech-Scan 2026-09-20
 
 9 relevante Funde (Mindest-Relevanz 3, max. 4 je Bereich):
 
 - **[GitHub] [karacca/moodstone](https://github.com/karacca/moodstone)** (40★) — Relevanz 14, Bereich: Mobile-Stack/Agenten-Kern/DevOps
   Animated, procedurally generated agent avatars for React Native. Topics: agent-ui, ai-agent, ai-agents, android, animated-svg, animation, avatar, avatars, expo, generative-art, ios, llm, procedural-generation, react, rea
 
-- **[GitHub] [Lukecele/ARBVPN](https://github.com/Lukecele/ARBVPN)** (4★) — Relevanz 10, Bereich: Mobile-Stack/DevOps
-  Cross-platform 1-tap WireGuard VPN mobile application built with React Native and TypeScript Topics: android, cross-platform, cybersecurity, encrypted-tunnel, expo, ios, mobile, mobile-app, network-security, networking, 
+- **[GitHub] [tianyugithub/linux-sb-mobile](https://github.com/tianyugithub/linux-sb-mobile)** (4★) — Relevanz 10, Bereich: Mobile-Stack/DevOps
+  linux.sb 的第三方移动客户端（Expo / React Native 实现，非官方项目） Topics: android, expo, linux-sb, react-native, typescript
 
-- **[GitHub] [MingyiSecLab/Atlas](https://github.com/MingyiSecLab/Atlas)** (11★) — Relevanz 9, Bereich: Agenten-Kern/DevOps
+- **[GitHub] [MingyiSecLab/Atlas](https://github.com/MingyiSecLab/Atlas)** (18★) — Relevanz 9, Bereich: Agenten-Kern/DevOps
   Open-source local AI Agent desktop app for authorized security assessment — Electron + Mastra-powered runtime, visual pentest workflow, Kali sandbox, multi-provider LLM routing. 本地 AI 安全评估智能体桌面应用 Topics: ai-agent, ai-sec
 
 - **[GitHub] [Achref23illi/ui-craft](https://github.com/Achref23illi/ui-craft)** (5★) — Relevanz 8, Bereich: Mobile-Stack/Agenten-Kern
@@ -20,7 +20,7 @@
 - **[GitHub] [Albertchamberlain/Awesome-OKF](https://github.com/Albertchamberlain/Awesome-OKF)** (100★) — Relevanz 7, Bereich: Agenten-Kern
   OKF (Open Knowledge Format) — curated catalog of tools, plugins, skills, proposals, and docs for agent-friendly knowledge. YAML-driven, agent-searchable, MCP-ready. Topics: agent-memory, agent-skills, ai-agents, ai-memor
 
-- **[GitHub] [friday-memory/friday](https://github.com/friday-memory/friday)** (42★) — Relevanz 7, Bereich: Agenten-Kern
+- **[GitHub] [friday-memory/friday](https://github.com/friday-memory/friday)** (46★) — Relevanz 7, Bereich: Agenten-Kern
   ⚡ The open-source persistent cognitive memory layer for AI coding agents. Stop your Cursor, Claude & Copilot from having amnesia. Topics: ai-agents, ai-memory, antigravity, antigravity-cli, antigravity-ide, claude-code, 
 
 - **[GitHub] [henrykbrzoska/bebok](https://github.com/henrykbrzoska/bebok)** (5★) — Relevanz 7, Bereich: Agenten-Kern
