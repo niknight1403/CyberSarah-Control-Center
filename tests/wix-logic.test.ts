@@ -220,7 +220,7 @@ describe("Sprint 187: Status-Snapshot (ehrliche Zustaende)", () => {
 
 describe("Sprint 187: Maskierung + UUID-Prüfung", () => {
   it("Token wird maskiert, Klartext taucht nie auf", () => {
-    const token = "eyJhbGciOiJSUzI1NiJ9.eyJkYXRhIjoiIn0.sig";
+    const token = "eyJhbGciOiJSUzI1NiJ9.eyJkYXRhIjoiIn0.sig"; // gitleaks:allow (Dummy-JWT fuer Maskierungstest, kein echtes Secret)
     const masked = maskWixToken(token);
     expect(masked).not.toContain(token.slice(6, -7));
     expect(maskWixToken("short")).toBe("***");
