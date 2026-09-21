@@ -3,11 +3,20 @@ import { type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { ParticleField, ScanlineOverlay } from "@/components/living/living-ui";
-import { glassDepth, glassSurface } from "@/lib/design/future-glass";
+import { glassDepth, glassPalette } from "@/lib/design/future-glass";
+import { withAlpha } from "@/lib/theme-color-utils";
 
 /**
  * Sprint 49 — Premium-Hintergrund für den Chatbereich.
  * Tiefes Navy-Schwarz mit subtilen Leucht-Akzenten (Dark Command Center).
+ *
+ * Sprint 195 — Kontrast-Fix: Die Glow-Kreise nutzten faelschlicherweise
+ * glassSurface.textSecondary/textMuted (helle Text-Token, ~#99A7B8 /
+ * #6E7B8C) als VOLLE Deckkraft-Flaeche. Auf 320-340px-Kreisen wirkte das
+ * wie zwei helle, fast weisse Blobs ueber Header und Chatverlauf — der
+ * Chattext war darauf kaum noch zu erkennen. Jetzt: echte Akzentfarben
+ * (Cyan/Purple) als Licht mit sehr geringer Deckkraft, wie im Rest des
+ * Design-Systems (glassPalette = "Licht, nicht Flaeche").
  */
 export function ChatBackground({ children }: { children: ReactNode }) {
   return (
@@ -31,7 +40,7 @@ const styles = StyleSheet.create({
   gradient: { flex: 1 },
   glowCyan: {
     alignSelf: "flex-end",
-    backgroundColor: glassSurface.textSecondary,
+    backgroundColor: withAlpha(glassPalette.cyan, 0.07),
     borderRadius: 220,
     height: 320,
     marginRight: -120,
@@ -40,7 +49,7 @@ const styles = StyleSheet.create({
     width: 320,
   },
   glowViolet: {
-    backgroundColor: glassSurface.textMuted,
+    backgroundColor: withAlpha(glassPalette.purple, 0.06),
     borderRadius: 260,
     bottom: -160,
     height: 340,

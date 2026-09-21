@@ -24,6 +24,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { MarkdownLiteContent } from "@/components/chat/message-bubble";
@@ -35,6 +37,7 @@ import { buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagen
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { SecretsPanel } from "@/components/secrets/secrets-panel";
+import { useStudioSettings } from "@/lib/studio-settings";
 
 type TaskStatus = "pending" | "running" | "success" | "failed" | "escalated";
 
@@ -76,6 +79,7 @@ export default function SuperagentScreen() {
   );
 
   const runMutation = trpc.orchestrator.run.useMutation();
+  const { settings: studioSettings } = useStudioSettings();
   const [vaultOpen, setVaultOpen] = useState(false);
   const toolsQuery = trpc.orchestrator.tools.useQuery(undefined, { enabled: isAdmin });
 
@@ -394,6 +398,15 @@ export default function SuperagentScreen() {
         <View style={styles.composer}>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <View style={styles.composerRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="GitHub-Repository verbinden"
+              onPress={() => router.push("/settings")}
+              style={styles.githubButton}
+            >
+              <Ionicons name="logo-github" size={18} color={glassPalette.cyan} />
+              {studioSettings.hasGitHubToken ? <View style={styles.githubConnectedDot} /> : null}
+            </Pressable>
             <TextInput
               style={styles.composerInput}
               placeholder="Ziel eingeben — z. B. Prüfe den Produktiv-Deploy …"
@@ -494,6 +507,8 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   sendButton: { backgroundColor: accentAlpha("cyan", 0.92), borderRadius: glassRadii.md, width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  githubButton: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderWidth: 1, borderRadius: glassRadii.md, width: 46, height: 46, alignItems: "center", justifyContent: "center", position: "relative" },
+  githubConnectedDot: { position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: glassPalette.green },
   sendButtonDisabled: { opacity: 0.45 },
   sendButtonText: { color: glassDepth.void, fontWeight: "900", fontSize: 16 },
   vaultChip: {
