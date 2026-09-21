@@ -4,7 +4,8 @@ name: Server-Ops
 # Zweck: Status-Checks, PM2-Restarts, Log-Abruf und Self-Healing aus der
 # CI heraus — ohne beliebigen Shell-Input, nur fest definierte Operationen.
 # Ausloesung: GitHub UI → Actions → "Server-Ops" → Run workflow.
-# Alle Zugangsdaten kommen aus Repo-Secrets (PRODUCTION_SSH_KEY/HOST/USER).
+# Alle Zugangsdaten kommen aus Repo-Secrets — die frischen Suffix-2-Varianten
+# (PRODUCTION_SSH_KEY2/HOST2/USER2) haben Vorrang, alte Namen als Fallback.
 
 on:
   workflow_dispatch:
@@ -41,14 +42,14 @@ jobs:
       - name: SSH-Zugang einrichten
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/prod_key
+          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/prod_key
           chmod 600 ~/.ssh/prod_key
 
       - name: Operation ausfuehren
         env:
           OP: ${{ github.event.inputs.operation }}
           SVC: ${{ github.event.inputs.service }}
-          SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}
+          SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
         run: |
           case "$OP" in
             status)
@@ -70,7 +71,7 @@ jobs:
             probe)
               for U in root cybersarah ubuntu debian admin; do
                 echo "== Teste Benutzer: $U =="
-                ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes -o PasswordAuthentication=no $U@${{ secrets.PRODUCTION_SSH_HOST }} 'echo LOGIN_OK als $USER; hostname' && break || true
+                ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes -o PasswordAuthentication=no $U@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }} 'echo LOGIN_OK als $USER; hostname' && break || true
               done
               ;;
             deploy-pull)
