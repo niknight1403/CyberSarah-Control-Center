@@ -4,6 +4,16 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 194]
+
+### Fixed
+- **Sprint 194 — Chat-Nachrichten laufen nicht mehr aus dem Bildschirm (Owner-Feedback 21.09.2026):** Lange, nicht umbrechbare Inhalte (URLs, Pfade, Stacktrace-Zeilen) sprengten die Flex-Zeile der Chat-Bubbles und verschwanden rechts aus dem Bildschirmrand — React-Native-Web erzwingt ohne `minWidth: 0` min-width:auto auf Flex-Kindern. Neu: die komplette Kette row/rowUser/bubble/codeBox im MessageBubble haelt `minWidth: 0`, Code-/Inhaltstexte brechen via `wordBreak: "break-word"` mitten im Token statt die Zeile zu sprengen. Regressionsschutz: tests/chat-overflow-connector.test.ts.
+
+### Changed
+- **Sprint 194 — GitHub-Repository-Picker im Chat vollautonom:** chat.tsx und agent.tsx gaben `onListRepositories` nur bei lokal hinterlegtem Token weiter — der Ein-Klick-Picker blieb fuer einen Administrator stumm, obwohl das Admin-Auto-Provisioning (Sprint 87, adminRouter.githubToken) server-seitig laengst existierte. Neu: `listGithubRepositories` faellt ohne lokales Secure-Store-Token automatisch auf das server-seitige Admin-Token zurueck (ADMIN_GITHUB_TOKEN/GITHUB_TOKEN); beide Screens uebergeben den Picker immer, die Karte faelllt nur noch bei wirklich fehlendem Token auf die manuelle Eingabe zurueck. Der GitHub-Sub-Tab bleibt fuer Status/Diagnose, ist fuer die Verbindung aber nicht mehr noetig.
+
+- App-Lockfile 2.3.0 → 2.5.0 nachgezogen (war hinter package.json zurueckgefallen).
+
 ## [Unreleased — Sprint 189]
 
 ### Changed

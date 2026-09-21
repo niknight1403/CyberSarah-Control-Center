@@ -919,7 +919,7 @@ export default function AgentScreen() {
                         return result;
                       })
                     }
-                    onListRepositories={settings.hasGitHubToken ? listGithubRepositories : undefined}
+                    onListRepositories={listGithubRepositories}
                   />
                 ) : null}
                 <View

@@ -228,12 +228,27 @@ export function StudioSettingsProvider({ children }: { children: React.ReactNode
   }, [settings.provider]);
 
   /** Sprint 132: Repos ueber das gespeicherte Token laden — Grundlage des
-   * autonomen Repository-Pickers ("nur Token, Workspace frei waehlen"). */
+   * autonomen Repository-Pickers ("nur Token, Workspace frei waehlen").
+   *
+   * Sprint 194: Faellt ohne lokal hinterlegtes Token auf das server-seitige
+   * Admin-Auto-Provisioning zurueck (adminRouter.githubToken, Sprint 87) —
+   * damit greift der Ein-Klick-Picker fuer einen Administrator auch dann,
+   * wenn nur ADMIN_GITHUB_TOKEN/GITHUB_TOKEN auf dem Server hinterlegt ist
+   * und nie lokal eingetippt wurde. Kein Admin oder kein Server-Token ->
+   * derselbe klare Fehler wie bisher, RepositoryConnectCard faellt dann auf
+   * die manuelle Eingabe zurueck.
+   */
   const listGithubRepositories = useCallback(async () => {
     const storedGitHubToken = await readSecureValue(GITHUB_TOKEN_KEY);
-    if (!storedGitHubToken) throw new Error("Hinterlege zuerst einen GitHub-Token in den Einstellungen.");
-    return fetchGithubRepositories(storedGitHubToken);
-  }, []);
+    if (storedGitHubToken) return fetchGithubRepositories(storedGitHubToken);
+    try {
+      const adminToken = await trpcUtils.admin.githubToken.fetch();
+      if (adminToken?.token) return fetchGithubRepositories(adminToken.token);
+    } catch {
+      // Kein Administrator oder Abfrage fehlgeschlagen — Fallback unten.
+    }
+    throw new Error("Hinterlege zuerst einen GitHub-Token in den Einstellungen.");
+  }, [trpcUtils]);
 
   const attachRepository = useCallback(async (input: StudioSettingsInput) => {
     // Sprint 84: Guard — ohne Basis-URL (weder Admin-Proxy noch hinterlegte

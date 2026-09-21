@@ -384,7 +384,7 @@ export default function ChatScreen() {
                       onClose={() => setShowRepositoryCard(false)}
                       onConnect={(input) => attachRepository({ workspaceUrl: settings.workspaceUrl, repositoryUrl: input.repositoryUrl, branch: input.branch, provider: settings.provider, localProviderEndpoints: settings.localProviderEndpoints, protectChatContent: settings.protectChatContent })
                         .then((result) => { loadRemoteFiles(result.files); setMessages((cur) => [...cur, { id: "repo-" + Date.now(), role: "agent", content: "Repository verbunden. " + result.files.length + " Dateien bereit." }]); return result; })}
-                      onListRepositories={settings.hasGitHubToken ? listGithubRepositories : undefined}
+                      onListRepositories={listGithubRepositories}
                     />
                   )}
                   {!statusCollapsed ? (
