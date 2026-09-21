@@ -2,15 +2,15 @@
 
 ## Status
 
-Release **1.3.0** ist gebaut und veröffentlicht. Die App ist portrait-orientiert konfiguriert, verwendet das Branding **CyberSarah Control Center** und enthält die Void-Dark-Oberfläche, SecureStore-Key-Verwaltung, lokale Provider-Endpoints, Cloud-Key-Verbindungstests, Agenten-Fallback, Repository-Workflows und tokenfreies Audit-Logging. Play-Store-Vorbereitung (Listing, Data-Safety, Screenshot-Gerüst) liegt aus Sprint 83 vor (siehe `PLAY_STORE_BEREITSCHAFT.md`).
+Release **v2.4.2-apk** (Commit `739da9a`, 21.09.2026) ist gebaut und veröffentlicht. Die App ist portrait-orientiert konfiguriert, verwendet das Branding **CyberSarah Control Center** und enthält die Void-Dark-Oberfläche, SecureStore-Key-Verwaltung, lokale Provider-Endpoints, Cloud-Key-Verbindungstests, Agenten-Fallback, Repository-Workflows und tokenfreies Audit-Logging. Play-Store-Vorbereitung (Listing, Data-Safety, Screenshot-Gerüst) liegt aus Sprint 83 vor (siehe `PLAY_STORE_BEREITSCHAFT.md`).
 
 ## APK-Erzeugung (aktuell)
 
 Der Android-Build läuft **nicht mehr über EAS**, sondern vollständig auf GitHub Actions über den Workflow `build-apk.yml` (Expo-Web-Export → Capacitor → Gradle). Er wird manuell per `workflow_dispatch` angestoßen:
 
-- **Start:** GitHub → Repo → *Actions* → **Build Android APK** → *Run workflow* → Branch `main`, optional `version_name` (Standard aus `app.config.ts`, aktuell 1.3.0).
-- **Letzter erfolgreicher Lauf:** Run #26 (ID 34612205152) auf `main`, Commit `3eacddb`, 11.09.2026 — per `workflow_dispatch`, Status `success`.
-- **Ergebnis:** GitHub-Release [`v1.3.0-apk`](https://github.com/niknight1403/CyberSarah-Control-Center/releases/tag/v1.3.0-apk) mit `CyberSarah-ControlCenter-v1.3.0-release.apk` (signiert, 5.8 MB) und `CyberSarah-ControlCenter-v1.3.0-debug.apk` (7.0 MB); das Play-Store-AAB (`CyberSarah-ControlCenter-aab`, 5.5 MB, R8-obfuskiert, unsigniert — Signierung ist Owner-Handoff) liegt als Workflow-Artefakt bereit.
+- **Start:** GitHub → Repo → *Actions* → **Build Android APK** → *Run workflow* → Branch `main`, optional `version_name` (leer = automatischer Patch-Increment ab letztem APK-Release, aktuell v2.4.2).
+- **Letzter erfolgreicher Lauf:** Run #65 (ID 35610819094) auf `main`, Commit `739da9a`, 21.09.2026 — per `workflow_dispatch`, Status `success`.
+- **Ergebnis:** GitHub-Release [`v2.4.2-apk`](https://github.com/niknight1403/CyberSarah-Control-Center/releases/tag/v2.4.2-apk) mit `CyberSarah-ControlCenter-v2.4.2-admin.apk` (Release-signiert, 6.2 MB — empfohlene APK für die tägliche Nutzung), `CyberSarah-ControlCenter-v2.4.2-dev.apk` (Debug, 7.4 MB, mit Service-Diagnose und Theme-Lab) und `CyberSarah-ControlCenter-v2.4.2-release.aab` (6.0 MB, Play-Store-AAB); das unsignierte AAB (`CyberSarah-ControlCenter-aab`, 5.9 MB) liegt zusätzlich als Workflow-Artefakt bereit.
 - **Kein EAS-Kontingent mehr nötig:** Da der Build nicht über EAS läuft, blockiert das ausgeschöpfte EAS-Free-Tier-Kontingent die APK-Erzeugung nicht mehr.
 
 ## Manuelle Voraussetzungen (transparent)
@@ -29,9 +29,9 @@ Die Play-Store-Einreichung verwendet den Service-Account `play-uploader@cybersar
 
 ## Realgerät-Test (offener Owner-Handoff)
 
-Installation der signierten `CyberSarah-ControlCenter-v1.3.0-release.apk`:
+Installation der signierten `CyberSarah-ControlCenter-v2.4.2-admin.apk` (empfohlen; alternativ die Dev-Variante mit Entwicklungsanzeigen):
 
-1. APK vom Release `v1.3.0-apk` herunterladen (nicht die Debug-Variante).
+1. APK vom Release `v2.4.2-apk` herunterladen (für den Gerätetest die `admin`-Variante).
 2. Auf dem Android-Gerät *Einstellungen → Apps → Spezialzugriff → Unbekannte Quellen* (bzw. *Apps aus unbekannten Quellen installieren*) für den Browser/Dateimanager erlauben.
 3. APK öffnen und installieren; bei Play-Protect-Warnung *Trotzdem installieren* wählen (Erstsignierung ist nicht Play-verifiziert).
 4. Beim ersten Start nacheinander testen:
