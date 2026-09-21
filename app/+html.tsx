@@ -110,10 +110,21 @@ const DIAG_SCRIPT = `(function(){
     show('[REJECTION] ' + ((r && (r.message || r) || r) + '') + (r && r.stack ? ('\\n' + r.stack) : ''));
   });
   setTimeout(function(){
-    if(!window.__csMounted){ show('[DIAG] React hat nach 8s NICHT gemountet.'); }
-    else { show('[DIAG] React gemountet OK.'); }
-    show('[DIAG] WebView/UA: ' + navigator.userAgent);
-    show('[DIAG] Origin: ' + (window.location && window.location.href));
+    // BUGFIX (Sprint 210): show() erzeugt ein permanentes, vollflaechiges
+    // weisses Overlay (z-index max) OHNE Entfernungslogik. Im Erfolgsfall
+    // durfte dieses Overlay NIE erscheinen — vorher legte es sich nach 8s
+    // ausnahmslos ueber die fertig gemountete App und blockte die gesamte UI
+    // dauerhaft (weisser Screen mit nur den 3 Diagnosezeilen). Jetzt: bei
+    // erfolgreichem Mount NUR still in die Konsole loggen, kein Overlay.
+    // Das Overlay bleibt ausschliesslich echten Problemen vorbehalten
+    // (Mount-Timeout, [FEHLER], [REJECTION]).
+    if(!window.__csMounted){
+      show('[DIAG] React hat nach 8s NICHT gemountet.');
+      show('[DIAG] WebView/UA: ' + navigator.userAgent);
+      show('[DIAG] Origin: ' + (window.location && window.location.href));
+    } else {
+      try { console.log('[CSDIAG] React gemountet OK. UA=' + navigator.userAgent + ' Origin=' + (window.location && window.location.href)); } catch(e){}
+    }
   }, 8000);
 })();`;
 
