@@ -20,6 +20,7 @@ on:
           - health
           - disk-report
           - disk-clean
+          - db-migrate
           - deploy-pull
           - probe
         default: status
@@ -75,6 +76,9 @@ jobs:
               ;;
             disk-clean)
               $SSH_CMD 'echo "== Vorher =="; df -h / | tail -1; echo "== npm-Cache =="; npm cache clean --force 2>/dev/null || true; echo "== Gradle-Cache =="; rm -rf ~/.gradle/caches/* 2>/dev/null || true; echo "== pip-Cache =="; rm -rf ~/.cache/pip 2>/dev/null || true; echo "== Journal auf 200M =="; sudo -n journalctl --vacuum-size=200M 2>/dev/null || journalctl --vacuum-size=200M 2>/dev/null || echo "journal nicht vacuumbar"; echo "== apt-Cache =="; sudo -n apt-get clean 2>/dev/null || true; echo "== bashrc =="; sed -i "/AAAAB3NzaC1yc2EAAAADAQABAAACAQDBuTFmaD/d;/u0_a691@localhost/d" ~/.bashrc && echo "bashrc bereinigt" || echo "bashrc fix fehlgeschlagen"; echo "== Nachher =="; df -h / | tail -1'
+              ;;
+            db-migrate)
+              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "== vorhandene Migrationen =="; ls drizzle/*.sql 2>/dev/null | tail -4; echo "== .env vorhanden =="; test -f .env && echo ja || echo "keine .env — DATABASE_URL nicht verfuegbar"; echo "== Migration ausfuehren =="; set -a; . ./.env 2>/dev/null; set +a; npx drizzle-kit migrate 2>&1 | tail -15; echo "== Tabellen-Check =="; npx drizzle-kit check 2>&1 | tail -5 || true'
               ;;
             probe)
               for U in root cybersarah ubuntu debian admin; do
