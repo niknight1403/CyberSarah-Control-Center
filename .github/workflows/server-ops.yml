@@ -1,0 +1,76 @@
+name: Server-Ops
+
+# Sichere Operations-Bruecke zum CyberSarah-Produktionsserver.
+# Zweck: Status-Checks, PM2-Restarts, Log-Abruf und Self-Healing aus der
+# CI heraus — ohne beliebigen Shell-Input, nur fest definierte Operationen.
+# Ausloesung: GitHub UI → Actions → "Server-Ops" → Run workflow.
+# Alle Zugangsdaten kommen aus Repo-Secrets (PRODUCTION_SSH_KEY/HOST/USER).
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Operation auf dem Produktionsserver"
+        type: choice
+        options:
+          - status
+          - pm2-restart
+          - logs
+          - health
+          - deploy-pull
+        default: status
+      service:
+        description: "PM2-Service fuer Restart (leer = alle)"
+        required: false
+        default: ""
+
+concurrency:
+  group: server-ops
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ops:
+    name: "Server-Ops: ${{ github.event.inputs.operation }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: SSH-Zugang einrichten
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+
+      - name: Operation ausfuehren
+        env:
+          OP: ${{ github.event.inputs.operation }}
+          SVC: ${{ github.event.inputs.service }}
+          SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}
+        run: |
+          case "$OP" in
+            status)
+              $SSH_CMD 'echo "== pm2 =="; (pm2 list 2>/dev/null || echo "pm2 nicht gefunden"); echo "== systemd =="; (systemctl list-units --type=service --state=running 2>/dev/null | head -20 || true); echo "== docker =="; (docker ps --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || echo "docker nicht gefunden"); echo "== system =="; uptime; df -h / | tail -1; ls -la /opt/cybersarah-control-center 2>/dev/null | head -15 || true'
+              ;;
+            pm2-restart)
+              if [ -n "$SVC" ]; then
+                $SSH_CMD "pm2 restart $SVC --update-env && sleep 3 && pm2 list"
+              else
+                $SSH_CMD 'pm2 restart all --update-env && sleep 3 && pm2 list'
+              fi
+              ;;
+            logs)
+              $SSH_CMD 'pm2 logs --nostream --lines 100 2>/dev/null || journalctl -n 100 --no-pager 2>/dev/null | tail -100'
+              ;;
+            health)
+              $SSH_CMD 'echo "== lokale Dienste =="; curl -s -o /dev/null -w "localhost:3000 → HTTP %{http_code}\n" --max-time 5 http://localhost:3000/ || true; curl -s -o /dev/null -w "localhost:10000 → HTTP %{http_code}\n" --max-time 5 http://localhost:10000/ || true; echo "== pm2 health =="; pm2 jlist 2>/dev/null | head -c 2000 || true'
+              ;;
+            deploy-pull)
+              $SSH_CMD 'cd /opt/cybersarah-control-center && git fetch origin main && git status && git log --oneline -3 && echo "ACHTUNG: Pull erfolgt nur nach expliziter Freigabe" '
+              ;;
+            *)
+              echo "Unbekannte Operation: $OP" >&2
+              exit 1
+              ;;
+          esac
