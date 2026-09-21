@@ -85,33 +85,9 @@ export default function TabLayout() {
             ),
           }}
         />
-        <Tabs.Screen
-          name="cyber-dashboard"
-          options={{
-            title: "Cyber",
-            tabBarIcon: ({ color, focused }) => (
-              <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="bolt.fill" color={color} /></GlassTabIcon>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="cyber-terminal"
-          options={{
-            title: "Terminal",
-            tabBarIcon: ({ color, focused }) => (
-              <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chevron.left.forwardslash.chevron.right" color={color} /></GlassTabIcon>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Workspace",
-            tabBarIcon: ({ color, focused }) => (
-              <GlassTabIcon focused={focused} accent="blue"><IconSymbol size={22} name="folder.fill" color={color} /></GlassTabIcon>
-            ),
-          }}
-        />
+        <Tabs.Screen name="cyber-dashboard" options={{ href: null }} />
+        <Tabs.Screen name="cyber-terminal" options={{ href: null }} />
+        <Tabs.Screen name="index" options={{ href: null }} />
         <Tabs.Screen
           name="chat"
           options={{
@@ -130,33 +106,9 @@ export default function TabLayout() {
             ),
           }}
         />
-        <Tabs.Screen
-          name="superagent"
-          options={{
-            title: "Superagent",
-            tabBarIcon: ({ color, focused }) => (
-              <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="wand.and.stars" color={color} /></GlassTabIcon>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="preview"
-          options={{
-            title: "Vorschau",
-            tabBarIcon: ({ color, focused }) => (
-              <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="play.rectangle.fill" color={color} /></GlassTabIcon>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="quality"
-          options={{
-            title: "Qualität",
-            tabBarIcon: ({ color, focused }) => (
-              <GlassTabIcon focused={focused} accent="amber"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
-            ),
-          }}
-        />
+        <Tabs.Screen name="superagent" options={{ href: null }} />
+        <Tabs.Screen name="preview" options={{ href: null }} />
+        <Tabs.Screen name="quality" options={{ href: null }} />
         <Tabs.Screen
           name="account"
           options={{
