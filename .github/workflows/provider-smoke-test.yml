@@ -57,6 +57,6 @@ jobs:
               echo "$name: FAIL HTTP ${status:-000} (${output#* }s)"
             fi
           }
-          test_provider "Groq" "https://api.groq.com/openai/v1/chat/completions" "llama-3.3-70b-versatile" "$GROQ_KEY"
-          test_provider "Gemini" "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" "gemini-2.5-flash" "$GEMINI_KEY"
+          test_provider "Groq" "https://api.groq.com/openai/v1/chat/completions" "llama-3.1-8b-instant" "$GROQ_KEY"
+          test_provider "Gemini" "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" "gemini-3.8-flash" "$GEMINI_KEY"
           test_provider "OpenRouter" "https://openrouter.ai/api/v1/chat/completions" "openrouter/free" "$OPENROUTER_KEY" "HTTP-Referer: $OPENROUTER_REFERER"
