@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { detectConfiguredProviders, type RouterProviderId } from "../lib/model-router-logic";
-import { getRouterHealth } from "./model-router";
+import { getRouterHealth , getRouterSnapshot } from "./model-router";
 import {
   buildRuntimeStatusSnapshot,
   classifyRuntimeState,
@@ -12,7 +12,6 @@ import {
   getRuntimeLogs,
   installRuntimeLogger,
 } from "./runtime-logger";
-import { getRouterSnapshot } from "./model-router";
 import { getTelegramStatus } from "./_core/telegram";
 import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 
