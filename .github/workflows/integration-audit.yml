@@ -1,0 +1,51 @@
+name: Integrations-Audit
+
+# Sprint 196 — E2E-Pruefung aller Betriebs-Bruecken gegen das LIVE-Backend.
+# Nutzt npm run audit (scripts/integration-audit.ts): Backend-Health,
+# 429-Fallback-Simulation, Telegram-Bruecke (Konfiguration + optionaler
+# Echtversand), Tool-Proxy-Queue-Verhalten.
+# Secrets kommen aus den Repo-Secrets — nie im Klartext im Workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sendTelegramTest:
+        description: "Telegram-Testnachricht versenden"
+        type: boolean
+        default: false
+  schedule:
+    # Taeglich 06:15 UTC — frueher Morgen in Europa, ausserhalb Stoerzeiten.
+    - cron: "15 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: "Integrations-Audit gegen Produktion"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v7
+
+      - name: Node einrichten
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      - name: Audit ausfuehren
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          AUDIT_TARGET: ${{ secrets.AUDIT_TARGET }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.sendTelegramTest }}" = "true" ]; then
+            ARGS="--send-telegram"
+          fi
+          npm run audit -- $ARGS
