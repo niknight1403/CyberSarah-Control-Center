@@ -20,7 +20,8 @@ import React, { useEffect, useMemo } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { accentAlpha, aiCoreStates, glassMotion, glassOverlay, glassPalette, type AiCoreState } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
+import { type GlassAccent, type AiCoreState } from "@/lib/design/future-glass";
 
 interface AiCoreProps {
   /** Durchmesser in px (Default 44 — kompakt fuer Header). */
@@ -33,8 +34,10 @@ interface AiCoreProps {
 const PARTICLE_TINTS = { 0: 0, 1: 0.25, 2: 0.5, 3: 0.75 } as const;
 
 export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreProps) {
-  const visual = aiCoreStates[state];
-  const accent = glassPalette[visual.accent];
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
+  const visual = glass.aiCoreStates[state];
+  const accent = glass.glassPalette[visual.accent];
 
   // --- Rotation des aeusseren Rings ---
   const rotation = useMemo(() => new Animated.Value(0), []);
@@ -86,14 +89,14 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
     const loop = Animated.loop(
       Animated.timing(orbit, {
         toValue: 1,
-        duration: glassMotion.particleDrift,
+        duration: glass.glassMotion.particleDrift,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
     );
     loop.start();
     return () => loop.stop();
-  }, [orbit, visual.particles]);
+  }, [glass.glassMotion.particleDrift, orbit, visual.particles]);
 
   // --- Gegenlaeufiger innerer Ring (Sprint 192: zweite Rotationsebene) ---
   const counterRotation = useMemo(() => new Animated.Value(0), []);
@@ -126,7 +129,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
               width: size * 1.24,
               height: size * 1.24,
               borderRadius: (size * 1.24) / 2,
-              backgroundColor: accentAlpha(visual.accent, 0.14),
+              backgroundColor: glass.accentAlpha(visual.accent, 0.14),
               opacity: glowOpacity,
             },
           ]}
@@ -142,9 +145,9 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
                   height: size,
                   borderRadius: size / 2,
                   borderWidth: ringWidth,
-                  borderColor: accentAlpha(visual.accent, 0.75),
+                  borderColor: glass.accentAlpha(visual.accent, 0.75),
                   borderTopColor: "transparent",
-                  borderLeftColor: accentAlpha(visual.accent, 0.18),
+                  borderLeftColor: glass.accentAlpha(visual.accent, 0.18),
                   transform: [{ rotate: spin }],
                 },
               ]}
@@ -158,8 +161,8 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
                   height: size * 0.8,
                   borderRadius: (size * 0.8) / 2,
                   borderWidth: Math.max(1, ringWidth * 0.55),
-                  borderColor: accentAlpha(visual.accent, 0.4),
-                  borderBottomColor: accentAlpha(visual.accent, 0.1),
+                  borderColor: glass.accentAlpha(visual.accent, 0.4),
+                  borderBottomColor: glass.accentAlpha(visual.accent, 0.1),
                   borderRightColor: "transparent",
                   transform: [{ rotate: counterSpin }],
                 },
@@ -175,7 +178,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
                 height: size,
                 borderRadius: size / 2,
                 borderWidth: ringWidth,
-                borderColor: accentAlpha(visual.accent, 0.5),
+                borderColor: glass.accentAlpha(visual.accent, 0.5),
               },
             ]}
           />
@@ -183,7 +186,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
         {/* Pulsierender Gradient-Kern */}
         <Animated.View style={{ transform: [{ scale: coreScale }] }}>
           <LinearGradient
-            colors={[accentAlpha(visual.accent, 0.95), accentAlpha(visual.accent, 0.4), glassPalette.purple]}
+            colors={[glass.accentAlpha(visual.accent, 0.95), glass.accentAlpha(visual.accent, 0.4), glass.glassPalette.purple]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{
@@ -194,7 +197,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
               justifyContent: "center",
             }}
           >
-            <View style={innerCoreStyle(visual.accent, coreSize)} />
+            <View style={innerCoreStyle(glass, visual.accent, coreSize)} />
           </LinearGradient>
         </Animated.View>
         {/* Umlaufende Partikel: rotierender Container, Dot am Ringrand */}
@@ -214,7 +217,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
                 },
               ]}
             >
-              <View style={particleDotStyle(accent)} />
+              <View style={particleDotStyle(glass.glassOverlay.whiteBright, accent)} />
             </Animated.View>
           ))}
       </View>
@@ -222,20 +225,20 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   aura: { position: "absolute" },
   ring: { position: "absolute" },
 });
 
 // Dynamische Style-Factories (haengen von Groesse/Akzent ab — gehoeren
 // nicht in StyleSheet.create, da RN-Typen dort keine Funktionswerte kennen).
-function innerCoreStyle(accent: keyof typeof glassPalette, coreSize: number) {
+function innerCoreStyle(glass: RuntimeGlassTheme, accent: GlassAccent, coreSize: number) {
   return {
     width: coreSize * 0.34,
     height: coreSize * 0.34,
     borderRadius: (coreSize * 0.34) / 2,
-    backgroundColor: glassOverlay.whiteStrong,
-    shadowColor: glassPalette[accent],
+    backgroundColor: glass.glassOverlay.whiteStrong,
+    shadowColor: glass.glassPalette[accent],
     shadowOpacity: 0.9,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
@@ -252,12 +255,12 @@ function particleOrbitStyle(size: number) {
   };
 }
 
-function particleDotStyle(accent: string) {
+function particleDotStyle(dotColor: string, accent: string) {
   return {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: glassOverlay.whiteBright,
+    backgroundColor: dotColor,
     shadowColor: accent,
     shadowOpacity: 1,
     shadowRadius: 4,

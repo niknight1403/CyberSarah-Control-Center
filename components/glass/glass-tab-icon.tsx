@@ -4,10 +4,11 @@
  * Rein visuell, keine Navigationslogik — wird als tabBarIcon eingesetzt.
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { accentAlpha, glassPalette, type GlassAccent } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
+import { type GlassAccent } from "@/lib/design/future-glass";
 
 interface GlassTabIconProps {
   focused: boolean;
@@ -16,15 +17,17 @@ interface GlassTabIconProps {
 }
 
 export function GlassTabIcon({ focused, accent = "cyan", children }: GlassTabIconProps) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   if (!focused) return <View style={styles.idleWrap}>{children}</View>;
   return (
     <View
       style={[
         styles.activeWrap,
         {
-          backgroundColor: accentAlpha(accent, 0.16),
-          borderColor: accentAlpha(accent, 0.5),
-          shadowColor: glassPalette[accent],
+          backgroundColor: glass.accentAlpha(accent, 0.16),
+          borderColor: glass.accentAlpha(accent, 0.5),
+          shadowColor: glass.glassPalette[accent],
         },
       ]}
     >
@@ -33,7 +36,7 @@ export function GlassTabIcon({ focused, accent = "cyan", children }: GlassTabIco
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   idleWrap: { width: 40, height: 30, alignItems: "center", justifyContent: "center" },
   activeWrap: {
     width: 46,

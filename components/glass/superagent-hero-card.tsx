@@ -4,14 +4,15 @@
  * bei ECHTEM aktiven Status, "Öffnen"-CTA. Keine erfundenen Zustaende.
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import { AiCore } from "@/components/glass/ai-core";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import { superAgentStatusCopy, type SuperAgentStatus } from "@/lib/dashboard-view-model";
-import { glassSpacing, glassSurface, glassType, type AiCoreState, type GlassAccent } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
+import { type AiCoreState, type GlassAccent } from "@/lib/design/future-glass";
 
 const STATUS_TO_ACCENT: Record<SuperAgentStatus, GlassAccent> = {
   active: "green",
@@ -42,6 +43,8 @@ export function SuperagentHeroCard({
   detail: string;
   onRetry?: () => void;
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   const accent = STATUS_TO_ACCENT[status];
   const isLive = status === "active";
   const canOpen = status !== "offline";
@@ -67,10 +70,10 @@ export function SuperagentHeroCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: { gap: glassSpacing.lg },
-  row: { flexDirection: "row", gap: glassSpacing.lg, alignItems: "center" },
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
+  card: { gap: glass.glassSpacing.lg },
+  row: { flexDirection: "row", gap: glass.glassSpacing.lg, alignItems: "center" },
   textWrap: { flex: 1, gap: 6 },
-  title: { ...glassType.headline, color: glassSurface.textPrimary, fontSize: 17, letterSpacing: 1 },
-  detail: { fontSize: 12, color: glassSurface.textSecondary, lineHeight: 16 },
+  title: { ...glass.glassType.headline, color: glass.glassSurface.textPrimary, fontSize: 17, letterSpacing: 1 },
+  detail: { fontSize: 12, color: glass.glassSurface.textSecondary, lineHeight: 16 },
 });

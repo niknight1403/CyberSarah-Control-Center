@@ -16,7 +16,8 @@ import React, { useEffect, useMemo } from "react";
 import { Animated, Easing, StyleSheet, View, useWindowDimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { accentAlpha, glassDepth, glassOverlay, glassPalette, type GlassAccent } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
+import { type GlassAccent } from "@/lib/design/future-glass";
 import {
   buildAurora,
   buildGridMesh,
@@ -33,6 +34,8 @@ interface GlassBackdropProps {
 }
 
 export function GlassBackdrop({ children, accent = "purple", atmosphere = true }: GlassBackdropProps) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   const { width, height } = useWindowDimensions();
 
   // --- Aurora-Drift: langsame, sanfte Pendelbewegung (ein Loop, Native Driver) ---
@@ -43,13 +46,13 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
       Animated.sequence([
         Animated.timing(auroraDrift, {
           toValue: 1,
-          duration: buildAurora(glassPalette[accent]).driftMs,
+          duration: buildAurora(glass.glassPalette[accent]).driftMs,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(auroraDrift, {
           toValue: 0,
-          duration: buildAurora(glassPalette[accent]).driftMs,
+          duration: buildAurora(glass.glassPalette[accent]).driftMs,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
@@ -57,8 +60,8 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
     );
     loop.start();
     return () => loop.stop();
-  }, [atmosphere, auroraDrift, accent]);
-  const aurora = buildAurora(glassPalette[accent]);
+  }, [atmosphere, auroraDrift, accent, glass.glassPalette]);
+  const aurora = buildAurora(glass.glassPalette[accent]);
   const auroraShift = auroraDrift.interpolate({
     inputRange: [0, 1],
     outputRange: [0, aurora.driftAmplitudePx],
@@ -89,28 +92,28 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
   const grid = useMemo(() => buildGridMesh(width, height, 120), [width, height]);
 
   return (
-    <View style={[styles.root, { backgroundColor: glassDepth.void }]}>
+    <View style={[styles.root, { backgroundColor: glass.glassDepth.void }]}>
       {/* Lichtwolke oben rechts — Akzentfarbe */}
       <LinearGradient
-        colors={[accentAlpha(accent, 0.16), "transparent"]}
+        colors={[glass.accentAlpha(accent, 0.16), "transparent"]}
         style={[styles.cloud, styles.cloudTopRight]}
         pointerEvents="none"
       />
       {/* Lichtwolke unten links — Cyan (System) */}
       <LinearGradient
-        colors={[accentAlpha("cyan", 0.1), "transparent"]}
+        colors={[glass.accentAlpha("cyan", 0.1), "transparent"]}
         style={[styles.cloud, styles.cloudBottomLeft]}
         pointerEvents="none"
       />
       {/* Lichtwolke oben links — Blue (Daten), sehr dezent (Sprint 192) */}
       <LinearGradient
-        colors={[accentAlpha("blue", 0.07), "transparent"]}
+        colors={[glass.accentAlpha("blue", 0.07), "transparent"]}
         style={[styles.cloud, styles.cloudTopLeft]}
         pointerEvents="none"
       />
       {/* Zentrale, sehr dezente Tiefenebene */}
       <LinearGradient
-        colors={[glassDepth.abyss, glassDepth.void]}
+        colors={[glass.glassDepth.abyss, glass.glassDepth.void]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -164,7 +167,7 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
                     width: particle.size,
                     height: particle.size,
                     borderRadius: particle.size / 2,
-                    backgroundColor: accentAlpha(particleAccent(particle), particle.opacity),
+                    backgroundColor: glass.accentAlpha(particleAccent(particle), particle.opacity),
                     opacity: fade,
                     transform: [{ translateY: drift }],
                   },
@@ -180,7 +183,7 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
   cloud: {
@@ -211,7 +214,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-evenly",
   },
   gridHorizontal: { flexDirection: "column" },
-  gridLine: { width: 1, height: "100%", backgroundColor: glassOverlay.gridLine },
+  gridLine: { width: 1, height: "100%", backgroundColor: glass.glassOverlay.gridLine },
   gridLineH: { width: "100%", height: 1 },
   particle: { position: "absolute" },
 });

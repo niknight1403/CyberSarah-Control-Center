@@ -10,14 +10,14 @@
  * Rolle, Session-Status, Alert-Flag) — KEINE erfundenen Werte.
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { AiCore } from "@/components/glass/ai-core";
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
-import { accentAlpha, glassPalette, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 
 interface GlassHeaderProps {
   name: string | null;
@@ -34,6 +34,8 @@ function initial(name: string | null): string {
 }
 
 export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotifications, onPressProfile }: GlassHeaderProps) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   return (
     <GlassCard accent="purple" glow={0} style={styles.card}>
       <View style={styles.brandRow}>
@@ -41,7 +43,7 @@ export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotific
           <AiCore size={34} state={online ? "idle" : "warning"} />
           <View>
             <Text style={styles.brandTitle}>
-              Cyber<Text style={{ color: glassPalette.cyan }}>Sarah</Text>
+              Cyber<Text style={{ color: glass.glassPalette.cyan }}>Sarah</Text>
             </Text>
             <Text style={styles.brandSubtitle}>CONTROL CENTER</Text>
           </View>
@@ -52,7 +54,7 @@ export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotific
           onPress={onPressNotifications ?? (() => router.push("/quality" as never))}
           style={styles.iconButton}
         >
-          <IconSymbol size={18} name="exclamationmark.triangle.fill" color={glassSurface.textSecondary} />
+          <IconSymbol size={18} name="exclamationmark.triangle.fill" color={glass.glassSurface.textSecondary} />
           {hasAlerts ? <View style={styles.alertDot} /> : null}
         </Pressable>
       </View>
@@ -61,7 +63,7 @@ export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotific
 
       <View style={styles.profileRow}>
         <View style={styles.avatarWrap}>
-          <View style={[styles.avatarRing, { borderColor: accentAlpha(online ? "green" : "red", 0.7) }]}>
+          <View style={[styles.avatarRing, { borderColor: glass.accentAlpha(online ? "green" : "red", 0.7) }]}>
             <Text style={styles.avatarText}>{initial(name)}</Text>
           </View>
           {online ? <View style={styles.presenceDot} /> : null}
@@ -87,21 +89,21 @@ export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotific
   );
 }
 
-const styles = StyleSheet.create({
-  card: { paddingVertical: glassSpacing.md, gap: glassSpacing.md },
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
+  card: { paddingVertical: glass.glassSpacing.md, gap: glass.glassSpacing.md },
   brandRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   brandLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  brandTitle: { ...glassType.headline, color: glassSurface.textPrimary },
-  brandSubtitle: { ...glassType.label, color: glassSurface.textMuted, marginTop: 1 },
+  brandTitle: { ...glass.glassType.headline, color: glass.glassSurface.textPrimary },
+  brandSubtitle: { ...glass.glassType.label, color: glass.glassSurface.textMuted, marginTop: 1 },
   iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: accentAlpha("purple", 0.08),
+    backgroundColor: glass.accentAlpha("purple", 0.08),
     borderWidth: 1,
-    borderColor: glassSurface.border,
+    borderColor: glass.glassSurface.border,
   },
   alertDot: {
     position: "absolute",
@@ -110,13 +112,13 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: glassPalette.amber,
-    shadowColor: glassPalette.amber,
+    backgroundColor: glass.glassPalette.amber,
+    shadowColor: glass.glassPalette.amber,
     shadowOpacity: 0.9,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 0 },
   },
-  divider: { height: 1, backgroundColor: glassSurface.border },
+  divider: { height: 1, backgroundColor: glass.glassSurface.border },
   profileRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatarWrap: { position: "relative" },
   avatarRing: {
@@ -126,9 +128,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: glassSurface.cardElevated,
+    backgroundColor: glass.glassSurface.cardElevated,
   },
-  avatarText: { color: glassSurface.textPrimary, fontWeight: "900", fontSize: 18 },
+  avatarText: { color: glass.glassSurface.textPrimary, fontWeight: "900", fontSize: 18 },
   presenceDot: {
     position: "absolute",
     right: 0,
@@ -137,20 +139,20 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: glassSurface.card,
-    backgroundColor: glassPalette.green,
+    borderColor: glass.glassSurface.card,
+    backgroundColor: glass.glassPalette.green,
   },
   profileText: { flex: 1, gap: 2 },
-  greeting: { ...glassType.caption, color: glassSurface.textSecondary, fontWeight: "500" },
-  name: { ...glassType.title, color: glassSurface.textPrimary, fontSize: 17 },
+  greeting: { ...glass.glassType.caption, color: glass.glassSurface.textSecondary, fontWeight: "500" },
+  name: { ...glass.glassType.title, color: glass.glassSurface.textPrimary, fontSize: 17 },
   chipRow: { flexDirection: "row", gap: 6, marginTop: 4, flexWrap: "wrap" },
   profileButton: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: glassSurface.border,
+    borderColor: glass.glassSurface.border,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: accentAlpha("cyan", 0.1),
+    backgroundColor: glass.accentAlpha("cyan", 0.1),
   },
-  profileButtonText: { color: glassPalette.cyan, fontWeight: "700", fontSize: 12 },
+  profileButtonText: { color: glass.glassPalette.cyan, fontWeight: "700", fontSize: 12 },
 });

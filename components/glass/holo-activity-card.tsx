@@ -8,14 +8,14 @@
  * Dauer-Animation im Leerlauf (Performance).
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { useAnimatedValue } from "@/lib/use-animated-value";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
 import { sparklineGeometry } from "@/lib/dashboard-view-model";
-import { glassPalette, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 
 const CHART_WIDTH = 280;
 const CHART_HEIGHT = 56;
@@ -40,6 +40,8 @@ export function HoloActivityCard({
   changePercent: number | null;
   points: number[];
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   const geometry = sparklineGeometry(points);
   const hasData = geometry.length >= 2;
   const path = buildPath(geometry);
@@ -60,7 +62,7 @@ export function HoloActivityCard({
         <View style={styles.valueRow}>
           <Text style={styles.value}>{count === null ? "—" : String(count)}</Text>
           {typeof changePercent === "number" ? (
-            <Text style={[styles.change, { color: changePercent >= 0 ? glassPalette.green : glassPalette.red }]}>
+            <Text style={[styles.change, { color: changePercent >= 0 ? glass.glassPalette.green : glass.glassPalette.red }]}>
               {changePercent >= 0 ? "+" : ""}{changePercent}%
             </Text>
           ) : null}
@@ -72,12 +74,12 @@ export function HoloActivityCard({
           <Svg width="100%" height={CHART_HEIGHT} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
             <Defs>
               <LinearGradient id="holoFill" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={glassPalette.blue} stopOpacity={0.35} />
-                <Stop offset="1" stopColor={glassPalette.blue} stopOpacity={0} />
+                <Stop offset="0" stopColor={glass.glassPalette.blue} stopOpacity={0.35} />
+                <Stop offset="1" stopColor={glass.glassPalette.blue} stopOpacity={0} />
               </LinearGradient>
             </Defs>
             <Path d={`${path} L${CHART_WIDTH},${CHART_HEIGHT} L0,${CHART_HEIGHT} Z`} fill="url(#holoFill)" />
-            <Path d={path} stroke={glassPalette.blue} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d={path} stroke={glass.glassPalette.blue} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         </Animated.View>
       ) : (
@@ -89,22 +91,22 @@ export function HoloActivityCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: { gap: glassSpacing.sm },
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
+  card: { gap: glass.glassSpacing.sm },
   header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
   titleRow: { gap: 6 },
-  title: { ...glassType.label, color: glassSurface.textMuted },
+  title: { ...glass.glassType.label, color: glass.glassSurface.textMuted },
   valueRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
-  value: { fontSize: 26, fontWeight: "900", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
+  value: { fontSize: 26, fontWeight: "900", color: glass.glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
   change: { fontSize: 12, fontWeight: "700" },
   emptyState: {
     height: CHART_HEIGHT,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: glassSurface.border,
+    borderColor: glass.glassSurface.border,
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
   },
-  emptyText: { fontSize: 11, color: glassSurface.textMuted },
+  emptyText: { fontSize: 11, color: glass.glassSurface.textMuted },
 });
