@@ -27,10 +27,22 @@ const GEMINI_URL = "generativelanguage.googleapis.com";
 const OPENAI_URL = "api.openai.com";
 
 describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
+  // Test-Isolation: invokeLLM sendet seit Sprint 196/210 bei Provider-
+  // Failover Telegram-Warnungen — sobald Token + Chat-ID in der Env
+  // stehen, wuerden diese zusaetzlichen Fetches die Call-Zaehler
+  // verfaelschen (Host-Env und CI setzen beide Secrets). Fuer die
+  // Rotations-Assertions werden sie daher deterministisch entfernt.
+  const savedTelegramEnv = {
+    botToken: process.env.TELEGRAM_BOT_TOKEN,
+    chatId: process.env.TELEGRAM_CHAT_ID,
+  };
+
   beforeEach(() => {
     resetManagedKeyPoolForTests();
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.BUILT_IN_FORGE_API_URL;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    delete process.env.TELEGRAM_CHAT_ID;
     process.env.AI_GEMINI_API_KEY = "gem-test-key-1234";
     process.env.OPENAI_API_KEY = "sk-openai-test-5678";
     // Sprint 108: Die Rotations-Mechanik wird hier mit aktivem Admin-Override
@@ -46,6 +58,14 @@ describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
     delete process.env.AI_ALLOW_PAID_LLM_FALLBACK;
     delete process.env.GROQ_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
+    // Telegram-Env wiederherstellen, damit andere Suites/Host-Prozesse
+    // unbeeinflusst bleiben.
+    if (savedTelegramEnv.botToken !== undefined) {
+      process.env.TELEGRAM_BOT_TOKEN = savedTelegramEnv.botToken;
+    }
+    if (savedTelegramEnv.chatId !== undefined) {
+      process.env.TELEGRAM_CHAT_ID = savedTelegramEnv.chatId;
+    }
   });
 
   it("rotiert bei 429 automatisch auf den naechsten Key mit passendem Modell", async () => {
