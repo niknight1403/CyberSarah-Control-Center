@@ -1,0 +1,62 @@
+name: AI Provider Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provider-smoke-test:
+    name: Test Groq, Gemini and OpenRouter
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GROQ_KEY: ${{ secrets.AI_GROQ_API_KEY || secrets.GROQ_API_KEY }}
+      GEMINI_KEY: ${{ secrets.AI_GEMINI_API_KEY || secrets.GEMINI_API_KEY }}
+      OPENROUTER_KEY: ${{ secrets.AI_OPENROUTER_API_KEY || secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_REFERER: https://app.cybersarah-ki.com
+    steps:
+      - name: Run provider requests without exposing credentials
+        shell: bash
+        run: |
+          set -u
+          test_provider() {
+            local name="$1"
+            local url="$2"
+            local model="$3"
+            local key="$4"
+            local extra_header="${5:-}"
+            local output status
+            if [ -z "$key" ]; then
+              echo "$name: NOT_CONFIGURED"
+              return 0
+            fi
+            if [ -n "$extra_header" ]; then
+              output=$(curl --silent --show-error --max-time 20 \
+                -o /tmp/provider-body.json \
+                -w '%{http_code} %{time_total}' \
+                -X POST "$url" \
+                -H 'content-type: application/json' \
+                -H "authorization: Bearer $key" \
+                -H "$extra_header" \
+                --data "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly OK.\"}],\"max_tokens\":8,\"temperature\":0}" 2>/dev/null)
+            else
+              output=$(curl --silent --show-error --max-time 20 \
+                -o /tmp/provider-body.json \
+                -w '%{http_code} %{time_total}' \
+                -X POST "$url" \
+                -H 'content-type: application/json' \
+                -H "authorization: Bearer $key" \
+                --data "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly OK.\"}],\"max_tokens\":8,\"temperature\":0}" 2>/dev/null)
+            fi
+            status="${output%% *}"
+            if [ "$status" = "200" ]; then
+              echo "$name: PASS HTTP $status (${output#* }s)"
+            else
+              echo "$name: FAIL HTTP ${status:-000} (${output#* }s)"
+            fi
+          }
+          test_provider "Groq" "https://api.groq.com/openai/v1/chat/completions" "llama-3.3-70b-versatile" "$GROQ_KEY"
+          test_provider "Gemini" "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" "gemini-2.5-flash" "$GEMINI_KEY"
+          test_provider "OpenRouter" "https://openrouter.ai/api/v1/chat/completions" "openrouter/free" "$OPENROUTER_KEY" "HTTP-Referer: $OPENROUTER_REFERER"
