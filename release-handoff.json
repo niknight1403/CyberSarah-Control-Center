@@ -12,7 +12,7 @@
     "issues": [],
     "normalized": {
       "appName": "CyberSarah Control Center",
-      "version": "2.3.0",
+      "version": "2.5.0",
       "androidPackage": "com.cybersarah.controlcenter",
       "orientation": "portrait",
       "buildCommand": "npm run build"
