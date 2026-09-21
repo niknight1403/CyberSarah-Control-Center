@@ -1,5 +1,5 @@
-import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
-import { useMemo , useEffect, useState } from "react";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
+import { useMemo, useEffect, useState } from "react";
 /**
  * Sprint 156 — Loading-/Empty-/Error-States fuer das Dashboard.
  * Skeleton-Shimmer nur als dezente Opacity-Animation (performant,
@@ -26,6 +26,8 @@ function useReducedMotion(): boolean {
 }
 
 export function DashboardSkeleton() {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   const opacity = useAnimatedValue(0.45);
   const reduceMotion = useReducedMotion();
   useEffect(() => {
@@ -60,6 +62,8 @@ export function DashboardSkeleton() {
 }
 
 export function DashboardErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   
   return (
     <View style={[themeStyles.neonCard, styles.errorCard]} accessibilityLabel={`Fehler: ${message}`}>
@@ -77,9 +81,9 @@ export function DashboardErrorState({ message, onRetry }: { message: string; onR
   );
 }
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   wrap: { gap: 12 },
-  block: { borderRadius: 18, backgroundColor: glassDepth.glass, borderWidth: 1, borderColor: accentAlpha("cyan", 0.14) },
+  block: { borderRadius: 18, backgroundColor: glass.glassDepth.glass, borderWidth: 1, borderColor: glass.accentAlpha("cyan", 0.14) },
   header: { height: 48 },
   user: { height: 96 },
   kpiRow: { flexDirection: "row", gap: 12 },
@@ -88,11 +92,11 @@ const createStyles = () => StyleSheet.create({
   activity: { height: 120 },
   superAgent: { height: 120 },
   errorCard: { gap: 10 },
-  errorTitle: { color: glassPalette.red, fontSize: 15, fontWeight: "800" },
-  errorMessage: { color: glassSurface.textSecondary, fontSize: 13 },
-  retry: { backgroundColor: accentAlpha("cyan", 0.12), borderWidth: 1, borderColor: glassSurface.border, alignSelf: "flex-start" },
-  retryText: { color: glassPalette.cyan, fontWeight: "700", fontSize: 13 },
+  errorTitle: { color: glass.glassPalette.red, fontSize: 15, fontWeight: "800" },
+  errorMessage: { color: glass.glassSurface.textSecondary, fontSize: 13 },
+  retry: { backgroundColor: glass.accentAlpha("cyan", 0.12), borderWidth: 1, borderColor: glass.glassSurface.border, alignSelf: "flex-start" },
+  retryText: { color: glass.glassPalette.cyan, fontWeight: "700", fontSize: 13 },
 });
 
-const styles = createStyles();
+
 const themeStyles = createNeonStyles();

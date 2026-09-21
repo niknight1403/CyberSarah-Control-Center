@@ -1,4 +1,5 @@
-import { glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useMemo } from "react";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 /**
  * Sprint 156 — KPI-Karte: Icon, Wert, Label mit ehrlichen Zustaenden —
  * Loading (Skeleton), Fehler (— mit Hinweis), Empty (— statt erfundener 0/99,9).
@@ -27,8 +28,10 @@ export function DashboardKpiCard({
   onPress?: () => void;
   accent?: string;
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   
-  const resolvedAccent = accent ?? glassPalette.cyan;
+  const resolvedAccent = accent ?? glass.glassPalette.cyan;
   const body = (
     <View style={styles.inner}>
       <View style={styles.topRow}>
@@ -56,16 +59,16 @@ export function DashboardKpiCard({
   );
 }
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   card: { flex: 1, minWidth: 104, gap: 6 },
   inner: { gap: 4 },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  iconWrap: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
-  value: { fontSize: 22, fontWeight: "900", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glass.glassOverlay.scrim },
+  value: { fontSize: 22, fontWeight: "900", color: glass.glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
   status: { fontSize: 10, fontWeight: "700", marginTop: 2 },
-  error: { fontSize: 10, fontWeight: "700", color: glassPalette.red, marginTop: 2 },
+  error: { fontSize: 10, fontWeight: "700", color: glass.glassPalette.red, marginTop: 2 },
   pressed: { opacity: 0.78 },
 });
 
-const styles = createStyles();
+
 const themeStyles = createNeonStyles();

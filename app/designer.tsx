@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -9,7 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
  * unveraendert.
  */
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
-import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import {
@@ -26,6 +26,8 @@ import {
  * Admin-gated wie der Rest der Autonomie-Flaeche.
  */
 export default function DesignerScreen() {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const isAdmin = accountQuery.data?.role === "admin";
 
@@ -68,7 +70,7 @@ export default function DesignerScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={galleryQuery.isFetching} onRefresh={() => void galleryQuery.refetch()} tintColor={glassPalette.cyan} />
+          <RefreshControl refreshing={galleryQuery.isFetching} onRefresh={() => void galleryQuery.refetch()} tintColor={glass.glassPalette.cyan} />
         }
       >
         <View style={styles.header}>
@@ -78,9 +80,9 @@ export default function DesignerScreen() {
           </View>
           <Text style={styles.headerKicker}>AI GRAFIK-DESIGNER</Text>
           <Text style={styles.headerTitle}>
-            DESIGNER<Text style={{ color: glassPalette.cyan }}>AGENT</Text>
+            DESIGNER<Text style={{ color: glass.glassPalette.cyan }}>AGENT</Text>
           </Text>
-          <View style={[styles.headerLine, { backgroundColor: `${glassPalette.cyan}55` }]} />
+          <View style={[styles.headerLine, { backgroundColor: `${glass.glassPalette.cyan}55` }]} />
           <Text style={styles.headerSub}>
             Der Designer-Agent entwirft Icons, Logos, Splash-Screens, Banner, Illustrationen und Design-Tokens im Cyber-Design-System — validiert und in der Galerie gespeichert.
           </Text>
@@ -100,7 +102,7 @@ export default function DesignerScreen() {
                   const active = type === assetType;
                   return (
                     <Pressable key={type} onPress={() => setAssetType(type)} style={[styles.typeChip, active && styles.typeChipActive]}>
-                      <Text style={[styles.typeChipText, active && { color: glassDepth.void }]}>{DESIGN_ASSET_TYPE_META[type].label}</Text>
+                      <Text style={[styles.typeChipText, active && { color: glass.glassDepth.void }]}>{DESIGN_ASSET_TYPE_META[type].label}</Text>
                     </Pressable>
                   );
                 })}
@@ -111,7 +113,7 @@ export default function DesignerScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="z. B. Neon-Logo mit Hexagon-Rahmen und Claim 'Revenue OS' …"
-                placeholderTextColor={glassSurface.textSecondary}
+                placeholderTextColor={glass.glassSurface.textSecondary}
                 value={description}
                 onChangeText={setDescription}
                 multiline
@@ -123,7 +125,7 @@ export default function DesignerScreen() {
                 onPress={() => void startGeneration()}
               >
                 {generateMutation.isPending ? (
-                  <ActivityIndicator color={glassDepth.void} size="small" />
+                  <ActivityIndicator color={glass.glassDepth.void} size="small" />
                 ) : (
                   <Text style={styles.runButtonText}>✦ ENTWURF GENERIEREN</Text>
                 )}
@@ -170,39 +172,37 @@ export default function DesignerScreen() {
   );
 }
 
-const createStyles = () =>
+const createStyles = (glass: RuntimeGlassTheme) =>
   StyleSheet.create({
-    safe: { backgroundColor: glassDepth.void, flex: 1 },
+    safe: { backgroundColor: glass.glassDepth.void, flex: 1 },
     safeTransparent: { backgroundColor: "transparent", flex: 1 },
     screen: { flex: 1 },
     content: { padding: 18, paddingBottom: 48 },
     header: { marginBottom: 18 },
     menuRow: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "flex-end" },
-    headerKicker: { ...glassType.label, color: glassSurface.textSecondary, fontSize: 11, letterSpacing: 3 },
-    headerTitle: { ...glassType.display, color: glassSurface.textPrimary, marginTop: 4 },
+    headerKicker: { ...glass.glassType.label, color: glass.glassSurface.textSecondary, fontSize: 11, letterSpacing: 3 },
+    headerTitle: { ...glass.glassType.display, color: glass.glassSurface.textPrimary, marginTop: 4 },
     headerLine: { height: 2, marginVertical: 8, width: 56 },
-    headerSub: { color: glassSurface.textSecondary, fontSize: 12, lineHeight: 17 },
-    panel: { backgroundColor: glassDepth.glass, borderColor: glassSurface.border, borderRadius: 14, borderWidth: 1, marginBottom: 14, padding: 14 },
-    panelTitle: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800", marginBottom: 4 },
-    panelText: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
-    inputLabel: { color: glassSurface.textSecondary, fontSize: 9, fontWeight: "800", letterSpacing: 0.6, marginBottom: 6, marginTop: 10 },
+    headerSub: { color: glass.glassSurface.textSecondary, fontSize: 12, lineHeight: 17 },
+    panel: { backgroundColor: glass.glassDepth.glass, borderColor: glass.glassSurface.border, borderRadius: 14, borderWidth: 1, marginBottom: 14, padding: 14 },
+    panelTitle: { color: glass.glassSurface.textPrimary, fontSize: 13, fontWeight: "800", marginBottom: 4 },
+    panelText: { color: glass.glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
+    inputLabel: { color: glass.glassSurface.textSecondary, fontSize: 9, fontWeight: "800", letterSpacing: 0.6, marginBottom: 6, marginTop: 10 },
     typeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-    typeChip: { borderColor: glassSurface.border, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
-    typeChipActive: { backgroundColor: glassPalette.cyan, borderColor: glassPalette.cyan },
-    typeChipText: { color: glassSurface.textSecondary, fontSize: 10, fontWeight: "700" },
-    typeHint: { color: glassSurface.textSecondary, fontSize: 10, marginTop: 6 },
-    input: { backgroundColor: `${glassPalette.cyan}08`, borderColor: glassSurface.border, borderRadius: 10, borderWidth: 1, color: glassSurface.textPrimary, fontSize: 12, minHeight: 74, padding: 10, textAlignVertical: "top" },
-    runButton: { alignItems: "center", backgroundColor: glassPalette.cyan, borderRadius: 10, marginTop: 12, paddingVertical: 12 },
+    typeChip: { borderColor: glass.glassSurface.border, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+    typeChipActive: { backgroundColor: glass.glassPalette.cyan, borderColor: glass.glassPalette.cyan },
+    typeChipText: { color: glass.glassSurface.textSecondary, fontSize: 10, fontWeight: "700" },
+    typeHint: { color: glass.glassSurface.textSecondary, fontSize: 10, marginTop: 6 },
+    input: { backgroundColor: `${glass.glassPalette.cyan}08`, borderColor: glass.glassSurface.border, borderRadius: 10, borderWidth: 1, color: glass.glassSurface.textPrimary, fontSize: 12, minHeight: 74, padding: 10, textAlignVertical: "top" },
+    runButton: { alignItems: "center", backgroundColor: glass.glassPalette.cyan, borderRadius: 10, marginTop: 12, paddingVertical: 12 },
     runButtonDisabled: { opacity: 0.4 },
-    runButtonText: { color: glassDepth.void, fontSize: 12, fontWeight: "900", letterSpacing: 0.8 },
-    errorText: { color: glassPalette.cyan, fontSize: 11, marginTop: 8 },
-    successText: { color: glassPalette.green, fontSize: 11, marginTop: 8 },
-    galleryRow: { alignItems: "center", borderTopColor: glassSurface.border, borderTopWidth: 1, flexDirection: "row", gap: 8, marginTop: 8, paddingTop: 8 },
+    runButtonText: { color: glass.glassDepth.void, fontSize: 12, fontWeight: "900", letterSpacing: 0.8 },
+    errorText: { color: glass.glassPalette.cyan, fontSize: 11, marginTop: 8 },
+    successText: { color: glass.glassPalette.green, fontSize: 11, marginTop: 8 },
+    galleryRow: { alignItems: "center", borderTopColor: glass.glassSurface.border, borderTopWidth: 1, flexDirection: "row", gap: 8, marginTop: 8, paddingTop: 8 },
     galleryRowMain: { flex: 1 },
-    galleryTitle: { color: glassSurface.textPrimary, fontSize: 12, fontWeight: "700" },
-    galleryMeta: { color: glassSurface.textSecondary, fontSize: 9, marginTop: 2 },
-    deleteButton: { borderColor: `${glassPalette.cyan}66`, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
-    deleteButtonText: { color: glassPalette.cyan, fontSize: 10, fontWeight: "700" },
+    galleryTitle: { color: glass.glassSurface.textPrimary, fontSize: 12, fontWeight: "700" },
+    galleryMeta: { color: glass.glassSurface.textSecondary, fontSize: 9, marginTop: 2 },
+    deleteButton: { borderColor: `${glass.glassPalette.cyan}66`, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
+    deleteButtonText: { color: glass.glassPalette.cyan, fontSize: 10, fontWeight: "700" },
   });
-
-const styles = createStyles();

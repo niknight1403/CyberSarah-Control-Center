@@ -1,4 +1,5 @@
-import { accentAlpha, glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useMemo } from "react";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 /**
  * Sprint 156 — Aktivitaetskarte (NICHT „Neueste Aktivitaeten"): kompakte
  * System-/Nutzungsuebersicht der letzten 24 h. Nur echte Zaehlwerte;
@@ -19,6 +20,8 @@ export function ActivitySummaryCard({
   changePercent: number | null;
   points: number[];
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   
   const geometry = sparklineGeometry(points);
   const hasData = typeof count === "number" && count > 0;
@@ -26,7 +29,7 @@ export function ActivitySummaryCard({
     <View style={[themeStyles.neonCard, themeStyles.neonCardBlue, styles.card]}>
       <View style={styles.header}>
         <View style={styles.iconWrap} accessibilityLabel="Aktivität">
-          <IconSymbol size={16} name="chart.bar.fill" color={glassPalette.cyan} />
+          <IconSymbol size={16} name="chart.bar.fill" color={glass.glassPalette.cyan} />
         </View>
         <View style={styles.titleWrap}>
           <Text style={themeStyles.sectionTitle}>Aktivität</Text>
@@ -37,7 +40,7 @@ export function ActivitySummaryCard({
             {count === null ? "—" : String(count)}
           </Text>
           {typeof changePercent === "number" ? (
-            <Text style={[styles.change, { color: changePercent >= 0 ? glassPalette.green : glassPalette.red }]}>
+            <Text style={[styles.change, { color: changePercent >= 0 ? glass.glassPalette.green : glass.glassPalette.red }]}>
               {changePercent >= 0 ? "+" : ""}{changePercent}% vs. Vortag
             </Text>
           ) : null}
@@ -60,20 +63,20 @@ export function ActivitySummaryCard({
   );
 }
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   card: { gap: 12 },
   header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: glassSurface.textSecondary, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: glass.glassSurface.textSecondary, alignItems: "center", justifyContent: "center", backgroundColor: glass.glassOverlay.scrim },
   titleWrap: { flex: 1, gap: 2 },
   valueWrap: { alignItems: "flex-end" },
-  value: { fontSize: 26, fontWeight: "900", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
+  value: { fontSize: 26, fontWeight: "900", color: glass.glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
   change: { fontSize: 11, fontWeight: "700" },
   sparkArea: { height: 40, justifyContent: "flex-end" },
   sparkRow: { flexDirection: "row", alignItems: "flex-end", gap: 3, height: 40 },
-  sparkBar: { flex: 1, borderRadius: 2, backgroundColor: glassPalette.cyan, opacity: 0.85 },
-  sparkEmpty: { height: 34, borderRadius: 8, borderWidth: 1, borderColor: accentAlpha("cyan", 0.14), borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
-  sparkEmptyText: { fontSize: 11, color: glassSurface.textSecondary },
+  sparkBar: { flex: 1, borderRadius: 2, backgroundColor: glass.glassPalette.cyan, opacity: 0.85 },
+  sparkEmpty: { height: 34, borderRadius: 8, borderWidth: 1, borderColor: glass.accentAlpha("cyan", 0.14), borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  sparkEmptyText: { fontSize: 11, color: glass.glassSurface.textSecondary },
 });
 
-const styles = createStyles();
+
 const themeStyles = createNeonStyles();

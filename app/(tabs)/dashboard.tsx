@@ -27,13 +27,14 @@ import { DashboardErrorState, DashboardSkeleton } from "@/components/cyber/dashb
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { chatStatusCopy, formatUptime, systemStatusCopy, workspaceStatusCopy } from "@/lib/dashboard-view-model";
 import { isWideViewport } from "@/lib/viewport-logic";
-import { glassSpacing, glassSurface } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 
 export default function DashboardScreen() {
+  const glass = useGlassTheme();
   const { vm, state, hasAlerts, isAdmin, retry, serverUptimeText } = useDashboardData();
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
-  const styles = useMemo(() => createStyles(wide), [wide]);
+  const styles = useMemo(() => createStyles(glass, wide), [glass, wide]);
 
   if (state === "loading" || vm === null) {
     return (
@@ -148,19 +149,19 @@ export default function DashboardScreen() {
   );
 }
 
-function createStyles(wide: boolean) {
+function createStyles(glass: RuntimeGlassTheme, wide: boolean) {
   return StyleSheet.create({
     transparent: { backgroundColor: "transparent" },
     content: {
-      gap: glassSpacing.lg,
-      paddingHorizontal: glassSpacing.lg,
+      gap: glass.glassSpacing.lg,
+      paddingHorizontal: glass.glassSpacing.lg,
       paddingBottom: 120,
       maxWidth: 1280,
       width: "100%",
       alignSelf: "center" as const,
     },
-    metricRow: { flexDirection: "row", gap: glassSpacing.md },
-    moduleRow: wide ? { flexDirection: "row", gap: glassSpacing.md } : { flexDirection: "column", gap: glassSpacing.md },
-    footnote: { fontSize: 11, color: glassSurface.textMuted, textAlign: "center", paddingTop: 4 },
+    metricRow: { flexDirection: "row", gap: glass.glassSpacing.md },
+    moduleRow: wide ? { flexDirection: "row", gap: glass.glassSpacing.md } : { flexDirection: "column", gap: glass.glassSpacing.md },
+    footnote: { fontSize: 11, color: glass.glassSurface.textMuted, textAlign: "center", paddingTop: 4 },
   });
 }

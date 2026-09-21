@@ -1,4 +1,5 @@
-import { accentAlpha, glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useMemo } from "react";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 /**
  * Sprint 156 — Systemstatus-Karte: echte Werte aus appStatus (Uptime,
  * Workspace-Ping), korrekt abgeleitet — „/api/health != DB-Readiness".
@@ -10,7 +11,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { createNeonStyles } from "./neon-dashboard-styles";
 import type { SystemStatus } from "@/lib/dashboard-view-model";
 
-const ACCENT = () => ({ healthy: glassPalette.green, checking: glassPalette.cyan, degraded: glassPalette.amber, offline: glassPalette.red, unknown: glassSurface.textSecondary });
+const ACCENT = (glass: RuntimeGlassTheme) => ({ healthy: glass.glassPalette.green, checking: glass.glassPalette.cyan, degraded: glass.glassPalette.amber, offline: glass.glassPalette.red, unknown: glass.glassSurface.textSecondary });
 
 export function SystemStatusCard({
   status,
@@ -25,8 +26,10 @@ export function SystemStatusCard({
   offline: boolean;
   onRetry: () => void;
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   
-  const accent = ACCENT()[status];
+  const accent = ACCENT(glass)[status];
   return (
     <Pressable
       accessibilityRole="button"
@@ -54,26 +57,26 @@ export function SystemStatusCard({
       ) : null}
       <View style={styles.chevronRow}>
         <Text style={themeStyles.mutedLabel}>Details</Text>
-        <IconSymbol size={13} name="chevron.right" color={glassSurface.textSecondary} />
+        <IconSymbol size={13} name="chevron.right" color={glass.glassSurface.textSecondary} />
       </View>
     </Pressable>
   );
 }
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glass.glassOverlay.scrim },
   state: { fontSize: 16, fontWeight: "800" },
   uptimeRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  uptimeTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: glassOverlay.track, overflow: "hidden" },
+  uptimeTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: glass.glassOverlay.track, overflow: "hidden" },
   uptimeBar: { height: 6, borderRadius: 3 },
-  uptimeValue: { fontSize: 13, fontWeight: "800", color: glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
-  retry: { backgroundColor: accentAlpha("amber", 0.12), borderWidth: 1, borderColor: accentAlpha("amber", 0.4) },
-  retryText: { color: glassPalette.amber, fontWeight: "700", fontSize: 12 },
+  uptimeValue: { fontSize: 13, fontWeight: "800", color: glass.glassSurface.textPrimary, fontVariant: ["tabular-nums"] },
+  retry: { backgroundColor: glass.accentAlpha("amber", 0.12), borderWidth: 1, borderColor: glass.accentAlpha("amber", 0.4) },
+  retryText: { color: glass.glassPalette.amber, fontWeight: "700", fontSize: 12 },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });
 
-const styles = createStyles();
+
 const themeStyles = createNeonStyles();

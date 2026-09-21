@@ -1,4 +1,5 @@
-import { glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useMemo } from "react";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 /**
  * Sprint 156 — Workspace-Karte: echte Service-Verfuegbarkeit und Anzahl,
  * keine erfundenen Projektzahlen; Empty-State wenn nichts konfiguriert.
@@ -10,7 +11,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { createNeonStyles } from "./neon-dashboard-styles";
 import { workspaceStatusCopy, type WorkspaceStatus } from "@/lib/dashboard-view-model";
 
-const ACCENT = () => ({ ready: glassPalette.green, checking: glassPalette.cyan, unavailable: glassPalette.amber, unknown: glassSurface.textSecondary });
+const ACCENT = (glass: RuntimeGlassTheme) => ({ ready: glass.glassPalette.green, checking: glass.glassPalette.cyan, unavailable: glass.glassPalette.amber, unknown: glass.glassSurface.textSecondary });
 
 export function WorkspaceStatusCard({
   status,
@@ -21,8 +22,10 @@ export function WorkspaceStatusCard({
   count: number | null;
   detail: string;
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   
-  const accent = ACCENT()[status];
+  const accent = ACCENT(glass)[status];
   const countText = count === null ? "—" : String(count);
   return (
     <Pressable
@@ -41,21 +44,21 @@ export function WorkspaceStatusCard({
       <Text style={styles.meta} accessibilityLabel={`${countText} aktive Workspaces`}>{countText} aktive Workspaces</Text>
       <View style={styles.chevronRow}>
         <Text style={themeStyles.mutedLabel}>Projekte &amp; Automationen</Text>
-        <IconSymbol size={13} name="chevron.right" color={glassSurface.textSecondary} />
+        <IconSymbol size={13} name="chevron.right" color={glass.glassSurface.textSecondary} />
       </View>
     </Pressable>
   );
 }
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   card: { flex: 1, minWidth: 220, gap: 10 },
   pressed: { opacity: 0.8 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glassOverlay.scrim },
+  iconWrap: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: glass.glassOverlay.scrim },
   state: { fontSize: 15, fontWeight: "800" },
-  meta: { fontSize: 12, color: glassSurface.textSecondary, fontVariant: ["tabular-nums"] },
+  meta: { fontSize: 12, color: glass.glassSurface.textSecondary, fontVariant: ["tabular-nums"] },
   chevronRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });
 
-const styles = createStyles();
+
 const themeStyles = createNeonStyles();

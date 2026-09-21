@@ -9,7 +9,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { GlassTabIcon } from "@/components/glass/glass-tab-icon";
 import { Platform, View, useWindowDimensions } from "react-native";
 import { isWideViewport } from "@/lib/viewport-logic";
-import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useGlassTheme } from "@/lib/design/future-glass-runtime";
 
 /**
  * Sprint 168 — Future-Glass-Navigation: schwebende CyberGlass-Bar statt
@@ -18,6 +18,7 @@ import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glas
  * (Position, Rand, Glow, aktives Icon) wurde neu aufgebaut.
  */
 export default function TabLayout() {
+  const glass = useGlassTheme();
   const insets = useSafeAreaInsets();
   // Sprint 117: erster Start → Willkommensflow mit Theme-Auswahl, einmalig.
   const { status: onboardingStatus } = useOnboarding();
@@ -36,12 +37,12 @@ export default function TabLayout() {
   const tabBarHeight = barHeight + floatMargin;
 
   return (
-    <View style={{ flex: 1, flexDirection: wide ? "row" : "column", backgroundColor: glassSurface.background }}>
+    <View style={{ flex: 1, flexDirection: wide ? "row" : "column", backgroundColor: glass.glassSurface.background }}>
       {wide ? <AppSidebar /> : null}
       <Tabs
       screenOptions={{
-        tabBarActiveTintColor: glassPalette.cyan,
-        tabBarInactiveTintColor: glassSurface.textMuted,
+        tabBarActiveTintColor: glass.glassPalette.cyan,
+        tabBarInactiveTintColor: glass.glassSurface.textMuted,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarShowLabel: true,
@@ -52,10 +53,10 @@ export default function TabLayout() {
           marginHorizontal: 12,
           marginBottom: floatMargin,
           borderRadius: 26,
-          backgroundColor: glassDepth.abyss,
+          backgroundColor: glass.glassDepth.abyss,
           borderWidth: 1,
-          borderColor: glassSurface.border,
-          shadowColor: glassPalette.purple,
+          borderColor: glass.glassSurface.border,
+          shadowColor: glass.glassPalette.purple,
           shadowOpacity: 0.28,
           shadowRadius: 18,
           shadowOffset: { width: 0, height: 6 },

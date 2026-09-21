@@ -1,4 +1,5 @@
-import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useMemo } from "react";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 /**
  * Sprint 156 — Benutzeruebersicht: Avatar mit Neon-Ring, Begruessung,
  * Rollen-Badge NUR bei serverseitig bestaetigter Rolle, Session-Status.
@@ -22,6 +23,8 @@ export function UserOverviewCard({
   sessionExpired: boolean;
   avatarUrl?: string | null;
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   
   const badge = roleBadge(role);
   const state = sessionState(authenticated, sessionExpired);
@@ -66,40 +69,40 @@ export function UserOverviewCard({
   );
 }
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", gap: 14 },
   avatarWrap: { position: "relative" },
   avatarRing: {
     width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: glassPalette.cyan,
-    shadowColor: glassPalette.cyan, shadowOpacity: 0.8, shadowRadius: 10, shadowOffset: { width: 0, height: 0 },
+    borderWidth: 2, borderColor: glass.glassPalette.cyan,
+    shadowColor: glass.glassPalette.cyan, shadowOpacity: 0.8, shadowRadius: 10, shadowOffset: { width: 0, height: 0 },
   },
-  avatarRingOffline: { borderColor: glassSurface.textSecondary, shadowOpacity: 0 },
+  avatarRingOffline: { borderColor: glass.glassSurface.textSecondary, shadowOpacity: 0 },
   avatar: {
     width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center",
-    backgroundColor: glassDepth.void, borderWidth: 1, borderColor: glassSurface.border,
+    backgroundColor: glass.glassDepth.void, borderWidth: 1, borderColor: glass.glassSurface.border,
   },
-  avatarText: { color: glassPalette.cyan, fontWeight: "900", fontSize: 20 },
-  presenceDot: { position: "absolute", right: 2, bottom: 2, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: glassDepth.void },
-  presenceOnline: { backgroundColor: glassPalette.green },
+  avatarText: { color: glass.glassPalette.cyan, fontWeight: "900", fontSize: 20 },
+  presenceDot: { position: "absolute", right: 2, bottom: 2, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: glass.glassDepth.void },
+  presenceOnline: { backgroundColor: glass.glassPalette.green },
   textWrap: { flex: 1, gap: 3 },
-  greeting: { color: glassSurface.textSecondary, fontSize: 13 },
-  name: { color: glassSurface.textPrimary, fontSize: 20, fontWeight: "800" },
+  greeting: { color: glass.glassSurface.textSecondary, fontSize: 13 },
+  name: { color: glass.glassSurface.textPrimary, fontSize: 20, fontWeight: "800" },
   badgeRow: { flexDirection: "row", gap: 6, marginTop: 4, flexWrap: "wrap" },
   badge: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeAdmin: { borderColor: accentAlpha("purple", 0.6), backgroundColor: accentAlpha("purple", 0.14) },
-  badgeAdminText: { color: glassPalette.cyan },
-  badgeUser: { borderColor: glassSurface.border, backgroundColor: accentAlpha("cyan", 0.08) },
-  badgeUserText: { color: glassPalette.cyan },
-  badgeOnline: { borderColor: accentAlpha("green", 0.5), backgroundColor: accentAlpha("green", 0.1) },
-  badgeOnlineText: { color: glassPalette.green },
-  badgeOffline: { borderColor: accentAlpha("red", 0.5), backgroundColor: accentAlpha("red", 0.1) },
-  badgeOfflineText: { color: glassPalette.red },
+  badgeAdmin: { borderColor: glass.accentAlpha("purple", 0.6), backgroundColor: glass.accentAlpha("purple", 0.14) },
+  badgeAdminText: { color: glass.glassPalette.cyan },
+  badgeUser: { borderColor: glass.glassSurface.border, backgroundColor: glass.accentAlpha("cyan", 0.08) },
+  badgeUserText: { color: glass.glassPalette.cyan },
+  badgeOnline: { borderColor: glass.accentAlpha("green", 0.5), backgroundColor: glass.accentAlpha("green", 0.1) },
+  badgeOnlineText: { color: glass.glassPalette.green },
+  badgeOffline: { borderColor: glass.accentAlpha("red", 0.5), backgroundColor: glass.accentAlpha("red", 0.1) },
+  badgeOfflineText: { color: glass.glassPalette.red },
   badgeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
-  profileButton: { backgroundColor: accentAlpha("cyan", 0.14), borderWidth: 1, borderColor: glassSurface.border },
-  profileButtonText: { color: glassPalette.cyan, fontWeight: "700", fontSize: 13 },
+  profileButton: { backgroundColor: glass.accentAlpha("cyan", 0.14), borderWidth: 1, borderColor: glass.glassSurface.border },
+  profileButtonText: { color: glass.glassPalette.cyan, fontWeight: "700", fontSize: 13 },
   pressed: { opacity: 0.75 },
 });
 
-const styles = createStyles();
+
 const themeStyles = createNeonStyles();

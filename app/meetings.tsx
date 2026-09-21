@@ -1,7 +1,7 @@
 /**
  * Sprint 183 — Meetings-Screen: useColors durch Glass-Tokens ersetzt. Logik unveraendert.
  */
-import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -14,6 +14,8 @@ import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/com
  * (Agenten-Zusammenfassungen von Terminen, Voice-Bridge).
  */
 export default function MeetingsScreen() {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   const roadmap = [
     { phase: "Phase 1", title: "Termin-Einbindung", detail: "Google-Calendar-Anschluss: der Agent fasst kommende Meetings zusammen und bereitet Talking Points vor." },
     { phase: "Phase 2", title: "Meeting-Notizen", detail: "Aufzeichnungen transkribieren (Whisper), Aktionspunkte extrahieren und ins Projekt-Gedächtnis schreiben." },
@@ -22,7 +24,7 @@ export default function MeetingsScreen() {
 
   return (
     <DrawerScreen kicker="KOMMENDE MODULE" title="Meetings">
-      <DrawerCard accent={`${glassPalette.cyan}66`}>
+      <DrawerCard accent={`${glass.glassPalette.cyan}66`}>
         <View style={styles.badgeRow}>
           <Text style={styles.badge}>NEU</Text>
           <Text style={styles.badgeText}>Modul in Vorbereitung</Text>
@@ -34,7 +36,7 @@ export default function MeetingsScreen() {
       </DrawerCard>
 
       {roadmap.map((item) => (
-        <View key={item.phase} style={[styles.roadmapCard, { borderColor: `${glassPalette.cyan}44` }]}>
+        <View key={item.phase} style={[styles.roadmapCard, { borderColor: `${glass.glassPalette.cyan}44` }]}>
           <Text style={styles.phase}>{item.phase}</Text>
           <Text style={styles.phaseTitle}>{item.title}</Text>
           <Text style={styles.phaseDetail}>{item.detail}</Text>
@@ -44,16 +46,14 @@ export default function MeetingsScreen() {
   );
 }
 
-function createStyles() {
+function createStyles(glass: RuntimeGlassTheme) {
   return StyleSheet.create({
     badgeRow: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 8 },
-    badge: { backgroundColor: `${glassPalette.cyan}22`, borderColor: glassPalette.cyan, borderRadius: 8, borderWidth: 1, color: glassPalette.cyan, fontSize: 9, fontWeight: "900", letterSpacing: 0.6, overflow: "hidden", paddingHorizontal: 8, paddingVertical: 3 },
-    badgeText: { color: glassSurface.textSecondary, fontSize: 9, fontWeight: "700", letterSpacing: 1 },
-    roadmapCard: { backgroundColor: glassDepth.glass, borderRadius: 14, borderWidth: 1, marginBottom: 10, padding: 14 },
-    phase: { color: glassPalette.cyan, fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
-    phaseTitle: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800", marginTop: 3 },
-    phaseDetail: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4 },
+    badge: { backgroundColor: `${glass.glassPalette.cyan}22`, borderColor: glass.glassPalette.cyan, borderRadius: 8, borderWidth: 1, color: glass.glassPalette.cyan, fontSize: 9, fontWeight: "900", letterSpacing: 0.6, overflow: "hidden", paddingHorizontal: 8, paddingVertical: 3 },
+    badgeText: { color: glass.glassSurface.textSecondary, fontSize: 9, fontWeight: "700", letterSpacing: 1 },
+    roadmapCard: { backgroundColor: glass.glassDepth.glass, borderRadius: 14, borderWidth: 1, marginBottom: 10, padding: 14 },
+    phase: { color: glass.glassPalette.cyan, fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
+    phaseTitle: { color: glass.glassSurface.textPrimary, fontSize: 13, fontWeight: "800", marginTop: 3 },
+    phaseDetail: { color: glass.glassSurface.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4 },
   });
 }
-
-const styles = createStyles();

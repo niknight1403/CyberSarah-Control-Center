@@ -1,5 +1,5 @@
-import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
-import { useMemo , useEffect, useState } from "react";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
+import { useMemo, useEffect, useState } from "react";
 /**
  * Sprint 156 — Superagenten-Modul: breite Neon-Glas-Karte mit ECHTEM
  * Backend-Status. Zeigt niemals „LIVE · AKTIV" ohne aktiven Agenten und
@@ -13,7 +13,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { superAgentStatusCopy, type SuperAgentStatus } from "@/lib/dashboard-view-model";
 import { createNeonStyles } from "./neon-dashboard-styles";
 
-const STATUS_COLOR = () => ({ active: glassPalette.green, ready: glassPalette.cyan, paused: glassPalette.amber, unconfigured: glassSurface.textSecondary, offline: glassPalette.red, error: glassPalette.red });
+const STATUS_COLOR = (glass: RuntimeGlassTheme) => ({ active: glass.glassPalette.green, ready: glass.glassPalette.cyan, paused: glass.glassPalette.amber, unconfigured: glass.glassSurface.textSecondary, offline: glass.glassPalette.red, error: glass.glassPalette.red });
 
 /** Reduce-Motion sicher abfragen (Web-Polyfill: Promise-API). */
 function useReducedMotion(): boolean {
@@ -41,8 +41,10 @@ export function SuperAgentCard({
   detail: string;
   onRetry: () => void;
 }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   
-  const accent = STATUS_COLOR()[status];
+  const accent = STATUS_COLOR(glass)[status];
   const pulse = useAnimatedValue(1);
   const reduceMotion = useReducedMotion();
 
@@ -92,12 +94,12 @@ export function SuperAgentCard({
             style={({ pressed }) => [
               themeStyles.neonButton,
               styles.openButton,
-              { borderColor: accentAlpha("amber", 0.45) },
+              { borderColor: glass.accentAlpha("amber", 0.45) },
               pressed && styles.pressed,
             ]}
             onPress={onRetry}
           >
-            <Text style={[styles.openButtonText, { color: glassPalette.amber }]}>Erneut laden</Text>
+            <Text style={[styles.openButtonText, { color: glass.glassPalette.amber }]}>Erneut laden</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -120,7 +122,7 @@ export function SuperAgentCard({
   );
 }
 
-const createStyles = () => StyleSheet.create({
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 18 },
   left: { alignItems: "center", gap: 4 },
   avatarRing: {
@@ -140,20 +142,20 @@ const createStyles = () => StyleSheet.create({
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: glassDepth.void,
+    backgroundColor: glass.glassDepth.void,
   },
   liveDot: { width: 9, height: 9, borderRadius: 5 },
   center: { flex: 1, gap: 3 },
-  title: { fontSize: 16, fontWeight: "900", color: glassSurface.textPrimary, letterSpacing: 1.2 },
-  subtitle: { fontSize: 12, color: glassSurface.textSecondary },
+  title: { fontSize: 16, fontWeight: "900", color: glass.glassSurface.textPrimary, letterSpacing: 1.2 },
+  subtitle: { fontSize: 12, color: glass.glassSurface.textSecondary },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 2 },
   statusText: { fontSize: 11, fontWeight: "900", letterSpacing: 1 },
-  detailText: { fontSize: 11, color: glassSurface.textSecondary },
+  detailText: { fontSize: 11, color: glass.glassSurface.textSecondary },
   right: { alignItems: "flex-end" },
-  openButton: { flexDirection: "row", gap: 6, borderWidth: 1, backgroundColor: accentAlpha("cyan", 0.1) },
+  openButton: { flexDirection: "row", gap: 6, borderWidth: 1, backgroundColor: glass.accentAlpha("cyan", 0.1) },
   openButtonText: { fontWeight: "800", fontSize: 13 },
   pressed: { opacity: 0.7 },
 });
 
-const styles = createStyles();
+
 const themeStyles = createNeonStyles();
