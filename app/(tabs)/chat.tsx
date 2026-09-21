@@ -98,11 +98,11 @@ export default function ChatScreen() {
   const scrollChatToEnd = useCallback((animated = true) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        listRef.current?.scrollToIndex({ index: Math.max(0, messages.length - 1), animated, viewPosition: 0 });
+        listRef.current?.scrollToEnd({ animated });
         // Late-Layout-Retry: Android streamt Layout-Aenderungen teils
         // erst nach dem Frame — ein zweiter Versuch nach 120 ms fängt
         // alle verspaeteten Frames zuverlaessig ein.
-        setTimeout(() => listRef.current?.scrollToIndex({ index: Math.max(0, messages.length - 1), animated: false, viewPosition: 0 }), 120);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
       });
     });
   }, []);
@@ -359,7 +359,7 @@ export default function ChatScreen() {
                 data={messages}
                 keyExtractor={(m) => m.id}
                 keyboardShouldPersistTaps="handled"
-                onContentSizeChange={() => listRef.current?.scrollToIndex({ index: Math.max(0, messages.length - 1), animated: false, viewPosition: 0 })}
+                onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
                 onLayout={() => scrollChatToEnd(false)}
                 ListHeaderComponent={isChatEmpty ? <>
                   <TouchableOpacity
