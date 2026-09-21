@@ -21,7 +21,24 @@ import {
 } from "../lib/telegram-notify-logic";
 
 const args = new Set(process.argv.slice(2));
-const baseUrl = (args.has("--url") ? process.argv[process.argv.indexOf("--url") + 1] : undefined) ?? process.env.AUDIT_TARGET ?? "https://app.cybersarah-ki.com";
+
+/**
+ * BUGFIX (Sprint 210): leeres AUDIT_TARGET schlug dem Default vor.
+ * `${{ secrets.AUDIT_TARGET }}` im Workflow setzt die Env-Variable auf den
+ * LEEREN String, wenn das Secret nicht existiert. Der bisherige ??-Fallback
+ * greift bei "" aber nie (leerer String ist nicht nullish) — der Audit lief
+ * somit gegen fetch("/api/ready") und schlug mit HTTP 0 fehl, obwohl die
+ * Produktion gesund war. Leere/whitespace-only Werte werden jetzt wie
+ * "nicht gesetzt" behandelt.
+ */
+const urlArg = args.has("--url") ? process.argv[process.argv.indexOf("--url") + 1] : undefined;
+const envTarget = process.env.AUDIT_TARGET;
+const firstNonEmpty = [urlArg, envTarget].find((candidate) => typeof candidate === "string" && candidate.trim().length > 0);
+const baseUrl = (firstNonEmpty ?? "https://app.cybersarah-ki.com").replace(/\/+$/, "");
+if (!/^https?:\/\//.test(baseUrl)) {
+  console.error(`Ungueltiges Audit-Ziel "${baseUrl}" — es muss mit http(s):// beginnen.`);
+  process.exit(1);
+}
 
 type CheckResult = { name: string; ok: boolean; detail: string };
 
