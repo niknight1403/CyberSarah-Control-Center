@@ -21,6 +21,7 @@ on:
           - disk-report
           - disk-clean
           - db-migrate
+          - pm2-redeploy
           - deploy-pull
           - probe
         default: status
@@ -79,6 +80,9 @@ jobs:
               ;;
             db-migrate)
               $SSH_CMD 'cd /opt/cybersarah-control-center && echo "== vorhandene Migrationen =="; ls drizzle/*.sql 2>/dev/null | tail -4; echo "== .env vorhanden =="; test -f .env && echo ja || echo "keine .env — DATABASE_URL nicht verfuegbar"; echo "== Migration ausfuehren =="; set -a; . ./.env 2>/dev/null; set +a; npx drizzle-kit migrate 2>&1 | tail -15; echo "== Tabellen-Check =="; npx drizzle-kit check 2>&1 | tail -5 || true'
+              ;;
+            pm2-redeploy)
+              $SSH_CMD 'echo "== Port 3000 vorher =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "frei"; echo "== Stop =="; pm2 stop all; sleep 2; pkill -f "dist/index.js" 2>/dev/null || true; sleep 2; echo "== Port nach Kill =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "frei"; pm2 start all; sleep 5; echo "== Status =="; pm2 list; echo "== Port nachher =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "nicht gebunden"; echo "== Letzte App-Logzeilen =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
               ;;
             probe)
               for U in root cybersarah ubuntu debian admin; do
