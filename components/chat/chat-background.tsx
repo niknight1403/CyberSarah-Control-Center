@@ -22,6 +22,7 @@ export function ChatBackground({ children }: { children: ReactNode }) {
   return (
     <View style={styles.root}>
       <LinearGradient colors={[glassDepth.void, glassDepth.deep, glassDepth.abyss]} locations={[0, 0.55, 1]} style={styles.gradient}>
+        <View style={styles.readabilitySurface} />
         <View style={styles.glowCyan} />
         <View style={styles.glowViolet} />
         {/* Sprint 89 — Living Layer: langsam driftende Partikel + dezente
@@ -38,23 +39,27 @@ export function ChatBackground({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: "hidden" },
   gradient: { flex: 1 },
+  readabilitySurface: {
+    backgroundColor: withAlpha(glassDepth.void, 0.92),
+    ...StyleSheet.absoluteFill,
+  },
   glowCyan: {
     alignSelf: "flex-end",
-    backgroundColor: withAlpha(glassPalette.cyan, 0.07),
-    borderRadius: 220,
-    height: 320,
-    marginRight: -120,
-    marginTop: -140,
+    backgroundColor: withAlpha(glassPalette.cyan, 0.018),
+    borderRadius: 180,
+    height: 220,
+    marginRight: -80,
+    marginTop: -70,
     position: "absolute",
-    width: 320,
+    width: 220,
   },
   glowViolet: {
-    backgroundColor: withAlpha(glassPalette.purple, 0.06),
-    borderRadius: 260,
-    bottom: -160,
-    height: 340,
-    left: -140,
+    backgroundColor: withAlpha(glassPalette.purple, 0.015),
+    borderRadius: 180,
+    bottom: -90,
+    height: 220,
+    left: -80,
     position: "absolute",
-    width: 340,
+    width: 220,
   },
 });
