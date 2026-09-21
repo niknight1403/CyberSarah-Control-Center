@@ -299,7 +299,10 @@ function getFallbackProviders(provider: ProviderId) {
   const providers: ProviderId[] = parsed
     .filter((result): result is { success: true; data: ProviderId } => result.success && Boolean(result.data))
     .map((result) => result.data);
-  return providers.filter((candidate, index, all) => candidate !== provider && all.indexOf(candidate) === index);
+  return providers.filter(
+    (candidate, index, all): candidate is Exclude<ProviderId, "auto"> =>
+      candidate !== provider && candidate !== "auto" && all.indexOf(candidate) === index,
+  );
 }
 
 async function callProvider(provider: ProviderId, messages: ChatMessage[], model?: string) {
@@ -1033,19 +1036,39 @@ export async function handleDevelopmentChat(input: {
   if (input.provider === "auto") {
     return handleAutoRoutedChat({ messages: input.messages, model: input.model, role: input.role });
   }
+  const primaryStartedAt = Date.now();
   try {
     const reply = await callProvider(input.provider, input.messages, input.model);
+    recordRouterOutcome(input.provider, { kind: "success", latencyMs: Date.now() - primaryStartedAt }, Date.now());
     return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
   } catch (error) {
     if (error instanceof TRPCError) throw error;
+    const primaryMessage = error instanceof Error ? error.message : String(error);
+    recordRouterOutcome(
+      input.provider,
+      error instanceof Error && error.name === "AbortError"
+        ? { kind: "timeout" }
+        : { kind: "failure", retryable: isTransientChatError(error), rateLimited: /\b429\b/.test(primaryMessage) },
+      Date.now(),
+    );
     if (isTransientChatError(error)) {
       let lastFallbackError: unknown = error;
       for (const fallbackProvider of getFallbackProviders(input.provider)) {
+        const fallbackStartedAt = Date.now();
         try {
           const reply = await callProvider(fallbackProvider, input.messages, input.model);
+          recordRouterOutcome(fallbackProvider, { kind: "success", latencyMs: Date.now() - fallbackStartedAt }, Date.now());
           return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
         } catch (fallbackError) {
           lastFallbackError = fallbackError;
+          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+          recordRouterOutcome(
+            fallbackProvider,
+            fallbackError instanceof Error && fallbackError.name === "AbortError"
+              ? { kind: "timeout" }
+              : { kind: "failure", retryable: isTransientChatError(fallbackError), rateLimited: /\b429\b/.test(fallbackMessage) },
+            Date.now(),
+          );
           if (!isTransientChatError(fallbackError)) break;
         }
       }

@@ -28,7 +28,7 @@ const REACT_COMPILER_RULES = {
 export default defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*", "coverage/*", "workspace-service/node_modules/*", "workspace-service/dist/*"],
+    ignores: ["dist/*", "web-dist/*", "coverage/*", "workspace-service/node_modules/*", "workspace-service/dist/*"],
   },
   {
     // Node-Kontext (Server, Skripte, Workspace-Service): Node-Globals und

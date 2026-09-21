@@ -9,6 +9,7 @@ import {
   sanitizeChatError,
   testDevelopmentChatConnection,
 } from "../server/development-chat";
+import { getRouterHealth } from "../server/model-router";
 
 // Sprint 191: invokeLLM via Test-Hook (server/_core/llm.ts) statt vi.mock —
 // deterministisch unter isolate:false (Sprint 187) auf jedem Rechner.
@@ -156,6 +157,8 @@ describe("development chat server chain", () => {
     expect(result.content).toBe("Fallback-Antwort.");
     expect(result.providerUsed).toBe("lmstudio");
     expect(result.fallbackUsed).toBe(true);
+    expect(getRouterHealth().custom?.status).toBe("cooldown");
+    expect(getRouterHealth().lmstudio?.status).toBe("ready");
     await failing.close();
     await fallback.close();
   });
