@@ -1,0 +1,43 @@
+name: DB-Ops
+
+# Datenbank-Operationen (Neon/Postgres) ueber den GitHub-Runner.
+# Derzeit unterstuetzt: Chat-Verlauf leeren (preview/delete).
+# DATABASE_URL kommt aus den Repo-Secrets — kein Klartext im Workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Operation"
+        type: choice
+        options:
+          - chat-clear-preview
+          - chat-clear-delete
+        default: chat-clear-preview
+
+permissions:
+  contents: read
+
+jobs:
+  db-ops:
+    name: "DB-Ops: ${{ github.event.inputs.operation }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v7
+
+      - name: Node einrichten
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Chat-Verlauf Operation
+        working-directory: scripts/db-ops
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OP: ${{ github.event.inputs.operation }}
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install pg --no-audit --no-fund >/dev/null 2>&1
+          node chat-clear.mjs
