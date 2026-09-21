@@ -98,3 +98,4 @@ expo-env.d.ts
 # @end expo-cli# Lokale Backups der .env niemals einchecken
 .env.backup*
 CyberSarah-ControlCenter-*.apk
+production.env
