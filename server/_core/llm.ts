@@ -18,6 +18,7 @@ import {
 import { evaluateAndNotifyQuotaWarnings, recordProviderCall, recordProviderFailover } from "../provider-metering";
 import { diagnoseLlmPoolFailure, type LlmEndpointAttempt } from "../../lib/llm-failure-diagnostics";
 import { sendOpsDiscordAlert } from "../ops-alerts";
+import { notifyTelegram } from "./telegram";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -684,6 +685,15 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         }
         // Sprint 115: Failover auf den naechsten Kandidaten protokollieren.
         recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
+        // Sprint 196: Telegram-Warnung bei Limit-/Auth-Failover (dedupliziert, never-throw).
+        if ([401, 402, 403, 429].includes(response.status)) {
+          void notifyTelegram(
+            "warnung",
+            `provider_fallback:${endpoint.source}`,
+            `LLM-Fallback: ${endpoint.source} → ${nextSource(ordered, endpoint.source) ?? "keine weitere Route"}`,
+            `HTTP ${response.status} bei ${endpoint.source}. Rotiert automatisch auf die naechste Route.`,
+          );
+        }
         continue;
       }
       recordPoolObservation(endpoint.source, { latencyMs });
@@ -703,6 +713,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // ersetzt die Diagnose den kryptischen Roh-Fehler durch eine klare
   // Handlungsanweisung (gueltigen API-Key hinterlegen).
   const diagnostics = diagnoseLlmPoolFailure(attempts);
+  // Sprint 196: Alle Routen fehlgeschlagen → kritische Telegram-Meldung (dedupliziert).
+  void notifyTelegram(
+    "kritisch",
+    "llm_pool_failure",
+    "Alle LLM-Routen fehlgeschlagen",
+    `Versuche: ${attempts.map((attempt) => `${attempt.source} (${attempt.httpStatus ?? "Netzwerk"})`).join(", ") || "keine Route konfiguriert"}.`,
+  );
   if (diagnostics.actionableMessage) {
     throw new Error(diagnostics.actionableMessage);
   }

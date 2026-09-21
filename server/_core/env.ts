@@ -35,4 +35,12 @@ export const ENV = {
   get forgeApiKey() {
     return process.env.BUILT_IN_FORGE_API_KEY ?? "";
   },
+  /** Sprint 196 — Telegram-Bot-Token fuer Betriebsmeldungen (optional). */
+  get telegramBotToken() {
+    return process.env.TELEGRAM_BOT_TOKEN ?? "";
+  },
+  /** Sprint 196 — Ziel-Chat-ID fuer Betriebsmeldungen (optional). */
+  get telegramChatId() {
+    return process.env.TELEGRAM_CHAT_ID ?? "";
+  },
 };

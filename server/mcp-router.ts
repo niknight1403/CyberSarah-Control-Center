@@ -31,6 +31,7 @@ import {
 } from "../lib/mcp-transport-logic";
 import { assertToolAllowed } from "../lib/mcp-registry-logic";
 import { createMcpSessionStore, runMcpToolCall } from "../lib/mcp-session-logic";
+import { getToolProxyQueue } from "./_core/tool-proxy-queue";
 import { adminProcedure, router } from "./_core/trpc";
 
 /** Request-Timeout fuer MCP-Gespraeche (Sandbox-Ports wuerden haengen). */
@@ -221,7 +222,9 @@ export const mcpRouter = router({
       // Sprint 136: Orchestrierung mit Sitzungs-Cache liegt rein und
       // getestet in lib/mcp-session-logic.ts (Handshake nur ohne frische
       // Sitzung; HTTP 404 => ein frischer Handshake mit Wiederholung).
-      return runMcpToolCall({
+      // Sprint 196: Remote-Tool-Aufrufe durchlaufen die Tool-Proxy-Queue
+      // (Concurrency-Limit, 429-Retry mit Backoff) — schuetzt den Remote-Server.
+      return getToolProxyQueue().enqueue(() => runMcpToolCall({
         toolName: input.toolName,
         args: input.args,
         serverUrl: endpoint.rpcUrl,
@@ -229,6 +232,6 @@ export const mcpRouter = router({
         nowMs: () => Date.now(),
         clientVersion: process.env.APP_VERSION ?? "0.0.0",
         openSession: (sessionId) => createStreamableHttpSend(endpoint.rpcUrl, sessionId),
-      });
+      }));
     }),
 });

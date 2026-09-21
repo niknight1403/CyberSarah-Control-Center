@@ -15,6 +15,7 @@ import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/
 import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 import { AdminLiveStatusCard } from "@/components/studio/admin-live-status-card";
 import { ProviderAdminCard } from "@/components/studio/provider-admin-card";
+import { IntegrationStatusCard } from "@/components/studio/integration-status-card";
 import { WixCard } from "@/components/studio/wix-card";
 import { AutonomousDevCard } from "@/components/studio/autonomous-dev-card";
 import { trpc } from "@/lib/trpc";
@@ -111,6 +112,9 @@ export default function AdminDashboardScreen() {
         <Text style={styles.sectionLabel}>PROVIDER</Text>
         <Text style={styles.sectionTitle}>LLM-Provider & API-Keys</Text>
         <ProviderAdminCard isAdmin={isAdmin} />
+        <Text style={styles.sectionLabel}>INTEGRATIONEN</Text>
+        <Text style={styles.sectionTitle}>Integrations-Status (Sprint 196)</Text>
+        <IntegrationStatusCard isAdmin={isAdmin} />
         <WixCard isAdmin={isAdmin} />
 
         <Text style={styles.sectionLabel}>ENTWICKLUNG</Text>

@@ -12,6 +12,9 @@ import {
   getRuntimeLogs,
   installRuntimeLogger,
 } from "./runtime-logger";
+import { getRouterSnapshot } from "./model-router";
+import { getTelegramStatus } from "./_core/telegram";
+import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 
 /**
  * Sprint 66 — appStatusRouter: Laufzeit-Status und Konsolen-Logs als
@@ -40,6 +43,31 @@ async function pingWorkspace(): Promise<number | null> {
 }
 
 export const appStatusRouter = router({
+  /**
+   * Sprint 196 — Aggregierter Integrations-Status fuer die Admin-UI:
+   * LLM-Routen (Health/Reihenfolge), Telegram-Bruecke (maskiert) und
+   * Tool-Proxy-Queue-Auslastung in einer Admin-geschuetzten Abfrage.
+   */
+  integrationStatus: adminProcedure.query(async () => {
+    const snapshot = await getRouterSnapshot();
+    const telegram = getTelegramStatus();
+    const queue = getToolProxyQueueMetrics();
+    return {
+      llm: {
+        healthy: snapshot.health.filter((provider) => provider.status === "ready").length,
+        degraded: snapshot.health.filter((provider) => provider.status === "cooldown" || provider.status === "unknown").length,
+        total: snapshot.health.length,
+        preferredOrder: snapshot.preferredOrder,
+        checkedAt: snapshot.now,
+      },
+      telegram,
+      queue,
+      mcp: {
+        configured: Boolean(process.env.MCP_SERVER_URL?.trim()),
+        url: process.env.MCP_SERVER_URL?.trim() ? "konfiguriert" : "nicht konfiguriert",
+      },
+    };
+  }),
   status: protectedProcedure.query(async () => {
     installRuntimeLogger();
     const logs = getRuntimeLogs();

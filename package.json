@@ -21,6 +21,7 @@
     "qr": "node scripts/generate_qr.mjs",
     "test:coverage": "vitest run --coverage",
     "verify:system": "tsx scripts/system-verify.ts",
+    "audit": "tsx scripts/integration-audit.ts",
     "web:smoke": "node scripts/web-export-smoke.mjs",
     "web:shell": "node scripts/inject-startup-shell.mjs"
   },

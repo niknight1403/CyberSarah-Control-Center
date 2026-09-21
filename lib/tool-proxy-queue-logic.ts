@@ -61,7 +61,7 @@ export function isRetryableTaskError(error: unknown): boolean {
 }
 
 /** Exponentielles Backoff mit Jitter: 2^attempt-1 * Basis, gedeckelt, ±20% Jitter. */
-export function computeBackoffDelayMs(attempt: number, options: Pick<ToolProxyQueueOptions, "baseBackoffMs" | "maxBackoffMs"> & { jitter?: number }): number {
+export function computeBackoffDelayMs(attempt: number, options: Pick<ToolProxyQueueOptions, "baseBackoffMs" | "maxBackoffMs"> & { jitter?: number; now?: () => number }): number {
   const base = Math.max(0, options.baseBackoffMs ?? 500);
   const max = Math.max(base, options.maxBackoffMs ?? 15_000);
   const raw = Math.min(max, base * 2 ** Math.max(0, attempt - 1));
