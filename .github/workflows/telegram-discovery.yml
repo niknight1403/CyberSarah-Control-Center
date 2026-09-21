@@ -1,0 +1,41 @@
+name: Telegram-Discovery
+
+# Einmal-Werkzeug: ermittelt die Chat-ID des Eigentuemers ueber getUpdates.
+# Der Bot-Token kommt aus dem Repo-Secret TELEGRAM_BOT_TOKEN. Die gefundene
+# Chat-ID wird im Log ausgegeben (Chat-ID ist kein Secret) — danach kann der
+# Agent sie als TELEGRAM_CHAT_ID-Secret hinterlegen.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    name: "Telegram Chat-ID ermitteln"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: getUpdates aufrufen
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          RESPONSE=$(curl -s --max-time 15 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?limit=10")
+          echo "$RESPONSE" | node -e '
+            let raw = "";
+            process.stdin.on("data", (chunk) => (raw += chunk));
+            process.stdin.on("end", () => {
+              try {
+                const parsed = JSON.parse(raw);
+                if (!parsed.ok) { console.log("API-Fehler:", parsed.description ?? "unbekannt"); process.exit(1); }
+                const seen = new Map();
+                for (const update of parsed.result ?? []) {
+                  const message = update.message ?? update.channel_post;
+                  if (message?.chat) seen.set(message.chat.id, `${message.chat.type}${message.chat.username ? " @" + message.chat.username : ""} — ${String(message.text ?? "").slice(0, 40)}`);
+                }
+                if (seen.size === 0) { console.log("Keine Nachrichten gefunden — Eigentuemern muss dem Bot zuerst /start senden."); process.exit(0); }
+                for (const [id, info] of seen) console.log(`CHAT_ID=${id} (${info})`);
+              } catch { console.log("Unerwartete Antwort:", raw.slice(0, 300)); process.exit(1); }
+            });
+          '
