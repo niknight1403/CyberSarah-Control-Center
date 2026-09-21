@@ -40,6 +40,31 @@ async function fetchOk(url: string, timeoutMs = 10_000): Promise<{ ok: boolean; 
   }
 }
 
+/**
+ * BUGFIX (Sprint 210): Render-Free-Cold-Start-Toleranz.
+ * Der Plan schlaeft nach 15 Min. Inaktivitaet ein; ein Kaltstart dauert
+ * regelmaessig 30-60 s. Der bisherige einzelne 10s-Fetch lief fuer jeden
+ * schlafenden Service auf HTTP 0 und liess den taeglichen Audit fehl-
+ * schlagen, obwohl die Produktion gesund war (Uptime-Waechter sah
+ * regelmuessig HTTP 200). Diese Variante probiert bis zu 5x mit wachsendem
+ * Abstand (5s/10s/15s/25s), bleibt also unter den 6-Minuten-Job-Limit und
+ * weckt den Service im ersten Versuch implizit an.
+ */
+async function fetchOkWithColdStartWake(
+  url: string,
+  attempts = 5,
+): Promise<{ ok: boolean; status: number; wokeUp: boolean }> {
+  let last = { ok: false, status: 0 };
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    last = await fetchOk(url, attempt === 0 ? 10_000 : 15_000);
+    if (last.status !== 0) return { ...last, wokeUp: attempt > 0 };
+    // Wartezeit: 5s, 10s, 15s, 25s (summiert ~55s zuzueglich Fetch-Zeiten).
+    const delayMs = attempt === 3 ? 25_000 : (attempt + 1) * 5_000;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return { ...last, wokeUp: false };
+}
+
 async function main(): Promise<void> {
   console.log(`\n=== CyberSarah Integrations-Audit — ${baseUrl} ===\n`);
 
@@ -57,9 +82,13 @@ async function main(): Promise<void> {
   );
 
   // --- 2. Backend-Gesundheit ---
-  const ready = await fetchOk(`${baseUrl}/api/ready`);
-  check("Backend /api/ready", ready.ok, `HTTP ${ready.status}${ready.ok ? " (Datenbank erreichbar)" : ""}`);
-  const metrics = await fetchOk(`${baseUrl}/api/metrics`);
+  const ready = await fetchOkWithColdStartWake(`${baseUrl}/api/ready`);
+  check(
+    "Backend /api/ready",
+    ready.ok,
+    `HTTP ${ready.status}${ready.ok ? " (Datenbank erreichbar)" : ""}${ready.wokeUp ? " — Cold-Start abgewartet" : ""}`,
+  );
+  const metrics = await fetchOkWithColdStartWake(`${baseUrl}/api/metrics`);
   check(
     "Backend /api/metrics",
     metrics.ok || metrics.status === 401,
