@@ -22,6 +22,7 @@ on:
           - disk-clean
           - db-migrate
           - pm2-redeploy
+          - db-probe2
           - db-probe
           - db-check
           - deploy
@@ -80,6 +81,25 @@ jobs:
               ;;
             disk-clean)
               $SSH_CMD 'echo "== Vorher =="; df -h / | tail -1; echo "== npm-Cache =="; npm cache clean --force 2>/dev/null || true; echo "== Gradle-Cache =="; rm -rf ~/.gradle/caches/* 2>/dev/null || true; echo "== pip-Cache =="; rm -rf ~/.cache/pip 2>/dev/null || true; echo "== Journal auf 200M =="; sudo -n journalctl --vacuum-size=200M 2>/dev/null || journalctl --vacuum-size=200M 2>/dev/null || echo "journal nicht vacuumbar"; echo "== apt-Cache =="; sudo -n apt-get clean 2>/dev/null || true; echo "== bashrc =="; sed -i "/AAAAB3NzaC1yc2EAAAADAQABAAACAQDBuTFmaD/d;/u0_a691@localhost/d" ~/.bashrc && echo "bashrc bereinigt" || echo "bashrc fix fehlgeschlagen"; echo "== Nachher =="; df -h / | tail -1'
+              ;;
+            db-probe2)
+              $SSH_CMD 'cd /opt/cybersarah-control-center; node -e "
+const fs=require(String.fromCharCode(102,115));const cp=require(String.fromCharCode(99,104,105,108,100,95,112,114,111,99,101,115,115));const Pool=require(String.fromCharCode(112,103)).Pool;
+function shape(u){try{const p=new URL(u);return p.protocol+String.fromCharCode(47,47)+p.hostname+String.fromCharCode(58)+p.port+String.fromCharCode(47)+p.pathname.slice(1)+String.fromCharCode(32,112,97,115,115,58)+(p.password?String.fromCharCode(108,97,110,103,32)+p.password.length:String.fromCharCode(70,69,72,76,84))}catch(e){return String.fromCharCode(85,82,76,45,117,110,103,117,101,108,116,105,103)}}
+function test(tag,u){return new Pool({connectionString:u}).query(String.fromCharCode(83,69,76,69,67,84,32,49)).then(()=>console.log(tag,String.fromCharCode(58,32,79,75))).catch(e=>console.log(tag,String.fromCharCode(58,32,70,69,72,76,69,82,58),e.code,String.fromCharCode(124),e.message.split(String.fromCharCode(10))[0]))}
+(async()=>{
+const raw=fs.readFileSync(String.fromCharCode(46,101,110,118),String.fromCharCode(117,116,102,56)).split(String.fromCharCode(10)).find(l=>l.startsWith(String.fromCharCode(68,65,84,65,66,65,83,69,95,85,82,76,61)));
+const envUrl=raw?raw.slice(13).trim().replace(/^[\x22\x27]|[\x22\x27]$/g,String.fromCharCode(0)):null;
+console.log(String.fromCharCode(61,61,32,46,101,110,118,45,85,82,76,32,70,111,114,109,32,61,61));console.log(envUrl?shape(envUrl):String.fromCharCode(102,101,104,108,116));
+if(envUrl)await test(String.fromCharCode(69,78,86),envUrl);
+const out=cp.execSync(String.fromCharCode(112,109,50,32,101,110,118,32,49)).toString();
+const line=out.split(String.fromCharCode(10)).find(l=>l.startsWith(String.fromCharCode(68,65,84,65,66,65,83,69,95,85,82,76,58)));
+const pm2Url=line?line.replace(/^DATABASE_URL:\s*/,String.fromCharCode(0)).trim():null;
+console.log(String.fromCharCode(61,61,32,80,77,50,45,85,82,76,32,70,111,114,109,32,61,61));console.log(pm2Url?shape(pm2Url):String.fromCharCode(102,101,104,108,116));
+if(pm2Url)await test(String.fromCharCode(80,77,50),pm2Url);
+console.log(String.fromCharCode(61,61,32,46,101,110,118,45,86,97,114,115,32,61,61));
+console.log(fs.readFileSync(String.fromCharCode(46,101,110,118),String.fromCharCode(117,116,102,56)).split(String.fromCharCode(10)).filter(l=>l.includes(String.fromCharCode(61))).map(l=>l.split(String.fromCharCode(61))[0]).join(String.fromCharCode(44)));
+})()"
               ;;
             db-probe)
               $SSH_CMD 'cd /opt/cybersarah-control-center; set -a; . ./.env 2>/dev/null; set +a; echo "== Test mit .env-URL =="; node -e "const {Pool}=require(String.fromCharCode(112,103)); const p=new Pool({connectionString:process.env.DATABASE_URL}); p.query(String.fromCharCode(83,69,76,69,67,84,32,49)).then(r=>{console.log(String.fromCharCode(68,66,45,79,75));process.exit(0)}).catch(e=>{console.log(String.fromCharCode(68,66,45,70,69,72,76,69,82,58), e.code, String.fromCharCode(124), e.message.split(String.fromCharCode(10))[0]);process.exit(0)})"; echo "== URL-Hash .env =="; sed -n "s/^DATABASE_URL=//p" .env 2>/dev/null | tr -d "\r\n" | sha256sum | cut -c1-16; echo "== URL-Hash PM2-Prozess =="; pm2 env 1 2>/dev/null | sed -n "s/^DATABASE_URL: //p" | tr -d "\r\n" | sha256sum | cut -c1-16; echo "== ecosystem.config.js DATABASE_URL-Zeile vorhanden? =="; grep -c "DATABASE_URL" ecosystem.config.js 2>/dev/null || echo "keine ecosystem.config.js"; echo "== Hat PM2-Prozess DATABASE_URL? =="; pm2 env 1 2>/dev/null | grep -c "^DATABASE_URL:" || true; echo "== Postgres-Log (letzte Auth-/Verbindungsfehler) =="; sudo -n journalctl -u postgresql@18-main --since "18:40" --no-pager 2>/dev/null | grep -iE "auth|fatal|error|reject" | tail -8 || echo "kein sudo-journal"; echo "== Letzte App-Fehler komplett =="; tail -6 /opt/cybersarah-control-center/logs/pm2-error.log 2>/dev/null || true'
