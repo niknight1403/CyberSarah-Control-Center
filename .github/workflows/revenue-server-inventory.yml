@@ -48,6 +48,11 @@ jobs:
           if command -v pm2 >/dev/null 2>&1; then
             pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{const p=JSON.parse(s);for(const x of p){if(x.name==="cybersarah-backend")console.log("root_backend_pm2: "+(x.pm2_env?.status==="online"?"ONLINE":"OFFLINE"))}}catch{console.log("root_backend_pm2: UNKNOWN")}})' || true
           fi
+          if [ -d /opt/cybersarah-control-center ]; then echo 'control_center_directory: PRESENT'; else echo 'control_center_directory: MISSING'; fi
+          if [ -f /opt/cybersarah-control-center/.env ]; then echo 'control_center_env: PRESENT'; else echo 'control_center_env: MISSING'; fi
+          if command -v pm2 >/dev/null 2>&1; then
+            pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{for(const x of JSON.parse(s).slice(0,15))console.log("pm2_service: "+String(x.name).replace(/[^a-zA-Z0-9_-]/g,"_")+"_"+(x.pm2_env?.status==="online"?"ONLINE":"OFFLINE"))}catch{console.log("pm2_service: UNKNOWN")}})' || true
+          fi
           echo "server_node_major: $(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo UNKNOWN)"
           if [ -d /opt/cybersarah/.git ]; then echo 'revenue_git: PRESENT'; else echo 'revenue_git: MISSING'; fi
           if [ -d /opt/cybersarah/node_modules ]; then echo 'revenue_dependencies: PRESENT'; else echo 'revenue_dependencies: MISSING'; fi
