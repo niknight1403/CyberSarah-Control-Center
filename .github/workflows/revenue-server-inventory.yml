@@ -44,7 +44,7 @@ jobs:
           if [ -d /opt/cybersarah/.git ]; then echo 'revenue_git: PRESENT'; else echo 'revenue_git: MISSING'; fi
           if [ -d /opt/cybersarah/node_modules ]; then echo 'revenue_dependencies: PRESENT'; else echo 'revenue_dependencies: MISSING'; fi
           if command -v pnpm >/dev/null 2>&1 || command -v corepack >/dev/null 2>&1; then echo 'pnpm_or_corepack: PRESENT'; else echo 'pnpm_or_corepack: MISSING'; fi
-          for port in 3000 3001 4000 5000; do
+          for port in 3000 3001 18741 4000 5000; do
             if (echo > "/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1; then echo "localhost_port_$port: LISTENING"; else echo "localhost_port_$port: CLOSED"; fi
           done
           REMOTE

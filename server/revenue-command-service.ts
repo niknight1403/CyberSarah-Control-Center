@@ -123,8 +123,8 @@ export async function triggerRevenueScan(path: "hara/scan" | "expansion/scan") {
   let base: URL;
   try { base = new URL(raw); } catch { throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ungültige Revenue-Engine-URL." }); }
   // HTTPS fuer externe Engines; eine auf demselben Produktionshost gebundene
-  // Loopback-Engine darf per HTTP erreichbar sein (niemals ueber das Netz).
-  const localOnly = base.protocol === "http:" && base.hostname === "127.0.0.1" && base.port === "3001";
+  // Loopback-Engine auf Port 18741 darf per HTTP erreichbar sein (niemals ueber das Netz).
+  const localOnly = base.protocol === "http:" && base.hostname === "127.0.0.1" && base.port === "18741";
   if ((!localOnly && base.protocol !== "https:") || base.username || base.password || base.search || base.hash) {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Revenue-Engine erfordert HTTPS oder den lokalen Loopback-Dienst." });
   }
