@@ -99,3 +99,4 @@ expo-env.d.ts
 .env.backup*
 CyberSarah-ControlCenter-*.apk
 production.env
+.env
