@@ -96,6 +96,31 @@ jobs:
           }).finally(() => pool.end().catch(() => {}));
           JS
           if sudo -n -u postgres psql -Atqc 'SELECT 1' >/dev/null 2>&1; then echo 'local_pg_admin: YES'; else echo 'local_pg_admin: NO'; fi
+          cd /opt/cybersarah
+          node <<'JS'
+          const fs = require('node:fs');
+          const cp = require('node:child_process');
+          const envline = fs.readFileSync('.env','utf8').split(/\r?\n/).find(line=>line.startsWith('DATABASE_URL='));
+          if (!envline) { console.log('revenue_db_inventory: UNAVAILABLE'); process.exit(0); }
+          try {
+            let value = envline.slice('DATABASE_URL='.length).trim();
+            if ((value[0] === '"' && value.at(-1) === '"') || (value[0] === "'" && value.at(-1) === "'")) value = value.slice(1, -1);
+            const target = decodeURIComponent(new URL(value).pathname.slice(1));
+            const query = (args) => cp.execFileSync('sudo', ['-n','-u','postgres','psql','-Atq',...args],{encoding:'utf8',timeout:6000,stdio:['ignore','pipe','pipe']}).trim();
+            const databases = query(['-c',"SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate"]).split('\n').filter(Boolean);
+            console.log('revenue_db_exact_exists:',databases.includes(target)?'YES':'NO');
+            let full=0;
+            const tables = "'hara_proposals','hara_performance','subscription_plans','customer_subscriptions','subscription_invoices','cross_sell_rules','cross_sell_recommendations','expansion_chancen'";
+            for (const db of databases.slice(0,30)) {
+              try {
+                const count = Number(query(['-d',db,'-c',`SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename IN (${tables})`]));
+                if (db===target) console.log('revenue_db_target_tables:',count+'/8');
+                if (count===8) full++;
+              } catch { if (db===target) console.log('revenue_db_target_tables: UNAVAILABLE'); }
+            }
+            console.log('revenue_db_full_schema_instances:',full);
+          } catch { console.log('revenue_db_inventory: UNAVAILABLE'); }
+          JS
           if command -v pm2 >/dev/null 2>&1; then
             pm2 jlist 2>/dev/null | node -e 'let input="";process.stdin.on("data",chunk=>input+=chunk);process.stdin.on("end",()=>{try{const p=JSON.parse(input);console.log("pm2_revenue_process: "+(p.some(x=>String(x.pm2_env?.pm_cwd??"").startsWith("/opt/cybersarah/"))?"PRESENT":"MISSING"))}catch{console.log("pm2_revenue_process: UNKNOWN")}})' || true
           fi
