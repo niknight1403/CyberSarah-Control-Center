@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { HapticTab } from "@/components/haptic-tab";
-import { AppSidebar } from "@/components/responsive/app-sidebar";
+import { DualSidebar } from "@/components/responsive/dual-sidebar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { GlassTabIcon } from "@/components/glass/glass-tab-icon";
 import { Platform, View, useWindowDimensions } from "react-native";
@@ -38,7 +38,7 @@ export default function TabLayout() {
 
   return (
     <View style={{ flex: 1, flexDirection: wide ? "row" : "column", backgroundColor: glass.glassSurface.background }}>
-      {wide ? <AppSidebar /> : null}
+      {wide ? <DualSidebar /> : null}
       <Tabs
       screenOptions={{
         tabBarActiveTintColor: glass.glassPalette.cyan,
@@ -47,6 +47,8 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarShowLabel: true,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
+        tabBarItemStyle: { flex: 1, minWidth: 0 },
+        tabBarIconStyle: { height: 24 },
         tabBarStyle: {
           display: wide ? "none" : "flex",
           height: tabBarHeight,
@@ -61,6 +63,7 @@ export default function TabLayout() {
           shadowRadius: 18,
           shadowOffset: { width: 0, height: 6 },
           elevation: 12,
+          paddingHorizontal: 4,
           paddingTop: 6,
           paddingBottom: 4,
         },

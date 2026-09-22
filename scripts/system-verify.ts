@@ -33,7 +33,8 @@ function run(command: string, args: string[]): { ok: boolean; tail: string; outp
     stdio: ["ignore", "pipe", "pipe"],
   });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-  return { ok: result.status === 0, tail: output.split("\n").slice(-8).join("\n").trim(), output };
+  const cleanOutput = output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+  return { ok: result.status === 0, tail: cleanOutput.split("\n").slice(-8).join("\n").trim(), output: cleanOutput };
 }
 
 const checks: Check[] = [];
@@ -47,13 +48,15 @@ checks.push({
 });
 
 // --- 2) Volle Test-Suite ---
-const vitest = run("npx", ["vitest", "run"]);
-const testMatch = /Tests\s+(\d+)\s+passed/.exec(vitest.output);
+const vitest = run("npx", ["vitest", "run", "--maxWorkers=2"]);
+const testMatch = /(?:Tests|Test Files)\s+(\d+)\s+passed/.exec(vitest.output);
 const testCount = testMatch ? Number(testMatch[1]) : 0;
 checks.push({
   name: "Vitest Gesamt-Suite",
   passed: vitest.ok,
-  detail: vitest.ok ? `${testCount} Tests gruen` : vitest.tail,
+  detail: vitest.ok
+    ? `${testCount} Testdateien/Tests gruen`
+    : vitest.tail,
 });
 
 // --- 3) V4.0-Kernmodule vorhanden ---

@@ -118,8 +118,8 @@ export function buildSuperagentChatRows(
 export function buildConversationHistory(
   rows: SuperagentChatRow[],
   maxEntries = 12,
-): Array<{ role: "user" | "assistant"; content: string }> {
-  const history: Array<{ role: "user" | "assistant"; content: string }> = [];
+): { role: "user" | "assistant"; content: string }[] {
+ const history: { role: "user" | "assistant"; content: string }[] = [];
   for (const row of rows) {
     if (row.kind === "objective") {
       const text = row.objective.trim();

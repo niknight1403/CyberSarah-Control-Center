@@ -85,7 +85,7 @@ export function createToolProxyQueue(options: ToolProxyQueueOptions = {}): ToolP
   const now = options.now ?? Date.now;
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
 
-  let queued: Array<() => void> = [];
+  let queued: (() => void)[] = [];
   let active = 0;
   let peakActive = 0;
   let completed = 0;
@@ -122,8 +122,7 @@ export function createToolProxyQueue(options: ToolProxyQueueOptions = {}): ToolP
 
   async function run<T>(task: () => Promise<T>): Promise<T> {
     let attempt = 0;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    while (attempt <= maxRetries) {
       try {
         const result = await task();
         completed += 1;
@@ -145,6 +144,7 @@ export function createToolProxyQueue(options: ToolProxyQueueOptions = {}): ToolP
         if (delayMs > 0) await sleep(delayMs);
       }
     }
+    throw new Error("Tool-Proxy-Warteschlange wurde ohne Ergebnis beendet.");
   }
 
   return {

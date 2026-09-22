@@ -212,7 +212,7 @@ export async function runOrchestratorTask(input: {
   maxRounds?: number;
   /** Sprint 197 — bisheriger Dialog-Verlauf (wie im Entwicklungs-Chat), damit
    * der Superagent auf Nachfragen und Folgeaufgaben kontextuell antwortet. */
-  history?: Array<{ role: "user" | "assistant"; content: string }>;
+  history?: { role: "user" | "assistant"; content: string }[];
 }): Promise<TaskRecord> {
   const task = await createTask({
     title: input.title ?? input.objective.slice(0, 120),

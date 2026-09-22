@@ -16,7 +16,7 @@ import { trpc } from "@/lib/trpc";
 import * as Auth from "@/lib/_core/auth";
 import { accentAlpha, glassDepth, glassPalette, glassRadii, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
 export default function AccountScreen() {
@@ -126,6 +126,7 @@ export default function AccountScreen() {
   return (
     <GlassBackdrop accent="purple">
       <ScreenContainer style={styles.transparent} containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
+        <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.page}>
           <View style={styles.menuRow}>
             <NavDrawer {...navDrawer.drawerProps} />
@@ -233,6 +234,7 @@ export default function AccountScreen() {
           )}
           {message ? <Text style={styles.message}>{message}</Text> : null}
         </View>
+        </ScrollView>
       </ScreenContainer>
     </GlassBackdrop>
   );
@@ -241,7 +243,8 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   transparent: { backgroundColor: "transparent" },
   menuRow: { marginBottom: glassSpacing.md },
-  page: { flex: 1, paddingTop: glassSpacing.xl },
+  page: { flexGrow: 1, paddingTop: glassSpacing.xl, width: "100%" },
+  pageContent: { paddingBottom: glassSpacing.xl, paddingHorizontal: glassSpacing.md },
   eyebrow: { ...glassType.label, color: accentAlpha("cyan", 0.9), marginTop: glassSpacing.sm },
   title: { ...glassType.display, color: glassSurface.textPrimary, marginTop: glassSpacing.sm },
   lead: { ...glassType.body, color: glassSurface.textSecondary, lineHeight: 20, marginTop: glassSpacing.sm },

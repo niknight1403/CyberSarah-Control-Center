@@ -35,13 +35,11 @@ const server = http.createServer((req, res) => {
       // fs.writeWorkspaceFile-Tool-Call ausgegeben; nach dem Tool-Result
       // (role "tool" im Verlauf) folgt die strukturierte finale Antwort.
       let parsedTools = [];
-      let hasToolResult = false;
       let toolResultCount = 0;
       try {
         const parsed = JSON.parse(body);
         parsedTools = parsed.tools || [];
         toolResultCount = (parsed.messages || []).filter((m) => m.role === "tool").length;
-        hasToolResult = toolResultCount > 0;
       } catch {}
       if (prompt.includes("uhr-app") && Array.isArray(parsedTools) && parsedTools.length > 0 && toolResultCount === 0) {
         const args = {

@@ -10,7 +10,7 @@
  * ermoeglicht Anlegen/Aktualisieren und Loeschen einzelner Eintraege.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
