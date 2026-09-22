@@ -23,6 +23,7 @@ import { autonomousDevRouter } from "./autonomous-dev-router";
 import { keylessSearchRouter } from "./keyless-search";
 import { secretsRouter } from "./secrets-router";
 import { wixRouter } from "./wix-router";
+import { influencerRouter } from "./influencer-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -51,6 +52,7 @@ export const appRouter = router({
   keylessSearch: keylessSearchRouter,
   secrets: secretsRouter,
   wix: wixRouter,
+  influencer: influencerRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.
