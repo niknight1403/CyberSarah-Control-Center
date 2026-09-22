@@ -81,24 +81,36 @@ export async function expansionOverview() {
 }
 
 export async function saasOverview() {
-  const subscriptions = await subscriptionsOverview();
-  // Stripe-Produkte sind die tatsaechliche Checkout-Quelle, nicht erfundene SaaS-Datensaetze.
+  // Stripe bleibt auch ohne die separate Revenue-Datenbank abfragbar.
+  // Unverfuegbare Abo-Zahlen sind null, niemals erfundene Nullen.
+  let subscriptions: Awaited<ReturnType<typeof subscriptionsOverview>> | null = null;
+  let subscriptionsStatus: "ready" | "not-configured" | "unavailable" = "ready";
+  try {
+    subscriptions = await subscriptionsOverview();
+  } catch (error) {
+    if (!(error instanceof TRPCError)) throw error;
+    subscriptionsStatus = error.code === "PRECONDITION_FAILED" ? "not-configured" : "unavailable";
+  }
   let stripeProducts: { id: string; name: string; active: boolean }[] = [];
   let checkout: { started: number; completed: number; successRate: number | null; capped: boolean } | null = null;
+  let stripeStatus: "ready" | "not-configured" | "unavailable" = "not-configured";
+  let checkoutStatus: "ready" | "not-configured" | "unavailable" = "not-configured";
   const key = process.env.STRIPE_SECRET_KEY;
   if (key) {
+    const stripe = new Stripe(key);
     try {
-      const stripe = new Stripe(key);
       const products = await stripe.products.list({ active: true, limit: 100 });
       stripeProducts = products.data.map(({ id, name, active }) => ({ id, name, active }));
+      stripeStatus = "ready";
+    } catch { stripeStatus = "unavailable"; }
+    try {
       const sessions = await stripe.checkout.sessions.list({ created: { gte: Math.floor(Date.now() / 1000) - 30 * 86400 }, limit: 100 }).autoPagingToArray({ limit: 1000 });
       const completed = sessions.filter(item => item.status === "complete").length;
       checkout = { started: sessions.length, completed, successRate: sessions.length ? completed / sessions.length * 100 : null, capped: sessions.length === 1000 };
-    } catch {
-      throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Stripe-Produktabfrage fehlgeschlagen." });
-    }
+      checkoutStatus = "ready";
+    } catch { checkoutStatus = "unavailable"; }
   }
-  return { ...subscriptions, stripeProducts, stripeConfigured: !!key, checkout };
+  return { subscriptions, subscriptionsStatus, stripeProducts, stripeStatus, checkout, checkoutStatus };
 }
 
 export async function tradingOverview() { return fetchTradingSnapshot(); }

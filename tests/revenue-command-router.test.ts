@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "../server/routers";
-import { triggerRevenueScan } from "../server/revenue-command-service";
+import { saasOverview, triggerRevenueScan } from "../server/revenue-command-service";
 import type { TrpcContext } from "../server/_core/context";
 
 const ctx = (role: "admin" | "user" | null): TrpcContext => ({
@@ -10,6 +10,16 @@ const ctx = (role: "admin" | "user" | null): TrpcContext => ({
 });
 
 describe("Zentrale Revenue-Router", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("meldet bei fehlenden Quellen unbekannte statt erfundene SaaS-Kennzahlen", async () => {
+    vi.stubEnv("REVENUE_OS_DATABASE_URL", "");
+    vi.stubEnv("STRIPE_SECRET_KEY", "");
+    const result = await saasOverview();
+    expect(result.subscriptions).toBeNull();
+    expect(result.subscriptionsStatus).toBe("not-configured");
+    expect(result.stripeStatus).toBe("not-configured");
+    expect(result.checkout).toBeNull();
+  });
   it("registriert alle Revenue-Domänen", () => {
     const c = appRouter.createCaller(ctx(null));
     expect(c.hara.overview).toBeTypeOf("function");

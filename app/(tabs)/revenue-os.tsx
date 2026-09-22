@@ -98,13 +98,23 @@ function HaraSection() {
 
 function SaasSection() {
   const q = trpc.saas.overview.useQuery(undefined, { retry: false });
-  return <FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Echte Pläne und aktive Abos aus Revenue-OS; Stripe-Produkte nur bei konfigurierter Verbindung. Content-to-Lead-CVR erfordert Funnel-Events." cta="SaaS-Daten aktualisieren" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Daten geladen"} loading={q.isLoading || q.isFetching} error={q.error?.message} metrics={[metric("Produkte", q.data?.stripeConfigured ? q.data.stripeProducts.length : "nicht verbunden"), metric("Trials", q.data?.trials ?? "—"), metric("MRR", q.data ? formatEur(q.data.mrrEur) : "—")]} details={q.data ? [
-    `Abos aktiv: ${q.data.active} · Bezahlte Rechnungen 7 Tage: ${formatEur(q.data.paidEur7d)}`,
-    `Neues aktives MRR: 24 h ${formatEur(q.data.newMrr1dEur)} · 7 Tage ${formatEur(q.data.newMrr7dEur)} (ohne Churn)`,
-    `Checkout-Erfolg (30 Tage): ${q.data.checkout?.successRate == null ? "nicht messbar" : q.data.checkout.successRate.toFixed(1) + " %"}${q.data.checkout?.capped ? " (Stichprobe, maximal 1.000 Sessions)" : ""}`,
-    `Rechnungs-Erfolgsquote (30 Tage): ${q.data.invoiceSuccessRate === null ? "keine Daten" : q.data.invoiceSuccessRate.toFixed(1) + " %"} (keine Checkout-Erfolgsquote)`,
-    `Funnel-CVR: ${q.data.funnelConversionRate === null ? "nicht messbar, Tracking fehlt" : q.data.funnelConversionRate.toFixed(1) + " %"}`,
-    ...q.data.plans.slice(0, 5).map(p => `${p.name}: ${p.preis} ${p.waehrung}/${p.intervall} · ${p.aktiv ? "aktiv" : "inaktiv"}`),
+  const subscriptions = q.data?.subscriptions;
+  const status = q.isError ? "nicht verbunden" : q.isLoading ? "lädt" :
+    q.data?.stripeStatus === "ready" && q.data.subscriptionsStatus === "ready" ? "Daten geladen" : "teilweise verfügbar";
+  return <FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Stripe-Produkte und Checkout-Sessions werden unabhängig von der separaten Revenue-Datenbank geladen. Ohne Abo-Daten bleiben MRR und Trials unbekannt." cta="SaaS-Daten aktualisieren" status={status} loading={q.isLoading || q.isFetching} error={q.error?.message} metrics={[
+    metric("Stripe-Produkte", q.data?.stripeStatus === "ready" ? q.data.stripeProducts.length : "—"),
+    metric("Trials", subscriptions?.trials ?? "—"),
+    metric("MRR", subscriptions ? formatEur(subscriptions.mrrEur) : "—"),
+  ]} details={q.data ? [
+    `Stripe: ${q.data.stripeStatus} · Abo-Datenbank: ${q.data.subscriptionsStatus}`,
+    ...(subscriptions ? [
+      `Abos aktiv: ${subscriptions.active} · Bezahlte Rechnungen 7 Tage: ${formatEur(subscriptions.paidEur7d)}`,
+      `Neues aktives MRR: 24 h ${formatEur(subscriptions.newMrr1dEur)} · 7 Tage ${formatEur(subscriptions.newMrr7dEur)} (ohne Churn)`,
+      `Rechnungs-Erfolgsquote (30 Tage): ${subscriptions.invoiceSuccessRate === null ? "keine Daten" : subscriptions.invoiceSuccessRate.toFixed(1) + " %"} (keine Checkout-Erfolgsquote)`,
+      ...subscriptions.plans.slice(0, 5).map(p => `${p.name}: ${p.preis} ${p.waehrung}/${p.intervall} · ${p.aktiv ? "aktiv" : "inaktiv"}`),
+    ] : ["Abonnements und MRR: separate Revenue-Datenbank nicht erreichbar."]),
+    `Checkout-Erfolg (30 Tage): ${q.data.checkout?.successRate == null ? "nicht messbar" : q.data.checkout.successRate.toFixed(1) + " %"}${q.data.checkout?.capped ? " (Stichprobe, maximal 1.000 Sessions)" : ""} · Quelle: ${q.data.checkoutStatus}`,
+    "Funnel-CVR: nicht messbar, Event-Tracking fehlt.",
   ] : undefined} onPress={() => void q.refetch()} />;
 }
 
