@@ -102,6 +102,10 @@ export default function SuperagentScreen() {
   const listRef = useRef<FlatList<SuperagentChatRow> | null>(null);
   const stickToBottomRef = useRef(true);
   const rowsLengthRef = useRef(0);
+  // Sprint 199 — Antwort-zum-Anfang: Y-Offset jeder Antwort-Zeile messen,
+  // damit nach Abschluss an den ANFANG der Antwort gescrollt werden kann
+  // (lange Ergebnisse sollen von oben lesbar sein, nicht am unteren Rand).
+  const rowOffsetsRef = useRef<Map<string, number>>(new Map());
 
   // Aktiven Lauf nach Abschluss aus dem Live-Polling nehmen.
   // Sprint 171: Adjust-Pattern statt Effect — Schlüssel auf id:status, weil
@@ -115,6 +119,13 @@ export default function SuperagentScreen() {
     if (activeTask && (activeTask.status === "success" || activeTask.status === "failed" || activeTask.status === "escalated")) {
       setActiveId(null);
       setExpandedIds((prev) => new Set(prev).add(`${activeTask.id}-answer`));
+      // Sprint 199: Anfang der fertigen Antwort an den oberen Bildschirmrand
+      // springen lassen — der Nutzer liest vom Start des Ergebnisses, nicht
+      // irgendwo aus dem herausragenden Text.
+      requestAnimationFrame(() => {
+        const y = rowOffsetsRef.current.get(`${activeTask.id}-answer`);
+        if (y != null) listRef.current?.scrollToOffset({ offset: Math.max(0, y - 12), animated: true });
+      });
     }
   }
 
@@ -310,7 +321,12 @@ export default function SuperagentScreen() {
                 </GlassCard>
               </View>
             ) : (
-              <View style={styles.answerBubbleWrap}>
+              <View
+                style={styles.answerBubbleWrap}
+                onLayout={(e) => {
+                  rowOffsetsRef.current.set(item.key, e.nativeEvent.layout.y);
+                }}
+              >
                 <GlassCard accent="purple" onPress={() => toggleExpanded(item.key)} style={styles.answerBubble} testID="superagent-answer-bubble">
                   <View style={styles.answerHead}>
                     <Text

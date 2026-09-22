@@ -89,28 +89,38 @@ export default function ChatScreen() {
   // Sprint 172: Aktuelle Zeit im Render ueber die Tick-Uhr statt Date.now().
   const nowMs = useNow();
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  // Sprint 199 — Antwort-zum-Anfang: Y-Offsets der Agent-Nachrichten
+  // messen, damit neue Antworten an IHREM ANFANG erscheinen.
+  const bubbleOffsetsRef = useRef<Map<string, number>>(new Map());
   // Sprint 139 — Robustes Auto-Scroll (Owner-Feedback 16.09.2026): Die Antwort
   // muss nach dem Senden sofort im sichtbaren Bereich erscheinen, wie in jedem
   // Messenger. onContentSizeChange allein war auf Android unzuverlaessig —
   // deshalb doppelt abgesichert: Effect auf jede Nachrichten-Aenderung (nach
   // dem Layout, via doppeltem requestAnimationFrame + Timer-Fallback) plus der
   // bestehende Content-Size-Hook.
-  const scrollChatToEnd = useCallback((animated = true) => {
+  const scrollChatToLatestAnswer = useCallback((animated = true) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated });
-        // Late-Layout-Retry: Android streamt Layout-Aenderungen teils
-        // erst nach dem Frame — ein zweiter Versuch nach 120 ms fängt
-        // alle verspaeteten Frames zuverlaessig ein.
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
+        // Sprint 199: Neue Agent-Antworten springen an ihren ANFANG — der
+        // Nutzer liest vom Start der Antwort statt irgendwo im
+        // herausragenden Text. Fallback: Listenende.
+        const lastAgent = [...messages].reverse().find((m) => m.role === "agent" && !m.id.startsWith("thinking-"));
+        const y = lastAgent ? bubbleOffsetsRef.current.get(lastAgent.id) : undefined;
+        if (y != null) {
+          listRef.current?.scrollToOffset({ offset: Math.max(0, y - 12), animated });
+          setTimeout(() => listRef.current?.scrollToOffset({ offset: Math.max(0, y - 12), animated: false }), 120);
+        } else {
+          listRef.current?.scrollToEnd({ animated });
+          setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
+        }
       });
     });
-  }, []);
+  }, [messages]);
   useEffect(() => {
     if (activeTab !== "chat") return;
-    const timer = setTimeout(() => scrollChatToEnd(true), 40);
+    const timer = setTimeout(() => scrollChatToLatestAnswer(true), 40);
     return () => clearTimeout(timer);
-  }, [messages, isThinking, activeTab, scrollChatToEnd]);
+  }, [messages, isThinking, activeTab, scrollChatToLatestAnswer]);
   const { busy: mediaPickerBusy, pickFiles: pickFilesFromDevice, pickPhotos, pickVideos } = useMediaPicker();
   const developmentChatMutation = trpc.developmentChat.send.useMutation();
   const chatWorkspaceId = settings.workspaceId;
@@ -317,7 +327,13 @@ export default function ChatScreen() {
             <View style={s.dayDividerLine} />
           </View>
         ) : null}
-        <MessageBubble message={{ id: msg.id, role: msg.role, content: msg.content, timestampMs: msg.timestampMs }} showTimestamp={shouldShowTimestamp(previous, { role: msg.role, timestampMs: msg.timestampMs })} />
+        <View
+          onLayout={(e) => {
+            bubbleOffsetsRef.current.set(msg.id, e.nativeEvent.layout.y);
+          }}
+        >
+          <MessageBubble message={{ id: msg.id, role: msg.role, content: msg.content, timestampMs: msg.timestampMs }} showTimestamp={shouldShowTimestamp(previous, { role: msg.role, timestampMs: msg.timestampMs })} />
+        </View>
         {msg.role === "agent" && msg.devTrace?.length ? <DevTracePanel trace={msg.devTrace} /> : null}
       </>
     );
@@ -360,7 +376,7 @@ export default function ChatScreen() {
                 keyExtractor={(m) => m.id}
                 keyboardShouldPersistTaps="handled"
                 onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-                onLayout={() => scrollChatToEnd(false)}
+                onLayout={() => scrollChatToLatestAnswer(false)}
                 ListHeaderComponent={isChatEmpty ? <>
                   <TouchableOpacity
                     accessibilityRole="button"

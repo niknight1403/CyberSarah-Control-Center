@@ -98,6 +98,8 @@ export default function TabLayout() {
           name="cyber-terminal"
           options={{
             title: "Terminal",
+            // Sprint 199: aus der Tab-Leiste ausgeblendet, erreichbar ueber den NavDrawer.
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chevron.left.forwardslash.chevron.right" color={color} /></GlassTabIcon>
             ),
@@ -107,6 +109,8 @@ export default function TabLayout() {
           name="index"
           options={{
             title: "Workspace",
+            // Sprint 199: aus der Tab-Leiste ausgeblendet, erreichbar ueber den NavDrawer.
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="blue"><IconSymbol size={22} name="folder.fill" color={color} /></GlassTabIcon>
             ),
@@ -125,6 +129,8 @@ export default function TabLayout() {
           name="agent"
           options={{
             title: "Agent",
+            // Sprint 199: aus der Tab-Leiste ausgeblendet, erreichbar ueber den NavDrawer.
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="sparkles" color={color} /></GlassTabIcon>
             ),
@@ -143,6 +149,8 @@ export default function TabLayout() {
           name="preview"
           options={{
             title: "Vorschau",
+            // Sprint 199: aus der Tab-Leiste ausgeblendet, erreichbar ueber den NavDrawer.
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="play.rectangle.fill" color={color} /></GlassTabIcon>
             ),
@@ -152,6 +160,8 @@ export default function TabLayout() {
           name="quality"
           options={{
             title: "Qualität",
+            // Sprint 199: aus der Tab-Leiste ausgeblendet, erreichbar ueber den NavDrawer.
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="amber"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
             ),

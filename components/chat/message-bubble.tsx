@@ -52,7 +52,7 @@ export function MarkdownLiteContent({ content }: { content: string }) {
             return (
               <View key={index} style={styles.bulletRow}>
                 <Text style={styles.bulletMarker}>•</Text>
-                <Text style={styles.contentAgent}>
+                <Text style={[styles.contentAgent, styles.bulletContent]}>
                   {block.spans.map((span, spanIndex) => (
                     <SpanText key={spanIndex} span={span} base={styles.contentAgentBase} styles={styles} />
                   ))}
@@ -194,6 +194,7 @@ function createStyles() {
     headerBase: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5 },
     headerText: { color: glassPalette.cyan, fontFamily: "monospace", fontSize: 14.5, fontWeight: "800", marginBottom: 6, marginTop: 4 },
     bulletRow: { flexDirection: "row", gap: 6, marginBottom: 3 },
+    bulletContent: { flex: 1, flexShrink: 1, minWidth: 0 },
     bulletMarker: { color: glassPalette.cyan, fontSize: 13.5, lineHeight: 22 },
     codeBox: { backgroundColor: accentAlpha("purple", 0.08), borderColor: glassSurface.border, borderRadius: 8, borderWidth: 1, marginVertical: 6, minWidth: 0, overflow: "hidden", paddingHorizontal: 10, paddingVertical: 8 },
     codeText: { color: glassSurface.textPrimary, flexShrink: 1, fontFamily: "monospace", fontSize: 12, lineHeight: 18, ...( { wordBreak: "break-word" } as object ) },

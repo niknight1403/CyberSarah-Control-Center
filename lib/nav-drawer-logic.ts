@@ -7,7 +7,20 @@
  * Einträge zeigt als die kompakte Bottom-Tab-Leiste.
  */
 
-export type DrawerRoute = "/chat" | "/superagent" | "/designer" | "/plugins" | "/meetings" | "/" | "/memory" | "/data" | "/settings";
+export type DrawerRoute =
+  | "/chat"
+  | "/superagent"
+  | "/designer"
+  | "/plugins"
+  | "/meetings"
+  | "/cyber-terminal"
+  | "/agent"
+  | "/preview"
+  | "/quality"
+  | "/"
+  | "/memory"
+  | "/data"
+  | "/settings";
 
 export type DrawerItem = {
   route: DrawerRoute;
@@ -21,7 +34,11 @@ export type DrawerItem = {
     | "folder.fill"
     | "brain.head.profile"
     | "tablecells.fill"
-    | "gearshape.fill";
+    | "gearshape.fill"
+    | "chevron.left.forwardslash.chevron.right"
+    | "sparkles"
+    | "play.rectangle.fill"
+    | "chart.bar.fill";
   badge?: string;
 };
 
@@ -32,6 +49,11 @@ export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/designer", title: "Designer", icon: "paintpalette.fill", badge: "KI" },
   { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },
   { route: "/meetings", title: "Meetings", icon: "video.fill", badge: "Neu" },
+  // Sprint 199: ehemals sichtbare Tabs — jetzt hier, damit die Tab-Leiste schlank bleibt.
+  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right" },
+  { route: "/agent", title: "Entwicklung", icon: "sparkles" },
+  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill" },
+  { route: "/quality", title: "Qualität", icon: "chart.bar.fill" },
   { route: "/", title: "Dateien", icon: "folder.fill" },
   { route: "/memory", title: "Gedächtnis", icon: "brain.head.profile" },
   { route: "/data", title: "Daten", icon: "tablecells.fill" },

@@ -103,6 +103,46 @@ function sandboxPath(relative: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// GitHub-Autonomie (Sprint 198): Repo lesen, committen, Branch/PR anlegen
+// und Server-Ops-Workflows dispatchen — der Superagent kann das eigene
+// Control-Center-Projekt damit autonom weiterentwickeln (wie der
+// Base44-Superagent-Chat). Zugriff laeuft ueber GITHUB_TOKEN ?? ADMIN_GITHUB_TOKEN.
+// ---------------------------------------------------------------------------
+
+/** Feste Allowlist dispatchbarer Server-Ops-Operationen (server-ops.yml). */
+const SERVER_OPS_ALLOWLIST = new Set([
+  "status",
+  "probe",
+  "db-check",
+  "db-probe",
+  "db-probe2",
+  "db-migrate",
+  "db-fix",
+  "pm2-redeploy",
+  "pm2-env-sync",
+  "deploy",
+  "deploy-pull",
+  "env-set-github-token",
+]);
+
+function githubClientOrError(): { client: AxiosInstance } | { error: string } {
+  const client = githubClient();
+  if (!client) return { error: "GitHub-Client nicht initialisierbar (kein GITHUB_TOKEN/ADMIN_GITHUB_TOKEN)." };
+  return { client };
+}
+
+/** Dateiinhalt base64-dekodieren (Contents-API liefert base64 oder NULL-Blob). */
+function decodeContent(content: unknown): string {
+  if (typeof content !== "string") return "";
+  const compact = content.replace(/\n/g, "");
+  try {
+    return Buffer.from(compact, "base64").toString("utf-8");
+  } catch {
+    return "";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tool-Definitionen
 // ---------------------------------------------------------------------------
 
@@ -241,6 +281,219 @@ const tools: ToolSpec[] = [
         return {
           ok: true,
           result: { repo, branches: (response.data ?? []).map((b: Record<string, unknown>) => b.name) },
+        };
+      }),
+  },
+  {
+    name: "git.getFileContents",
+    description:
+      "Liest eine Datei aus einem GitHub-Repository (Inhalt, Groesse, SHA). Bei einem Verzeichnispfad liefert es die Dateiliste. Grundlage fuer autonome Weiterentwicklung.",
+    parameters: {
+      type: "object",
+      properties: {
+        repo: { type: "string", description: "owner/name; leer = Standard-Repo" },
+        path: { type: "string", description: "Repo-relativer Datei- oder Ordnerpfad" },
+        branch: { type: "string", description: "Optional: Branch/Ref (leer = Default-Branch)" },
+      },
+      required: ["path"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const resolved = githubClientOrError();
+        if ("error" in resolved) return { ok: false, error: resolved.error };
+        const repo = String(args.repo ?? DEFAULT_REPO);
+        const filePath = String(args.path ?? "").replace(/^\/+/, "");
+        const branch = args.branch ? String(args.branch) : undefined;
+        const response = await resolved.client.get(`/repos/${repo}/contents/${filePath}`, {
+          params: branch ? { ref: branch } : undefined,
+        });
+        const data = response.data;
+        if (Array.isArray(data)) {
+          return {
+            ok: true,
+            result: {
+              repo,
+              path: filePath,
+              type: "directory",
+              entries: data.map((e: Record<string, unknown>) => ({ name: e.name, type: e.type, size: e.size })),
+            },
+          };
+        }
+        const text = decodeContent(data?.content);
+        const tooLarge = typeof data?.size === "number" && data.size > 400_000;
+        return {
+          ok: true,
+          result: {
+            repo,
+            path: filePath,
+            branch: data?.git_url ? branch ?? "default" : branch,
+            sha: data?.sha,
+            size: data?.size,
+            encoding: data?.encoding,
+            content: tooLarge ? text.slice(0, 400_000) : text,
+            truncated: Boolean(tooLarge),
+          },
+        };
+      }),
+  },
+  {
+    name: "git.commitFile",
+    description:
+      "Erstellt einen Commit in einem GitHub-Repository: legt eine Datei neu an oder aktualisiert sie (Contents-API). SHA wird automatisch ermittelt. Fuer autonome Fixes und Features.",
+    parameters: {
+      type: "object",
+      properties: {
+        repo: { type: "string", description: "owner/name; leer = Standard-Repo" },
+        path: { type: "string", description: "Repo-relativer Dateipfad" },
+        content: { type: "string", description: "Neuer vollstaendiger Dateiinhalt (UTF-8)" },
+        message: { type: "string", description: "Commit-Nachricht (Konvention: feat/fix/chore(scope): ...)" },
+        branch: { type: "string", description: "Optional: Ziel-Branch (leer = Default-Branch)" },
+      },
+      required: ["path", "content", "message"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const resolved = githubClientOrError();
+        if ("error" in resolved) return { ok: false, error: resolved.error };
+        const client = resolved.client;
+        const repo = String(args.repo ?? DEFAULT_REPO);
+        const filePath = String(args.path ?? "").replace(/^\/+/, "");
+        const message = String(args.message ?? "").trim();
+        if (!filePath || !message) return { ok: false, error: "Pfad und Commit-Nachricht sind erforderlich." };
+        const branch = args.branch ? String(args.branch) : undefined;
+        // Aktuellen Stand holen (SHA der Datei, falls vorhanden) — sonst Anlage.
+        let sha: string | undefined;
+        try {
+          const current = await client.get(`/repos/${repo}/contents/${filePath}`, {
+            params: branch ? { ref: branch } : undefined,
+          });
+          if (Array.isArray(current.data)) return { ok: false, error: `"${filePath}" ist ein Verzeichnis."` };
+          sha = current.data?.sha;
+        } catch (e) {
+          // 404 = Datei existiert noch nicht -> neuer Commit ohne SHA.
+          if (!(e && typeof e === "object" && "response" in e && (e as { response?: { status?: number } }).response?.status === 404)) {
+            throw e;
+          }
+        }
+        const response = await client.put(`/repos/${repo}/contents/${filePath}`, {
+          message,
+          content: Buffer.from(String(args.content ?? ""), "utf-8").toString("base64"),
+          branch,
+          sha,
+        });
+        return {
+          ok: true,
+          result: {
+            repo,
+            path: filePath,
+            branch: branch ?? "default",
+            commit: (response.data?.commit?.sha ?? "").slice(0, 7),
+            htmlUrl: response.data?.content?.html_url,
+            created: !sha,
+          },
+        };
+      }),
+  },
+  {
+    name: "git.createBranch",
+    description:
+      "Erstellt einen neuen Branch in einem GitHub-Repository (ab Default-Branch oder explizitem Basis-Branch). Fuer parallele Entwicklungsstränge.",
+    parameters: {
+      type: "object",
+      properties: {
+        repo: { type: "string", description: "owner/name; leer = Standard-Repo" },
+        branchName: { type: "string", description: "Neuer Branch-Name (z. B. agent/neue-funktion)" },
+        fromBranch: { type: "string", description: "Optional: Basis-Branch (leer = Default-Branch)" },
+      },
+      required: ["branchName"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const resolved = githubClientOrError();
+        if ("error" in resolved) return { ok: false, error: resolved.error };
+        const client = resolved.client;
+        const repo = String(args.repo ?? DEFAULT_REPO);
+        const branchName = String(args.branchName ?? "").trim();
+        if (!branchName || /[\^~:\\]/.test(branchName) || branchName.startsWith("-")) {
+          return { ok: false, error: "Ungueltiger Branch-Name." };
+        }
+        let fromRef = args.fromBranch ? String(args.fromBranch) : undefined;
+        if (!fromRef) {
+          const repoResponse = await client.get(`/repos/${repo}`);
+          fromRef = repoResponse.data?.default_branch ?? "main";
+        }
+        const refResponse = await client.get(`/repos/${repo}/git/ref/heads/${fromRef}`);
+        await client.post(`/repos/${repo}/git/refs`, {
+          ref: `refs/heads/${branchName}`,
+          sha: refResponse.data?.object?.sha,
+        });
+        return { ok: true, result: { repo, branch: branchName, from: fromRef } };
+      }),
+  },
+  {
+    name: "git.createPullRequest",
+    description:
+      "Erstellt einen Pull-Request in einem GitHub-Repository. Kopf-Branch muss bereits gepusht sein (z. B. via git.commitFile auf diesem Branch).",
+    parameters: {
+      type: "object",
+      properties: {
+        repo: { type: "string", description: "owner/name; leer = Standard-Repo" },
+        title: { type: "string" },
+        head: { type: "string", description: "Branch mit den Aenderungen" },
+        base: { type: "string", description: "Ziel-Branch (leer = Default-Branch)" },
+        body: { type: "string", description: "Optionale PR-Beschreibung (Markdown)" },
+      },
+      required: ["title", "head"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const resolved = githubClientOrError();
+        if ("error" in resolved) return { ok: false, error: resolved.error };
+        const client = resolved.client;
+        const repo = String(args.repo ?? DEFAULT_REPO);
+        const base = args.base ? String(args.base) : (await client.get(`/repos/${repo}`)).data?.default_branch ?? "main";
+        const response = await client.post(`/repos/${repo}/pulls`, {
+          title: String(args.title ?? "").trim(),
+          head: String(args.head ?? ""),
+          base,
+          body: args.body ? String(args.body) : undefined,
+        });
+        return {
+          ok: true,
+          result: { repo, number: response.data?.number, url: response.data?.html_url, base, head: response.data?.head?.ref },
+        };
+      }),
+  },
+  {
+    name: "git.dispatchServerOps",
+    description:
+      "Loest eine feste Server-Ops-Operation ueber den GitHub-Actions-Workflow aus (z. B. status, db-migrate, deploy, pm2-redeploy). Nur Operationen aus der Allowlist.",
+    parameters: {
+      type: "object",
+      properties: {
+        operation: {
+          type: "string",
+          description: "Operation aus der Allowlist: status, probe, db-check, db-probe, db-probe2, db-migrate, db-fix, pm2-redeploy, pm2-env-sync, deploy, deploy-pull, env-set-github-token",
+          enum: [...SERVER_OPS_ALLOWLIST],
+        },
+      },
+      required: ["operation"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const resolved = githubClientOrError();
+        if ("error" in resolved) return { ok: false, error: resolved.error };
+        const operation = String(args.operation ?? "").trim();
+        if (!SERVER_OPS_ALLOWLIST.has(operation)) {
+          return { ok: false, error: `Operation "${operation}" ist nicht freigegeben.` };
+        }
+        await resolved.client.post(
+          `/repos/${DEFAULT_REPO}/actions/workflows/server-ops.yml/dispatches`,
+          { ref: "main", inputs: { operation } },
+        );
+        return {
+          ok: true,
+          result: { repo: DEFAULT_REPO, workflow: "server-ops.yml", operation, dispatched: true, note: "Lauf folgt asynchron — Ergebnis via git.repoStatus oder Actions-Logs pruefbar." },
         };
       }),
   },
