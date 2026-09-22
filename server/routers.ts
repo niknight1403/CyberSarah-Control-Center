@@ -25,6 +25,7 @@ import { secretsRouter } from "./secrets-router";
 import { wixRouter } from "./wix-router";
 import { influencerRouter } from "./influencer-router";
 import { publicProcedure, router } from "./_core/trpc";
+import { haraRouter, saasRouter, crossSellRouter, expansionRouter, subscriptionManagementRouter, revenueTradingRouter } from "./revenue-command-router";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -53,6 +54,12 @@ export const appRouter = router({
   secrets: secretsRouter,
   wix: wixRouter,
   influencer: influencerRouter,
+  hara: haraRouter,
+  saas: saasRouter,
+  crossSell: crossSellRouter,
+  expansion: expansionRouter,
+  subscriptionManagement: subscriptionManagementRouter,
+  revenueTrading: revenueTradingRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.

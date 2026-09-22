@@ -1,0 +1,66 @@
+name: Provision isolated Revenue DB access
+on:
+  push:
+    branches: [integration/revenue-os-live-data]
+    paths: ['.github/workflows/revenue-db-bridge.yml']
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+      GH_TOKEN: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
+    steps:
+      - name: Create least-privilege access and store only encrypted repository secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$GH_TOKEN"
+          gh api repos/${{ github.repository }}/actions/secrets/public-key > /dev/null
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/bridge_key
+          chmod 600 ~/.ssh/bridge_key
+          url=$(ssh -i ~/.ssh/bridge_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" node <<'JS'
+          const fs = require('node:fs');
+          const cp = require('node:child_process');
+          const crypto = require('node:crypto');
+          const { Pool } = require('/opt/cybersarah-control-center/node_modules/pg');
+          const lines = fs.readFileSync('/opt/cybersarah/.env','utf8').split(/\r?\n/);
+          const line = lines.find(x => x.startsWith('DATABASE_URL='));
+          if (!line) throw new Error('Revenue database is not configured');
+          let original = line.slice('DATABASE_URL='.length).trim();
+          if ((original[0] === '"' && original.at(-1) === '"') || (original[0] === "'" && original.at(-1) === "'")) original = original.slice(1,-1);
+          const parsed = new URL(original);
+          if (!['localhost','127.0.0.1','::1'].includes(parsed.hostname) || !['postgres:','postgresql:'].includes(parsed.protocol)) throw new Error('Expected local PostgreSQL source');
+          const dbname = decodeURIComponent(parsed.pathname.slice(1));
+          if (!/^[a-zA-Z0-9_-]+$/.test(dbname)) throw new Error('Unexpected database identifier');
+          const role = 'cybersarah_revenue_bridge';
+          const psql = (db, sql) => cp.execFileSync('sudo',['-n','-u','postgres','psql','-X','-v','ON_ERROR_STOP=1','-Atq','-d',db], { input: sql, encoding:'utf8', stdio:['pipe','pipe','pipe'], timeout:10000 }).trim();
+          const roleExists = psql('postgres', `SELECT count(*) FROM pg_roles WHERE rolname = '${role}';`);
+          if (roleExists !== '0') throw new Error('Bridge role already exists: abort to avoid rotation');
+          const tables = psql(dbname, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename IN ('hara_proposals','hara_performance','subscription_plans','customer_subscriptions','subscription_invoices','cross_sell_rules','cross_sell_recommendations','expansion_chancen');");
+          if (tables !== '8') throw new Error('Revenue schema is incomplete: abort');
+          const password = crypto.randomBytes(36).toString('hex');
+          (async () => {
+            try {
+              psql('postgres', `CREATE ROLE ${role} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD '${password}'; GRANT CONNECT ON DATABASE "${dbname}" TO ${role};`);
+              psql(dbname, `GRANT USAGE ON SCHEMA public TO ${role}; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO ${role}; GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${role};`);
+              const url = `postgresql://${role}:${password}@127.0.0.1:${parsed.port || '5432'}/${encodeURIComponent(dbname)}`;
+              const pool = new Pool({connectionString:url, max:1, connectionTimeoutMillis:5000});
+              try { const result=await pool.query("SELECT to_regclass('public.hara_proposals') AS found"); if(!result.rows[0]?.found) throw new Error('Revenue table not readable'); }
+              finally { await pool.end(); }
+              process.stdout.write(url);
+            } catch { process.stderr.write('Bridge provisioning or read-only validation failed\n'); process.exitCode=1; }
+          })();
+          JS
+          )
+          test -n "$url"
+          echo "::add-mask::$url"
+          printf '%s' "$url" | gh secret set REVENUE_OS_DATABASE_URL --repo '${{ github.repository }}'
+          unset url
+          rm -f ~/.ssh/bridge_key
+          echo 'Revenue bridge credential: stored as encrypted repository secret and read-only connection verified.'

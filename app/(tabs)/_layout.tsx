@@ -65,7 +65,6 @@ export default function TabLayout() {
           name="revenue-os"
           options={{
             title: "Revenue OS",
-            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
             ),
@@ -75,7 +74,6 @@ export default function TabLayout() {
           name="micro-trading"
           options={{
             title: "Micro Trading",
-            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
             ),
@@ -85,7 +83,6 @@ export default function TabLayout() {
           name="loop-engineering"
           options={{
             title: "Loop Engineering",
-            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="blue"><IconSymbol size={22} name="wand.and.stars" color={color} /></GlassTabIcon>
             ),
@@ -136,6 +133,7 @@ export default function TabLayout() {
           name="agent"
           options={{
             title: "Agent",
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="sparkles" color={color} /></GlassTabIcon>
             ),
@@ -177,6 +175,7 @@ export default function TabLayout() {
           name="account"
           options={{
             title: "Konto",
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="cyan"><IconSymbol size={22} name="person.crop.circle" color={color} /></GlassTabIcon>
             ),

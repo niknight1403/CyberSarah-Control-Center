@@ -1,0 +1,37 @@
+name: Check isolated hosted Revenue DB feasibility
+on:
+  push:
+    branches: [integration/revenue-os-live-data]
+    paths: ['.github/workflows/revenue-neon-capabilities.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Read only role permissions, never log URLs or credentials
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node <<'JS'
+          const { Pool }=require('pg');
+          (async()=>{
+            if (!process.env.DATABASE_URL) { console.log('hosted_db: NOT_CONFIGURED'); return; }
+            const db=new Pool({connectionString:process.env.DATABASE_URL,max:1,connectionTimeoutMillis:6000});
+            try {
+              const r=await db.query(`SELECT r.rolcreatedb, r.rolsuper, (SELECT count(*) FROM pg_database WHERE datname='cybersarah_revenue_os') AS existing FROM pg_roles r WHERE rolname=current_user`);
+              console.log('hosted_db: REACHABLE');
+              console.log('hosted_db_createdb:',r.rows[0]?.rolcreatedb?'YES':'NO');
+              console.log('hosted_db_superuser:',r.rows[0]?.rolsuper?'YES':'NO');
+              console.log('hosted_revenue_db_exists:',Number(r.rows[0]?.existing)?'YES':'NO');
+            } catch { console.log('hosted_db: UNAVAILABLE'); process.exitCode=1; }
+            finally { await db.end().catch(()=>{}); }
+          })();
+          JS
