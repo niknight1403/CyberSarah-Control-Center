@@ -1,0 +1,103 @@
+name: Deploy isolated Revenue integration bridge
+on:
+  push:
+    branches: [integration/revenue-os-live-data]
+    paths: ['.github/workflows/revenue-engine-deploy.yml']
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+      DB_URL: ${{ secrets.REVENUE_OS_DATABASE_URL }}
+      STRIPE_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      OPENAI_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GH_TOKEN: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: niknight1403/cybersarah-revenue-os
+          ref: integration/revenue-bridge-safe
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Compile and validate isolated engine
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm --filter @workspace/api-server run typecheck
+          pnpm --filter @workspace/api-server run build:integration
+          test -s artifacts/api-server/dist/integration-server.mjs
+      - name: Deploy private loopback service and test authenticated read-only access
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$SSH_KEY" && test -n "$DB_URL" && test -n "$STRIPE_KEY" && test -n "$GH_TOKEN"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/revenue_bridge_key
+          chmod 600 ~/.ssh/revenue_bridge_key
+          trap 'rm -f .revenue.integration.env ~/.ssh/revenue_bridge_key' EXIT
+          api_key=$(openssl rand -hex 32)
+          echo "::add-mask::$api_key"
+          export api_key
+          node <<'JS'
+          const fs=require('node:fs');
+          const keys={
+            DATABASE_URL:process.env.DB_URL,
+            REVENUE_OS_API_KEY:process.env.api_key,
+            REVENUE_OS_INTEGRATION_ONLY:'1',
+            REVENUE_OS_INTEGRATION_PORT:'18741',
+            STRIPE_SECRET_KEY:process.env.STRIPE_KEY,
+          };
+          if(process.env.OPENAI_KEY) keys.OPENAI_API_KEY=process.env.OPENAI_KEY;
+          if(!keys.DATABASE_URL || !keys.REVENUE_OS_API_KEY) throw Error('Required integration secret missing');
+          fs.writeFileSync('.revenue.integration.env',Object.entries(keys).map(([k,v])=>`${k}=${JSON.stringify(v)}`).join('\n')+'\n',{mode:0o600});
+          JS
+          ssh -i ~/.ssh/revenue_bridge_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          target=/opt/cybersarah-revenue-bridge
+          if [ ! -d "$target/.git" ]; then
+            sudo -n mkdir -p "$target"
+            sudo -n chown "$(id -un):$(id -gn)" "$target"
+            git clone -q --single-branch --branch integration/revenue-bridge-safe https://github.com/niknight1403/cybersarah-revenue-os.git "$target"
+          else
+            cd "$target"
+            git fetch -q origin integration/revenue-bridge-safe
+            git merge --ff-only FETCH_HEAD >/dev/null
+          fi
+          cd "$target"
+          corepack pnpm install --prod --frozen-lockfile --ignore-scripts --silent
+          mkdir -p artifacts/api-server/dist
+          REMOTE
+          scp -q -i ~/.ssh/revenue_bridge_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new artifacts/api-server/dist/integration-server.mjs .revenue.integration.env "$SSH_USER@$SSH_HOST:/opt/cybersarah-revenue-bridge/"
+          ssh -i ~/.ssh/revenue_bridge_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          target=/opt/cybersarah-revenue-bridge
+          mv "$target/integration-server.mjs" "$target/artifacts/api-server/dist/integration-server.mjs"
+          chmod 600 "$target/.revenue.integration.env"
+          if pm2 describe cybersarah-revenue-bridge >/dev/null 2>&1; then
+            DOTENV_CONFIG_PATH="$target/.revenue.integration.env" REVENUE_OS_INTEGRATION_ONLY=1 pm2 restart cybersarah-revenue-bridge --update-env >/dev/null
+          else
+            DOTENV_CONFIG_PATH="$target/.revenue.integration.env" REVENUE_OS_INTEGRATION_ONLY=1 pm2 start "$target/artifacts/api-server/dist/integration-server.mjs" --name cybersarah-revenue-bridge --cwd "$target" >/dev/null
+          fi
+          sleep 5
+          test "$(curl -s -o /dev/null -w '%{http_code}' --max-time 7 http://127.0.0.1:18741/api/healthz)" = '200'
+          pm2 save >/dev/null
+          echo 'Revenue integration bridge: private loopback and DB health verified.'
+          REMOTE
+          ssh -fN -i ~/.ssh/revenue_bridge_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -L 18741:127.0.0.1:18741 "$SSH_USER@$SSH_HOST"
+          denied=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -X POST http://127.0.0.1:18741/api/hara/scan)
+          test "$denied" = 403
+          allowed=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -H "X-Revenue-Internal-Key: $api_key" http://127.0.0.1:18741/api/hara/overview)
+          test "$allowed" = 200
+          printf '%s' "$api_key" | gh secret set REVENUE_OS_API_KEY --repo '${{ github.repository }}'
+          printf '%s' 'http://127.0.0.1:18741' | gh secret set REVENUE_OS_API_BASE_URL --repo '${{ github.repository }}'
+          echo 'Revenue bridge: authenticated read-only route and unauthorized-scan denial verified; API secrets stored.'
