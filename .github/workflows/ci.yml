@@ -58,9 +58,9 @@ jobs:
           cd workspace-service
           echo "--- A: plain node"; timeout 8 node -e "console.log('node ok')"; echo "A exit=$?"
           echo "--- B: deps import"; timeout 20 node -e "await import('cors'); await import('express'); await import('http-proxy'); await import('zod'); console.log('imports ok')"; echo "B exit=$?"
-          echo "--- C: fallback-dir"; timeout 8 node -e "const fsSync=require('node:fs'); try { fsSync.mkdirSync('/proc/cybersarah-unwritable',{recursive:true}); console.log('primary created?!'); } catch (e) { console.log('primary failed (expected):', e.code); } fsSync.mkdirSync(process.cwd()+'/workspaces',{recursive:true}); console.log('fallback ok')"; echo "C exit=$?"
+          echo "--- C: fallback-dir"; timeout 8 node -e "const fsSync=require('node:fs'); try { fsSync.mkdirSync('/dev/null/cybersarah-unwritable',{recursive:true}); console.log('primary created?!'); } catch (e) { console.log('primary failed (expected):', e.code); } fsSync.mkdirSync(process.cwd()+'/workspaces',{recursive:true}); console.log('fallback ok')"; echo "C exit=$?"
           echo "--- D: full service (20s, Output direkt im Log)"
-          ( PORT=29787 WORKSPACES_DIR=/proc/cybersarah-unwritable NODE_ENV=production timeout 20 node src/index.js; echo "D exit=$?" ) &
+          ( PORT=29787 WORKSPACES_DIR=/dev/null/cybersarah-unwritable NODE_ENV=production timeout 20 node src/index.js; echo "D exit=$?" ) &
           for i in $(seq 1 20); do
             if curl -sf http://127.0.0.1:29787/api/v1/health > /dev/null 2>&1; then
               echo "Health-Check OK (Fallback-Workspaces)"; pkill -f "node src/index.js" 2>/dev/null; exit 0
