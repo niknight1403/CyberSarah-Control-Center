@@ -106,6 +106,9 @@ export default function SuperagentScreen() {
   // damit nach Abschluss an den ANFANG der Antwort gescrollt werden kann
   // (lange Ergebnisse sollen von oben lesbar sein, nicht am unteren Rand).
   const rowOffsetsRef = useRef<Map<string, number>>(new Map());
+  // Ziel-Row des bevorstehenden Antwort-Sprungs (wird im Effect ausgefuehrt —
+  // Refs sind im Render nicht lesbar, der ESLint-Rule verbietet das zurecht).
+  const [scrollToAnswerKey, setScrollToAnswerKey] = useState<string | null>(null);
 
   // Aktiven Lauf nach Abschluss aus dem Live-Polling nehmen.
   // Sprint 171: Adjust-Pattern statt Effect — Schlüssel auf id:status, weil
@@ -120,12 +123,9 @@ export default function SuperagentScreen() {
       setActiveId(null);
       setExpandedIds((prev) => new Set(prev).add(`${activeTask.id}-answer`));
       // Sprint 199: Anfang der fertigen Antwort an den oberen Bildschirmrand
-      // springen lassen — der Nutzer liest vom Start des Ergebnisses, nicht
-      // irgendwo aus dem herausragenden Text.
-      requestAnimationFrame(() => {
-        const y = rowOffsetsRef.current.get(`${activeTask.id}-answer`);
-        if (y != null) listRef.current?.scrollToOffset({ offset: Math.max(0, y - 12), animated: true });
-      });
+      // springen lassen — der Effect weiter unten liest die gemessenen
+      // Offsets und fuehrt den Sprung nach dem Layout aus.
+      setScrollToAnswerKey(`${activeTask.id}-answer`);
     }
   }
 
@@ -135,6 +135,26 @@ export default function SuperagentScreen() {
     [ledger, activeTask, optimisticRows],
   );
   const toolCount = useMemo(() => toolsQuery.data?.tools?.length ?? 0, [toolsQuery.data]);
+
+  // Sprint 199 — Antwort-zum-Anfang: Nach Abschluss einer Aufgabe an den
+  // ANFANG der Antwort springen (der Nutzer liest vom Start des Ergebnisses,
+  // nicht irgendwo im herausragenden Text). Doppelt rAF + Late-Retry fuer
+  // verzoegerte Android-Layout-Frames.
+  useEffect(() => {
+    if (!scrollToAnswerKey) return;
+    const jump = (animated: boolean) => {
+      const y = rowOffsetsRef.current.get(scrollToAnswerKey);
+      if (y == null) return;
+      listRef.current?.scrollToOffset({ offset: Math.max(0, y - 12), animated });
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        jump(true);
+        setTimeout(() => jump(false), 140);
+      });
+    });
+    return () => setScrollToAnswerKey(null);
+  }, [scrollToAnswerKey]);
 
   // Chat-UX: Bei neuen Nachrichten (oder waehrend ein Lauf live tickt) an
   // das Listenende scrollen — aber nur, wenn der Nutzer nicht absichtlich
