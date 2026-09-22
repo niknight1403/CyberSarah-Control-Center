@@ -1,0 +1,34 @@
+name: Revenue-OS Readiness (GitHub Secrets)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, integration/revenue-os-live-data]
+    paths:
+      - 'server/revenue-command-*'
+      - 'modules/revenue-os/artifacts/api-server/src/app.ts'
+      - 'scripts/revenue-readiness.mjs'
+      - '.github/workflows/revenue-readiness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Read-only DB schema and Stripe connectivity
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REVENUE_OS_DATABASE_URL: ${{ secrets.REVENUE_OS_DATABASE_URL }}
+          REVENUE_OS_API_BASE_URL: ${{ secrets.REVENUE_OS_API_BASE_URL }}
+          REVENUE_OS_API_KEY: ${{ secrets.REVENUE_OS_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: node scripts/revenue-readiness.mjs

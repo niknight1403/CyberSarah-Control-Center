@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -72,22 +73,70 @@ function InfluencerSection() {
   </>;
 }
 
-function FeatureCard({ accent, title, subtitle, body, cta, metrics }: { accent: Accent; title: string; subtitle: string; body: string; cta: string; metrics: [string, string][] }) {
-  return <GlassCard accent={accent} glow={1} style={styles.featureCard}><View style={styles.featureHeader}><AiCore state="idle" size={34} /><View style={styles.headingCopy}><Text style={styles.featureTitle}>{title}</Text><Text style={styles.featureSubtitle}>{subtitle}</Text></View><StatusChip label="bereit" accent="green" /></View><Text style={styles.detailText}>{body}</Text><View style={styles.metricRow}>{metrics.map(([label, value]) => <View key={label} style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>)}</View><GlowButton label={cta} accent={accent} variant="secondary" onPress={() => undefined} /></GlassCard>;
+function FeatureCard({ accent, title, subtitle, body, cta, metrics, status, onPress, loading, error, details }: { accent: Accent; title: string; subtitle: string; body: string; cta: string; metrics: [string, string][]; status: string; onPress: () => void; loading: boolean; error?: string; details?: string[] }) {
+  return <GlassCard accent={accent} glow={1} style={styles.featureCard}>
+    <View style={styles.featureHeader}><AiCore state={error ? "error" : loading ? "processing" : "idle"} size={34} /><View style={styles.headingCopy}><Text style={styles.featureTitle}>{title}</Text><Text style={styles.featureSubtitle}>{subtitle}</Text></View><StatusChip label={status} accent={error ? "red" : loading ? "amber" : "green"} /></View>
+    <Text style={styles.detailText}>{body}</Text>
+    {error ? <Text style={styles.errorText} accessibilityRole="alert">{error}</Text> : null}
+    <View style={styles.metricRow}>{metrics.map(([label, value]) => <View key={label} style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>)}</View>
+    {details?.map((line, index) => <Text key={`${index}-${line}`} style={styles.detailText}>{line}</Text>)}
+    <GlowButton label={cta} accent={accent} variant="secondary" onPress={onPress} disabled={loading} />
+  </GlassCard>;
+}
+
+const formatEur = (value: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value);
+const metric = (label: string, value: string | number): [string, string] => [label, String(value)];
+
+function HaraSection() {
+  const q = trpc.hara.overview.useQuery(undefined, { retry: false });
+  const scan = trpc.hara.scan.useMutation({ onSuccess: () => void q.refetch() });
+  return <FeatureCard accent="purple" title="HARA" subtitle="Hyper-Autonomer Revenue Agent" body="Vorschläge und Kampagnenstatus direkt aus der Revenue-Datenbank. Ein Scan wird nur auf Anforderung angestoßen." cta="HARA-Scan starten" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Daten geladen"} loading={q.isLoading || scan.isPending} error={q.error?.message ?? scan.error?.message} metrics={[metric("Chancen", q.data?.counts.proposals ?? "—"), metric("In Umsetzung", q.data?.counts.active ?? "—"), metric("Abgeschlossen", q.data?.counts.completed ?? "—")]} details={[
+    ...(q.data?.proposals.slice(0, 5).map(p => `${p.titel}: ${p.status} (${p.kanal})`) ?? []),
+    ...(scan.data?.accepted ? ["Scan angenommen. Ergebnis wird nach Abschluss sichtbar, kein garantierter Erfolg."] : []),
+  ]} onPress={() => scan.mutate()} />;
+}
+
+function SaasSection() {
+  const q = trpc.saas.overview.useQuery(undefined, { retry: false });
+  return <FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Echte Pläne und aktive Abos aus Revenue-OS; Stripe-Produkte nur bei konfigurierter Verbindung. Content-to-Lead-CVR erfordert Funnel-Events." cta="SaaS-Daten aktualisieren" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Daten geladen"} loading={q.isLoading || q.isFetching} error={q.error?.message} metrics={[metric("Produkte", q.data?.stripeConfigured ? q.data.stripeProducts.length : "nicht verbunden"), metric("Trials", q.data?.trials ?? "—"), metric("MRR", q.data ? formatEur(q.data.mrrEur) : "—")]} details={q.data ? [
+    `Abos aktiv: ${q.data.active} · Bezahlte Rechnungen 7 Tage: ${formatEur(q.data.paidEur7d)}`,
+    `Neues aktives MRR: 24 h ${formatEur(q.data.newMrr1dEur)} · 7 Tage ${formatEur(q.data.newMrr7dEur)} (ohne Churn)`,
+    `Checkout-Erfolg (30 Tage): ${q.data.checkout?.successRate == null ? "nicht messbar" : q.data.checkout.successRate.toFixed(1) + " %"}${q.data.checkout?.capped ? " (Stichprobe, maximal 1.000 Sessions)" : ""}`,
+    `Rechnungs-Erfolgsquote (30 Tage): ${q.data.invoiceSuccessRate === null ? "keine Daten" : q.data.invoiceSuccessRate.toFixed(1) + " %"} (keine Checkout-Erfolgsquote)`,
+    `Funnel-CVR: ${q.data.funnelConversionRate === null ? "nicht messbar, Tracking fehlt" : q.data.funnelConversionRate.toFixed(1) + " %"}`,
+    ...q.data.plans.slice(0, 5).map(p => `${p.name}: ${p.preis} ${p.waehrung}/${p.intervall} · ${p.aktiv ? "aktiv" : "inaktiv"}`),
+  ] : undefined} onPress={() => void q.refetch()} />;
+}
+
+function LoopSection() {
+  const cross = trpc.crossSell.overview.useQuery(undefined, { retry: false });
+  const expansion = trpc.expansion.overview.useQuery(undefined, { retry: false });
+  const scan = trpc.expansion.scan.useMutation({ onSuccess: () => void expansion.refetch() });
+  const error = cross.error?.message ?? expansion.error?.message ?? scan.error?.message;
+  return <FeatureCard accent="blue" title="Loop Engineering" subtitle="Cross-Sell und Expansion" body="Echte Cross-Sell-Regeln und Chancen. Die Expansion-Suche ist ein expliziter, admin-geschützter Trigger, keine automatische Veröffentlichung." cta="Expansion-Scan starten" status={error ? "nicht verbunden" : cross.isLoading || expansion.isLoading ? "lädt" : "Daten geladen"} loading={cross.isLoading || expansion.isLoading || scan.isPending} error={error} metrics={[metric("Regeln", cross.data?.rules.length ?? "—"), metric("Aktive Regeln", cross.data?.rules.filter(r => r.aktiv).length ?? "—"), metric("Chancen", expansion.data?.opportunities.length ?? "—")]} details={[
+    ...(cross.data?.recommendationCounts.map(c => `Empfehlungen ${c.status}: ${c.count}`) ?? []),
+    ...(expansion.data?.opportunities.slice(0, 3).map(o => `${o.titel}: ${o.status}`) ?? []),
+    ...(scan.data?.accepted ? ["Scan angenommen; Ausführungsergebnis noch nicht bestätigt."] : []),
+  ]} onPress={() => scan.mutate()} />;
+}
+
+function TradingSection() {
+  const q = trpc.revenueTrading.overview.useQuery(undefined, { retry: false });
+  return <FeatureCard accent="green" title="Micro Trading" subtitle="Live-Marktbeobachtung, keine Orderausführung" body="Live-Kurse kommen aus Binance mit Kraken-Fallback. Kein Broker-Zugriff über diesen Bildschirm." cta="Trading-Analyse öffnen" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Marktdaten"} loading={q.isLoading} error={q.error?.message} metrics={[metric("Datenstatus", q.data?.status ?? "—")]} details={q.data?.status === "ok" ? q.data.tickers.map(t => `${t.symbol}: ${t.priceUsd.toLocaleString("de-DE")} USD (${t.changePercent.toFixed(2)} %)`) : q.data?.error ? [q.data.error] : undefined} onPress={() => router.push("/micro-trading" as never)} />;
 }
 
 function OtherSection({ section }: { section: Exclude<Section, "influencer"> }) {
-  if (section === "hara") return <FeatureCard accent="purple" title="HARA" subtitle="Hyper-Autonomer Revenue Agent" body="Findet Revenue-Chancen, priorisiert Cross-Sell-Ideen und erstellt Kampagnenentwürfe zur Freigabe." cta="HARA-Konsole öffnen" metrics={[["Chancen", "12"], ["Kampagnen", "4"], ["Nächster Lauf", "09:00"]]} />;
-  if (section === "saas") return <FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Verwalte Produktideen, Pricing-Experimente, Trial-to-Paid-Funnel und aktive Subscriptions." cta="SaaS-Workspace öffnen" metrics={[["Produkte", "8"], ["Trials", "26"], ["MRR-Entwurf", "€ 2.480"]]} />;
-  if (section === "loop") return <FeatureCard accent="blue" title="Loop Engineering" subtitle="Umsatzschleifen systematisch bauen" body="Mappe Content → Lead → Produkt → Retention → Referral. Jede Schleife erhält Hypothese und Messgröße." cta="Revenue-Loops planen" metrics={[["Loops", "4"], ["Hypothesen", "11"], ["Aktive Tests", "3"]]} />;
-  return <FeatureCard accent="green" title="Micro Trading" subtitle="Analyse und Paper-Simulation" body="Marktbeobachtung, Signale und Backtests bleiben auf Analyse und Paper-Simulation beschränkt. Keine Broker-Anbindung und keine Orderausführung." cta="Trading-Analyse öffnen" metrics={[["Watchlist", "6"], ["Paper-Signale", "3"], ["Risiko", "simuliert"]]} />;
+  if (section === "hara") return <HaraSection />;
+  if (section === "saas") return <SaasSection />;
+  if (section === "loop") return <LoopSection />;
+  return <TradingSection />;
 }
 
 export default function RevenueOsScreen() {
   const [section, setSection] = useState<Section>("influencer");
   const navDrawer = useNavDrawer();
   const active = useMemo(() => SECTIONS.find((item) => item.key === section) ?? SECTIONS[0], [section]);
-  return <GlassBackdrop accent={active.accent}><ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent"><View style={styles.topBar}><NavDrawerButton {...navDrawer.hamburgerProps} tint={glassPalette.cyan} /><View style={styles.titleBlock}><Text style={styles.eyebrow}>CYBERSARAH · REVENUE OS</Text><Text style={styles.title}>Revenue Hub</Text></View><StatusChip label="verbunden" accent="green" live /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow} accessibilityLabel="Revenue-OS-Bereiche">{SECTIONS.map((item) => <SectionButton key={item.key} item={item} active={item.key === section} onPress={() => setSection(item.key)} />)}</ScrollView><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><GlassCard accent={active.accent} glow={2} style={styles.heroCard}><Text style={styles.heroKicker}>INTEGRIERTES REVENUE-OS</Text><Text style={styles.heroTitle}>Alle Umsatzsysteme an einem Ort.</Text><Text style={styles.heroText}>Persona auswählen, Briefing eingeben und Content sicher als Entwurf generieren.</Text></GlassCard>{section === "influencer" ? <InfluencerSection /> : <OtherSection section={section} />}</ScrollView></ScreenContainer><NavDrawer {...navDrawer.drawerProps} /></GlassBackdrop>;
+  return <GlassBackdrop accent={active.accent}><ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent"><View style={styles.topBar}><NavDrawerButton {...navDrawer.hamburgerProps} tint={glassPalette.cyan} /><View style={styles.titleBlock}><Text style={styles.eyebrow}>CYBERSARAH · REVENUE OS</Text><Text style={styles.title}>Revenue Hub</Text></View><StatusChip label="Live-Status je Modul" accent="cyan" /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow} accessibilityLabel="Revenue-OS-Bereiche">{SECTIONS.map((item) => <SectionButton key={item.key} item={item} active={item.key === section} onPress={() => setSection(item.key)} />)}</ScrollView><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><GlassCard accent={active.accent} glow={2} style={styles.heroCard}><Text style={styles.heroKicker}>INTEGRIERTES REVENUE-OS</Text><Text style={styles.heroTitle}>Alle Umsatzsysteme an einem Ort.</Text><Text style={styles.heroText}>Live-Daten pro Bereich statt Demo-Kennzahlen. Fehlende Verbindungen werden sichtbar angezeigt.</Text></GlassCard>{section === "influencer" ? <InfluencerSection /> : <OtherSection section={section} />}</ScrollView></ScreenContainer><NavDrawer {...navDrawer.drawerProps} /></GlassBackdrop>;
 }
 
 const styles = StyleSheet.create({

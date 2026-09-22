@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { timingSafeEqual } from "node:crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -156,6 +157,19 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     return res.status(500).json({ error: "Datenbank-Fehler", detail: err.message?.slice(0, 120) });
   }
   next(err);
+});
+
+// Control-Center-Scans: serverseitiges Shared Secret, kein ungeschuetzter
+// oeffentlicher Revenue-Trigger. Wenn nicht konfiguriert, immer fail-closed.
+app.use(["/api/hara/scan", "/api/expansion/scan"], (req, res, next) => {
+  const expected = process.env.REVENUE_OS_API_KEY;
+  const supplied = req.get("X-Revenue-Internal-Key") ?? "";
+  if (!expected || !supplied || Buffer.byteLength(expected) !== Buffer.byteLength(supplied) ||
+      !timingSafeEqual(Buffer.from(expected), Buffer.from(supplied))) {
+    res.status(403).json({ error: "Interner Scan-Zugriff verweigert" });
+    return;
+  }
+  next();
 });
 
 app.use("/api", router);
