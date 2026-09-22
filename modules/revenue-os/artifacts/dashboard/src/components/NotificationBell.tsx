@@ -35,8 +35,8 @@ function formatZeit(iso: string): string {
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   if (diff < 60000) return "gerade eben";
-  if (diff < 3600000) return \`vor \${Math.floor(diff / 60000)} Min\`;
-  if (diff < 86400000) return \`vor \${Math.floor(diff / 3600000)}h\`;
+  if (diff < 3600000) return `vor ${Math.floor(diff / 60000)} Min`;
+  if (diff < 86400000) return `vor ${Math.floor(diff / 3600000)}h`;
   return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }
 
