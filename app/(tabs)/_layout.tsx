@@ -82,7 +82,6 @@ export default function TabLayout() {
           name="business"
           options={{
             title: "Business",
-            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="blue"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
             ),
@@ -91,6 +90,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="cyber-dashboard"
           options={{
+            href: null, // Sprint 195: aus Leiste ausgeblendet für Handy-Übersicht
             title: "Cyber",
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="bolt.fill" color={color} /></GlassTabIcon>
@@ -132,8 +132,6 @@ export default function TabLayout() {
           name="agent"
           options={{
             title: "Agent",
-            // Sprint 199: aus der Tab-Leiste ausgeblendet, erreichbar ueber den NavDrawer.
-            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="sparkles" color={color} /></GlassTabIcon>
             ),
@@ -142,6 +140,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="superagent"
           options={{
+            href: null, // Sprint 195: aus Leiste ausgeblendet für Handy-Übersicht
             title: "Superagent",
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="wand.and.stars" color={color} /></GlassTabIcon>
