@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+import { ENV } from "./_core/env";
 import { detectConfiguredProviders, type RouterProviderId } from "../lib/model-router-logic";
 import { getRouterHealth , getRouterSnapshot } from "./model-router";
 import {
@@ -27,7 +28,7 @@ import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 const BOOT_AT = Date.now();
 
 async function pingWorkspace(): Promise<number | null> {
-  const baseUrl = process.env.WORKSPACE_SERVICE_URL?.replace(/\/$/, "");
+  const baseUrl = ENV.workspaceServiceUrl;
   if (!baseUrl) return null;
   const started = Date.now();
   try {

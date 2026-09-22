@@ -159,6 +159,11 @@ export class RemoteWorkspaceClient {
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    if (!this.config.baseUrl) {
+      throw new Error(
+        "Kein Workspace-Service erreichbar: Server-Proxy und Workspace-URL fehlen.",
+      );
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45_000);
     try {

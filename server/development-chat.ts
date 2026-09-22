@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { ENV } from "./_core/env";
 import { insertChatTurn, insertAgentLearningRecord, listChatMessages, listChatSessions, listRecentAgentLearnings } from "./db";
 import {
   buildLearningRecord,
@@ -902,7 +903,7 @@ async function buildSuperagentContext() {
     .slice(-5)
     .map((entry) => `${entry.level}: ${entry.message}`.slice(0, 300));
   let workspaceConnected = false;
-  const workspaceUrl = process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "");
+  const workspaceUrl = ENV.workspaceServiceUrl;
   if (workspaceUrl) {
     try {
       const controller = new AbortController();

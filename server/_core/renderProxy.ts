@@ -1,6 +1,7 @@
 // Express-Response wird als ExpressResponse aliastiert, damit der globale
 // Fetch-Response-Typ (Response) ohne Namenskollision genutzt werden kann.
 import type { Express, Request, Response as ExpressResponse } from "express";
+import { ENV } from "./env";
 
 /**
  * Sprint 73 — Server-seitiger Render-Proxy (/api/render/*).
@@ -36,9 +37,8 @@ const FORWARDED_HEADER_ALLOWLIST = [
 
 const UPSTREAM_TIMEOUT_MS = 120_000;
 
-function workspaceServiceUrl(): string | null {
-  const raw = process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/+$/, "");
-  return raw && /^https?:\/\//.test(raw) ? raw : null;
+function workspaceServiceUrl(): string {
+  return ENV.workspaceServiceUrl;
 }
 
 function serverServiceToken(): string | null {
