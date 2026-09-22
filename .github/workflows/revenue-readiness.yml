@@ -36,6 +36,7 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/revenue_tunnel_key
           chmod 600 ~/.ssh/revenue_tunnel_key
           ssh -fN -i ~/.ssh/revenue_tunnel_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -o ConnectTimeout=12 -L 15432:127.0.0.1:5432 "$SSH_USER@$SSH_HOST"
+          ssh -fN -i ~/.ssh/revenue_tunnel_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -o ConnectTimeout=12 -L 18741:127.0.0.1:18741 "$SSH_USER@$SSH_HOST"
       - name: Read-only DB schema and Stripe connectivity
         env:
           REVENUE_OS_DB_TUNNEL_PORT: 15432
@@ -44,4 +45,5 @@ jobs:
           REVENUE_OS_API_BASE_URL: ${{ secrets.REVENUE_OS_API_BASE_URL }}
           REVENUE_OS_API_KEY: ${{ secrets.REVENUE_OS_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node scripts/revenue-readiness.mjs

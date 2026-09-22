@@ -50,23 +50,56 @@ async function checkDb(label, url) {
   } catch { console.log(`${label}: CONNECTION_OR_PERMISSION_ERROR`); return false; }
   finally { await pool.end().catch(() => undefined); }
 }
+async function checkEngine() {
+  const raw = process.env.REVENUE_OS_API_BASE_URL;
+  const key = process.env.REVENUE_OS_API_KEY;
+  if (!raw || !key) { console.log('REVENUE_BRIDGE: NOT_CONFIGURED'); return false; }
+  try {
+    const base = new URL(raw);
+    const local = base.protocol === 'http:' && base.hostname === '127.0.0.1' && base.port === '18741';
+    if (!local && base.protocol !== 'https:') throw new Error('unsupported_endpoint');
+    const health = await fetch(new URL('/api/healthz', base), { signal: AbortSignal.timeout(7000) });
+    if (!health.ok || (await health.json()).status !== 'ready') throw new Error('health_unavailable');
+    const overview = await fetch(new URL('/api/hara/overview', base), { headers: { 'X-Revenue-Internal-Key': key }, signal: AbortSignal.timeout(7000) });
+    if (!overview.ok) throw new Error('authenticated_read_unavailable');
+    // Kein echter Scan im Readiness-Check: nur Ablehnung ohne Zugangsschluessel pruefen.
+    const rejected = await fetch(new URL('/api/hara/scan', base), { method: 'POST', signal: AbortSignal.timeout(7000) });
+    if (rejected.status !== 403) throw new Error('scan_not_protected');
+    console.log('REVENUE_BRIDGE: READY (DB health, authenticated read, scan denied without key)');
+    return true;
+  } catch { console.log('REVENUE_BRIDGE: UNAVAILABLE_OR_UNPROTECTED'); return false; }
+}
+async function checkOpenAI() {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) { console.log('OPENAI_API_KEY: NOT_CONFIGURED'); return false; }
+  try {
+    const response = await fetch('https://api.openai.com/v1/models?limit=1', {
+      headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(7000),
+    });
+    console.log(`OPENAI_API_KEY: ${response.ok ? 'REACHABLE' : 'UNAVAILABLE'}`);
+    return response.ok;
+  } catch { console.log('OPENAI_API_KEY: UNAVAILABLE'); return false; }
+}
 async function main() {
   const dedicated = await checkDb('REVENUE_OS_DATABASE_URL', process.env.REVENUE_OS_DATABASE_URL);
   if (!dedicated) await checkDb('DATABASE_URL (nur Schema-Diagnose, kein Ersatz)', process.env.DATABASE_URL);
   const stripeKey = process.env.STRIPE_SECRET_KEY;
+  let stripeReady = false;
   if (!stripeKey) console.log('STRIPE_SECRET_KEY: NOT_CONFIGURED');
   else {
     try {
       await new Stripe(stripeKey).products.list({ limit: 1 });
-      console.log(`STRIPE_SECRET_KEY: REACHABLE (${stripeKey.startsWith('sk_live_') ? 'LIVE' : 'TEST'})`);
+      stripeReady = stripeKey.startsWith('sk_live_');
+      console.log(`STRIPE_SECRET_KEY: REACHABLE (${stripeReady ? 'LIVE' : 'TEST'})`);
     } catch { console.log('STRIPE_SECRET_KEY: CONNECTION_OR_PERMISSION_ERROR'); }
   }
-  console.log('REVENUE_OS_API_BASE_URL:', process.env.REVENUE_OS_API_BASE_URL ? 'CONFIGURED' : 'NOT_CONFIGURED');
-  console.log('REVENUE_OS_API_KEY:', process.env.REVENUE_OS_API_KEY ? 'CONFIGURED' : 'NOT_CONFIGURED');
-  // Informativ: fehlende Konfiguration niemals als erfolgreichen Live-Loop ausgeben.
-  if (!dedicated || !stripeKey || !process.env.REVENUE_OS_API_BASE_URL || !process.env.REVENUE_OS_API_KEY) {
-    console.log('REVENUE_LOOPS: NOT_READY');
+  const aiReady = await checkOpenAI();
+  const bridgeReady = await checkEngine();
+  if (!dedicated || !stripeReady || !aiReady || !bridgeReady) {
+    console.log('REVENUE_INTEGRATION: NOT_READY');
     process.exitCode = 1;
+  } else {
+    console.log('REVENUE_INTEGRATION: READY (proposal scans are guarded, not auto-executed)');
   }
 }
 await main();
