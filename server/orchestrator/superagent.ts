@@ -1,3 +1,4 @@
+import { callAIWithFallback } from "../ai-fallback.js";
 /**
  * Superagenten-Runtime (Sprint 123, Sprint 150: Zero-Cost-Multi-Provider-Failover).
  *
@@ -135,16 +136,27 @@ async function callOllama(config: LlmConfig, messages: ChatMessage[]): Promise<C
  * Credits) blockiert damit nicht mehr den gesamten Superagenten.
  */
 async function callManagedCloud(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
-  const result = await invokeLLM({
-    messages: messages as unknown as LlmMessage[],
-    tools: getToolDefinitions() as unknown as LlmTool[],
-    toolChoice: "auto",
-    maxTokens: 1_800,
-    ...(config.model ? { model: config.model } : {}),
-  });
-  const choice = result.choices?.[0]?.message;
-  if (!choice) throw new Error("LLM-API: keine Antwort-Message erhalten.");
-  return choice as ChatMessage;
+  try {
+    const result = await invokeLLM({
+      messages: messages as unknown as LlmMessage[],
+      tools: getToolDefinitions() as unknown as LlmTool[],
+      toolChoice: "auto",
+      maxTokens: 1_800,
+      ...(config.model ? { model: config.model } : {}),
+    });
+    const choice = result.choices?.[0]?.message;
+    if (!choice) throw new Error("LLM-API: keine Antwort-Message erhalten.");
+    return choice as ChatMessage;
+  } catch (error: any) {
+    console.warn(`⚠️ Cloud-Provider Limit/Fehler erreicht (${error.message}). Wechsle zu lokalem Ollama-Fallback...`);
+    const localUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
+    const ollamaConfig: LlmConfig = {
+      mode: "ollama",
+      baseUrl: localUrl,
+      model: process.env.ORCHESTRATOR_MODEL ?? "llama3.1",
+    };
+    return await callOllama(ollamaConfig, messages);
+  }
 }
 
 async function callLlm(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
