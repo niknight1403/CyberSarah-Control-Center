@@ -32,6 +32,9 @@ export default defineConfig([
       "dist/*",
       "web-dist/*",
       "coverage/*",
+      // Revenue OS ist ein eigenständiger pnpm-Workspace mit eigener
+      // TypeScript-/ESLint-Konfiguration und wird separat validiert.
+      "modules/revenue-os/**/*",
       "workspace-service/node_modules/*",
       "workspace-service/dist/*",
       // Generierte Expo/Capacitor-Bundles sind Build-Artefakte, kein Quellcode.
