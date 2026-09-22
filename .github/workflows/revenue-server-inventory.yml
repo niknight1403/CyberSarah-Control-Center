@@ -84,9 +84,14 @@ jobs:
               'subscription_invoices', 'cross_sell_rules', 'cross_sell_recommendations', 'expansion_chancen'];
             const result = await pool.query("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = ANY($1::text[])", [names]);
             console.log(`revenue_db_tables: ${result.rows.length}/${names.length}`);
-          })().catch(() => console.log('revenue_db_probe: CONNECTION_OR_PERMISSION_ERROR')).finally(() => pool.end().catch(() => {}));
+          })().catch(error => {
+            const code = String(error?.code ?? 'UNKNOWN');
+            const safe = ['ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', '28P01', '3D000', '28000', '42P01'].includes(code) ? code : 'OTHER';
+            console.log(`revenue_db_probe: ${safe}`);
+          }).finally(() => pool.end().catch(() => {}));
           JS
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 http://127.0.0.1:3000/api/health || true)
           case "$code" in 200|503) echo "revenue_api_health: HTTP_$code" ;; *) echo 'revenue_api_health: UNAVAILABLE' ;; esac
           REMOTE
+          ssh -i ~/.ssh/revenue_inventory_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'node -e '''fetch("http://127.0.0.1:3000/api/health",{signal:AbortSignal.timeout(8000)}).then(r=>r.json()).then(d=>{for(const c of d.komponenten||[]){if(["PostgreSQL","Stripe","OpenAI"].includes(c.name)){console.log("revenue_health_"+c.name+": "+(c.status==="ONLINE"?"ONLINE":"OFFLINE"))}}}).catch(()=>console.log("revenue_health: UNAVAILABLE"))''''
           rm -f ~/.ssh/revenue_inventory_key
