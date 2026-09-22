@@ -62,7 +62,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
 export function NavDrawerButton({ onPress, tint }: { onPress: () => void; tint?: string }) {
   return (
     <Pressable accessibilityLabel="Menü öffnen" accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.hamburger, pressed && { opacity: 0.6 }]}>
-      <IconSymbol name="line.3.horizontal" size={22} color={tint ?? glassSurface.textPrimary} />
+      <IconSymbol name="chevron.left" size={22} color={tint ?? glassSurface.textPrimary} />
     </Pressable>
   );
 }

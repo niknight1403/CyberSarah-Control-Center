@@ -1,6 +1,5 @@
 import { router, Tabs } from "expo-router";
 import { useEffect } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { HapticTab } from "@/components/haptic-tab";
@@ -12,14 +11,12 @@ import { isWideViewport } from "@/lib/viewport-logic";
 import { useGlassTheme } from "@/lib/design/future-glass-runtime";
 
 /**
- * Sprint 168 — Future-Glass-Navigation: schwebende CyberGlass-Bar statt
- * einer flach anliegenden Standard-Tab-Bar (Referenz §14). Alle bisherigen
- * Tabs/Routen bleiben unveraendert erhalten — nur die visuelle Huelle
- * (Position, Rand, Glow, aktives Icon) wurde neu aufgebaut.
+ * Die Routen bleiben als Expo-Router-Segmente erhalten, aber die mobile
+ * Bottom-Tab-Bar ist bewusst deaktiviert. Die Navigation wird über das
+ * Top-Menü geöffnet und reserviert keinen Platz am unteren Bildschirmrand.
  */
 export default function TabLayout() {
   const glass = useGlassTheme();
-  const insets = useSafeAreaInsets();
   // Sprint 117: erster Start → Willkommensflow mit Theme-Auswahl, einmalig.
   const { status: onboardingStatus } = useOnboarding();
   useEffect(() => {
@@ -29,12 +26,6 @@ export default function TabLayout() {
   }, [onboardingStatus]);
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
-  const floatMargin = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 10);
-  const barHeight = 58;
-  // Docked (kein position:absolute) — der Rand bleibt im Layout reserviert,
-  // damit KEIN Screen-Inhalt hinter der schwebend wirkenden Bar verschwindet
-  // (nur der Freiraum unter/um die Bar zeigt den Void-Hintergrund durch).
-  const tabBarHeight = barHeight + floatMargin;
 
   return (
     <View style={{ flex: 1, flexDirection: wide ? "row" : "column", backgroundColor: glass.glassSurface.background }}>
@@ -49,24 +40,7 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
         tabBarItemStyle: { flex: 1, minWidth: 0 },
         tabBarIconStyle: { height: 24 },
-        tabBarStyle: {
-          display: wide ? "none" : "flex",
-          height: tabBarHeight,
-          marginHorizontal: 12,
-          marginBottom: floatMargin,
-          borderRadius: 26,
-          backgroundColor: glass.glassDepth.abyss,
-          borderWidth: 1,
-          borderColor: glass.glassSurface.border,
-          shadowColor: glass.glassPalette.purple,
-          shadowOpacity: 0.28,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 12,
-          paddingHorizontal: 4,
-          paddingTop: 6,
-          paddingBottom: 4,
-        },
+        tabBarStyle: { display: "none" },
       }}
     >
         <Tabs.Screen

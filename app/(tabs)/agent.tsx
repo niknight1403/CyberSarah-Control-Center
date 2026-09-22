@@ -15,6 +15,7 @@ import { MarkdownLiteContent } from "@/components/chat/message-bubble";
 import { AgentAvatar } from "@/components/living/agent-avatar";
 import { resolveAvatarMood } from "@/lib/agent-avatar-logic";
 import { ScreenContainer } from "@/components/screen-container";
+import { TopNavigation } from "@/components/responsive/top-navigation";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import {
@@ -835,6 +836,7 @@ export default function AgentScreen() {
         containerClassName="bg-transparent"
         edges={["top", "left", "right", "bottom"]}
       >
+        <TopNavigation />
         <StudioErrorBoundary section="Agent">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}

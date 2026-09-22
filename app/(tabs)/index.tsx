@@ -8,6 +8,7 @@ import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import { accentAlpha, glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
+import { TopNavigation } from "@/components/responsive/top-navigation";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { DiffConfirmationSheet } from "@/components/studio/diff-confirmation-sheet";
 import { NextStepGuide } from "@/components/studio/next-step-guide";
@@ -259,6 +260,7 @@ export default function WorkspaceScreen() {
   return (
     <GlassBackdrop accent="blue">
       <ScreenContainer className="px-5" containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
+      <TopNavigation />
       <FlatList
                 initialNumToRender={12}
                 maxToRenderPerBatch={8}

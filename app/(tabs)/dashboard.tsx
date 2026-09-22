@@ -16,6 +16,7 @@ import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } fro
 import { router } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { TopNavigation } from "@/components/responsive/top-navigation";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlowButton } from "@/components/glass/glass-primitives";
 import { GlassHeader } from "@/components/glass/glass-header";
@@ -40,6 +41,7 @@ export default function DashboardScreen() {
     return (
       <GlassBackdrop>
         <ScreenContainer style={styles.transparent} containerClassName="bg-transparent">
+          <TopNavigation />
           <ScrollView contentContainerStyle={styles.content}>
             <GlassHeader name={null} roleBadge={null} online={false} hasAlerts={false} />
             <DashboardSkeleton />
@@ -53,6 +55,7 @@ export default function DashboardScreen() {
     return (
       <GlassBackdrop>
         <ScreenContainer style={styles.transparent} containerClassName="bg-transparent">
+          <TopNavigation />
           <ScrollView contentContainerStyle={styles.content}>
             <GlassHeader name={null} roleBadge={null} online={false} hasAlerts />
             <DashboardErrorState
@@ -70,6 +73,7 @@ export default function DashboardScreen() {
   return (
     <GlassBackdrop>
       <ScreenContainer style={styles.transparent} containerClassName="bg-transparent">
+        <TopNavigation />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <GlassHeader name={vm.user.name} roleBadge={roleBadge} online={vm.user.online} hasAlerts={hasAlerts} />
 

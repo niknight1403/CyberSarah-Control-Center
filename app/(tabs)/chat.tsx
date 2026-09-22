@@ -7,6 +7,7 @@ import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { StatusChip } from "@/components/glass/glass-primitives";
 import { glassDepth, glassOverlay, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
+import { TopNavigation } from "@/components/responsive/top-navigation";
 import { AiOrb } from "@/components/living/living-ui";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { ChatBackground } from "@/components/chat/chat-background";
@@ -345,8 +346,11 @@ export default function ChatScreen() {
       <ChatBackground>
         <StudioErrorBoundary section="Chat">
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.flex}>
-            <Text style={s.eyebrow}>CYBERSARAH · KI-OPERATIONS</Text>
-            <Text style={s.screenTitle}>Chat</Text>
+            <TopNavigation />
+            <View style={s.chatHeading}>
+              <Text style={s.eyebrow}>CYBERSARAH · KI-OPERATIONS</Text>
+              <Text style={s.screenTitle}>Chat</Text>
+            </View>
             <View style={s.tabBar}>
               {([["chat", "chatbubbles", "Chat"], ["github", "logo-github", "GitHub"], ["skills", "sparkles", "Skills"], ["secrets", "lock-closed", "Secrets"]] as const).map(([tab, icon, label]) => (
                 <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[s.tab, activeTab === tab && s.tabActive]}>
@@ -414,32 +418,30 @@ export default function ChatScreen() {
                   ) : null}
                 </> : null}
                 renderItem={renderMessage}
-                ListFooterComponent={<>
-                  {chatError ? (
-                    <View style={s.errorRow}>
-                      <Ionicons name="warning" size={14} color={glassPalette.red} />
-                      <Text style={s.error}>{chatError}</Text>
-                    </View>
-                  ) : null}
-                  <ChatComposer
-                    value={prompt}
-                    onChange={setPrompt}
-                    onSend={() => void sendMessage()}
-                    canSend={canSend}
-                    isThinking={isThinking}
-                    onToggleAttach={() => setShowAttachMenu((v) => !v)}
-                    attachMenuOpen={showAttachMenu}
-                    attachments={attachments}
-                    onRemoveAttachment={(id) => setAttachments((cur) => cur.filter((x) => x.id !== id))}
-                    onOpenGithub={() => setActiveTab("github")}
-                    onOpenSkills={() => setActiveTab("skills")}
-                    githubConnected={settings.hasGitHubToken}
-                    skillCount={enabledSkillCount(skillPreferences)}
-                    onAttach={(kind) => { void (kind === "datei" ? pickFilesFromDevice() : kind === "foto" ? pickPhotos() : pickVideos()).then((f: ChatAttachment[]) => setAttachments((a) => [...a, ...f].slice(-6))); setShowAttachMenu(false); }}
-                    attachBusy={mediaPickerBusy}
-                  />
-                </>}
+                ListFooterComponent={chatError ? <View style={s.errorRow}>
+                  <Ionicons name="warning" size={14} color={glassPalette.red} />
+                  <Text style={s.error}>{chatError}</Text>
+                </View> : null}
               />
+              <View style={s.composerDock}>
+                <ChatComposer
+                  value={prompt}
+                  onChange={setPrompt}
+                  onSend={() => void sendMessage()}
+                  canSend={canSend}
+                  isThinking={isThinking}
+                  onToggleAttach={() => setShowAttachMenu((v) => !v)}
+                  attachMenuOpen={showAttachMenu}
+                  attachments={attachments}
+                  onRemoveAttachment={(id) => setAttachments((cur) => cur.filter((x) => x.id !== id))}
+                  onOpenGithub={() => setActiveTab("github")}
+                  onOpenSkills={() => setActiveTab("skills")}
+                  githubConnected={settings.hasGitHubToken}
+                  skillCount={enabledSkillCount(skillPreferences)}
+                  onAttach={(kind) => { void (kind === "datei" ? pickFilesFromDevice() : kind === "foto" ? pickPhotos() : pickVideos()).then((f: ChatAttachment[]) => setAttachments((a) => [...a, ...f].slice(-6))); setShowAttachMenu(false); }}
+                  attachBusy={mediaPickerBusy}
+                />
+              </View>
               </>
             )}
 
@@ -552,10 +554,12 @@ function createStyles() {
   return StyleSheet.create({
   eyebrow: { ...glassType.label, color: glassPalette.cyan, marginTop: 8 },
   screenTitle: { ...glassType.display, color: glassSurface.textPrimary, marginTop: 4 },
+  chatHeading: { paddingHorizontal: 2 },
   sectionLabel: { ...glassType.label, color: glassSurface.textMuted, marginTop: 18 },
   sectionTitle: { ...glassType.headline, color: glassSurface.textPrimary, marginTop: 2 },
   flex: { flex: 1 },
   content: { paddingBottom: 28 },
+  composerDock: { backgroundColor: withAlpha(glassDepth.void, 0.96), borderTopColor: glassSurface.border, borderTopWidth: 1, paddingBottom: 6, paddingTop: 8 },
   mono: { fontFamily: "monospace" },
   tabBar: { backgroundColor: glassOverlay.dark, borderColor: glassSurface.border, borderRadius: 16, borderWidth: 1, flexDirection: "row", marginBottom: 12, padding: 4, width: "100%" },
   tab: { alignItems: "center", borderRadius: 12, flex: 1, flexDirection: "row", gap: 3, justifyContent: "center", minWidth: 0, paddingHorizontal: 2, paddingVertical: 9 },
