@@ -10,6 +10,8 @@
 export type DrawerRoute =
   | "/chat"
   | "/revenue-os"
+  | "/micro-trading"
+  | "/loop-engineering"
   | "/superagent"
   | "/designer"
   | "/plugins"
@@ -47,6 +49,8 @@ export type DrawerItem = {
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/chat", title: "Chat", icon: "message.fill" },
   { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", badge: "Neu" },
+  { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill", badge: "Paper" },
+  { route: "/loop-engineering", title: "Loop Engineering", icon: "wand.and.stars", badge: "Umsatz" },
   { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
   { route: "/designer", title: "Designer", icon: "paintpalette.fill", badge: "KI" },
   { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },

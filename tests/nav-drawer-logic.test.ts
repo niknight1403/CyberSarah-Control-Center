@@ -7,6 +7,8 @@ describe("DRAWER_ITEMS", () => {
     expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
       "Chat",
       "Revenue OS",
+      "Micro Trading",
+      "Loop Engineering",
       "Workflows",
       "Designer",
       "Plugins",
@@ -22,9 +24,9 @@ describe("DRAWER_ITEMS", () => {
     ]);
   });
 
-  it("badgt Designer als 'KI', Revenue OS und Meetings als 'Neu'", () => {
+  it("badgt die neuen Revenue-Einträge und Systembereiche", () => {
     const badged = DRAWER_ITEMS.filter((item) => item.badge);
-    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Designer=KI", "Meetings=Neu"]);
+    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Micro Trading=Paper", "Loop Engineering=Umsatz", "Designer=KI", "Meetings=Neu"]);
   });
 });
 
@@ -33,6 +35,8 @@ describe("resolveActiveDrawerItem", () => {
     expect(resolveActiveDrawerItem("/memory")?.title).toBe("Gedächtnis");
     expect(resolveActiveDrawerItem("/settings")?.title).toBe("Agenteneinstellungen");
     expect(resolveActiveDrawerItem("/revenue-os")?.title).toBe("Revenue OS");
+    expect(resolveActiveDrawerItem("/micro-trading")?.title).toBe("Micro Trading");
+    expect(resolveActiveDrawerItem("/loop-engineering")?.title).toBe("Loop Engineering");
   });
 
   it("findet Praefix-Treffer fuer verschachtelte Routen", () => {

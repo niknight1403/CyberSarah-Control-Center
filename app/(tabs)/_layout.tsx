@@ -72,6 +72,26 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="micro-trading"
+          options={{
+            title: "Micro Trading",
+            href: null,
+            tabBarIcon: ({ color, focused }) => (
+              <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="loop-engineering"
+          options={{
+            title: "Loop Engineering",
+            href: null,
+            tabBarIcon: ({ color, focused }) => (
+              <GlassTabIcon focused={focused} accent="blue"><IconSymbol size={22} name="wand.and.stars" color={color} /></GlassTabIcon>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="cyber-dashboard"
           options={{
             href: null, // Sprint 195: aus Leiste ausgeblendet für Handy-Übersicht

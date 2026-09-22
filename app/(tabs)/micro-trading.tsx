@@ -1,0 +1,23 @@
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+
+import { AiCore } from "@/components/glass/ai-core";
+import { GlassBackdrop } from "@/components/glass/glass-backdrop";
+import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
+import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
+import { ScreenContainer } from "@/components/screen-container";
+import { glassPalette, glassSurface } from "@/lib/design/future-glass";
+
+const WATCHLIST = [
+  ["BTC/USD", "+1,8 %", "Beobachten"],
+  ["ETH/USD", "-0,4 %", "Neutral"],
+  ["SOL/USD", "+2,1 %", "Paper-Signal"],
+] as const;
+
+export default function MicroTradingScreen() {
+  const drawer = useNavDrawer();
+  return <GlassBackdrop accent="green"><ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent"><View style={styles.topBar}><NavDrawerButton {...drawer.hamburgerProps} tint={glassPalette.green} /><View style={styles.headingCopy}><Text style={styles.eyebrow}>CYBERSARAH · ANALYTICS</Text><Text style={styles.title}>Micro Trading</Text></View><StatusChip label="PAPER ONLY" accent="amber" /></View><ScrollView contentContainerStyle={styles.content}><GlassCard accent="green" glow={2} style={styles.hero}><View style={styles.heroHeader}><AiCore state="warning" size={38} /><View style={styles.headingCopy}><Text style={styles.heroTitle}>Marktbeobachtung ohne Orderrisiko</Text><Text style={styles.subtitle}>Signale, Backtests und hypothetische Positionen</Text></View></View><Text style={styles.body}>Dieses Modul arbeitet ausschließlich analytisch. Es besitzt keine Broker-Anbindung, keine Wallet-Verbindung und kann keine Orders platzieren, verändern oder stornieren.</Text></GlassCard><GlassCard accent="green" style={styles.card}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Watchlist</Text><StatusChip label="read-only" accent="green" /></View>{WATCHLIST.map(([symbol, change, signal]) => <View key={symbol} style={styles.row}><Text style={styles.symbol}>{symbol}</Text><Text style={[styles.change, { color: change.startsWith("+") ? glassPalette.green : glassPalette.amber }]}>{change}</Text><Text style={styles.signal}>{signal}</Text></View>)}</GlassCard><GlassCard accent="blue" style={styles.card}><Text style={styles.cardTitle}>Paper-Signale</Text><View style={styles.metrics}><Metric label="Signale heute" value="3" /><Metric label="Backtests" value="8" /><Metric label="Risiko" value="simuliert" /></View><Text style={styles.body}>Nächster Schritt: Strategie, Zeitraum und Risikobudget festlegen. Ergebnisse bleiben hypothetisch und müssen außerhalb der App manuell geprüft werden.</Text></GlassCard></ScrollView></ScreenContainer><NavDrawer {...drawer.drawerProps} /></GlassBackdrop>;
+}
+
+function Metric({ label, value }: { label: string; value: string }) { return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>; }
+
+const styles = StyleSheet.create({ topBar: { alignItems: "center", flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 }, headingCopy: { flex: 1 }, eyebrow: { color: glassPalette.green, fontSize: 10, fontWeight: "800", letterSpacing: 1.3 }, title: { color: glassSurface.textPrimary, fontSize: 23, fontWeight: "900", marginTop: 2 }, content: { gap: 14, padding: 16, paddingBottom: 40 }, hero: { gap: 14, paddingVertical: 20 }, heroHeader: { alignItems: "center", flexDirection: "row", gap: 12 }, heroTitle: { color: glassSurface.textPrimary, fontSize: 20, fontWeight: "900" }, subtitle: { color: glassSurface.textSecondary, fontSize: 12, marginTop: 4 }, body: { color: glassSurface.textSecondary, fontSize: 13, lineHeight: 20 }, card: { gap: 12 }, cardHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, cardTitle: { color: glassSurface.textPrimary, fontSize: 17, fontWeight: "900" }, row: { alignItems: "center", borderBottomColor: glassSurface.border, borderBottomWidth: 1, flexDirection: "row", paddingVertical: 12 }, symbol: { color: glassSurface.textPrimary, flex: 1, fontSize: 14, fontWeight: "800" }, change: { fontSize: 13, fontWeight: "800", width: 70 }, signal: { color: glassSurface.textMuted, fontSize: 11, textAlign: "right", width: 90 }, metrics: { flexDirection: "row", gap: 8 }, metric: { backgroundColor: `${glassSurface.border}55`, borderRadius: 12, flex: 1, padding: 10 }, metricValue: { color: glassSurface.textPrimary, fontSize: 16, fontWeight: "900" }, metricLabel: { color: glassSurface.textMuted, fontSize: 10, marginTop: 3 } });
