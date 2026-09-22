@@ -24,8 +24,21 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Open temporary SSH tunnel to local Revenue Postgres
+        env:
+          SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+          SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+          SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$SSH_KEY"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/revenue_tunnel_key
+          chmod 600 ~/.ssh/revenue_tunnel_key
+          ssh -fN -i ~/.ssh/revenue_tunnel_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -o ConnectTimeout=12 -L 15432:127.0.0.1:5432 "$SSH_USER@$SSH_HOST"
       - name: Read-only DB schema and Stripe connectivity
         env:
+          REVENUE_OS_DB_TUNNEL_PORT: 15432
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REVENUE_OS_DATABASE_URL: ${{ secrets.REVENUE_OS_DATABASE_URL }}
           REVENUE_OS_API_BASE_URL: ${{ secrets.REVENUE_OS_API_BASE_URL }}

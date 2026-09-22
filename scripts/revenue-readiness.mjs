@@ -19,7 +19,21 @@ const routeQueries = [
 ];
 async function checkDb(label, url) {
   if (!url) { console.log(`${label}: NOT_CONFIGURED`); return false; }
-  const pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 5000, query_timeout: 5000 });
+  let connectionString = url;
+  // Lokale Produktions-DB nie ins Internet exponieren: GitHub Runner nutzt einen
+  // kurzlebigen SSH-Tunnel. Die Postgres-Zugangsdaten bleiben als Actions-Secret.
+  if (label === 'REVENUE_OS_DATABASE_URL') {
+    try {
+      const target = new URL(url);
+      if (['localhost', '127.0.0.1', '[::1]'].includes(target.hostname)) {
+        const port = process.env.REVENUE_OS_DB_TUNNEL_PORT;
+        if (!port || !/^\d{2,5}$/.test(port)) { console.log(`${label}: LOCAL_CONNECTION_REQUIRES_TUNNEL`); return false; }
+        target.hostname = '127.0.0.1'; target.port = port;
+        connectionString = target.toString();
+      }
+    } catch { console.log(`${label}: INVALID_CONFIGURATION`); return false; }
+  }
+  const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5000, query_timeout: 5000 });
   try {
     const result = await pool.query('SELECT to_regclass($1)::text AS name', ['public.hara_proposals']);
     if (!result.rows[0]?.name) { console.log(`${label}: REACHABLE_SCHEMA_MISMATCH`); return false; }
