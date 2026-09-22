@@ -28,6 +28,8 @@ export const APPS_ITEMS: NavigationItem[] = [
   { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right" },
   { route: "/data", title: "Daten-Hub", icon: "tablecells.fill" },
   { route: "/meetings", title: "Meetings", icon: "gearshape.fill" },
+  // Sprint 201: Speicher-Manager — per Prompt App-Speicher sortieren und aufraeumen.
+  { route: "/storage-manager", title: "Speicher", icon: "internaldrive.fill" },
   // Sprint 200: auf Wide-Viewports ist die Tab-Bar ausgeblendet — ohne
   // diesen Eintrag waere der Konto-Screen dort unerreichbar.
   { route: "/account", title: "Konto", icon: "person.crop.circle" },

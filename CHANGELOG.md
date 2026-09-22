@@ -4,6 +4,14 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 201]
+
+### Added — Interner Speicher-Manager (Prompt-gesteuert, Test-Modul)
+- **Neuer Screen `app/storage-manager.tsx` (Sidebar: „Speicher")**: per Prompt den App-eigenen Speicher analysieren, sortieren, aufräumen und Optimierungs-Vorschläge erhalten — als Test-Modul zur Voll-Funktionsprüfung.
+- **Reine Logik in `lib/storage-manager-logic.ts`** (deterministisch, 11 Tests): Pfad-Klassifikation in Kategorien (Cache, Logs, Backups, Dokumente, Medien, Other), Aggregation, deutsche Byte-Formatierung, vier Sortierungen, Aufäum-Plan mit Sicherheitsregeln (Cache/veraltete Logs gefahrlos, Backups/Dokumente/Medien nur mit Bestätigung, Systempfade wie SQLite/IndexedDB grundsätzlich geschützt), Optimierungs-Vorschläge (größte/stälteste/doppelte Einträge, Kategorie-Dominanz) und deutsches Prompt-Parsing (Aktionen, Kategorien, „älter als N Tage", Sortierung, Umlaut-sicher).
+- **Ehrliche Geräte-Anbindung in `lib/storage-manager-device.ts`**: Scan der Expo-Verzeichnisse + WebStorage-Einträge mit injizierbarem FS-Adapter (Tiefe/Anzahl begrenzt, nicht lesbare Bereiche werden als Hinweis gemeldet statt still leer zu bleiben); Löschen ausschließlich vom Plan freigegebener Pfade.
+- **Orchestrierung in `hooks/use-storage-manager.ts`**: Scan, Prompt-Auswertung, Plan; Löschung nie ohne Nutzer-Bestätigung (Confirm-Dialog mit Freigabe-Vorschau). Sidebar-Icon `internaldrive.fill` ergänzt.
+
 ## [Unreleased — Sprint 200]
 
 ### Fixed — Dual-Sidebar ehrlich und vollstaendig (Wide-Viewport)

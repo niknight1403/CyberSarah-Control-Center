@@ -52,6 +52,8 @@ const MAPPING = {
   "tablecells.fill": "table-chart",
   "xmark": "close",
   "line.3.horizontal": "menu",
+  "internaldrive.fill": "storage",
+  "arrow.trash": "delete-sweep",
 } as const satisfies Record<string, ComponentProps<typeof MaterialIcons>["name"]>;
 
 /**
