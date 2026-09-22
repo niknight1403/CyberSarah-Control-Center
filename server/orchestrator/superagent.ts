@@ -25,6 +25,7 @@
  *                         (leer = automatische Modellwahl je Anbieter)
  */
 
+import { describeLlmError } from "../../lib/llm-error-logic";
 import { invokeLLM, type Message as LlmMessage, type Tool as LlmTool } from "../_core/llm";
 import { executeTool, getToolDefinitions } from "./tool-registry";
 import {
@@ -208,6 +209,9 @@ export async function runOrchestratorTask(input: {
   objective: string;
   title?: string;
   maxRounds?: number;
+  /** Sprint 197 — bisheriger Dialog-Verlauf (wie im Entwicklungs-Chat), damit
+   * der Superagent auf Nachfragen und Folgeaufgaben kontextuell antwortet. */
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
 }): Promise<TaskRecord> {
   const task = await createTask({
     title: input.title ?? input.objective.slice(0, 120),
@@ -219,6 +223,7 @@ export async function runOrchestratorTask(input: {
   const maxRounds = Math.min(Math.max(input.maxRounds ?? MAX_ROUNDS_DEFAULT, 1), 24);
   const messages: ChatMessage[] = [
     { role: "system", content: SUPERAGENT_SYSTEM_PROMPT },
+    ...(input.history ?? []).map((entry): ChatMessage => ({ role: entry.role, content: entry.content })),
     { role: "user", content: input.objective },
   ];
 
@@ -294,7 +299,7 @@ export async function runOrchestratorTask(input: {
         await finishTask(
           task.id,
           "escalated",
-          `Ich konnte die Aufgabe nicht abschließen: Wiederholter Laufzeitfehler nach ${iterations} Iterationen (${message}). Ich habe eskaliert, damit ein Administrator eingreifen kann.`,
+          `Ich konnte die Aufgabe nicht abschließen: Wiederholter Laufzeitfehler nach ${iterations} Iterationen (${describeLlmError(message)}). Ich habe eskaliert, damit ein Administrator eingreifen kann.`,
         );
         break;
       }

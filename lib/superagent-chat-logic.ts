@@ -108,3 +108,26 @@ export function buildSuperagentChatRows(
   }
   return rows;
 }
+
+/**
+ * Sprint 197 — Baut aus dem sichtbaren Chat-Strom den Dialog-Verlauf, der
+ * als Kontext an orchestrator.run uebergeben wird (wie im Entwicklungs-Chat).
+ * Nur abgeschlossene, mit Text beantwortete Laeufe fliessen ein — laufende
+ * oder leere Zeilen wuerden dem Modell nichts Nuetzliches sagen.
+ */
+export function buildConversationHistory(
+  rows: SuperagentChatRow[],
+  maxEntries = 12,
+): Array<{ role: "user" | "assistant"; content: string }> {
+  const history: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const row of rows) {
+    if (row.kind === "objective") {
+      const text = row.objective.trim();
+      if (text.length > 0) history.push({ role: "user", content: text });
+    } else if (row.answer && (row.status === "success" || row.status === "escalated")) {
+      const text = row.answer.trim();
+      if (text.length > 0) history.push({ role: "assistant", content: text });
+    }
+  }
+  return history.slice(-maxEntries);
+}

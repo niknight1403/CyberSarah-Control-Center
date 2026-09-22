@@ -33,7 +33,8 @@ import { GlassCard } from "@/components/glass/glass-primitives";
 import { AiCore } from "@/components/glass/ai-core";
 import { accentAlpha, glassDepth, glassPalette, glassRadii, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
 import { coerceLedgerTask, type LedgerTask } from "@/lib/task-ledger-logic";
-import { buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
+import { buildConversationHistory, buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
+import { describeLlmError } from "@/lib/llm-error-logic";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { SecretsPanel } from "@/components/secrets/secrets-panel";
@@ -83,12 +84,20 @@ export default function SuperagentScreen() {
   const [vaultOpen, setVaultOpen] = useState(false);
   const toolsQuery = trpc.orchestrator.tools.useQuery(undefined, { enabled: isAdmin });
 
-  const optimizerQuery = trpc.orchestrator.optimizerStatus.useQuery(undefined, {
-    enabled: isAdmin,
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: false,
-  });
-  const optimizerTrigger = trpc.orchestrator.optimizerTrigger.useMutation();
+  // Sprint 197 — Optimizer ist NICHT mehr in der UI vertreten. Er laeuft
+  // rein im Hintergrund: einmal autonom pro App-Start (rate-limited, der
+  // Server fuehrt den Zyklus nur aus, wenn der letzte laenger als 60 Min
+  // zurueckliegt) plus im gewohnten Intervall-Loop.
+  const optimizerEnsureOnce = trpc.orchestrator.optimizerEnsureOnce.useMutation();
+  const optimizerEnsureOnceRef = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || optimizerEnsureOnceRef.current) return;
+    optimizerEnsureOnceRef.current = true;
+    // Feuer-und-vergessen: Ergebnis landet im Zyklus-Verlauf, nie im Chat.
+    optimizerEnsureOnce.mutate(undefined, {
+      onError: (e) => console.warn("[superagent] Optimizer-Start-Zyklus fehlgeschlagen:", e),
+    });
+  }, [isAdmin, optimizerEnsureOnce]);
 
   const listRef = useRef<FlatList<SuperagentChatRow> | null>(null);
   const stickToBottomRef = useRef(true);
@@ -175,13 +184,19 @@ export default function SuperagentScreen() {
     ]);
     setObjective("");
     try {
-      const record = (await runMutation.mutateAsync({ objective: trimmed })) as LedgerTask;
+      // Sprint 197: bisheriger Dialog-Verlauf als Kontext (wie im
+      // Entwicklungs-Chat) — der Superagent kann auf Nachfragen eingehen.
+      const record = (await runMutation.mutateAsync({
+        objective: trimmed,
+        history: buildConversationHistory(rows),
+      })) as LedgerTask;
       setOptimisticRows([]);
       setActiveId(record.id);
       setExpandedIds((prev) => new Set(prev).add(`${record.id}-answer`));
       void ledgerQuery.refetch();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Ausführung fehlgeschlagen.";
+      const raw = e instanceof Error ? e.message : "Ausführung fehlgeschlagen.";
+      const message = describeLlmError(raw);
       setError(message);
       setOptimisticRows((current) => current.map((row) => row.kind === "answer" ? {
         ...row,
@@ -232,30 +247,9 @@ export default function SuperagentScreen() {
                 </Text>
               </View>
             </View>
-            <Pressable
-              style={styles.optimizerChip}
-              onPress={() => {
-                void optimizerTrigger.mutateAsync().catch((e: unknown) =>
-                  setError(e instanceof Error ? e.message : "Optimizer-Start fehlgeschlagen."),
-                );
-              }}
-            >
-              {optimizerTrigger.isPending ? (
-                <ActivityIndicator size="small" color={optimizerQuery.data?.enabled ? glassPalette.green : glassPalette.cyan} />
-              ) : (
-                <Text
-                  style={[
-                    styles.optimizerChipText,
-                    { color: optimizerQuery.data?.enabled ? glassPalette.green : glassPalette.cyan },
-                  ]}
-                >
-                  ⟲ OPTIMIZER {optimizerQuery.data?.enabled ? "AKTIV" : "AUS"} · {toolCount > 0 ? `${toolCount} TOOLS` : "TOOLS"}
-                </Text>
-              )}
-            </Pressable>
-            {optimizerQuery.data?.lastError ? (
-              <Text style={styles.optimizerError} numberOfLines={1}>{optimizerQuery.data.lastError}</Text>
-            ) : null}
+            <Text style={styles.toolCountText} numberOfLines={1}>
+              {toolCount > 0 ? `${toolCount} TOOLS BEREIT · OPTIMIZER IM HINTERGRUND` : "OPTIMIZER IM HINTERGRUND"}
+            </Text>
             <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
               <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
             </Pressable>
@@ -458,9 +452,7 @@ const styles = StyleSheet.create({
   headerTitleRow: { flexDirection: "row", alignItems: "center", gap: glassSpacing.sm },
   headerTitle: { ...glassType.headline, fontSize: 22, color: glassSurface.textPrimary },
   headerTitleAccent: { color: glassPalette.purple },
-  optimizerChip: { alignSelf: "flex-start", borderWidth: 1, borderColor: accentAlpha("cyan", 0.4), borderRadius: glassRadii.pill, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: glassDepth.glass },
-  optimizerChipText: { ...glassType.label, letterSpacing: 1.5 },
-  optimizerError: { ...glassType.caption, color: glassPalette.amber },
+  toolCountText: { ...glassType.label, letterSpacing: 1.5, color: glassSurface.textMuted },
   objectiveBubbleWrap: { flexDirection: "row", justifyContent: "flex-end" },
   objectiveBubble: { borderBottomRightRadius: 4, padding: glassSpacing.md, maxWidth: "82%", gap: glassSpacing.xs },
   objectiveTitle: { ...glassType.label, color: glassPalette.cyan, letterSpacing: 1 },

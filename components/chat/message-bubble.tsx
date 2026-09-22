@@ -101,11 +101,22 @@ export function MarkdownLiteContent({ content }: { content: string }) {
  * Bubbles als Glass Layers"). User-Bubble: Cyan-Verlauf-Glow-Rand,
  * rechtsbuendig. Agent-Bubble: Purple-Akzentkante, CyberGlass-Flaeche.
  */
-export function MessageBubble({ message, showTimestamp }: { message: BubbleMessage; showTimestamp: boolean }) {
+export function MessageBubble({
+  message,
+  showTimestamp,
+  agentLabel,
+  agentInitials,
+}: {
+  message: BubbleMessage;
+  showTimestamp: boolean;
+  /** Override fuer Label/Kuerzel der agent-Rolle (z. B. Superagent-Chat). */
+  agentLabel?: string;
+  agentInitials?: string;
+}) {
   const styles = useMemo(() => createStyles(), []);
   const isUser = message.role === "user";
-  const initials = avatarInitialsForRole(message.role);
-  const label = senderLabelForRole(message.role);
+  const initials = avatarInitialsForRole(message.role, agentInitials);
+  const label = senderLabelForRole(message.role, agentLabel);
 
   return (
     <Animated.View entering={FadeInDown.duration(260).springify().damping(18)} style={[styles.row, isUser && styles.rowUser]}>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSuperagentChatRows, formatFinalAnswer } from "@/lib/superagent-chat-logic";
+import { buildConversationHistory, buildSuperagentChatRows, formatFinalAnswer, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
 import { coerceLedgerTask, type LedgerTask } from "@/lib/task-ledger-logic";
 
 function makeTask(overrides: Partial<LedgerTask> = {}): LedgerTask {
@@ -67,5 +67,41 @@ describe("formatFinalAnswer", () => {
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     expect(typeof formatFinalAnswer(circular)).toBe("string");
+  });
+});
+
+describe("buildConversationHistory (Sprint 197)", () => {
+  const rows: SuperagentChatRow[] = [
+    { kind: "objective", key: "t1-o", taskId: "t1", title: "T1", objective: "Prüfe den Deploy.", createdAt: "2026-09-20T10:00:00Z" },
+    { kind: "answer", key: "t1-a", taskId: "t1", status: "success", round: 1, stepCount: 2, steps: [], answer: "Alles grün.", finishedAt: "2026-09-20T10:02:00Z" },
+    { kind: "objective", key: "t2-o", taskId: "t2", title: "T2", objective: "  ", createdAt: "2026-09-20T11:00:00Z" },
+    { kind: "answer", key: "t2-a", taskId: "t2", status: "running", round: 1, stepCount: 0, steps: [], answer: null, finishedAt: "2026-09-20T11:00:30Z" },
+    { kind: "objective", key: "t3-o", taskId: "t3", title: "T3", objective: "Und die Logs?", createdAt: "2026-09-20T12:00:00Z" },
+    { kind: "answer", key: "t3-a", taskId: "t3", status: "failed", round: 3, stepCount: 3, steps: [], answer: null, finishedAt: "2026-09-20T12:01:00Z" },
+  ];
+
+  it("nimmt nur abgeschlossene, beantwortete Laeufe in den Verlauf auf", () => {
+    const history = buildConversationHistory(rows);
+    expect(history).toEqual([
+      { role: "user", content: "Prüfe den Deploy." },
+      { role: "assistant", content: "Alles grün." },
+      { role: "user", content: "Und die Logs?" },
+    ]);
+  });
+
+  it("begrenzt den Verlauf auf die letzten maxEntries Nachrichten", () => {
+    const many: SuperagentChatRow[] = [];
+    for (let i = 0; i < 10; i += 1) {
+      many.push({ kind: "objective", key: `x${i}-o`, taskId: `x${i}`, title: `T${i}`, objective: `Ziel ${i}`, createdAt: "2026-09-20T10:00:00Z" });
+      many.push({ kind: "answer", key: `x${i}-a`, taskId: `x${i}`, status: "success", round: 1, stepCount: 1, steps: [], answer: `Antwort ${i}`, finishedAt: "2026-09-20T10:01:00Z" });
+    }
+    const history = buildConversationHistory(many, 4);
+    expect(history).toHaveLength(4);
+    expect(history[0]).toEqual({ role: "user", content: "Ziel 8" });
+    expect(history[3]).toEqual({ role: "assistant", content: "Antwort 9" });
+  });
+
+  it("leerer Strom -> leerer Verlauf", () => {
+    expect(buildConversationHistory([])).toEqual([]);
   });
 });
