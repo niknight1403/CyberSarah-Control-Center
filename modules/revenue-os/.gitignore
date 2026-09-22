@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment secrets (NEVER commit)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Android build
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Capacitor
+android/app/src/main/assets/public/
+
+# Temporary files
+/tmp/
+*.apk
