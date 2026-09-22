@@ -45,4 +45,39 @@ jobs:
             if (echo > "/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1; then echo "localhost_port_$port: LISTENING"; else echo "localhost_port_$port: CLOSED"; fi
           done
           REMOTE
+          # Die Revenue-Engine lebt bereits auf demselben Host. Nur read-only
+          # Tabellen- und Health-Status pruefen; weder URL noch Daten ausgeben.
+          ssh -i ~/.ssh/revenue_inventory_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          if [ ! -r /opt/cybersarah/.env ] || [ ! -d /opt/cybersarah/node_modules/pg ]; then
+            echo 'revenue_db_probe: UNAVAILABLE'; exit 0
+          fi
+          cd /opt/cybersarah
+          node <<'JS'
+          const fs = require('node:fs');
+          const { Pool } = require('pg');
+          const lines = fs.readFileSync('.env', 'utf8').split(/\r?\n/);
+          const lookup = name => {
+            const line = lines.find(line => line.startsWith(name + '='));
+            if (!line) return '';
+            let value = line.slice(name.length + 1).trim();
+            if ((value[0] === '"' && value.at(-1) === '"') || (value[0] === "'" && value.at(-1) === "'")) value = value.slice(1, -1);
+            return value;
+          };
+          const dbUrl = lookup('DATABASE_URL');
+          const publicUrl = lookup('PUBLIC_APP_URL');
+          console.log('revenue_public_https:', publicUrl.startsWith('https://') ? 'YES' : 'NO');
+          if (!dbUrl) { console.log('revenue_db_probe: UNAVAILABLE'); process.exit(0); }
+          const pool = new Pool({ connectionString: dbUrl, max: 1, connectionTimeoutMillis: 7000,
+            query_timeout: 5000, options: '-c default_transaction_read_only=on' });
+          (async () => {
+            const names = ['hara_proposals', 'hara_performance', 'subscription_plans', 'customer_subscriptions',
+              'subscription_invoices', 'cross_sell_rules', 'cross_sell_recommendations', 'expansion_chancen'];
+            const result = await pool.query("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = ANY($1::text[])", [names]);
+            console.log(`revenue_db_tables: ${result.rows.length}/${names.length}`);
+          })().catch(() => console.log('revenue_db_probe: CONNECTION_OR_PERMISSION_ERROR')).finally(() => pool.end().catch(() => {}));
+          JS
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 http://127.0.0.1:3000/api/health || true)
+          case "$code" in 200|503) echo "revenue_api_health: HTTP_$code" ;; *) echo 'revenue_api_health: UNAVAILABLE' ;; esac
+          REMOTE
           rm -f ~/.ssh/revenue_inventory_key
