@@ -49,13 +49,22 @@ jobs:
           # Tabellen- und Health-Status pruefen; weder URL noch Daten ausgeben.
           ssh -i ~/.ssh/revenue_inventory_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
           set -u
-          if [ ! -r /opt/cybersarah/.env ] || [ ! -d /opt/cybersarah/node_modules/pg ]; then
-            echo 'revenue_db_probe: UNAVAILABLE'; exit 0
-          fi
+          for path in /opt/cybersarah/.env /opt/cybersarah/node_modules/pg /opt/cybersarah-control-center/node_modules/pg /opt/cybersarah/package.json; do
+            case "$path" in
+              *.env) label=env_readable; if [ -r "$path" ]; then echo "$label: YES"; else echo "$label: NO"; fi ;;
+              */pg) label=pg_driver; if [ -d "$path" ]; then echo "$label: PRESENT"; else echo "$label: MISSING"; fi ;;
+              *) label=revenue_package; if [ -f "$path" ]; then echo "$label: PRESENT"; else echo "$label: MISSING"; fi ;;
+            esac
+          done
+          if [ ! -r /opt/cybersarah/.env ]; then echo 'revenue_db_probe: UNAVAILABLE'; exit 0; fi
           cd /opt/cybersarah
           node <<'JS'
           const fs = require('node:fs');
-          const { Pool } = require('pg');
+          let Pool;
+          try { Pool = require('pg').Pool; } catch {
+            try { Pool = require('/opt/cybersarah-control-center/node_modules/pg').Pool; }
+            catch { console.log('revenue_db_probe: DRIVER_UNAVAILABLE'); process.exit(0); }
+          }
           const lines = fs.readFileSync('.env', 'utf8').split(/\r?\n/);
           const lookup = name => {
             const line = lines.find(line => line.startsWith(name + '='));
