@@ -1,0 +1,285 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   CyberSarah Revenue OS — Design 1: Premium Dark
+   Glassmorphism • Anthrazit • Violett/Blau • Große Karten
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Basis: Dunkles Anthrazit ── */
+  --background: #0c0c14;
+  --background-gradient: linear-gradient(160deg, #0c0c14 0%, #0e0a1a 40%, #0a0f18 100%);
+  --foreground: #e8e8ed;
+  --foreground-muted: #88889a;
+
+  /* ── Akzente: Violett → Blau Verlauf ── */
+  --primary: #7c3aed;        /* Violett */
+  --primary-hover: #8b5cf6;
+  --primary-foreground: #ffffff;
+  --secondary: #3b82f6;      /* Blau */
+  --secondary-foreground: #ffffff;
+  --accent: #a78bfa;         /* Helles Violett */
+  --accent-foreground: #ffffff;
+
+  /* ── Glassmorphism ── */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.12);
+  --glass-blur: blur(24px);
+
+  /* ── Karten ── */
+  --card: rgba(255, 255, 255, 0.035);
+  --card-foreground: #e8e8ed;
+  --card-radius: 20px;
+
+  /* ── Semantik ── */
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: #88889a;
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: #7c3aed;
+
+  /* ── Status ── */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  /* ── Glühen ── */
+  --glow-violet: 0 0 30px rgba(124, 58, 237, 0.15), 0 0 60px rgba(124, 58, 237, 0.05);
+  --glow-blue: 0 0 30px rgba(59, 130, 246, 0.15), 0 0 60px rgba(59, 130, 246, 0.05);
+}
+
+/* ── Global Reset & Basis ─────────────────────────────────── */
+* { -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  background: var(--background);
+  background-image: var(--background-gradient);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
+}
+
+/* ── Große Touch-Flächen für Einhandbedienung ─────────────── */
+button, a, [role="button"], .tap-target {
+  min-height: 48px;
+  min-width: 48px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── GLASS CARD SYSTEM ─────────────────────────────────────── */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+}
+
+.glass-card-elevated {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Premium Card mit violettem Rand-Glow ─────────────────── */
+.glass-card-premium {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-radius: var(--card-radius);
+  box-shadow: 0 4px 24px rgba(124, 58, 237, 0.08);
+  transition: all 0.3s ease;
+}
+
+.glass-card-premium:active {
+  transform: scale(0.98);
+  border-color: rgba(124, 58, 237, 0.3);
+  box-shadow: 0 4px 32px rgba(124, 58, 237, 0.15);
+}
+
+/* ── Mobile Card (größer, für Einhandbedienung) ──────────── */
+.mobile-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  padding: 18px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  min-height: 80px;
+}
+.mobile-card:active { transform: scale(0.97); }
+
+/* ── FLOATING ACTION BUTTON ───────────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: 140px;
+  right: 20px;
+  z-index: 50;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4), 0 0 40px rgba(124, 58, 237, 0.1);
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fab:active {
+  transform: scale(0.9);
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.3);
+}
+
+/* ── Glow Effekte ─────────────────────────────────────────── */
+.glow-violet { box-shadow: var(--glow-violet); }
+.glow-blue { box-shadow: var(--glow-blue); }
+.glow-text { text-shadow: 0 0 20px rgba(124, 58, 237, 0.3); }
+
+/* ── Gradient Text ────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #7c3aed, #3b82f6, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Accent Border ────────────────────────────────────────── */
+.gradient-border {
+  position: relative;
+  background: var(--card);
+  border-radius: var(--card-radius);
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(var(--card-radius) + 1px);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(59, 130, 246, 0.3));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gradient-border:hover::before,
+.gradient-border:active::before { opacity: 1; }
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.animate-subtle-pulse { animation: subtle-pulse 3s ease-in-out infinite; }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slide-up 0.4s ease-out; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(124, 58, 237, 0.05) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* ── Safe Area für Bottom Nav ────────────────────────────── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* ── Status Badges ───────────────────────────────────────── */
+.badge-live {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+.badge-warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+.badge-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.badge-ai {
+  background: rgba(124, 58, 237, 0.12);
+  color: #a78bfa;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(124, 58, 237, 0.4); }
+
+/* ── Mobile Typography ───────────────────────────────────── */
+@media (max-width: 768px) {
+  .text-hero { font-size: 1.6rem; line-height: 2.1rem; font-weight: 700; }
+  .text-section { font-size: 1.05rem; line-height: 1.6rem; }
+  .text-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; }
+  
+  /* Größere Karten für Einhandbedienung */
+  .mobile-card, .glass-card, .glass-card-premium {
+    padding: 20px;
+    border-radius: 20px;
+  }
+}
+
+/* ── Bottom Navigation active dot ────────────────────────── */
+.nav-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #7c3aed;
+  margin-top: 2px;
+  transition: all 0.2s ease;
+}
+
+/* ── Utility für große Daumen-Zonen ──────────────────────── */
+.thumb-zone {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+}
+
+/* ── Skeleton Loading ────────────────────────────────────── */
+.skeleton-glass {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  animation: shimmer 2s ease-in-out infinite;
+}

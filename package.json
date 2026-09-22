@@ -1,0 +1,25 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "node artifacts/api-server/build.mjs",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "dev": "bash start.sh",
+    "start": "bash start.sh"
+  },
+  "private": true,
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.2",
+    "prettier": "^3.8.4",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "stripe": "^22.3.0"
+  },
+  "type": "module",
+  "packageManager": "pnpm@9.15.0"
+}

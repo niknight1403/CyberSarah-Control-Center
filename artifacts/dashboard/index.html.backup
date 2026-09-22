@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberSarah Revenue OS — AROS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0a0a0f; color: #e0e0e0; display: flex; height: 100vh; }
+    .sidebar { width: 240px; background: #111118; border-right: 1px solid #1f1f2e; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-header { padding: 1rem; border-bottom: 1px solid #1f1f2e; font-weight: 700; color: #a855f7; }
+    .sidebar nav { flex: 1; overflow-y: auto; padding: 0.5rem; }
+    .sidebar a { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 6px; color: #9ca3af; text-decoration: none; font-size: 0.85rem; transition: all 0.15s; }
+    .sidebar a:hover, .sidebar a.active { background: rgba(168,85,247,0.1); color: #a855f7; }
+    .sidebar .badge { font-size: 0.6rem; background: rgba(168,85,247,0.15); color: #a855f7; padding: 1px 6px; border-radius: 8px; margin-left: auto; }
+    .main { flex: 1; overflow-y: auto; padding: 1.5rem; }
+    .main h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+    .card { background: #111118; border: 1px solid #1f1f2e; border-radius: 10px; padding: 1.2rem; }
+    .card h3 { color: #a855f7; font-size: 0.95rem; margin-bottom: 0.5rem; }
+    .stat { font-size: 1.8rem; font-weight: 700; color: #06b6d4; }
+    .label { color: #6b7280; font-size: 0.8rem; margin-top: 0.3rem; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; }
+    .tag-green { background: #052e16; color: #22c55e; }
+    .tag-yellow { background: #422006; color: #eab308; }
+    .tag-red { background: #450a0a; color: #ef4444; }
+    .tag-blue { background: #0c2d48; color: #38bdf8; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #1f1f2e; font-size: 0.85rem; }
+    th { color: #6b7280; font-weight: 500; }
+    .loading { text-align: center; padding: 3rem; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">🚀 CyberSarah OS</div>
+    <nav id="nav">
+      <a href="/" data-page="dashboard" class="active">📊 Dashboard</a>
+      <a href="/agenten" data-page="agenten">🤖 Agenten <span class="badge">27</span></a>
+      <a href="/kampagnen" data-page="kampagnen">📢 Kampagnen</a>
+      <a href="/content" data-page="content">📝 Content</a>
+      <a href="/finanzen" data-page="finanzen">💰 Finanzen</a>
+      <a href="/sofort-start" data-page="sofort">⚡ Sofort-Start</a>
+      <a href="/trading" data-page="trading">🧠 Trading AI <span class="badge">⏸️</span></a>
+      <a href="/chancen" data-page="chancen">📈 Chancen</a>
+      <a href="/influencer" data-page="influencer">🌍 KI-Influencer</a>
+      <a href="/expansion" data-page="expansion">🚀 Expansion</a>
+      <a href="/hara" data-page="hara">🤖 HARA</a>
+      <a href="/einstellungen" data-page="settings">⚙️ Einstellungen</a>
+    </nav>
+  </aside>
+  <main class="main" id="content">
+    <div class="loading">Lade...</div>
+  </main>
+
+  <script>
+    const pages = {
+      dashboard: () => `
+        <h1>📊 Dashboard</h1>
+        <div class="grid">
+          <div class="card"><h3>🚀 System Status</h3><div class="stat">Aktiv</div><div class="label">Server läuft auf Port 3000</div></div>
+          <div class="card"><h3>🤖 KI-Agenten</h3><div class="stat">27</div><div class="label">Autonome Agenten</div></div>
+          <div class="card"><h3>💰 Revenue</h3><div class="stat">€0.00</div><div class="label">Echtzeit-Umsatz</div></div>
+          <div class="card"><h3>📱 Social Media</h3><div class="stat">4x/Tag</div><div class="label">TikTok + Instagram Auto-Post</div></div>
+          <div class="card"><h3>📝 SEO Blog</h3><div class="stat">/blog</div><div class="label">Autonome Artikel-Generierung</div></div>
+          <div class="card"><h3>⏸️ Micro-Trading</h3><div class="stat" style="color:#eab308">Pausiert</div><div class="label">Zu riskant — nur manuell</div></div>
+        </div>`,
+      
+      agenten: async () => {
+        const res = await fetch('/api/agents');
+        const agents = await res.json();
+        return `<h1>🤖 Agenten (${agents.length})</h1>
+        <table><thead><tr><th>Name</th><th>Typ</th><th>Status</th><th>Beschreibung</th></tr></thead><tbody>
+        ${agents.map(a => `<tr><td><strong>${a.name}</strong></td><td>${a.typ}</td>
+        <td><span class="tag ${a.status==='aktiv'?'tag-green':'tag-yellow'}">${a.status}</span></td>
+        <td>${a.beschreibung || ''}</td></tr>`).join('')}
+        </tbody></table>`;
+      },
+      
+      kampagnen: async () => {
+        const res = await fetch('/api/campaigns');
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : [];
+        return `<h1>📢 Kampagnen</h1>
+        ${items.length ? `<table><thead><tr><th>Name</th><th>Marke</th><th>Status</th></tr></thead><tbody>
+        ${items.map(c => `<tr><td>${c.name}</td><td>${c.marke}</td><td><span class="tag tag-green">${c.status||'aktiv'}</span></td></tr>`).join('')}
+        </tbody></table>` : '<div class="card"><h3>Noch keine Kampagnen</h3><p style="color:#6b7280;margin-top:0.5rem">Erstelle deine erste Kampagne mit dem Content-Factory-Agenten.</p></div>'}`;
+      },
+      
+      content: async () => {
+        const res = await fetch('/api/content');
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : [];
+        return `<h1>📝 Content</h1>
+        ${items.length ? `<table><thead><tr><th>Titel</th><th>Marke</th><th>Plattform</th><th>Status</th></tr></thead><tbody>
+        ${items.map(c => `<tr><td>${c.titel||'-'}</td><td>${c.marke}</td><td>${c.plattform}</td><td><span class="tag tag-blue">${c.status}</span></td></tr>`).join('')}
+        </tbody></table>` : '<div class="card"><h3>Content-Generierung</h3><p style="color:#6b7280;margin-top:0.5rem">Der Content Factory Agent generiert automatisch Content für TikTok, Instagram und Blog.</p></div>'}`;
+      },
+      
+      finanzen: async () => {
+        const res = await fetch('/api/finance/transactions');
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : [];
+        return `<h1>💰 Finanzen</h1>
+        <div class="grid">
+          <div class="card"><h3>Gesamt-Umsatz</h3><div class="stat">€0.00</div></div>
+          <div class="card"><h3>Ausgaben</h3><div class="stat">€0.00</div></div>
+          <div class="card"><h3>Netto</h3><div class="stat" style="color:#22c55e">€0.00</div></div>
+        </div>
+        <h2 style="margin-top:1.5rem;font-size:1.1rem">Letzte Transaktionen</h2>
+        ${items.length ? `<table><thead><tr><th>Datum</th><th>Typ</th><th>Betrag</th><th>Beschreibung</th></tr></thead><tbody>
+        ${items.map(t => `<tr><td>${new Date(t.createdAt).toLocaleDateString('de-DE')}</td><td>${t.typ}</td><td>€${t.betrag}</td><td>${t.beschreibung||''}</td></tr>`).join('')}
+        </tbody></table>` : '<p style="color:#6b7280;margin-top:1rem">Noch keine Transaktionen. Stripe-Webhooks aktivieren für echte Daten.</p>'}`;
+      },
+      
+      sofort: () => `<h1>⚡ Sofort-Start</h1>
+        <div class="card"><h3>Revenue-Pakete</h3><p style="margin-top:0.5rem">Der HARA-Agent scannt 50+ Plattformen nach kostenlosen Umsatzquellen.</p>
+        <p style="margin-top:1rem;color:#a855f7">💰 Digistore24, Gumroad, TikTok Creator Fund, YouTube Partner Program</p></div>`,
+      
+      trading: () => `<h1>🧠 Trading AI</h1>
+        <div class="card"><h3>⏸️ Pausiert</h3><p style="margin-top:0.5rem;color:#eab308">Der Micro-Trading Agent ist pausiert — zu riskant ohne Erfahrung.</p>
+        <p style="margin-top:1rem">Nur manuell aktivieren über die Admin-Einstellungen.</p></div>`,
+      
+      chancen: () => `<h1>📈 Chancen</h1>
+        <div class="card"><h3>Expansion Scanner</h3><p style="margin-top:0.5rem">Der Agent scannt automatisch nach neuen Umsatzquellen und Affiliate-Programmen.</p></div>`,
+      
+      influencer: () => `<h1>🌍 KI-Influencer</h1>
+        <div class="grid">
+          <div class="card"><h3>CyberSarah</h3><p style="color:#6b7280">KI-Tools & Automatisierung</p></div>
+          <div class="card"><h3>GeldPilot AI</h3><p style="color:#6b7280">Online-Geldverdienen</p></div>
+          <div class="card"><h3>UnternehmerGPT</h3><p style="color:#6b7280">Business-Automatisierung</p></div>
+        </div>`,
+      
+      expansion: () => `<h1>🚀 Expansion</h1>
+        <div class="card"><h3>Globale Expansion</h3><p style="margin-top:0.5rem">Identifiziert neue Märkte, Sprachen und Plattformen für die Marke CyberSarah.</p></div>`,
+      
+      hara: () => `<h1>🤖 HARA — Hyper-Autonomer Revenue Agent</h1>
+        <div class="card"><h3>Revenue-Pakete</h3><p style="margin-top:0.5rem">Scant kontinuierlich nach neuen Umsatzchancen auf 50+ Plattformen.</p>
+        <p style="margin-top:1rem;color:#06b6d4">Alle 4 Stunden: Neuer Scan → Priorisierung → Umsetzung</p></div>`,
+      
+      settings: () => `<h1>⚙️ Einstellungen</h1>
+        <div class="card"><h3>API-Keys</h3>
+        <p style="margin-top:0.5rem">• OpenAI: <span class="tag tag-yellow">Nicht konfiguriert</span></p>
+        <p>• Stripe: <span class="tag tag-yellow">Nicht konfiguriert</span></p>
+        <p>• TikTok: <span class="tag tag-yellow">Nicht konfiguriert</span></p>
+        <p>• Instagram: <span class="tag tag-yellow">Nicht konfiguriert</span></p>
+        <p>• PostgreSQL: <span class="tag tag-yellow">Nicht konfiguriert</span></p>
+        <p style="margin-top:1rem;color:#6b7280">Keys in .env eintragen oder Railway-Env-Vars setzen.</p></div>`,
+    };
+
+    async function navigate(page) {
+      const el = document.getElementById('content');
+      document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+      document.querySelector(`.sidebar a[data-page="${page}"]`)?.classList.add('active');
+      
+      if (pages[page]) {
+        const result = pages[page];
+        el.innerHTML = typeof result === 'string' ? result : await result();
+      } else {
+        el.innerHTML = `<h1>Seite nicht gefunden</h1>`;
+      }
+    }
+
+    // Click handler für Sidebar
+    document.querySelectorAll('.sidebar a').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = a.dataset.page;
+        history.pushState({}, '', a.href);
+        navigate(page);
+      });
+    });
+
+    // Back/Forward
+    window.addEventListener('popstate', () => {
+      const page = document.querySelector(`.sidebar a[href="${location.pathname}"]`)?.dataset.page || 'dashboard';
+      navigate(page);
+    });
+
+    // Initial page
+    const initPage = document.querySelector(`.sidebar a[href="${location.pathname}"]`)?.dataset.page || 'dashboard';
+    navigate(initPage);
+  </script>
+</body>
+</html>
