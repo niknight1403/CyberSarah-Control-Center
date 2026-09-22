@@ -38,7 +38,7 @@ export function MarkdownLiteContent({ content }: { content: string }) {
   const styles = useMemo(() => createStyles(), []);
   const blocks = useMemo(() => parseMarkdownLite(content), [content]);
   return (
-    <View>
+    <View style={styles.markdownRoot}>
       {blocks.map((block, index) => {
         switch (block.type) {
           case "header":
@@ -144,7 +144,7 @@ export function MessageBubble({
             <Text style={styles.senderAgent}>{label}</Text>
             {showTimestamp && message.timestampMs != null ? <Text style={styles.time}>{formatChatClock(message.timestampMs)}</Text> : null}
           </View>
-          {message.isThinking ? <Text style={[styles.contentAgent, styles.contentThinking]}>{message.content}</Text> : <MarkdownLiteContent content={message.content} />}
+          {message.isThinking ? <Text style={[styles.contentAgent, styles.contentThinking]}>{addSoftBreakOpportunities(message.content)}</Text> : <MarkdownLiteContent content={message.content} />}
         </View>
       )}
     </Animated.View>
@@ -160,7 +160,7 @@ function createStyles() {
     avatarUser: { backgroundColor: accentAlpha("cyan", 0.12), borderColor: accentAlpha("cyan", 0.4), borderWidth: 1 },
     avatarText: { color: glassPalette.purple, fontFamily: "monospace", fontSize: 9, fontWeight: "900" },
     avatarTextUser: { color: glassPalette.cyan },
-    bubble: { borderRadius: 16, flex: 1, flexShrink: 1, minWidth: 0, maxWidth: "100%", width: "100%", paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9, overflow: "hidden" },
+    bubble: { borderRadius: 16, flex: 1, flexShrink: 1, minWidth: 0, maxWidth: "100%", paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9, overflow: "hidden" },
     bubbleUser: {
       borderColor: accentAlpha("cyan", 0.35),
       borderWidth: 1,
@@ -185,7 +185,8 @@ function createStyles() {
     senderAgent: { color: glassPalette.purple, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
     senderUser: { color: glassPalette.cyan, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4, opacity: 0.9 },
     time: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 10 },
-    contentAgent: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22, ...( { wordBreak: "break-word" } as object ) },
+    markdownRoot: { minWidth: 0, maxWidth: "100%", width: "100%" },
+    contentAgent: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22, maxWidth: "100%", ...( { wordBreak: "break-word" } as object ) },
     contentUser: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5, lineHeight: 22, ...( { wordBreak: "break-word" } as object ) },
     contentThinking: { color: glassSurface.textMuted, fontStyle: "italic" },
     contentAgentBase: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5 },
@@ -193,7 +194,7 @@ function createStyles() {
     italic: { fontStyle: "italic" },
     mono: { fontFamily: "monospace", fontSize: 12.5 },
     headerBase: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 13.5 },
-    headerText: { color: glassPalette.cyan, fontFamily: "monospace", fontSize: 14.5, fontWeight: "800", marginBottom: 6, marginTop: 4 },
+    headerText: { color: glassPalette.cyan, fontFamily: "monospace", fontSize: 14.5, fontWeight: "800", marginBottom: 6, marginTop: 4, maxWidth: "100%" },
     bulletRow: { flexDirection: "row", gap: 6, marginBottom: 3 },
     bulletContent: { flex: 1, flexShrink: 1, minWidth: 0 },
     bulletMarker: { color: glassPalette.cyan, fontSize: 13.5, lineHeight: 22 },
@@ -201,6 +202,6 @@ function createStyles() {
     codeText: { color: glassSurface.textPrimary, flexShrink: 1, fontFamily: "monospace", fontSize: 12, lineHeight: 18, ...( { wordBreak: "break-word" } as object ) },
     tableText: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 12.5, lineHeight: 19, flexShrink: 1, maxWidth: "100%" },
     quoteBase: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 13.5 },
-    quoteText: { borderLeftColor: glassPalette.cyan, borderLeftWidth: 2, color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 13.5, fontStyle: "italic", lineHeight: 22, marginBottom: 4, paddingLeft: 8 },
+    quoteText: { borderLeftColor: glassPalette.cyan, borderLeftWidth: 2, color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 13.5, fontStyle: "italic", lineHeight: 22, marginBottom: 4, maxWidth: "100%", paddingLeft: 8 },
   });
 }

@@ -22,4 +22,11 @@ describe("text-wrap-logic", () => {
     expect(wrapped.replaceAll("\u200B", "")).toBe(value);
     expect(wrapped).not.toContain("...");
   });
+
+  it("preserves emoji and non-Latin text while adding breaks to unbroken tokens", () => {
+    const value = "🚀漢字абвгдеёжзийклmnopqrstuvwx";
+    const wrapped = addSoftBreakOpportunities(value, 8);
+    expect(wrapped.replaceAll("\u200B", "")).toBe(value);
+    expect(wrapped).toContain("\u200B");
+  });
 });

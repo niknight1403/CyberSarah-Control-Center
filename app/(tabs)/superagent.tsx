@@ -39,6 +39,7 @@ import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { SecretsPanel } from "@/components/secrets/secrets-panel";
 import { useStudioSettings } from "@/lib/studio-settings";
+import { addSoftBreakOpportunities } from "@/lib/text-wrap-logic";
 
 type TaskStatus = "pending" | "running" | "success" | "failed" | "escalated";
 
@@ -336,7 +337,7 @@ export default function SuperagentScreen() {
               <View style={styles.objectiveBubbleWrap}>
                 <GlassCard accent="cyan" style={styles.objectiveBubble}>
                   <Text style={styles.objectiveTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.objectiveText}>{item.objective}</Text>
+                  <Text style={styles.objectiveText}>{addSoftBreakOpportunities(item.objective)}</Text>
                   <Text style={styles.objectiveMeta}>{formatTime(item.createdAt)}</Text>
                 </GlassCard>
               </View>
@@ -370,7 +371,7 @@ export default function SuperagentScreen() {
                     <View style={styles.progressRow}>
                       <ActivityIndicator size="small" color={glassPalette.cyan} />
                       <Text style={styles.progressText}>
-                        {item.steps.length > 0 ? item.steps[item.steps.length - 1].name : "Ziel wird zerlegt …"}
+                        {addSoftBreakOpportunities(item.steps.length > 0 ? item.steps[item.steps.length - 1].name : "Ziel wird zerlegt …")}
                       </Text>
                     </View>
                   ) : null}
@@ -389,15 +390,15 @@ export default function SuperagentScreen() {
                           <View key={step.id} style={styles.stepRow}>
                             <Text style={[styles.stepDot, { color: sm.color }]}>{sm.dot}</Text>
                             <View style={styles.stepMain}>
-                              <Text style={styles.stepName}>{step.name}</Text>
+                              <Text style={styles.stepName}>{addSoftBreakOpportunities(step.name)}</Text>
                               {step.attempts > 1 ? (
                                 <Text style={styles.stepMeta}>{step.attempts} Versuche</Text>
                               ) : null}
-                              {step.error ? <Text style={styles.stepError}>{step.error}</Text> : null}
+                              {step.error ? <Text style={styles.stepError}>{addSoftBreakOpportunities(step.error)}</Text> : null}
                               {step.logs.length > 0 ? (
                                 <View style={styles.logBox}>
                                   {step.logs.slice(-4).map((line, i) => (
-                                    <Text key={i} style={styles.logLine} numberOfLines={1}>{line}</Text>
+                                    <Text key={i} style={styles.logLine}>{addSoftBreakOpportunities(line)}</Text>
                                   ))}
                                 </View>
                               ) : null}
@@ -492,24 +493,24 @@ const styles = StyleSheet.create({
   objectiveBubbleWrap: { flexDirection: "row", justifyContent: "flex-end", minWidth: 0, maxWidth: "100%" },
   objectiveBubble: { borderBottomRightRadius: 4, padding: glassSpacing.md, maxWidth: "82%", minWidth: 0, gap: glassSpacing.xs },
   objectiveTitle: { ...glassType.label, color: glassPalette.cyan, letterSpacing: 1 },
-  objectiveText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 20 },
+  objectiveText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 20, maxWidth: "100%" },
   objectiveMeta: { ...glassType.label, color: glassSurface.textMuted, alignSelf: "flex-end" },
   answerBubbleWrap: { flexDirection: "row", justifyContent: "flex-start", minWidth: 0, maxWidth: "100%", width: "100%" },
   answerBubble: { borderBottomLeftRadius: 4, padding: glassSpacing.md, maxWidth: "92%", minWidth: 0, flex: 1, gap: glassSpacing.sm },
   answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: glassSpacing.sm, minWidth: 0, maxWidth: "100%" },
-  statusBadge: { ...glassType.label, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, letterSpacing: 1.5 },
-  answerMeta: { ...glassType.caption, color: glassSurface.textMuted, fontSize: 11 },
+  statusBadge: { ...glassType.label, borderWidth: 1, borderRadius: 4, flexShrink: 0, paddingHorizontal: 6, paddingVertical: 2, letterSpacing: 1.5 },
+  answerMeta: { ...glassType.caption, color: glassSurface.textMuted, fontSize: 11, flexShrink: 1, maxWidth: "100%", textAlign: "right" },
   progressRow: { flexDirection: "row", alignItems: "center", gap: glassSpacing.md },
-  progressText: { ...glassType.caption, color: glassPalette.cyan },
+  progressText: { ...glassType.caption, color: glassPalette.cyan, flexShrink: 1, maxWidth: "100%" },
   stepBox: { gap: glassSpacing.sm, borderTopWidth: 1, borderTopColor: glassSurface.border, paddingTop: glassSpacing.sm },
   stepRow: { flexDirection: "row", gap: glassSpacing.sm },
   stepDot: { fontSize: 12, lineHeight: 18 },
   stepMain: { flex: 1, gap: 2 },
-  stepName: { ...glassType.caption, color: glassSurface.textPrimary, fontWeight: "600" },
+  stepName: { ...glassType.caption, color: glassSurface.textPrimary, fontWeight: "600", flexShrink: 1, maxWidth: "100%" },
   stepMeta: { ...glassType.label, color: glassSurface.textMuted, letterSpacing: 0 },
-  stepError: { ...glassType.label, color: glassPalette.red, letterSpacing: 0 },
+  stepError: { ...glassType.label, color: glassPalette.red, letterSpacing: 0, flexShrink: 1, maxWidth: "100%" },
   logBox: { backgroundColor: glassDepth.layer, borderRadius: 6, padding: 6, gap: 2 },
-  logLine: { ...glassType.label, color: glassSurface.textMuted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), letterSpacing: 0 },
+  logLine: { ...glassType.label, color: glassSurface.textMuted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), letterSpacing: 0, flexShrink: 1, maxWidth: "100%" },
   finalBox: { borderTopWidth: 1, borderTopColor: glassSurface.border, paddingTop: glassSpacing.sm, gap: 2, minWidth: 0, maxWidth: "100%", width: "100%" },
   finalLabel: { ...glassType.label, color: glassPalette.green, letterSpacing: 2 },
   finalText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 19, fontSize: 13 },
