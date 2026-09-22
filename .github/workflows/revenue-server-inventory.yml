@@ -77,6 +77,11 @@ jobs:
           const publicUrl = lookup('PUBLIC_APP_URL');
           console.log('revenue_public_https:', publicUrl.startsWith('https://') ? 'YES' : 'NO');
           if (!dbUrl) { console.log('revenue_db_probe: UNAVAILABLE'); process.exit(0); }
+          try {
+            const parsed = new URL(dbUrl);
+            console.log('revenue_db_target:', ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname) ? 'LOCAL' : 'REMOTE');
+            console.log('revenue_db_protocol:', ['postgres:', 'postgresql:'].includes(parsed.protocol) ? 'POSTGRES' : 'OTHER');
+          } catch { console.log('revenue_db_target: UNPARSEABLE'); }
           const pool = new Pool({ connectionString: dbUrl, max: 1, connectionTimeoutMillis: 7000,
             query_timeout: 5000, options: '-c default_transaction_read_only=on' });
           (async () => {
@@ -90,6 +95,10 @@ jobs:
             console.log(`revenue_db_probe: ${safe}`);
           }).finally(() => pool.end().catch(() => {}));
           JS
+          if sudo -n -u postgres psql -Atqc 'SELECT 1' >/dev/null 2>&1; then echo 'local_pg_admin: YES'; else echo 'local_pg_admin: NO'; fi
+          if command -v pm2 >/dev/null 2>&1; then
+            pm2 jlist 2>/dev/null | node -e 'let input="";process.stdin.on("data",chunk=>input+=chunk);process.stdin.on("end",()=>{try{const p=JSON.parse(input);console.log("pm2_revenue_process: "+(p.some(x=>String(x.pm2_env?.pm_cwd??"").startsWith("/opt/cybersarah/"))?"PRESENT":"MISSING"))}catch{console.log("pm2_revenue_process: UNKNOWN")}})' || true
+          fi
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 http://127.0.0.1:3000/api/health || true)
           case "$code" in 200|503) echo "revenue_api_health: HTTP_$code" ;; *) echo 'revenue_api_health: UNAVAILABLE' ;; esac
           REMOTE
