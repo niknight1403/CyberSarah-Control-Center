@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { avatarInitialsForRole, formatChatClock, senderLabelForRole } from "@/lib/chat-presentation-logic";
 import { parseMarkdownLite, type InlineSpan } from "@/lib/markdown-lite";
 import { accentAlpha, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { addSoftBreakOpportunities } from "@/lib/text-wrap-logic";
 
 export type BubbleMessage = {
   id: string;
@@ -28,7 +29,7 @@ type BubbleStyles = ReturnType<typeof createStyles>;
 function SpanText({ span, base, styles }: { span: InlineSpan; base: object; styles: BubbleStyles }) {
   return (
     <Text style={[base, span.bold && styles.bold, span.italic && styles.italic, span.mono && styles.mono]}>
-      {span.text}
+      {addSoftBreakOpportunities(span.text)}
     </Text>
   );
 }
@@ -63,14 +64,14 @@ export function MarkdownLiteContent({ content }: { content: string }) {
             return (
               <View key={index} style={styles.codeBox}>
                 <Text style={styles.codeText} selectable>
-                  {block.code}
+                  {addSoftBreakOpportunities(block.code)}
                 </Text>
               </View>
             );
           case "tableRow":
             return (
               <Text key={index} style={[styles.tableText, block.header && styles.bold]}>
-                {block.cells.join("   |   ")}
+                {addSoftBreakOpportunities(block.cells.join("   |   "))}
               </Text>
             );
           case "quote":
@@ -134,7 +135,7 @@ export function MessageBubble({
             <Text style={styles.senderUser}>{label}</Text>
             {showTimestamp && message.timestampMs != null ? <Text style={styles.time}>{formatChatClock(message.timestampMs)}</Text> : null}
           </View>
-          <Text style={styles.contentUser}>{message.content}</Text>
+          <Text style={styles.contentUser}>{addSoftBreakOpportunities(message.content)}</Text>
         </LinearGradient>
       ) : (
         <View style={[styles.bubble, styles.bubbleAgent]}>
@@ -159,7 +160,7 @@ function createStyles() {
     avatarUser: { backgroundColor: accentAlpha("cyan", 0.12), borderColor: accentAlpha("cyan", 0.4), borderWidth: 1 },
     avatarText: { color: glassPalette.purple, fontFamily: "monospace", fontSize: 9, fontWeight: "900" },
     avatarTextUser: { color: glassPalette.cyan },
-    bubble: { borderRadius: 16, flex: 1, flexShrink: 1, minWidth: 0, paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9, overflow: "hidden" },
+    bubble: { borderRadius: 16, flex: 1, flexShrink: 1, minWidth: 0, maxWidth: "100%", width: "100%", paddingBottom: 11, paddingHorizontal: 13, paddingTop: 9, overflow: "hidden" },
     bubbleUser: {
       borderColor: accentAlpha("cyan", 0.35),
       borderWidth: 1,
@@ -180,7 +181,7 @@ function createStyles() {
       shadowOffset: { width: 0, height: 0 },
     },
     agentAccent: { backgroundColor: glassPalette.purple, borderRadius: 2, height: 10, left: -1, opacity: 0.9, position: "absolute", top: 12, width: 3 },
-    bubbleHeader: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 4 },
+    bubbleHeader: { alignItems: "center", flexDirection: "row", gap: 8, marginBottom: 4, minWidth: 0, maxWidth: "100%" },
     senderAgent: { color: glassPalette.purple, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
     senderUser: { color: glassPalette.cyan, flexShrink: 1, fontFamily: "monospace", fontSize: 11, fontWeight: "800", letterSpacing: 0.4, opacity: 0.9 },
     time: { color: glassSurface.textMuted, fontFamily: "monospace", fontSize: 10 },
@@ -198,7 +199,7 @@ function createStyles() {
     bulletMarker: { color: glassPalette.cyan, fontSize: 13.5, lineHeight: 22 },
     codeBox: { backgroundColor: accentAlpha("purple", 0.08), borderColor: glassSurface.border, borderRadius: 8, borderWidth: 1, marginVertical: 6, minWidth: 0, overflow: "hidden", paddingHorizontal: 10, paddingVertical: 8 },
     codeText: { color: glassSurface.textPrimary, flexShrink: 1, fontFamily: "monospace", fontSize: 12, lineHeight: 18, ...( { wordBreak: "break-word" } as object ) },
-    tableText: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 12.5, lineHeight: 19 },
+    tableText: { color: glassSurface.textPrimary, fontFamily: "monospace", fontSize: 12.5, lineHeight: 19, flexShrink: 1, maxWidth: "100%" },
     quoteBase: { color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 13.5 },
     quoteText: { borderLeftColor: glassPalette.cyan, borderLeftWidth: 2, color: glassSurface.textSecondary, fontFamily: "monospace", fontSize: 13.5, fontStyle: "italic", lineHeight: 22, marginBottom: 4, paddingLeft: 8 },
   });
