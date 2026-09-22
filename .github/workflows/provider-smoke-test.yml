@@ -21,6 +21,7 @@ jobs:
         shell: bash
         run: |
           set -u
+          failures=0
           test_provider() {
             local name="$1"
             local url="$2"
@@ -33,30 +34,35 @@ jobs:
               return 0
             fi
             if [ -n "$extra_header" ]; then
-              output=$(curl --silent --show-error --max-time 20 \
+              if output=$(curl --silent --show-error --max-time 20 \
                 -o /tmp/provider-body.json \
                 -w '%{http_code} %{time_total}' \
                 -X POST "$url" \
                 -H 'content-type: application/json' \
                 -H "authorization: Bearer $key" \
                 -H "$extra_header" \
-                --data "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly OK.\"}],\"max_tokens\":8,\"temperature\":0}" 2>/dev/null)
+                --data "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly OK.\"}],\"max_tokens\":8,\"temperature\":0}" 2>/dev/null); then :; else output="000 0"; fi
             else
-              output=$(curl --silent --show-error --max-time 20 \
+              if output=$(curl --silent --show-error --max-time 20 \
                 -o /tmp/provider-body.json \
                 -w '%{http_code} %{time_total}' \
                 -X POST "$url" \
                 -H 'content-type: application/json' \
                 -H "authorization: Bearer $key" \
-                --data "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly OK.\"}],\"max_tokens\":8,\"temperature\":0}" 2>/dev/null)
+                --data "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly OK.\"}],\"max_tokens\":8,\"temperature\":0}" 2>/dev/null); then :; else output="000 0"; fi
             fi
             status="${output%% *}"
             if [ "$status" = "200" ]; then
               echo "$name: PASS HTTP $status (${output#* }s)"
             else
               echo "$name: FAIL HTTP ${status:-000} (${output#* }s)"
+              failures=$((failures + 1))
             fi
           }
           test_provider "Groq" "https://api.groq.com/openai/v1/chat/completions" "openai/gpt-oss-20b" "$GROQ_KEY"
-          test_provider "Gemini" "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" "gemini-3.8-flash" "$GEMINI_KEY"
+          test_provider "Gemini" "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" "gemini-flash-latest" "$GEMINI_KEY"
           test_provider "OpenRouter" "https://openrouter.ai/api/v1/chat/completions" "openrouter/free" "$OPENROUTER_KEY" "HTTP-Referer: $OPENROUTER_REFERER"
+          if [ "$failures" -gt 0 ]; then
+            echo "Mindestens ein konfigurierter Provider ist nicht erreichbar."
+            exit 1
+          fi
