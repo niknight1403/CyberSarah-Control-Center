@@ -66,7 +66,19 @@ function dockerClient(): AxiosInstance | null {
   return create({ baseURL: baseUrl.replace(/\/$/, ""), timeout: TOOL_TIMEOUT_MS });
 }
 
+/**
+ * Test-Seam (Sprint 198): erlaubt Unit-Tests, den GitHub-Client zu
+ * injizieren, ohne axios modulweit mocken zu muessen (isolate:false teilt
+ * die Modul-Registry zwischen Testdateien — vi.mock waere dort nicht
+ * deterministisch). Produktion: override bleibt null.
+ */
+let githubClientOverride: AxiosInstance | null = null;
+export function __setGithubClientOverrideForTests(client: AxiosInstance | null): void {
+  githubClientOverride = client;
+}
+
 function githubClient(): AxiosInstance | null {
+  if (githubClientOverride) return githubClientOverride;
   const token = process.env.GITHUB_TOKEN ?? process.env.ADMIN_GITHUB_TOKEN;
   return create({
     baseURL: "https://api.github.com",

@@ -1,23 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { executeTool, __setGithubClientOverrideForTests } from "@/server/orchestrator/tool-registry";
+import type { AxiosInstance } from "axios";
+
 /**
  * Sprint 198 — Unit-Tests fuer die GitHub-Autonomie-Tools des Orchestrators.
- * Der HTTP-Client ist gemockt: Kein echter API-Call, Determinismus.
+ * Der HTTP-Client wird ueber die Test-Seam des Tool-Registry injiziert
+ * (kein vi.mock: bei isolate:false waere ein Modul-Mock wegen geteilter
+ * Modul-Registry nicht deterministisch). Kein echter API-Call.
  */
 
 const mockGet = vi.fn();
 const mockPut = vi.fn();
 const mockPost = vi.fn();
 
-vi.mock("axios", () => ({
-  create: vi.fn(() => ({
-    get: (...a: unknown[]) => mockGet(...a),
-    put: (...a: unknown[]) => mockPut(...a),
-    post: (...a: unknown[]) => mockPost(...a),
-  })),
-}));
-
-import { executeTool } from "@/server/orchestrator/tool-registry";
+const fakeClient = { get: mockGet, put: mockPut, post: mockPost } as unknown as AxiosInstance;
 
 function b64(text: string): string {
   return Buffer.from(text, "utf-8").toString("base64");
@@ -25,13 +22,14 @@ function b64(text: string): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.ADMIN_GITHUB_TOKEN = "ghp_unit_test_token";
+  __setGithubClientOverrideForTests(fakeClient);
 });
 
 afterEach(() => {
-  delete process.env.ADMIN_GITHUB_TOKEN;
-  delete process.env.GITHUB_TOKEN;
+  __setGithubClientOverrideForTests(null);
 });
+
+
 
 describe("git.getFileContents", () => {
   it("liefert dekodierten Dateiinhalt mit SHA", async () => {
