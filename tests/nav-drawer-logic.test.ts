@@ -6,6 +6,7 @@ describe("DRAWER_ITEMS", () => {
   it("enthaelt genau die neun erwarteten Einträge in Reihenfolge", () => {
     expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
       "Chat",
+      "Revenue OS",
       "Workflows",
       "Designer",
       "Plugins",
@@ -21,9 +22,9 @@ describe("DRAWER_ITEMS", () => {
     ]);
   });
 
-  it("badgt Designer als 'KI' und Meetings als 'Neu'", () => {
+  it("badgt Designer als 'KI', Revenue OS und Meetings als 'Neu'", () => {
     const badged = DRAWER_ITEMS.filter((item) => item.badge);
-    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Designer=KI", "Meetings=Neu"]);
+    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Designer=KI", "Meetings=Neu"]);
   });
 });
 
@@ -31,6 +32,7 @@ describe("resolveActiveDrawerItem", () => {
   it("findet exakte Treffer", () => {
     expect(resolveActiveDrawerItem("/memory")?.title).toBe("Gedächtnis");
     expect(resolveActiveDrawerItem("/settings")?.title).toBe("Agenteneinstellungen");
+    expect(resolveActiveDrawerItem("/revenue-os")?.title).toBe("Revenue OS");
   });
 
   it("findet Praefix-Treffer fuer verschachtelte Routen", () => {

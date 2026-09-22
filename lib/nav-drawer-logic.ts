@@ -9,6 +9,7 @@
 
 export type DrawerRoute =
   | "/chat"
+  | "/revenue-os"
   | "/superagent"
   | "/designer"
   | "/plugins"
@@ -45,6 +46,7 @@ export type DrawerItem = {
 /** Reihenfolge deckungsgleich mit dem Base44-Vorbild (Chat oben, Settings unten). */
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/chat", title: "Chat", icon: "message.fill" },
+  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", badge: "Neu" },
   { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
   { route: "/designer", title: "Designer", icon: "paintpalette.fill", badge: "KI" },
   { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },

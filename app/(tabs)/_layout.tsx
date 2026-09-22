@@ -62,6 +62,16 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="revenue-os"
+          options={{
+            title: "Revenue OS",
+            href: null,
+            tabBarIcon: ({ color, focused }) => (
+              <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="cyber-dashboard"
           options={{
             href: null, // Sprint 195: aus Leiste ausgeblendet für Handy-Übersicht
