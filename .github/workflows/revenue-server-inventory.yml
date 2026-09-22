@@ -50,6 +50,12 @@ jobs:
           fi
           if [ -d /opt/cybersarah-control-center ]; then echo 'control_center_directory: PRESENT'; else echo 'control_center_directory: MISSING'; fi
           if [ -f /opt/cybersarah-control-center/.env ]; then echo 'control_center_env: PRESENT'; else echo 'control_center_env: MISSING'; fi
+          for entry in /opt/cybersarah-control-center/dist/index.js /opt/cybersarah-control-center/web-dist/index.html /opt/cybersarah-control-center/node_modules /opt/cybersarah-control-center/package.json; do
+            name=$(basename "$entry")
+            if [ -e "$entry" ]; then echo "control_center_asset_${name}: PRESENT"; else echo "control_center_asset_${name}: MISSING"; fi
+          done
+          pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{const x=JSON.parse(s).find(p=>p.name==="cybersarah-backend");console.log("backend_actual_cwd: "+(x?.pm2_env?.pm_cwd==="/opt/cybersarah-control-center"?"EXPECTED":"OTHER"));console.log("backend_expected_script: "+(x?.pm2_env?.pm_exec_path==="/opt/cybersarah-control-center/dist/index.js"?"YES":"NO"))}catch{console.log("backend_actual_cwd: UNKNOWN")}})' || true
+
           if command -v pm2 >/dev/null 2>&1; then
             pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{for(const x of JSON.parse(s).slice(0,15))console.log("pm2_service: "+String(x.name).replace(/[^a-zA-Z0-9_-]/g,"_")+"_"+(x.pm2_env?.status==="online"?"ONLINE":"OFFLINE"))}catch{console.log("pm2_service: UNKNOWN")}})' || true
           fi
