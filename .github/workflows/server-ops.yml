@@ -30,6 +30,7 @@ on:
           - deploy
           - deploy-pull
           - probe
+          - env-set-github-token
         default: status
       service:
         description: "PM2-Service fuer Restart (leer = alle)"
@@ -59,6 +60,7 @@ jobs:
         env:
           OP: ${{ github.event.inputs.operation }}
           SVC: ${{ github.event.inputs.service }}
+          GH_TOKEN_VALUE: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
           SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
         run: |
           case "$OP" in
@@ -108,7 +110,10 @@ jobs:
             deploy)
               $SSH_CMD 'cd /opt/cybersarah-control-center && echo "== Git vorher =="; git log --oneline -2; echo "== Arbeitskopie pruefen =="; if ! git diff-index --quiet HEAD --; then echo "ABBRUCH: modifizierte Dateien"; git status --porcelain | grep -v "^??"; exit 1; else echo "OK: sauber, untracked ignoriert"; fi; echo "== Pull =="; git pull --ff-only origin main && echo "== Git nachher =="; git log --oneline -2 && echo "== Abhaengigkeiten (inkl. dev, fuer drizzle-kit) =="; npm ci --include=dev --no-audit --no-fund 2>&1 | tail -3 && echo "== Build =="; npm run build 2>&1 | tail -5 && echo "== Migration =="; set -a; . ./.env 2>/dev/null; set +a; ./node_modules/.bin/drizzle-kit migrate 2>&1 | tail -5 && echo "== PM2 Neustart =="; pm2 stop all; sleep 2; fuser -k 3000/tcp 2>/dev/null && echo "Alte Prozesse beendet" || echo "Port 3000 war frei"; sleep 2; pm2 start all; sleep 6; echo "== Status =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000 → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready || true; echo "== Letzte App-Logzeilen =="; tail -8 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -8 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
               ;;
-            probe)
+                      env-set-github-token)
+              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "== Vorher =="; grep -c "^ADMIN_GITHUB_TOKEN=" .env 2>/dev/null || echo "0"; if grep -q "^ADMIN_GITHUB_TOKEN=" .env 2>/dev/null; then sed -i 's|^ADMIN_GITHUB_TOKEN=.*|ADMIN_GITHUB_TOKEN='"$GH_TOKEN_VALUE"'|' .env; else printf "\nADMIN_GITHUB_TOKEN=%s\n" '"$GH_TOKEN_VALUE"' >> .env; fi; echo "== .env aktualisiert (Wert nie ausgeben) =="; pm2 restart cybersarah-backend --update-env > /dev/null 2>&1; sleep 4; echo "== PM2 =="; pm2 list | grep cybersarah-backend; echo "== Token im PM2-Env vorhanden? =="; pm2 env 1 2>/dev/null | grep -c "^ADMIN_GITHUB_TOKEN:"; echo "== Health =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready'
+              ;;
+          probe)
               for U in root cybersarah ubuntu debian admin; do
                 echo "== Teste Benutzer: $U =="
                 ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes -o PasswordAuthentication=no $U@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }} 'echo LOGIN_OK als $USER; hostname' && break || true
