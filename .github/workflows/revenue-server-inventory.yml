@@ -1,0 +1,48 @@
+name: Revenue-OS Server Inventory (read-only)
+
+on:
+  push:
+    branches: [integration/revenue-os-live-data]
+    paths: ['.github/workflows/revenue-server-inventory.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+    steps:
+      - name: Inspect revenue installation without disclosing connection strings
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then echo 'SSH: NOT_CONFIGURED'; exit 1; fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/revenue_inventory_key
+          chmod 600 ~/.ssh/revenue_inventory_key
+          ssh -i ~/.ssh/revenue_inventory_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          for dir in /opt/cybersarah /opt/cybersarah-revenue-os /opt/cybersarah-control-center; do
+            case "$dir" in
+              /opt/cybersarah|/opt/cybersarah-revenue-os) label="revenue_install" ;;
+              *) label="control_center_install" ;;
+            esac
+            if [ -d "$dir" ]; then
+              echo "$label: PRESENT"
+              if [ -f "$dir/.env" ]; then
+                echo "$label.env: PRESENT"
+                if grep -q '^DATABASE_URL=' "$dir/.env"; then echo "$label.database_var: PRESENT"; else echo "$label.database_var: MISSING"; fi
+              else echo "$label.env: MISSING"; fi
+            else echo "$label: MISSING"; fi
+          done
+          for port in 3000 4000 5000; do
+            if (echo > "/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1; then echo "localhost_port_$port: LISTENING"; else echo "localhost_port_$port: CLOSED"; fi
+          done
+          REMOTE
+          rm -f ~/.ssh/revenue_inventory_key
