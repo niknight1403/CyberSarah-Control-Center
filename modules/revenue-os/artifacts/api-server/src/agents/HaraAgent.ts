@@ -160,7 +160,7 @@ export class HaraAgent extends AgentBase {
 
     // SPRINT 53: Bestätigte Vorschläge immer ausführen (auch wenn Queue nicht voll)
     const bestaetigteCheck = offene.filter(o => o.status === "bestaetigt");
-    if (bestaetigteCheck.length > 0) {
+    if (bestaetigteCheck.length > 0 && process.env.REVENUE_OS_INTEGRATION_ONLY !== "1") {
       logger.info({ anzahl: bestaetigteCheck.length }, "🤖 HARA: Führe bestätigte Vorschläge sofort aus");
       return this.fuehreAlleAutonomAus();
     }
@@ -186,7 +186,8 @@ export class HaraAgent extends AgentBase {
       const geschwindigkeitScore = clampScore(v.geschwindigkeitScore);
       const automatisierbarkeitScore = clampScore(v.automatisierbarkeitScore);
       const gesamtScore = Math.round(roiScore * 0.5 + geschwindigkeitScore * 0.25 + automatisierbarkeitScore * 0.25);
-      const autoConfirm = gesamtScore >= AUTO_CONFIRM_SCHWELLE || roiScore >= 70 || geschwindigkeitScore >= 80;
+      const autoConfirm = process.env.REVENUE_OS_INTEGRATION_ONLY !== "1" &&
+        (gesamtScore >= AUTO_CONFIRM_SCHWELLE || roiScore >= 70 || geschwindigkeitScore >= 80);
 
       try {
         const [inserted] = await db.insert(haraProposalsTable).values({
@@ -223,7 +224,8 @@ export class HaraAgent extends AgentBase {
     }
 
     // Flops pausieren als Nebenaktion
-    const flopResultat = await this.pausiereFlops();
+    const flopResultat = process.env.REVENUE_OS_INTEGRATION_ONLY === "1"
+      ? { metadaten: { pausiert: 0 } } : await this.pausiereFlops();
 
     if (this.agentId) {
       await db.insert(agentLogsTable).values({
