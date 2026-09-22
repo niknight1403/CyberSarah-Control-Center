@@ -122,8 +122,11 @@ export async function triggerRevenueScan(path: "hara/scan" | "expansion/scan") {
   if (!raw || !secret) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Revenue-Engine oder interner API-Schlüssel fehlt. Scan nicht gestartet." });
   let base: URL;
   try { base = new URL(raw); } catch { throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ungültige Revenue-Engine-URL." }); }
-  if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
-    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Revenue-Engine erfordert eine HTTPS-Basis-URL ohne Zugangsdaten." });
+  // HTTPS fuer externe Engines; eine auf demselben Produktionshost gebundene
+  // Loopback-Engine darf per HTTP erreichbar sein (niemals ueber das Netz).
+  const localOnly = base.protocol === "http:" && base.hostname === "127.0.0.1" && base.port === "3001";
+  if ((!localOnly && base.protocol !== "https:") || base.username || base.password || base.search || base.hash) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Revenue-Engine erfordert HTTPS oder den lokalen Loopback-Dienst." });
   }
   const target = new URL(`/api/${path}`, base);
   try {
