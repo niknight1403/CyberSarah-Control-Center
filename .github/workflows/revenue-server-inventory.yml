@@ -41,6 +41,14 @@ jobs:
               else echo "$label.env: MISSING"; fi
             else echo "$label: MISSING"; fi
           done
+          if [ -d /opt/cybersarah-control-center/.git ]; then
+            if git -C /opt/cybersarah-control-center diff-index --quiet HEAD --; then echo 'root_worktree_clean: YES'; else echo 'root_worktree_clean: NO'; fi
+            case "$(git -C /opt/cybersarah-control-center branch --show-current)" in main) echo 'root_branch_main: YES' ;; *) echo 'root_branch_main: NO' ;; esac
+          fi
+          if command -v pm2 >/dev/null 2>&1; then
+            pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{const p=JSON.parse(s);for(const x of p){if(x.name==="cybersarah-backend")console.log("root_backend_pm2: "+(x.pm2_env?.status==="online"?"ONLINE":"OFFLINE"))}}catch{console.log("root_backend_pm2: UNKNOWN")}})' || true
+          fi
+          echo "server_node_major: $(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo UNKNOWN)"
           if [ -d /opt/cybersarah/.git ]; then echo 'revenue_git: PRESENT'; else echo 'revenue_git: MISSING'; fi
           if [ -d /opt/cybersarah/node_modules ]; then echo 'revenue_dependencies: PRESENT'; else echo 'revenue_dependencies: MISSING'; fi
           if command -v pnpm >/dev/null 2>&1 || command -v corepack >/dev/null 2>&1; then echo 'pnpm_or_corepack: PRESENT'; else echo 'pnpm_or_corepack: MISSING'; fi
