@@ -4,6 +4,13 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 200]
+
+### Fixed — Dual-Sidebar ehrlich und vollstaendig (Wide-Viewport)
+- **Fake-Status entfernt:** Der Dual-Sidebar-Footer zeigte pauschal gruen „SYSTEM ONLINE"/„ORCHESTRATOR READY" — unabhaengig vom echten Serverzustand. Neu: echter Health-Poll gegen den oeffentlichen `/api/health`-Endpunkt (Timeout 4 s, alle 60 s, AbortController, kein Auth) mit ehrlichen Zustaenden: online (gruen) / offline (rot) / pruefend (muted). „ORCHESTRATOR ERREICHBAR" behauptet bewusst nur Erreichbarkeit, keine Orchestrator-Readiness oder DB-Verfuegbarkeit.
+- **Konto-Screen auf Wide-Viewports wieder erreichbar:** Die Tab-Bar ist ab 768 px ausgeblendet, `/account` fehlte aber in beiden Sidebar-Zonen — der Konto-Screen war auf dem Desktop unmoeglich zu erreichen. Neu: Eintrag „Konto" in der Apps-Zone.
+- **Logik extrahiert und getestet:** Routing-Match (inkl. index-/Praefix-Faelle), Zonen-Eintraege und Footer-Ableitung liegen als reine Funktionen in `lib/dual-sidebar-logic.ts`; deterministische Tests in `tests/dual-sidebar-logic.test.ts` pinnen auch die Konto-Erreichbarkeits-Regression.
+
 ## [Unreleased — Sprint 194]
 
 ### Fixed

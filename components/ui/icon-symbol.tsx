@@ -5,7 +5,9 @@ import type { SymbolWeight } from "expo-symbols";
 import { ComponentProps } from "react";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
-type IconSymbolName = keyof typeof MAPPING;
+// Sprint 200: exportiert, damit auch reine Logik-Module (Sidebar-Definitionen)
+// die Icon-Namen typsicher referenzieren koennen.
+export type IconSymbolName = keyof typeof MAPPING;
 
 /**
  * Add your SF Symbols to Material Icons mappings here.

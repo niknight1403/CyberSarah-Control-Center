@@ -3,39 +3,35 @@ import { usePathname, useRouter } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { getSidebarItems, matchesRoute, resolveSidebarFooter, type SidebarZone } from "@/lib/dual-sidebar-logic";
+import { useServerHealth } from "@/hooks/use-server-health";
 
-type Zone = "apps" | "superagent";
-type NavigationItem = { route: string; title: string; icon: Parameters<typeof IconSymbol>[0]["name"] };
+/**
+ * Sprint 200 — Dual-Sidebar: Navigationseintraege, Routing-Matching und
+ * der Footer-Status stammen aus lib/dual-sidebar-logic.ts (rein + getestet).
+ * Der Footer zeigt einen EHRLICHEN Server-Zustand aus dem echten
+ * /api/Health-Poll (hooks/use-server-health.ts) statt eines statischen
+ * "SYSTEM ONLINE" — offline ist offline, pruefend ist pruefend.
+ * Sprint 200 ausserdem: "Konto" ist erreichbar, auch wenn die Tab-Bar auf
+ * Wide-Viewports ausgeblendet ist.
+ */
 
-const APPS_ITEMS: NavigationItem[] = [
-  { route: "/dashboard", title: "Übersicht", icon: "house.fill" },
-  { route: "/", title: "Workspace", icon: "folder.fill" },
-  { route: "/cyber-dashboard", title: "Cyber Dashboard", icon: "bolt.fill" },
-  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
-  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right" },
-  { route: "/data", title: "Daten-Hub", icon: "tablecells.fill" },
-  { route: "/meetings", title: "Meetings", icon: "gearshape.fill" },
-];
+const TONE_COLORS: Record<"positive" | "negative" | "muted", string> = {
+  positive: glassPalette.green,
+  negative: glassPalette.red,
+  muted: glassSurface.textMuted,
+};
 
-const SUPERAGENT_ITEMS: NavigationItem[] = [
-  { route: "/superagent", title: "Command Center", icon: "wand.and.stars" },
-  { route: "/agent", title: "Development Agent", icon: "sparkles" },
-  { route: "/chat", title: "Agent Chat", icon: "message.fill" },
-  { route: "/quality", title: "Quality & Runs", icon: "checkmark.circle.fill" },
-  { route: "/preview", title: "Live Preview", icon: "play.rectangle.fill" },
-];
-
-function matchesRoute(pathname: string, route: string): boolean {
-  if (route === "/") return pathname === "/" || pathname.endsWith("/index");
-  return pathname === route || pathname.startsWith(`${route}/`);
-}
-
-function ZoneSidebar({ zone, items }: { zone: Zone; items: NavigationItem[] }) {
+function ZoneSidebar({ zone }: { zone: SidebarZone }) {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
+  const health = useServerHealth();
+  const items = getSidebarItems(zone);
   const accent = zone === "apps" ? glassPalette.cyan : glassPalette.purple;
   const title = zone === "apps" ? "APPS OPERATIONS" : "SUPERAGENT COMMAND";
   const subtitle = zone === "apps" ? "Tools · Data · Workspace" : "Autonomy · Execution · Control";
+  const footer = resolveSidebarFooter(zone, health);
+  const footerColor = TONE_COLORS[footer.tone];
 
   return (
     <View accessibilityLabel={`${zone === "apps" ? "Apps" : "Superagent"}-Sidebar`} style={[styles.sidebar, { borderColor: `${accent}44` }]}>
@@ -68,8 +64,11 @@ function ZoneSidebar({ zone, items }: { zone: Zone; items: NavigationItem[] }) {
         })}
       </ScrollView>
       <View style={[styles.footer, { borderTopColor: `${accent}22` }]}>
-        <View style={[styles.statusDot, { backgroundColor: glassPalette.green, shadowColor: glassPalette.green }]} />
-        <Text style={styles.footerText}>{zone === "apps" ? "SYSTEM ONLINE" : "ORCHESTRATOR READY"}</Text>
+        <View
+          accessibilityLabel={footer.label}
+          style={[styles.statusDot, { backgroundColor: footerColor, shadowColor: footerColor }]}
+        />
+        <Text style={[styles.footerText, { color: footerColor }]}>{footer.label}</Text>
       </View>
     </View>
   );
@@ -78,8 +77,8 @@ function ZoneSidebar({ zone, items }: { zone: Zone; items: NavigationItem[] }) {
 export function DualSidebar() {
   return (
     <View accessibilityLabel="Dual-Sidebar-Navigation" style={styles.shell}>
-      <ZoneSidebar zone="apps" items={APPS_ITEMS} />
-      <ZoneSidebar zone="superagent" items={SUPERAGENT_ITEMS} />
+      <ZoneSidebar zone="apps" />
+      <ZoneSidebar zone="superagent" />
     </View>
   );
 }
@@ -100,5 +99,5 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   footer: { alignItems: "center", borderTopWidth: 1, flexDirection: "row", gap: 7, marginHorizontal: 10, paddingVertical: 12 },
   statusDot: { borderRadius: 4, height: 8, shadowOpacity: 0.8, shadowRadius: 5, width: 8 },
-  footerText: { color: glassSurface.textMuted, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+  footerText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
 });
