@@ -4,6 +4,19 @@ import { applyCleanupEntries, isAppStorageKey, scanDeviceStorage } from "../lib/
 describe("storage manager web storage scope (Sprint 203)", () => {
   afterEach(() => vi.stubGlobal("localStorage", undefined));
 
+  it("marks incomplete scans as partial even when other files were found", async () => {
+    const adapter = {
+      documentDirectory: "file:///docs/", cacheDirectory: null,
+      readDirectoryAsync: async (uri: string) => uri.endsWith("/docs/") ? ["report.txt", "..", "folder"] : [],
+      getInfoAsync: async (uri: string) => ({ exists: true, isDirectory: uri.endsWith("folder"), size: 5 }),
+      deleteAsync: async () => {},
+    };
+    const scan = await scanDeviceStorage(adapter);
+    expect(scan.status).toBe("partial");
+    expect(scan.entries.map((item) => item.path)).toEqual(["document/report.txt"]);
+    expect(scan.notes.some((note) => note.includes("cache-Verzeichnis nicht verfügbar"))).toBe(true);
+  });
+
   it("rejects unsafe paths, directories and missing files before deletion", async () => {
     const deleted: string[] = [];
     const adapter = {

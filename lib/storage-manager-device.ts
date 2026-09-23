@@ -78,8 +78,12 @@ export function createExpoFileSystemAdapter(): FileSystemAdapter | null {
   }
 }
 
-async function scanDirectory(adapter: FileSystemAdapter, dirUri: string, prefix: string, depth: number, entries: StorageEntry[], notes: string[]): Promise<void> {
-  if (depth > MAX_SCAN_DEPTH || entries.length >= MAX_ENTRIES) return;
+async function scanDirectory(adapter: FileSystemAdapter, dirUri: string, prefix: string, depth: number, entries: StorageEntry[], notes: string[], visited: { count: number }): Promise<void> {
+  if (depth > MAX_SCAN_DEPTH) {
+    notes.push(`Scan-Tiefe bei ${prefix} begrenzt.`);
+    return;
+  }
+  if (visited.count >= MAX_ENTRIES) return;
   let names: string[];
   try {
     names = await adapter.readDirectoryAsync(dirUri);
@@ -88,14 +92,20 @@ async function scanDirectory(adapter: FileSystemAdapter, dirUri: string, prefix:
     return;
   }
   for (const name of names) {
-    if (entries.length >= MAX_ENTRIES) return;
-    const childUri = `${dirUri.replace(/\/+$/, "")}/${name}`;
+    if (visited.count >= MAX_ENTRIES) return;
+    visited.count += 1;
+    if (!name || name === "." || name === ".." || name.includes("/") || name.includes("\\")) {
+      notes.push(`Ungültiger Dateiname übersprungen in ${prefix}.`);
+      continue;
+    }
+    const childUri = `${dirUri.replace(/\/+$/, "")}/${encodeURIComponent(name)}`;
     const childPath = prefix ? `${prefix}/${name}` : name;
+    if (isProtectedPath(childPath)) continue;
     try {
       const info = await adapter.getInfoAsync(childUri);
       if (!info?.exists) continue;
       if (info.isDirectory) {
-        await scanDirectory(adapter, childUri, childPath, depth + 1, entries, notes);
+        await scanDirectory(adapter, childUri, childPath, depth + 1, entries, notes, visited);
         continue;
       }
       entries.push({
@@ -123,6 +133,7 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
     return { status: "partial", entries, notes };
   }
 
+  const visited = { count: 0 };
   for (const [rootUri, label] of [
     [adapter.documentDirectory, "document"],
     [adapter.cacheDirectory, "cache"],
@@ -131,11 +142,11 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
       notes.push(`${label}-Verzeichnis nicht verfügbar.`);
       continue;
     }
-    await scanDirectory(adapter, rootUri, label, 0, entries, notes);
+    await scanDirectory(adapter, rootUri, label, 0, entries, notes, visited);
   }
 
-  if (entries.length >= MAX_ENTRIES) notes.push(`Scan bei ${MAX_ENTRIES} Einträgen begrenzt.`);
-  return { status: entries.length > 0 ? "ok" : "partial", entries, notes };
+  if (visited.count >= MAX_ENTRIES) notes.push(`Scan bei ${MAX_ENTRIES} untersuchten Einträgen begrenzt.`);
+  return { status: notes.some((note) => /nicht verfügbar|Nicht lesbar|übersprungen|begrenzt/.test(note)) ? "partial" : "ok", entries, notes };
 }
 
 export type CleanupExecutionResult = {
