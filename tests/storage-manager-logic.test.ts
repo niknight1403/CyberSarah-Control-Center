@@ -10,6 +10,7 @@ import {
   isProtectedPath,
   parseStoragePrompt,
   sortStorageEntries,
+  selectCleanupTargets,
   totalSizeBytes,
   type StorageEntry,
 } from "../lib/storage-manager-logic";
@@ -63,6 +64,15 @@ describe("storage manager logic (Sprint 201)", () => {
       expect(command.actions, prompt).not.toContain("clean");
       expect(buildPromptResult(command, FIXTURE, { now: NOW }).plan).toBeUndefined();
     }
+  });
+
+  it("waehlt nur freigegebene Ziele aus dem sichtbaren Plan", () => {
+    const plan = buildCleanupPlan(FIXTURE, { now: NOW, categories: ["backups", "cache"] });
+    const targets = selectCleanupTargets(FIXTURE, plan, ["document/backups/settings.csc-backup", "cache/download.tmp"], []);
+    expect(targets.map((item) => item.path)).toEqual(["cache/download.tmp"]);
+    const confirmed = selectCleanupTargets(FIXTURE, plan, [], ["document/backups/settings.csc-backup", "document/exports/report.csv"]);
+    expect(confirmed.map((item) => item.path)).toEqual(["document/backups/settings.csc-backup"]);
+    expect(selectCleanupTargets(FIXTURE, null, ["cache/download.tmp"], [])).toEqual([]);
   });
 
   it("aggregiert Groessen pro Kategorie, absteigend sortiert", () => {

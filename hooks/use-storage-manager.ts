@@ -6,6 +6,7 @@ import {
   formatBytesGerman,
   parseStoragePrompt,
   sortStorageEntries,
+  selectCleanupTargets,
   totalSizeBytes,
   type CleanupPlan,
   type PromptResult,
@@ -81,9 +82,8 @@ export function useStorageManager() {
   const applyPlan = useCallback(
     async (safePaths: string[], confirmedPaths: string[]): Promise<void> => {
       const scan = state.scan;
-      if (!scan) return;
-      const targetPaths = new Set([...safePaths, ...confirmedPaths]);
-      const targets = scan.entries.filter((entry) => targetPaths.has(entry.path)).map((entry) => ({ path: entry.path, sizeBytes: entry.sizeBytes }));
+      if (!scan || !state.plan || state.applying) return;
+      const targets = selectCleanupTargets(scan.entries, state.plan, safePaths, confirmedPaths);
       if (targets.length === 0) return;
       setState((prev) => ({ ...prev, applying: true, applyMessage: null }));
       const execution = await applyCleanupEntries(adapterRef.current, targets);
@@ -94,7 +94,7 @@ export function useStorageManager() {
           : `${execution.deleted.length} gelöscht (${formatBytesGerman(execution.reclaimedBytes)} freigegeben), ${execution.failed.length} fehlgeschlagen: ${execution.failed[0]?.reason ?? "unbekannt"}.`;
       setState((prev) => ({ ...prev, applying: false, applyMessage: message, plan: null, scan: fresh }));
     },
-    [state.scan, scanNow],
+    [state.scan, state.plan, state.applying, scanNow],
   );
 
   const sortedEntries = useMemo<StorageEntry[]>(() => {

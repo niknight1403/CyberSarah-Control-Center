@@ -203,6 +203,19 @@ export function buildCleanupPlan(entries: StorageEntry[], options: CleanupOption
   return { items, reclaimableBytes: automaticBytes + confirmationBytes, automaticBytes, confirmationBytes };
 }
 
+/** Verhindert, dass Aufrufer Pfade ausserhalb des angezeigten Plans freigeben. */
+export function selectCleanupTargets(
+  entries: StorageEntry[], plan: CleanupPlan | null, safePaths: string[], confirmedPaths: string[],
+): StorageEntry[] {
+  if (!plan) return [];
+  const safe = new Set(safePaths);
+  const confirmed = new Set(confirmedPaths);
+  const allowed = new Set(plan.items.filter((item) =>
+    !isProtectedPath(item.path) && (item.requiresConfirmation ? confirmed.has(item.path) : safe.has(item.path) || confirmed.has(item.path)),
+  ).map((item) => item.path));
+  return entries.filter((entry) => allowed.has(entry.path));
+}
+
 /* ==================== Optimierungs-Vorschlaege ==================== */
 
 export type StorageSuggestion = {
