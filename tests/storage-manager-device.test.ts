@@ -4,6 +4,14 @@ import { applyCleanupEntries, isAppStorageKey, scanDeviceStorage } from "../lib/
 describe("storage manager web storage scope (Sprint 203)", () => {
   afterEach(() => vi.stubGlobal("localStorage", undefined));
 
+  it("faellt bei blockiertem WebStorage ohne Abbruch auf partial zurueck", async () => {
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, get: () => { throw new Error("blocked"); } });
+    const scan = await scanDeviceStorage(null);
+    expect(scan.status).toBe("partial");
+    expect(scan.entries).toEqual([]);
+    expect(scan.notes).toContain("WebStorage konnte nicht gelesen werden.");
+  });
+
   it("marks incomplete scans as partial even when other files were found", async () => {
     const adapter = {
       documentDirectory: "file:///docs/", cacheDirectory: null,

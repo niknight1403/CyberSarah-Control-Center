@@ -124,7 +124,12 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
   const notes: string[] = [];
   const entries: StorageEntry[] = [];
 
-  const webStorage = estimateWebStorageBytes();
+  let webStorage: StorageEntry[] = [];
+  try {
+    webStorage = estimateWebStorageBytes();
+  } catch {
+    notes.push("WebStorage konnte nicht gelesen werden.");
+  }
   entries.push(...webStorage);
   if (webStorage.length > 0) notes.push(`${webStorage.length} WebStorage-Einträge (geschätzte Größe) einbezogen.`);
 
@@ -146,7 +151,7 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
   }
 
   if (visited.count >= MAX_ENTRIES) notes.push(`Scan bei ${MAX_ENTRIES} untersuchten Einträgen begrenzt.`);
-  return { status: notes.some((note) => /nicht verfügbar|Nicht lesbar|übersprungen|begrenzt/.test(note)) ? "partial" : "ok", entries, notes };
+  return { status: notes.some((note) => /nicht verfügbar|Nicht lesbar|übersprungen|begrenzt|nicht gelesen/.test(note)) ? "partial" : "ok", entries, notes };
 }
 
 export type CleanupExecutionResult = {

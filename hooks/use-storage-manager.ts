@@ -52,9 +52,17 @@ export function useStorageManager() {
 
   const scanNow = useCallback(async (): Promise<StorageScan> => {
     setState((prev) => ({ ...prev, scanning: true }));
-    const scan = await scanDeviceStorage(adapterRef.current);
-    setState((prev) => ({ ...prev, scanning: false, scan, plan: null, lastResult: null }));
-    return scan;
+    try {
+      const scan = await scanDeviceStorage(adapterRef.current);
+      setState((prev) => ({ ...prev, scanning: false, scan, plan: null, lastResult: null }));
+      return scan;
+    } catch (error) {
+      const scan: StorageScan = { status: "partial", entries: [], notes: [
+        `Scan fehlgeschlagen: ${error instanceof Error ? error.message : "unbekannter Fehler"}`,
+      ] };
+      setState((prev) => ({ ...prev, scanning: false, scan, plan: null, lastResult: null }));
+      return scan;
+    }
   }, []);
 
   const runPrompt = useCallback(
