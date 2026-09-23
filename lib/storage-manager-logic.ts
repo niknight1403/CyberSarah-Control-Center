@@ -249,7 +249,7 @@ export function buildStorageSuggestions(entries: StorageEntry[], options: Sugges
       kind: "largest",
       title: `Größter Eintrag: ${entry.path}`,
       detail: `${formatBytesGerman(entry.sizeBytes)} — ${classifyStorageEntry(entry.path)}. Prüfe, ob die Datei noch gebraucht wird.`,
-      reclaimableBytes: entry.sizeBytes,
+      // Ein grosser Eintrag ist nicht automatisch loeschbar.
     });
   }
 
@@ -260,7 +260,7 @@ export function buildStorageSuggestions(entries: StorageEntry[], options: Sugges
       kind: "stale",
       title: `${stale.length} Einträge seit über ${staleDays} Tagen ungenutzt`,
       detail: `Zusammen ${formatBytesGerman(staleBytes)}. Der Aufräum-Befehl entfernt veraltete Logs automatisch; für alles Weitere gibt es einen Bestätigungs-Plan.`,
-      reclaimableBytes: staleBytes,
+      // Alter allein belegt weder Nutzlosigkeit noch Loeschbarkeit.
     });
   }
 
@@ -274,12 +274,10 @@ export function buildStorageSuggestions(entries: StorageEntry[], options: Sugges
   for (const [key, bucket] of duplicates) {
     if (bucket.length > 1) {
       const name = key.split("|")[0];
-      const reclaimable = totalSizeBytes(bucket.slice(1));
       suggestions.push({
         kind: "duplicate",
-        title: `Duplikat-Kandidat: ${name}`,
-        detail: `${bucket.length} identische Kopien (${formatBytesGerman(bucket[0].sizeBytes)} je Datei) — ca. ${formatBytesGerman(reclaimable)} durch Löschen der Mehrfachkopien gewinnbar.`,
-        reclaimableBytes: reclaimable,
+        title: `Möglicher Duplikat-Kandidat: ${name}`,
+        detail: `${bucket.length} Einträge mit gleichem Dateinamen und gleicher Größe (${formatBytesGerman(bucket[0].sizeBytes)}). Inhalte sind nicht verglichen; vor dem Löschen manuell prüfen.`,
       });
     }
   }

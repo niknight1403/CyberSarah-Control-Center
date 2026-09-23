@@ -83,6 +83,15 @@ describe("storage manager logic (Sprint 201)", () => {
     expect(cleanupTargetsUnchanged(target, [])).toBe(false);
   });
 
+  it("behauptet keine identischen Inhalte ohne Inhaltsvergleich", () => {
+    const suggestions = buildStorageSuggestions(FIXTURE, { now: NOW });
+    const duplicate = suggestions.find((item) => item.kind === "duplicate");
+    expect(duplicate?.detail).toContain("Inhalte sind nicht verglichen");
+    expect(duplicate?.reclaimableBytes).toBeUndefined();
+    expect(suggestions.filter((item) => item.kind === "largest" || item.kind === "stale")
+      .every((item) => item.reclaimableBytes === undefined)).toBe(true);
+  });
+
   it("aggregiert Groessen pro Kategorie, absteigend sortiert", () => {
     const aggregates = aggregateByCategory(FIXTURE);
     expect(aggregesAreSorted(aggregates)).toBe(true);
@@ -158,7 +167,7 @@ describe("storage manager logic (Sprint 201)", () => {
     expect(suggestions.some((s) => s.kind === "stale")).toBe(true);
     const duplicate = suggestions.find((s) => s.kind === "duplicate");
     expect(duplicate?.title).toContain("report.csv");
-    expect(duplicate?.reclaimableBytes).toBe(120_000);
+    expect(duplicate?.reclaimableBytes).toBeUndefined();
   });
 
   it("parst deutsche Prompts in Befehle", () => {
