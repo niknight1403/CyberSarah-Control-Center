@@ -158,10 +158,18 @@ export async function applyCleanupEntries(
   let reclaimedBytes = 0;
 
   for (const entry of entries) {
+    if (isProtectedPath(entry.path)) {
+      failed.push({ path: entry.path, reason: "Geschützter oder ungültiger Pfad" });
+      continue;
+    }
     if (entry.path.startsWith("webstorage/")) {
       const key = entry.path.slice("webstorage/".length);
       try {
-        if (typeof globalThis.localStorage !== "undefined") globalThis.localStorage.removeItem(key);
+        if (!isAppStorageKey(key) || typeof globalThis.localStorage === "undefined" || globalThis.localStorage.getItem(key) === null) {
+          failed.push({ path: entry.path, reason: "WebStorage-Eintrag nicht verfügbar oder nicht freigegeben" });
+          continue;
+        }
+        globalThis.localStorage.removeItem(key);
         deleted.push(entry.path);
         reclaimedBytes += entry.sizeBytes;
       } catch (error) {
@@ -169,7 +177,7 @@ export async function applyCleanupEntries(
       }
       continue;
     }
-    if (!adapter || !adapter.documentDirectory) {
+    if (!adapter) {
       failed.push({ path: entry.path, reason: "Dateisystem nicht verfügbar" });
       continue;
     }
@@ -178,8 +186,14 @@ export async function applyCleanupEntries(
       failed.push({ path: entry.path, reason: "Zielverzeichnis nicht verfügbar" });
       continue;
     }
-    const fileUri = `${root.replace(/\/+$/, "")}/${entry.path.replace(/^(?:document|cache)\//, "")}`;
+    const relative = entry.path.split("/").slice(1).map(encodeURIComponent).join("/");
+    const fileUri = `${root.replace(/\/+$/, "")}/${relative}`;
     try {
+      const info = await adapter.getInfoAsync(fileUri);
+      if (!info?.exists || info.isDirectory) {
+        failed.push({ path: entry.path, reason: "Datei nicht mehr vorhanden oder Verzeichnis" });
+        continue;
+      }
       await adapter.deleteAsync(fileUri);
       deleted.push(entry.path);
       reclaimedBytes += entry.sizeBytes;
