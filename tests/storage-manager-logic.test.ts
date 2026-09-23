@@ -57,6 +57,14 @@ describe("storage manager logic (Sprint 201)", () => {
     expect(buildCleanupPlan([entry("cache/backups/save.zip", 100, 1)], { now: NOW }).items).toEqual([]);
   });
 
+  it("interpretiert verneinte Loeschbefehle nur als Analyse", () => {
+    for (const prompt of ["Zeig den Cache, nicht löschen", "Keine Dateien löschen, nur analysieren", "Ohne zu löschen: Speicher bereinigen?", "Nichts löschen"]) {
+      const command = parseStoragePrompt(prompt);
+      expect(command.actions, prompt).not.toContain("clean");
+      expect(buildPromptResult(command, FIXTURE, { now: NOW }).plan).toBeUndefined();
+    }
+  });
+
   it("aggregiert Groessen pro Kategorie, absteigend sortiert", () => {
     const aggregates = aggregateByCategory(FIXTURE);
     expect(aggregesAreSorted(aggregates)).toBe(true);

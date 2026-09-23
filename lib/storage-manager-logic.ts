@@ -320,6 +320,13 @@ export function parseStoragePrompt(prompt: string): StoragePromptCommand {
   for (const { action, pattern } of ACTION_KEYWORDS) {
     if (pattern.test(trimmed) && !actions.includes(action)) actions.push(action);
   }
+  // Ein verneinter Loeschwunsch darf niemals einen Aufraeum-Plan erzeugen.
+  if (/(?:nicht|nichts|nie|ohne(?:\s+zu)?)\s+(?:löschen|loeschen|aufräumen|aufraeumen|bereinigen)/i.test(trimmed) ||
+      /(?:keine|keinerlei)\s+.{0,45}?(?:löschen|loeschen|aufräumen|aufraeumen)/i.test(trimmed) ||
+      /nur\s+(?:analysieren|anzeigen|ansehen|scannen)/i.test(trimmed)) {
+    const cleanIndex = actions.indexOf("clean");
+    if (cleanIndex >= 0) actions.splice(cleanIndex, 1);
+  }
   if (actions.length === 0) actions.push("analyze");
 
   const categories: StorageCategory[] = [];
