@@ -16,7 +16,7 @@
  */
 
 import { Platform } from "react-native";
-import type { StorageEntry } from "@/lib/storage-manager-logic";
+import { isProtectedPath, type StorageEntry } from "@/lib/storage-manager-logic";
 
 export type StorageScan = {
   status: "ok" | "partial";
@@ -38,13 +38,20 @@ const MAX_SCAN_DEPTH = 6;
 const MAX_ENTRIES = 2_000;
 const MS_PER_DAY = 86_400_000;
 
+/** Only app-owned keys; auth/session material is deliberately excluded. */
+export function isAppStorageKey(key: string): boolean {
+  return /^(?:cybersarah[.-]|expo[.-])/i.test(key) && !isProtectedPath(`webstorage/${key}`) &&
+    !/(?:auth|token|secret|password|credential|session|api[_-]?key)/i.test(key);
+}
+
 function estimateWebStorageBytes(): StorageEntry[] {
   if (typeof globalThis.localStorage === "undefined") return [];
   const entries: StorageEntry[] = [];
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
-    if (!key) continue;
-    const value = localStorage.getItem(key) ?? "";
+    if (!key || !isAppStorageKey(key)) continue;
+    const value = localStorage.getItem(key);
+    if (value === null) continue;
     entries.push({ path: `webstorage/${key}`, sizeBytes: value.length * 2, modifiedAt: Date.now() });
   }
   return entries;
