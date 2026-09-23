@@ -142,7 +142,7 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
   for (const [rootUri, label] of [
     [adapter.documentDirectory, "document"],
     [adapter.cacheDirectory, "cache"],
-  ] as Array<[string | null, string]>) {
+  ] as [string | null, string][]) {
     if (!rootUri) {
       notes.push(`${label}-Verzeichnis nicht verfügbar.`);
       continue;
@@ -156,7 +156,7 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
 
 export type CleanupExecutionResult = {
   deleted: string[];
-  failed: Array<{ path: string; reason: string }>;
+  failed: { path: string; reason: string }[];
   reclaimedBytes: number;
 };
 
@@ -167,10 +167,10 @@ export type CleanupExecutionResult = {
  */
 export async function applyCleanupEntries(
   adapter: FileSystemAdapter | null,
-  entries: Array<{ path: string; sizeBytes: number }>,
+  entries: { path: string; sizeBytes: number }[],
 ): Promise<CleanupExecutionResult> {
   const deleted: string[] = [];
-  const failed: Array<{ path: string; reason: string }> = [];
+  const failed: { path: string; reason: string }[] = [];
   let reclaimedBytes = 0;
 
   for (const entry of entries) {

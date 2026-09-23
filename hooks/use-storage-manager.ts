@@ -103,8 +103,7 @@ export function useStorageManager() {
         }
         const execution = await applyCleanupEntries(adapterRef.current, targets);
         const fresh = await scanDeviceStorage(adapterRef.current);
-        const message =
-        execution.failed.length === 0
+        const message = execution.failed.length === 0
           ? `${execution.deleted.length} Einträge gelöscht, ${formatBytesGerman(execution.reclaimedBytes)} freigegeben.`
           : `${execution.deleted.length} gelöscht (${formatBytesGerman(execution.reclaimedBytes)} freigegeben), ${execution.failed.length} fehlgeschlagen: ${execution.failed[0]?.reason ?? "unbekannt"}.`;
         setState((prev) => ({ ...prev, applying: false, applyMessage: message, plan: null, lastResult: null, scan: fresh }));
@@ -113,7 +112,7 @@ export function useStorageManager() {
           applyMessage: `Aufräumen abgebrochen: ${error instanceof Error ? error.message : "unbekannter Fehler"}` }));
       }
     },
-    [state.scan, state.plan, state.applying, scanNow],
+    [state.scan, state.plan, state.applying],
   );
 
   const sortedEntries = useMemo<StorageEntry[]>(() => {

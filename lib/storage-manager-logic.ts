@@ -203,6 +203,11 @@ export function buildCleanupPlan(entries: StorageEntry[], options: CleanupOption
   return { items, reclaimableBytes: automaticBytes + confirmationBytes, automaticBytes, confirmationBytes };
 }
 
+/** Nur in der Vorschau angezeigte Eintraege duerfen per Sammelaktion geloescht werden. */
+export function visibleCleanupItems(plan: CleanupPlan, count: number): CleanupPlanItem[] {
+  return plan.items.slice(0, Math.max(0, Math.floor(count)));
+}
+
 /** Verhindert, dass Aufrufer Pfade ausserhalb des angezeigten Plans freigeben. */
 export function selectCleanupTargets(
   entries: StorageEntry[], plan: CleanupPlan | null, safePaths: string[], confirmedPaths: string[],
@@ -312,14 +317,14 @@ export type StoragePromptCommand = {
   includeBackups: boolean;
 };
 
-const ACTION_KEYWORDS: Array<{ action: StoragePromptAction; pattern: RegExp }> = [
+const ACTION_KEYWORDS: { action: StoragePromptAction; pattern: RegExp }[] = [
   { action: "clean", pattern: /aufräum|räum|lösch|freigeb|platz (?:machen|schaffen)|leere?r?|bereinig/i },
   { action: "sort", pattern: /sortier|ordn|struktur|auflist/i },
   { action: "suggest", pattern: /vorschl(?:ä|ae)g|vorschlag|optimier|empfehl|tipp|idee|wie kann ich|spare/i },
   { action: "analyze", pattern: /analy|übersicht|status|scan|zeig|wie viel|beleg|größe|verbrauch/i },
 ];
 
-const CATEGORY_KEYWORDS: Array<{ category: StorageCategory; pattern: RegExp }> = [
+const CATEGORY_KEYWORDS: { category: StorageCategory; pattern: RegExp }[] = [
   { category: "cache", pattern: /cache|zwischenspeicher/i },
   { category: "logs", pattern: /logs?|protokoll/i },
   { category: "backups", pattern: /backups?|sicherung/i },

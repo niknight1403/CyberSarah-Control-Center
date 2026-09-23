@@ -70,7 +70,7 @@ export default defineConfig({
       provider: "v8",
       reportsDirectory: "coverage",
       reporter: ["text", "json-summary", "lcov"],
-      include: ["lib/**", "server/**", "shared/**", "scripts/**"],
+      include: ["lib/**", "server/**", "shared/**", "scripts/**/*.{js,mjs,cjs,ts,tsx}"],
       exclude: ["tests/**", "**/*.test.*", "**/*.d.ts", "**/__mocks__/**"],
       reportOnFailure: false,
     },

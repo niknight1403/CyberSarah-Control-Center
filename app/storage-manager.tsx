@@ -15,10 +15,10 @@ import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/com
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useStorageManager } from "@/hooks/use-storage-manager";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
-import { formatBytesGerman } from "@/lib/storage-manager-logic";
+import { formatBytesGerman, visibleCleanupItems } from "@/lib/storage-manager-logic";
 import type { StorageSortKey } from "@/lib/storage-manager-logic";
 
-const SORT_OPTIONS: Array<{ key: StorageSortKey; label: string }> = [
+const SORT_OPTIONS: { key: StorageSortKey; label: string }[] = [
   { key: "size-desc", label: "Größe" },
   { key: "date-desc", label: "Neueste" },
   { key: "name-asc", label: "Name" },
@@ -37,17 +37,23 @@ export default function StorageManagerScreen() {
   const styles = useMemo(() => createStyles(glass), [glass]);
   const { state, scanNow, runPrompt, sortEntries, applyPlan, sortedEntries, totalBytes } = useStorageManager();
   const [prompt, setPrompt] = useState("");
+  const [visiblePlanCount, setVisiblePlanCount] = useState(12);
+  const shownPlanItems = state.plan ? visibleCleanupItems(state.plan, visiblePlanCount) : [];
 
   const handlePrompt = async () => {
     const trimmed = prompt.trim();
     if (trimmed.length === 0) return;
+    setVisiblePlanCount(12);
     await runPrompt(trimmed);
   };
 
   const handleCleanupConfirm = () => {
     const plan = state.plan;
     if (!plan) return;
-    const safePaths = plan.items.filter((item) => !item.requiresConfirmation).map((item) => item.path);
+    const visible = visibleCleanupItems(plan, visiblePlanCount);
+    const safeItems = visible.filter((item) => !item.requiresConfirmation);
+    const safePaths = safeItems.map((item) => item.path);
+    const visibleBytes = safeItems.reduce((sum, item) => sum + item.sizeBytes, 0);
     if (safePaths.length === 0) {
       Alert.alert("Nichts gefahrlos löschbar", "Im Plan liegen nur Einträge mit Bestätigungspflicht — bitte gezielt auswählen.", [
         { text: "OK", style: "default" },
@@ -56,7 +62,7 @@ export default function StorageManagerScreen() {
     }
     Alert.alert(
       `${safePaths.length} Einträge löschen?`,
-      `Das gibt ${formatBytesGerman(plan.automaticBytes)} frei. Bestätigungspflichtige Einträge (${formatBytesGerman(plan.confirmationBytes)}) bleiben unberührt.`,
+      `Nur die ${safePaths.length} sichtbaren gefahrlosen Einträge werden gelöscht (${formatBytesGerman(visibleBytes)} laut Scan). Weitere, noch nicht angezeigte oder bestätigungspflichtige Einträge bleiben unberührt.`,
       [
         { text: "Abbrechen", style: "cancel" },
         {
@@ -75,7 +81,7 @@ export default function StorageManagerScreen() {
         <DrawerBodyText>
           Per Prompt den App-eigenen Speicher analysieren, sortieren und aufräumen: Datei-Verzeichnisse und WebStorage-Einträge der App werden
           gescannt, Kategorien (Cache, Logs, Backups, Dokumente, Medien) erkannt und Optimierungs-Vorschläge erzeugt. Löschen passiert nie ohne
-          deine Bestätigung — Cache und veraltete Logs gelten als gefahrlos, alles andere bleibt geschützt.
+          deine Bestätigung — Cache und veraltete Logs gelten als gefahrlos, alles andere bleibt im Plan geschützt und wird nicht gelöscht.
         </DrawerBodyText>
       </DrawerCard>
 
@@ -192,7 +198,7 @@ export default function StorageManagerScreen() {
       {state.plan && state.plan.items.length > 0 && (
         <DrawerCard accent={`${glass.glassPalette.amber}66`}>
           <DrawerCardTitle>Aufräum-Plan — {formatBytesGerman(state.plan.reclaimableBytes)} gewinnbar</DrawerCardTitle>
-          {state.plan.items.slice(0, 12).map((item) => (
+          {shownPlanItems.map((item) => (
             <View key={item.path} style={styles.entryRow}>
               <Text style={styles.entryPath} numberOfLines={1}>
                 {item.requiresConfirmation ? "🔒" : "✓"} {item.path} ({item.reason})
@@ -200,7 +206,11 @@ export default function StorageManagerScreen() {
               <Text style={styles.entrySize}>{formatBytesGerman(item.sizeBytes)}</Text>
             </View>
           ))}
-          {state.plan.items.length > 12 && <Text style={styles.noteText}>… und {state.plan.items.length - 12} weitere.</Text>}
+          {state.plan.items.length > shownPlanItems.length && (
+            <Pressable accessibilityLabel="Weitere Planziele anzeigen" onPress={() => setVisiblePlanCount((count) => count + 12)}>
+              <Text style={styles.noteText}>{state.plan.items.length - shownPlanItems.length} weitere anzeigen (je 12)</Text>
+            </Pressable>
+          )}
           <Pressable
             accessibilityLabel="Aufräum-Plan bestätigen und ausführen"
             style={[styles.button, styles.primaryButton, styles.confirmButton]}
@@ -208,7 +218,7 @@ export default function StorageManagerScreen() {
             disabled={state.applying}
           >
             <IconSymbol name="arrow.trash" size={16} color={glass.glassSurface.textPrimary} />
-            <Text style={[styles.buttonText, { color: glass.glassSurface.textPrimary }]}>Plan ausführen (nur gefahrlos)</Text>
+            <Text style={[styles.buttonText, { color: glass.glassSurface.textPrimary }]}>Sichtbare gefahrlose Einträge löschen</Text>
           </Pressable>
         </DrawerCard>
       )}

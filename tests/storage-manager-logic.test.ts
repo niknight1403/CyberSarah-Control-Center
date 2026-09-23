@@ -12,6 +12,7 @@ import {
   parseStoragePrompt,
   sortStorageEntries,
   selectCleanupTargets,
+  visibleCleanupItems,
   totalSizeBytes,
   type StorageEntry,
 } from "../lib/storage-manager-logic";
@@ -92,6 +93,16 @@ describe("storage manager logic (Sprint 201)", () => {
       .every((item) => item.reclaimableBytes === undefined)).toBe(true);
   });
 
+  it("gibt zur Sammelloeschung nur sichtbare Planziele frei", () => {
+    const plan = buildCleanupPlan(FIXTURE, { now: NOW });
+    const visible = visibleCleanupItems(plan, 1);
+    expect(visible).toHaveLength(1);
+    expect(visibleCleanupItems(plan, -5)).toEqual([]);
+    const targets = selectCleanupTargets(FIXTURE, plan, visible.map((item) => item.path), []);
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.path).toBe(visible[0]?.path);
+  });
+
   it("aggregiert Groessen pro Kategorie, absteigend sortiert", () => {
     const aggregates = aggregateByCategory(FIXTURE);
     expect(aggregesAreSorted(aggregates)).toBe(true);
@@ -101,7 +112,7 @@ describe("storage manager logic (Sprint 201)", () => {
     expect(totalSizeBytes(FIXTURE)).toBe(4_010_000);
   });
 
-  function aggregesAreSorted(aggregates: Array<{ sizeBytes: number }>): boolean {
+  function aggregesAreSorted(aggregates: { sizeBytes: number }[]): boolean {
     return aggregates.every((a, i) => i === 0 || aggregates[i - 1].sizeBytes >= a.sizeBytes);
   }
 
