@@ -216,6 +216,12 @@ export function selectCleanupTargets(
   return entries.filter((entry) => allowed.has(entry.path));
 }
 
+/** Ein alter Plan ist nach Dateiaenderungen nicht mehr gueltig. */
+export function cleanupTargetsUnchanged(targets: StorageEntry[], current: StorageEntry[]): boolean {
+  const byPath = new Map(current.map((entry) => [entry.path, entry]));
+  return targets.every((entry) => byPath.get(entry.path)?.sizeBytes === entry.sizeBytes);
+}
+
 /* ==================== Optimierungs-Vorschlaege ==================== */
 
 export type StorageSuggestion = {

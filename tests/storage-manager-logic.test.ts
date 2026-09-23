@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateByCategory,
   buildCleanupPlan,
+  cleanupTargetsUnchanged,
   buildPromptResult,
   buildStorageSuggestions,
   classifyStorageEntry,
@@ -73,6 +74,13 @@ describe("storage manager logic (Sprint 201)", () => {
     const confirmed = selectCleanupTargets(FIXTURE, plan, [], ["document/backups/settings.csc-backup", "document/exports/report.csv"]);
     expect(confirmed.map((item) => item.path)).toEqual(["document/backups/settings.csc-backup"]);
     expect(selectCleanupTargets(FIXTURE, null, ["cache/download.tmp"], [])).toEqual([]);
+  });
+
+  it("verwirft veraltete Plaene nach Dateiaenderung", () => {
+    const target = [entry("cache/a.tmp", 100, 1)];
+    expect(cleanupTargetsUnchanged(target, target)).toBe(true);
+    expect(cleanupTargetsUnchanged(target, [entry("cache/a.tmp", 200, 1)])).toBe(false);
+    expect(cleanupTargetsUnchanged(target, [])).toBe(false);
   });
 
   it("aggregiert Groessen pro Kategorie, absteigend sortiert", () => {
