@@ -26,8 +26,11 @@ export const VIDEO_LIMITS = {
 } as const;
 
 /**
- * Baut die ffmpeg-Argumente für EINE Szene: Farbverlauf-Hintergrund mit
- * Ken-Burns-Zoom + Erzähl-Audio, Normalisierung auf 1080p/25fps.
+ * Baut die ffmpeg-Argumente für EINE Szene, in zwei ehrlichen Varianten:
+ *   1. MIT imagePath: echtes FLUX-Szenenbild (Cover-Skalierung auf 1080p,
+ *      dann Ken-Burns-Zoom über das Bild).
+ *   2. OHNE imagePath: deterministische Farbverlauf-Bühne (lavfi gradients)
+ *      als Rückfall — niemals ein stiller Ersatzbild-Swap.
  * Rein und deterministisch — identische Szene ergibt identische Argumente.
  */
 export function buildSceneFfmpegArgs(input: {
@@ -36,17 +39,12 @@ export function buildSceneFfmpegArgs(input: {
   audioPath: string;
   outputPath: string;
   gradientIndex: number;
+  imagePath?: string | null;
 }): string[] {
-  const { seconds, audioPath, outputPath, gradientIndex } = input;
-  const gradient = `gradients=size=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:speed=0.0015:c${(gradientIndex % 5) + 1}`;
-  const zoompan = `zoompan=z='min(zoom+0.0008,1.12)':d=${Math.max(1, Math.round(seconds * VIDEO_LIMITS.fps))}:s=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:fps=${VIDEO_LIMITS.fps}`;
-  return [
-    "-y",
-    "-f", "lavfi",
-    "-i", gradient,
-    "-i", audioPath,
-    "-t", String(Math.max(1, seconds)),
-    "-vf", zoompan,
+  const { seconds, audioPath, outputPath, gradientIndex, imagePath } = input;
+  const frames = Math.max(1, Math.round(seconds * VIDEO_LIMITS.fps));
+  const zoompan = `zoompan=z='min(zoom+0.0008,1.12)':d=${frames}:s=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:fps=${VIDEO_LIMITS.fps}`;
+  const codecArgs = [
     "-pix_fmt", "yuv420p",
     "-c:v", "libx264",
     "-preset", "veryfast",
@@ -54,6 +52,32 @@ export function buildSceneFfmpegArgs(input: {
     "-b:a", "128k",
     "-shortest",
     outputPath,
+  ];
+
+  if (imagePath) {
+    // Echtes Szenenbild: Cover-Skalierung + Crop auf 16:9, dann Ken-Burns.
+    const cover = `scale=${VIDEO_LIMITS.width}:${VIDEO_LIMITS.height}:force_original_aspect_ratio=increase,crop=${VIDEO_LIMITS.width}:${VIDEO_LIMITS.height}`;
+    return [
+      "-y",
+      "-loop", "1",
+      "-framerate", String(VIDEO_LIMITS.fps),
+      "-i", imagePath,
+      "-i", audioPath,
+      "-t", String(Math.max(1, seconds)),
+      "-vf", `${cover},${zoompan}`,
+      ...codecArgs,
+    ];
+  }
+
+  const gradient = `gradients=size=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:speed=0.0015:c${(gradientIndex % 5) + 1}`;
+  return [
+    "-y",
+    "-f", "lavfi",
+    "-i", gradient,
+    "-i", audioPath,
+    "-t", String(Math.max(1, seconds)),
+    "-vf", zoompan,
+    ...codecArgs,
   ];
 }
 
@@ -100,8 +124,8 @@ export type VideoCapabilityProbe =
   | { available: false; reason: string };
 
 export interface VideoAssembler {
-  /** Rendert EINE Szene (Video-Pfad bei Erfolg). */
-  renderScene(args: { audioPath: string; seconds: number; sceneId: string; gradientIndex: number; outputPath: string }): Promise<
+  /** Rendert EINE Szene (Video-Pfad bei Erfolg); imagePath = FLUX-Bild oder null für Farbverlauf. */
+  renderScene(args: { audioPath: string; seconds: number; sceneId: string; gradientIndex: number; outputPath: string; imagePath?: string | null }): Promise<
     | { ok: true }
     | { ok: false; reason: string }
   >;
@@ -128,6 +152,12 @@ export interface VideoCacheEntry {
   createdAt: string;
   sceneCount: number;
   totalSeconds: number;
+  sceneImages?: SceneImageStats;
+}
+
+export interface SceneImageStats {
+  fluxImages: number;
+  gradientFallback: number;
 }
 
 export interface VideoCacheAdapter {

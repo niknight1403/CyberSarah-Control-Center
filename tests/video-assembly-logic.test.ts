@@ -69,3 +69,26 @@ describe("Video-Grenzen und Cache-Schlüssel (Sprint 274)", () => {
     );
   });
 });
+describe("ffmpeg-Szenen-Argumente mit echtem FLUX-Bild (Sprint 276)", () => {
+  it("nutzt Bild-Input mit Cover-Skalierung statt Farbverlauf, wenn ein Pfad übergeben wird", () => {
+    const withImage = buildSceneFfmpegArgs({
+      sceneId: "s1", seconds: 6, audioPath: "/tmp/a.mp3", outputPath: "/tmp/s1.mp4",
+      gradientIndex: 0, imagePath: "/tmp/scene.png",
+    });
+    const flat = withImage.join(" ");
+    expect(flat).toContain("-loop 1");
+    expect(flat).toContain("-i /tmp/scene.png");
+    expect(flat).toContain("force_original_aspect_ratio=increase");
+    expect(flat).toContain("crop=1920:1080");
+    expect(flat).not.toContain("gradients=");
+  });
+
+  it("fällt ohne imagePath deterministisch auf die Farbverlauf-Bühne zurück", () => {
+    const fallback = buildSceneFfmpegArgs({
+      sceneId: "s1", seconds: 6, audioPath: "/tmp/a.mp3", outputPath: "/tmp/s1.mp4",
+      gradientIndex: 0, imagePath: null,
+    });
+    expect(fallback.join(" ")).toContain("gradients=size=1920x1080");
+    expect(fallback.join(" ")).not.toContain("-loop 1");
+  });
+});

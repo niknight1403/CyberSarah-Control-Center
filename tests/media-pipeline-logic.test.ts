@@ -127,3 +127,59 @@ describe("generateVideoForUser Guards (Sprint 275)", () => {
     }
   });
 });
+describe("Szenenbild-Integration (Sprint 276)", () => {
+  it("nutzt FLUX-Bilder je Szene und zählt sie ehrlich", async () => {
+    const assembler = fakeAssembler();
+    const result = await renderVideoRun({ text: VALID_TEXT, voice: DEFAULT_TTS_VOICE }, {
+      cache: memoryCache(),
+      assembler,
+      synthesize: await okTts(),
+      sceneImage: async () => ({
+        ok: true,
+        dataUrl: `data:image/png;base64,${Buffer.from("png").toString("base64")}`,
+        source: "provider" as const,
+        note: "ok",
+      }),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.sceneImages).toEqual({ fluxImages: 3, gradientFallback: 0 });
+      expect(result.note).toContain("3/3 Szenen mit echten FLUX-Bildern");
+    }
+  });
+
+  it("fällt pro Szene auf die Farbverlauf-Bühne zurück, wenn das Bild scheitert", async () => {
+    const assembler = fakeAssembler();
+    const result = await renderVideoRun({ text: VALID_TEXT, voice: DEFAULT_TTS_VOICE }, {
+      cache: memoryCache(),
+      assembler,
+      synthesize: await okTts(),
+      sceneImage: async () => ({ ok: false, reason: "HF_TOKEN fehlt" }),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.sceneImages).toEqual({ fluxImages: 0, gradientFallback: 3 });
+      expect(result.note).toContain("Farbverlauf");
+    }
+  });
+
+  it("mischt erfolgreich gezählt: FLUX + Rückfall in einem Lauf", async () => {
+    const assembler = fakeAssembler();
+    let call = 0;
+    const result = await renderVideoRun({ text: VALID_TEXT, voice: DEFAULT_TTS_VOICE }, {
+      cache: memoryCache(),
+      assembler,
+      synthesize: await okTts(),
+      sceneImage: async () => {
+        call += 1;
+        if (call === 1) return { ok: false, reason: "Ratelimit" };
+        return { ok: true, dataUrl: "data:image/png;base64,cG5n", source: "provider" as const, note: "ok" };
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.sceneImages).toEqual({ fluxImages: 2, gradientFallback: 1 });
+      expect(result.note).toContain("1 mit Farbverlauf-Rückfall");
+    }
+  });
+});

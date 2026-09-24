@@ -92,6 +92,16 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="media-studio"
+          options={{
+            title: "Medien-Studio",
+            href: null,
+            tabBarIcon: ({ color, focused }) => (
+              <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="video.fill" color={color} /></GlassTabIcon>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="decisions"
           options={{
             title: "Entscheidungen",

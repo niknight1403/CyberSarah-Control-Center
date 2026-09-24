@@ -93,6 +93,28 @@ async function checkAndConsumeDailyQuota(openId: string): Promise<{ ok: true } |
   return { ok: true };
 }
 
+/**
+ * Sprint 276 — Szenenbild für die Medien-Pipeline: nutzt denselben FLUX-Adapter
+ * und Cache wie die Bild-Generierung, verzichtet aber auf die Nutzer-Quote der
+ * Bild-Funktion — die Pipeline begrenzt sich selbst über die Video-Quote.
+ * Ehrlich: ohne HF_TOKEN oder bei Provider-Fehlern liefert dies ok:false und
+ * die Pipeline fällt deterministisch auf die Farbverlauf-Bühne zurück.
+ */
+export async function generateSceneImageForPipeline(
+  prompt: string,
+): Promise<{ ok: true; dataUrl: string; source: "cache" | "provider"; note: string } | { ok: false; reason: string }> {
+  const result = await generateImageWithCache(
+    { prompt, model: DEFAULT_IMAGE_MODEL, size: "landscape", seed: null },
+    {
+      cache: kvCacheAdapter(),
+      fetchFromProvider: async (scenePrompt, model, size, seed) => fetchFromHuggingFace(scenePrompt, model, size, seed),
+    },
+  );
+  if (!result.ok) return { ok: false, reason: result.reason };
+  if (!result.dataUrl) return { ok: false, reason: "Szenenbild erzeugt, aber Bytes fehlen." };
+  return { ok: true, dataUrl: result.dataUrl, source: result.source, note: result.note };
+}
+
 export async function generateImageForUser(
   openId: string,
   input: { prompt: string; size?: ImageSize; seed?: number | null; approved: boolean },

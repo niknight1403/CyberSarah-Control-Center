@@ -19,6 +19,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import * as db from "./db";
+import { generateSceneImageForPipeline } from "./image-generation";
 import { synthesizeSpeech } from "./tts";
 import {
   DEFAULT_TTS_VOICE,
@@ -31,6 +32,7 @@ import {
   buildConcatFfmpegArgs,
   buildSceneFfmpegArgs,
   buildVideoCacheKey,
+  type SceneImageStats,
   type VideoCacheAdapter,
   type VideoCacheEntry,
   type VideoCapabilityProbe,
@@ -114,8 +116,13 @@ export type GenerateVideoResult =
       note: string;
       sceneCount: number;
       totalSeconds: number;
+      sceneImages: SceneImageStats;
     }
   | { ok: false; reason: string; retryHint: string | null; configured: boolean };
+
+export type SceneImageProvider = (
+  prompt: string,
+) => Promise<{ ok: true; dataUrl: string; source: "cache" | "provider"; note: string } | { ok: false; reason: string }>;
 
 async function checkAndConsumeDailyQuota(openId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   const key = `videogen.usage.${dayKey()}.${openId}`;
@@ -140,6 +147,7 @@ export async function renderVideoRun(
     cache: VideoCacheAdapter;
     assembler: VideoAssembler;
     synthesize: (text: string, voice: TtsVoice) => Promise<{ ok: true; source: "cache" | "provider"; base64Mp3: string; bytes: number; note: string } | { ok: false; reason: string; retryHint: string | null }>;
+    sceneImage?: SceneImageProvider;
   },
 ): Promise<GenerateVideoResult> {
   const script = createSceneScript(input.text);
@@ -164,6 +172,7 @@ export async function renderVideoRun(
   try {
     const audioPaths: string[] = [];
     const sceneVideoPaths: string[] = [];
+    const imageStats: SceneImageStats = { fluxImages: 0, gradientFallback: 0 };
     for (const scene of script.scenes) {
       const audioResult = await deps.synthesize(scene.narration, input.voice);
       if (!audioResult.ok) {
@@ -173,6 +182,24 @@ export async function renderVideoRun(
       await writeFile(audioPath, Buffer.from(audioResult.base64Mp3, "base64"));
       audioPaths.push(audioPath);
 
+      // Sprint 276: FLUX-Szenenbild, wenn verfügbar — sonst ehrlicher
+      // Farbverlauf-Rückfall pro Szene (niemals still, immer gezählt).
+      let imagePath: string | null = null;
+      if (deps.sceneImage) {
+        const imageResult = await deps.sceneImage(scene.visualPrompt);
+        if (imageResult.ok) {
+          const imagePathCandidate = path.join(workDir, `${scene.id}.png`);
+          const base64 = imageResult.dataUrl.slice(imageResult.dataUrl.indexOf(",") + 1);
+          await writeFile(imagePathCandidate, Buffer.from(base64, "base64"));
+          imagePath = imagePathCandidate;
+          imageStats.fluxImages += 1;
+        } else {
+          imageStats.gradientFallback += 1;
+        }
+      } else {
+        imageStats.gradientFallback += 1;
+      }
+
       const outputPath = path.join(workDir, `${scene.id}.mp4`);
       const rendered = await deps.assembler.renderScene({
         audioPath,
@@ -180,6 +207,7 @@ export async function renderVideoRun(
         sceneId: scene.id,
         gradientIndex: scene.index,
         outputPath,
+        imagePath,
       });
       if (!rendered.ok) {
         return { ok: false, reason: rendered.reason, retryHint: "Szenen-Render erneut versuchen.", configured: true };
@@ -201,13 +229,19 @@ export async function renderVideoRun(
     if (bytes.byteLength > VIDEO_LIMITS.maxVideoBytes) {
       return { ok: false, reason: `Video überschreitet die Größenobergrenze (${Math.round(bytes.byteLength / 1024 / 1024)} MB).`, retryHint: "Text kürzen.", configured: true };
     }
+    const visualNote =
+      imageStats.fluxImages > 0
+        ? `${imageStats.fluxImages}/${script.scenes.length} Szenen mit echten FLUX-Bildern` +
+          (imageStats.gradientFallback > 0 ? `, ${imageStats.gradientFallback} mit Farbverlauf-Rückfall (ehrlich gezählt)` : "")
+        : `synthetische Farbverlauf-Bühne (Ken-Burns)${deps.sceneImage ? " — FLUX-Bilder aktuell nicht verfügbar" : ""}`;
     return {
       ok: true,
       source: "render",
       dataUrl: `data:video/mp4;base64,${bytes.toString("base64")}`,
-      note: `${script.scenes.length} Szenen, ~${script.estimatedTotalSeconds}s, 1080p mit Untertiteln — synthetische Farbverlauf-Bühne (Ken-Burns), Stimme ${input.voice}.`,
+      note: `${script.scenes.length} Szenen, ~${script.estimatedTotalSeconds}s, 1080p mit Untertiteln — ${visualNote}, Stimme ${input.voice}.`,
       sceneCount: script.scenes.length,
       totalSeconds: script.estimatedTotalSeconds,
+      sceneImages: imageStats,
     };
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
@@ -244,6 +278,7 @@ export async function generateVideoForUser(
       note: `Aus dem Video-Cache (${Math.round(cached.bytes / 1024 / 1024)} MB, ${cached.sceneCount} Szenen, ~${cached.totalSeconds}s).`,
       sceneCount: cached.sceneCount,
       totalSeconds: cached.totalSeconds,
+      sceneImages: cached.sceneImages ?? { fluxImages: 0, gradientFallback: cached.sceneCount },
     };
   }
 
@@ -251,6 +286,7 @@ export async function generateVideoForUser(
     cache,
     assembler: new FfmpegAssembler(),
     synthesize: synthesizeSpeech,
+    sceneImage: generateSceneImageForPipeline,
   });
   if (!result.ok) return result;
 
@@ -260,6 +296,7 @@ export async function generateVideoForUser(
     createdAt: new Date().toISOString(),
     sceneCount: result.sceneCount,
     totalSeconds: result.totalSeconds,
+    sceneImages: result.sceneImages,
   });
   return result;
 }
