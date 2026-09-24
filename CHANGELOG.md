@@ -4,6 +4,16 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 25.09.2026 — Superagent-Faehigkeitsparitaet gegen Base44 (kostenlos)
+
+- Skill-Registry: wiederverwendbare Skills mit Parameter-Validierung vor dem Lauf (`lib/agent-skill-registry-logic.ts`)
+- Workflow-Scheduler: cron/Intervall/Einmal/Entity-Trigger, verpasste Laeufe bleiben faellig, pausiert laeuft nie (`lib/agent-workflow-scheduler-logic.ts`)
+- Sub-Agent-Delegation: Missionen mit Task-Graphen, Konflikt-Ressourcen, Scopes, Policies (`lib/subagent-delegation-logic.ts`)
+- Tool-Router: 7 Intents auf lokale/gratis Werkzeuge, unkonfiguriert bleibt ehrlich (`lib/agent-tool-router-logic.ts`)
+- Channel-Paritaet: Telegram/WhatsApp/iMessage/Slack/Phone, Gratis-Grenzen offen benannt (`lib/channel-parity-logic.ts`)
+- Capability-Registry: 10-Faehigkeiten-Katalog gegen Modul-Evidenz — 7 voll gruen, 3 gruen mit benannter Gratis-Grenze, 0 rot (`lib/superagent-capability-registry-logic.ts`)
+- 31 neue Tests (1.951 Tests gruen in 246 Testdateien)
+
 ## 25.09.2026 — Sprint-85-Flaky behoben (Root-Cause-Fix)
 
 - Echte Ursache: bei `isolate: false` leakte die Rotations-Agent-Suite Modul-Spiegel (`rotationPrimary`) + Env (`AI_GROQ_API_KEY`/`AI_OPENROUTER_API_KEY`) in die Sprint-85-Suite — Kette wurde lastabhaengig umsortiert (1 statt 2 Calls) oder verlaengert (3 statt 2)
