@@ -4,6 +4,20 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 25.09.2026 — Sprints 334–343: Serie F — Integrationen
+
+- E-Mail v2 (Sprint 334): Anhaenge mit Limits + versionierte Vorlagen (`lib/email-attachments-logic.ts`)
+- Kalender (Sprint 335): provider-abstrahierte Termine, Lese-Fehler bleibt Fehler (`lib/calendar-integration-logic.ts`)
+- Webhook-Eingang (Sprint 336): Signatur-Pruefung, Feld-Whitelist, Replay-Fenster (`lib/webhook-ingest-logic.ts`)
+- Export-Center (Sprint 337): JSON/CSV mit Manifest und Formel-Injektions-Schutz (`lib/export-center-logic.ts`)
+- Import-Wizard (Sprint 338): Validierung vor Schreiben, Fehler je Zeile (`lib/import-wizard-logic.ts`)
+- API-Keys (Sprint 339): Scope-Begrenzung, Ablauf, Widerruf, Fingerprint-Praefix (`lib/api-keys-logic.ts`)
+- API-Doku (Sprint 340): ehrliche Endpunkt-Doku, Luecken werden markiert (`lib/api-docs-logic.ts`)
+- Slack/Discord-Webhooks (Sprint 341): Schweregrad-Filter, ehrliche Versand-Bilanz (`lib/outbound-webhooks-logic.ts`)
+- Integrations-Diagnose (Sprint 342): echter Probe-Call, nicht geprueft ist nie gruen (`lib/integration-diagnostics-logic.ts`)
+- Serie-F-Abschluss (Sprint 343): Doku + CHANGELOG + Tracker + Version 3.0.0
+- 42 neue Tests (1.919 Tests gruen in 239 Testdateien)
+
 ## 25.09.2026 — Sprints 324–333: Serie E — Zuverlässigkeit & Sicherheit
 
 - Strukturierte Logs (Sprint 324): Korrelations-ID, Maskierung, Level-Gate (`lib/structured-logs-logic.ts`)
