@@ -79,6 +79,13 @@ import {
 } from "./model-router";
 
 import { autonomousKeyRecovery, getRuntimeApiKey, isProviderDisabledRuntime } from "./provider-admin";
+// Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette unterbrechungsfrei).
+import {
+  forceRouteRotation,
+  getRouteRotationStatus,
+  setRouteRotationEnabled,
+} from "./route-rotation-agent";
+import { FREE_ROUTE_SOURCES } from "../lib/route-rotation-agent-logic";
 
 const providerSchema = z.enum([
   "auto",
@@ -391,6 +398,19 @@ export const developmentChatRouter = router({
 
   /** Sprint 71 — Lokale Endpoints (Ollama/LM Studio) aktiv anpingen. */
   probeLocalProviders: adminProcedure.mutation(async () => probeLocalProviders()),
+
+  /** Sprint 196 — Rotations-Agent: vollstaendiger Status-Snapshot (Admin). */
+  routeRotationStatus: adminProcedure.query(async () => getRouteRotationStatus()),
+
+  /** Sprint 196 — Rotations-Agent pausieren/fortsetzen (Admin-Vollzugriff). */
+  setRouteRotationEnabled: adminProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ input }) => ({ enabled: await setRouteRotationEnabled(input.enabled) })),
+
+  /** Sprint 196 — Primaerroute erzwingen oder Zwang aufheben ('auto'). */
+  forceRouteRotation: adminProcedure
+    .input(z.object({ to: z.enum([...FREE_ROUTE_SOURCES, "auto"]) }))
+    .mutation(async ({ input }) => forceRouteRotation({ to: input.to })),
 
   send: protectedProcedure
     .input(chatInputSchema)
