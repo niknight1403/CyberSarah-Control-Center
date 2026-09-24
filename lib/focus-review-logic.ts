@@ -452,3 +452,110 @@ function extractNewFocus(prompt: string, day: string | null): { title: string; d
   const noteMatch = prompt.match(/Notiz\s*:([^;\n]+)/i);
   return { title, day, note: noteMatch?.[1]?.trim() ?? null };
 }
+
+/* ==================== Ehrliches Prompt-Ergebnis (Sprint 237) ==================== */
+
+export type FocusResult = {
+  headline: string;
+  lines: string[];
+  disclaimer: string;
+};
+
+/** Findet Punkte per Titel-Anteil (case-insensitive) — nie per ID-Raten. */
+export function findFocusByTitle(items: FocusItem[], query: string): FocusItem[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length < 3) return [];
+  return items.filter((item) => item.title.toLowerCase().includes(needle));
+}
+
+/**
+ * Baut die ehrliche Antwort auf ein Fokus-Kommando: Auskunft sofort,
+ * Änderungen nur als Freigabe-Anfrage formuliert — ausgeführt wird
+ * außerhalb und erst nach Bestätigung.
+ */
+export function buildFocusResult(command: FocusPromptCommand, items: FocusItem[], now = Date.now): FocusResult {
+  const lines: string[] = [];
+  const disclaimer = FOCUS_DISCLAIMER;
+
+  const targets = command.titleQuery ? findFocusByTitle(items, command.titleQuery) : [];
+
+  if (command.actions.includes("add")) {
+    if (!command.newFocus) {
+      lines.push('Kein Fokus-Punkt erkannt — nenne ihn z. B. als "Plane Fokus: <Titel>".');
+    } else {
+      const day = command.newFocus.day ?? isoDayFromTimestamp(now());
+      if (!isIsoDay(day)) {
+        lines.push("Ungültiger Tag für den Fokus-Punkt — bitte Datum prüfen.");
+      } else if (!hasDayCapacity(items, day)) {
+        lines.push(`Tag ${day} ist voll: max. ${FOCUS_LIMITS.maxPerDay} Punkte pro Tag — erst einen Punkt abschließen, verschieben oder streichen.`);
+      } else {
+        lines.push(`Fokus-Punkt für ${day} vorbereitet: "${command.newFocus.title}" — angelegt wird erst nach deiner Bestätigung.`);
+      }
+    }
+  }
+
+  if (command.actions.includes("list")) {
+    const active = items.filter((item) => item.status === "active");
+    if (items.length === 0) {
+      lines.push("Noch keine Fokus-Punkte gespeichert — der leere Zustand ist echt, kein Fehler.");
+    } else if (active.length === 0) {
+      lines.push(`${items.length} Punkt(e) gespeichert, keiner mehr aktiv — Zeit für einen Rückblick oder neue Punkte.`);
+    } else {
+      lines.push(`Aktive Fokus-Punkte: ${active.map((item) => `"${item.title}" (${item.day})`).join(", ")}.`);
+    }
+  }
+
+  if (command.actions.includes("day") && command.day) {
+    const verdict = evaluateFocusDay(items, command.day);
+    lines.push(`${command.day}: ${verdict.headline}.`);
+    for (const observation of verdict.observations) lines.push(`• ${observation}`);
+  }
+
+  if (command.titleQuery && targets.length === 0 && !command.actions.includes("add")) {
+    lines.push(`Kein Punkt passt zu "${command.titleQuery}" — bitte den Titel prüfen.`);
+  }
+  if (targets.length > 1) {
+    lines.push(`Uneindeutig: ${targets.length} Punkte passen (${targets.map((item) => item.title).slice(0, 4).join(", ")}) — bitte genauer benennen.`);
+  }
+
+  if (targets.length === 1) {
+    const target = targets[0]!;
+    const statusLine = `Punkt "${target.title}" (${target.day}): ${focusStatusLabel(target.status)}.`;
+    if (command.actions.includes("complete")) {
+      lines.push(`${statusLine} Als erledigt markieren — erst nach deiner Bestätigung.`);
+    } else if (command.actions.includes("move")) {
+      const day = command.day ?? isoDayFromTimestamp(now());
+      if (!hasDayCapacity(items, day)) {
+        lines.push(`Verschieben nach ${day} blockiert: Tag voll (max. ${FOCUS_LIMITS.maxPerDay} Punkte).`);
+      } else {
+        lines.push(`${statusLine} Verschieben nach ${day} vorbereitet — erst nach deiner Bestätigung.`);
+      }
+    } else if (command.actions.includes("drop")) {
+      lines.push(`${statusLine} Fallen lassen ist endgültig sichtbar — erst nach deiner Bestätigung.`);
+    } else if (!command.actions.includes("day") && !command.actions.includes("list")) {
+      lines.push(statusLine);
+    }
+  }
+
+  if (command.actions.includes("review")) {
+    const weekStart = isoWeekStart(now());
+    const review = buildWeeklyReview(items, weekStart);
+    lines.push(`${review.headline}: ${review.summary}`);
+    for (const observation of review.observations) lines.push(`• ${observation}`);
+    const prompts = selectReflectionPrompts(review);
+    for (const prompt of prompts) {
+      lines.push(`Frage: ${prompt.question}`);
+      lines.push(`  (${prompt.rationale})`);
+    }
+  }
+
+  if (lines.length === 0) lines.push('Alles im Plan — z. B. "Zeig alle Fokus-Punkte" oder "Wochenrückblick".');
+  const headline = command.actions.includes("review")
+    ? "Wochenrückblick"
+    : command.actions.includes("add")
+      ? "Neuer Fokus-Punkt"
+      : targets.length === 1
+        ? `Fokus: ${targets[0]!.title}`
+        : "Fokus & Rückblick";
+  return { headline, lines, disclaimer };
+}

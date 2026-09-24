@@ -6,6 +6,7 @@ import {
   buildWeeklyReview,
   isoWeekStart,
   selectReflectionPrompts,
+  buildFocusResult,
   parseFocusPrompt,
   countDayFocus,
   createFocusItem,
@@ -258,5 +259,53 @@ describe("focus prompt parsing (Sprint 236)", () => {
     expect(parseFocusPrompt('Streiche "Post finalisieren"').actions).toContain("drop");
     expect(parseFocusPrompt("Wochenrückblick").actions).toContain("review");
     expect(parseFocusPrompt('Erledige "Post finalisieren"').titleQuery).toBe("Post finalisieren");
+  });
+});
+
+describe("focus honest result builder (Sprint 237)", () => {
+  const now = () => new Date(2026, 8, 24, 12, 0).getTime();
+  const itemA = createFocusItem({ day: "2026-09-24", title: "Post finalisieren" }, now);
+  const itemB = createFocusItem({ day: "2026-09-24", title: "Post überarbeiten" }, () => now() + 5);
+
+  it("listet ehrlich inklusive echtem Leerzustand", () => {
+    const result = buildFocusResult({ actions: ["list"], titleQuery: null, day: null, newFocus: null }, [], now);
+    expect(result.lines[0]).toContain("leere Zustand ist echt");
+  });
+
+  it("bereitet neue Punkte vor und meldet volle Tage", () => {
+    const items = [1, 2, 3].map((n) => createFocusItem({ day: "2026-09-25", title: `Punkt ${n} am Tag` }, now));
+    const prepared = buildFocusResult({ actions: ["add"], titleQuery: null, day: "2026-09-25", newFocus: { title: "Vierter Punkt", day: "2026-09-25", note: null } }, items, now);
+    expect(prepared.lines[0]).toContain("voll");
+    expect(prepared.lines[0]).toContain("max. 3 Punkte");
+    const free = buildFocusResult({ actions: ["add"], titleQuery: null, day: "2026-09-26", newFocus: { title: "Vierter Punkt", day: "2026-09-26", note: null } }, items, now);
+    expect(free.lines[0]).toContain("vorbereitet");
+    expect(free.lines[0]).toContain("Bestätigung");
+  });
+
+  it("erledigen und streichen bleiben Freigabe-Anfragen", () => {
+    const complete = buildFocusResult(parseFocusPrompt('Erledige "Post finalisieren"', now), [itemA, itemB], now);
+    expect(complete.lines.some((line) => line.includes("erledigt markieren") && line.includes("Bestätigung"))).toBe(true);
+    const drop = buildFocusResult(parseFocusPrompt('Streiche "Post finalisieren"', now), [itemA, itemB], now);
+    expect(drop.lines.some((line) => line.includes("endgültig"))).toBe(true);
+  });
+
+  it("benennt uneindeutige Titel statt zu raten", () => {
+    const result = buildFocusResult(parseFocusPrompt('Erledige "Post"', now), [itemA, itemB], now);
+    expect(result.lines.some((line) => line.includes("Uneindeutig"))).toBe(true);
+    expect(result.headline).toBe("Fokus & Rückblick");
+  });
+
+  it("Wochenrückblick enthält Beobachtungen und genau zwei Fragen", () => {
+    const result = buildFocusResult(parseFocusPrompt("Wochenrückblick", now), [itemA], now);
+    expect(result.headline).toBe("Wochenrückblick");
+    expect(result.lines.filter((line) => line.startsWith("Frage:"))).toHaveLength(2);
+    expect(result.lines.some((line) => line.includes("2026-09-21"))).toBe(true);
+    expect(result.disclaimer).toContain("keine automatische Ausführung");
+  });
+
+  it("Tages-Anfrage zeigt die ehrliche Tages-Bewertung", () => {
+    const result = buildFocusResult({ actions: ["day"], titleQuery: null, day: "2026-09-24", newFocus: null }, [itemA], now);
+    expect(result.lines[0]).toContain("2026-09-24");
+    expect(result.lines.some((line) => line.startsWith("• "))).toBe(true);
   });
 });
