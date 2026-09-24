@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 24.09.2026 — Sprints 294–298: Produkt-Politur & i18n (Serie B Batch 3)
+
+- EN-Sprach-Toggle (Sprint 294): Vollständiges i18n-System mit DE/EN-Wörterbuch (42 UI-Keys), Sprach-Normalisierung und Persistenz-Helfern (`lib/i18n-language-logic.ts`)
+- Onboarding v2 (Sprint 295): Geführter 3-Schritt-Onboarding mit ehrlichen Erwartungen und Beta-Kennzeichnung, V1-Migrations-Helfer für Bestandskunden (`lib/onboarding-v2-logic.ts`)
+- Template-Galerie (Sprint 296): 7 Starter-Templates in 4 Kategorien mit Kategorie-Filter und ehrlichen Grenzen je Template (`lib/template-gallery-logic.ts`)
+- Chat-Leerer-Zustand (Sprint 297): 4 hilfreiche Starter-Prompts statt weißer Fläche, Repo-abhängige Prompts deaktiviert aber sichtbar (`lib/chat-empty-state-logic.ts`)
+- Fehlerbildschirme (Sprint 298): Sprechende Fallbacks statt rotem Diagnose-Overlay im Release-APK, Fehlerklassifikation ohneStacktrace-Lecks (`lib/error-fallback-logic.ts`)
+- 95 neue Tests (1.684 Tests grün in 197 Testdateien)
+
 ## 24.09.2026 — Sprints 289–293: Werkzeuge, Retry-Semantik, Kontext-Verdichtung & GitHub-Sync (Serie A Batch 2 & Abschluss)
 
 - Werkzeug-Fehlerklassen & Retry-Semantik (Sprint 289): Wiederholbare vs. fatale Fehler mit exponentiellem Backoff und transparentem Limit-Handling (`lib/tool-error-classification-logic.ts`)
