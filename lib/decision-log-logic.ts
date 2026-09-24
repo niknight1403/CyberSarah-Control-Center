@@ -318,7 +318,6 @@ export function findDecisionByTitle(items: DecisionItem[], query: string): Decis
 export function buildDecisionResult(command: DecisionPromptCommand, items: DecisionItem[], now = Date.now): DecisionResult {
   const lines: string[] = [];
   const targets = command.titleQuery ? findDecisionByTitle(items, command.titleQuery) : [];
-  const today = isoDayFromTimestamp(now());
 
   if (command.actions.includes("add")) {
     if (!command.newDecision) {
