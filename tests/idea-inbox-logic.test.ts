@@ -5,6 +5,8 @@ import {
   countInboxOpen,
   createIdeaItem,
   hasInboxCapacity,
+  describeIdeaAge,
+  describeInboxAges,
   ideaStatusLabel,
   validateIdeaItem,
 } from "../lib/idea-inbox-logic";
@@ -41,5 +43,46 @@ describe("idea inbox core domain (Sprint 242)", () => {
     expect(ideaStatusLabel("inbox")).toBe("im Eingang");
     expect(ideaStatusLabel("planted")).toBe("gepflanzt");
     expect(ideaStatusLabel("dropped")).toBe("fallen gelassen");
+  });
+});
+
+describe("idea aging (Sprint 243)", () => {
+  const DAY = 86_400_000;
+
+  it("frische Ideen werden nicht zur Eile gedrängt", () => {
+    const idea = createIdeaItem({ title: "Neue Idee", source: "chat" }, () => 10 * DAY);
+    const view = describeIdeaAge(idea, () => 10 * DAY + 12 * 3_600_000);
+    expect(view.age).toBe("fresh");
+    expect(view.observation).toContain("legitim");
+  });
+
+  it("vergilbende Ideen bekommen Tage und sanfte Triage-Aufforderung", () => {
+    const idea = createIdeaItem({ title: "Ältere Idee", source: "spontan" }, () => 0);
+    const view = describeIdeaAge(idea, () => 7 * DAY);
+    expect(view.age).toBe("aging");
+    expect(view.daysInInbox).toBe(7);
+    expect(view.observation).toContain("Triage");
+  });
+
+  it("verwelkende Ideen bekommen die ehrliche Fallenlassen-Frage", () => {
+    const idea = createIdeaItem({ title: "Uralte Idee", source: "rückblick" }, () => 0);
+    const view = describeIdeaAge(idea, () => 21 * DAY);
+    expect(view.age).toBe("withering");
+    expect(view.observation).toContain("Fallen lassen wäre ehrlicher");
+  });
+
+  it("statistik über den Stapel bleibt bei entschiedenen Ideen ehrlich", () => {
+    const now = () => 30 * DAY;
+    const items = [
+      createIdeaItem({ title: "Frische Idee", source: "chat" }, () => 29 * DAY),
+      createIdeaItem({ title: "Vergilbte Idee", source: "chat" }, () => 20 * DAY),
+      createIdeaItem({ title: "Verwelkende Idee", source: "chat" }, () => 5 * DAY),
+      createIdeaItem({ title: "Behaltene Idee", source: "chat", status: "kept" }, () => 0),
+    ];
+    const stats = describeInboxAges(items, now);
+    expect(stats.openTotal).toBe(3);
+    expect(stats.fresh).toBe(1);
+    expect(stats.aging).toBe(1);
+    expect(stats.withering).toBe(1);
   });
 });

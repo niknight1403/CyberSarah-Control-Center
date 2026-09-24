@@ -90,3 +90,53 @@ export function createIdeaItem(input: Partial<IdeaItem>, now = Date.now): IdeaIt
     updatedAt: timestamp,
   };
 }
+
+/* ==================== Ideen-Reifung (Sprint 243) ==================== */
+
+export type IdeaAge = "fresh" | "aging" | "withering";
+
+export type IdeaAgeView = {
+  age: IdeaAge;
+  label: string;
+  daysInInbox: number;
+  /** Ehrliche Beschreibung, kein Mahntext, keine Lösch-Drohung. */
+  observation: string;
+};
+
+/**
+ * Beschreibt, wie lange eine Idee offen im Eingang liegt — als Beobachtung:
+ * vergilbende Ideen sind keine Fehler, aber unsichtbar zu vergilben lügt
+ * über den Zustand des Stapels.
+ */
+export function describeIdeaAge(idea: IdeaItem, now = Date.now): IdeaAgeView {
+  const days = Math.max(0, Math.floor((now() - idea.capturedAt) / 86_400_000));
+  if (days <= 2) {
+    return { age: "fresh", label: "frisch", daysInInbox: days, observation: "Gerade erst angekommen — erst mal liegen lassen ist legitim." };
+  }
+  if (days <= 13) {
+    return {
+      age: "aging",
+      label: "vergilbt",
+      daysInInbox: days,
+      observation: `${days} Tage im Eingang — noch nichts Verwerfliches, aber die Triage sollte sie bald gesehen haben.`,
+    };
+  }
+  return {
+    age: "withering",
+    label: "verwelkend",
+    daysInInbox: days,
+    observation: `${days} Tage ohne Entscheidung — vermutlich war es ein Impuls, kein Vorhaben. Fallen lassen wäre ehrlicher als ewiges Aufbewahren.`,
+  };
+}
+
+/** Alters-Statistik des ganzen Stapels — ehrlich, auch bei leerer Inbox. */
+export function describeInboxAges(items: IdeaItem[], now = Date.now): { fresh: number; aging: number; withering: number; openTotal: number } {
+  const open = items.filter((item) => item.status === "inbox");
+  const views = open.map((idea) => describeIdeaAge(idea, now));
+  return {
+    fresh: views.filter((view) => view.age === "fresh").length,
+    aging: views.filter((view) => view.age === "aging").length,
+    withering: views.filter((view) => view.age === "withering").length,
+    openTotal: open.length,
+  };
+}
