@@ -10,6 +10,7 @@ import {
   createDecisionItem,
   decisionStatusLabel,
   findDueForReview,
+  parseDecisionPrompt,
   hasOpenCapacity,
   isIsoDay,
   validateDecisionItem,
@@ -149,5 +150,38 @@ describe("supersede with visible history (Sprint 254)", () => {
     expect(chain).toHaveLength(2);
     expect(chain[0]).toContain("ersetzt");
     expect(chain[1]).toContain("Zweite Entscheidung im Mai");
+  });
+});
+
+describe("decision prompt parsing (Sprint 255)", () => {
+  it("parst neue Entscheidungen mit Erwartung und Nachprüf-Tag", () => {
+    const command = parseDecisionPrompt("Entscheidung: Preis für Pro um 20% erhöht; Kontext: Marge zu dünn; Erwartung: Umsatz pro Kunde +10% bis Q4; Nachprüfen: 2026-12-31");
+    expect(command.actions).toContain("add");
+    expect(command.newDecision?.title).toBe("Preis für Pro um 20% erhöht");
+    expect(command.newDecision?.expectation).toBe("Umsatz pro Kunde +10% bis Q4");
+    expect(command.newDecision?.reviewBy).toBe("2026-12-31");
+    expect(command.newDecision?.context).toBe("Marge zu dünn");
+  });
+
+  it("ohne Erwartung bleibt es ehrlich unvollständig", () => {
+    const command = parseDecisionPrompt("Entscheidung: Irgendwas neues probieren");
+    expect(command.newDecision).toBeNull();
+  });
+
+  it("parst Nachprüfungs-Berichte mit Ergebnis", () => {
+    const command = parseDecisionPrompt('Nachprüfen für "Preis für Pro"; Ergebnis: Umsatz gestiegen, Erwartung erfüllt');
+    expect(command.actions).toContain("review");
+    expect(command.outcomeReport).toBe("Umsatz gestiegen, Erwartung erfüllt");
+    expect(command.titleQuery).toBe("Preis für Pro");
+  });
+
+  it("verneinte Aufträge werden nie ausführend", () => {
+    expect(parseDecisionPrompt("Status zeigen, aber nicht nachprüfen").actions).toEqual(["status"]);
+    expect(parseDecisionPrompt("Übersicht, nichts ersetzen").actions).toEqual(["status"]);
+  });
+
+  it("leerer und unklarer Text enden sicher", () => {
+    expect(parseDecisionPrompt("").actions).toEqual(["list"]);
+    expect(parseDecisionPrompt("hm?").actions).toEqual(["status"]);
   });
 });

@@ -238,3 +238,60 @@ export function describeSupersedeChain(items: DecisionItem[], decisionId: string
   // Chronologisch vom Ursprung zur Nachfolgerin — der älteste Eintrag zuerst.
   return chain;
 }
+
+/* ==================== Prompt-Parsing (Sprint 255) ==================== */
+
+export type DecisionPromptAction = "add" | "review" | "supersede" | "status" | "list";
+
+export type DecisionPromptCommand = {
+  actions: DecisionPromptAction[];
+  titleQuery: string | null;
+  newDecision: { title: string; context: string | null; expectation: string; reviewBy: string | null } | null;
+  /** Bericht für eine Nachprüfung — null, wenn keiner erkannt. */
+  outcomeReport: string | null;
+};
+
+/** Parst deutsche Entscheidungs-Aufträge. Verneinte Aufträge bleiben Anfragen. */
+export function parseDecisionPrompt(prompt: string, now = Date.now): DecisionPromptCommand {
+  const trimmed = prompt.trim();
+  if (!trimmed) return { actions: ["list"], titleQuery: null, newDecision: null, outcomeReport: null };
+
+  const negated = /(nicht|nichts|kein\w*)\s+(nachprüf|prüf\w*|ersetz\w*|ändern|änderst)/i.test(trimmed);
+  if (negated) return { actions: ["status"], titleQuery: extractDecisionTitleQuery(trimmed), newDecision: null, outcomeReport: null };
+
+  const actions: DecisionPromptAction[] = [];
+  if (/\b(entscheid\w*|beschloss\w*|festgehal\w*|notier|notiere|hinzufü)/i.test(trimmed)) actions.push("add");
+  if (/\b(nachprüf|prüf\w*\s+nach|ergebnis|bericht)/i.test(trimmed)) actions.push("review");
+  if (/\b(ersetz\w*|korrigier\w*|überarbeit\w*)/.test(trimmed) && /\bersetz/i.test(trimmed)) actions.push("supersede");
+  if (/\b(status|stand|fällig|überfällig)/i.test(trimmed)) actions.push("status");
+  if (/\b(liste|übersicht|alle|zeig|journal)/i.test(trimmed)) actions.push("list");
+  if (actions.length === 0) actions.push("status");
+
+  const newDecision = actions.includes("add") ? extractNewDecision(trimmed) : null;
+  const outcomeReport = actions.includes("review") ? extractOutcomeReport(trimmed) : null;
+  return { actions, titleQuery: extractDecisionTitleQuery(trimmed), newDecision, outcomeReport };
+}
+
+function extractDecisionTitleQuery(prompt: string): string | null {
+  const quoted = prompt.match(/["'„]([^"'„]{3,})["'„]/);
+  if (quoted?.[1]) return quoted[1].trim();
+  const colon = prompt.match(/\b(?:für|von)\s+(?:die\s+Entscheidung\s+)?([\w\- /!?:.,&+]+)/i);
+  return colon?.[1]?.trim() || null;
+}
+
+function extractNewDecision(prompt: string): { title: string; context: string | null; expectation: string; reviewBy: string | null } | null {
+  const colon = prompt.match(/(?:Entscheidung|Beschluss)\s*:([^;\n]+)/i);
+  const title = colon?.[1]?.trim();
+  const expectationMatch = prompt.match(/Erwartung\s*:([^;\n]+)/i);
+  const expectation = expectationMatch?.[1]?.trim();
+  if (!title || !expectation) return null;
+  const contextMatch = prompt.match(/Kontext\s*:([^;\n]+)/i);
+  const reviewMatch = prompt.match(/(?:Nachprüf\w*|Prüftermin)\s*:([^;\n]+)/i);
+  const reviewBy = reviewMatch?.[1]?.trim() ?? null;
+  return { title, context: contextMatch?.[1]?.trim() ?? null, expectation, reviewBy };
+}
+
+function extractOutcomeReport(prompt: string): string | null {
+  const report = prompt.match(/(?:Ergebnis|Bericht)\s*:([^;\n]+)/i);
+  return report?.[1]?.trim() ?? null;
+}
