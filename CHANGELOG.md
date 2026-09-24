@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 24.09.2026 — Sprints 289–293: Werkzeuge, Retry-Semantik, Kontext-Verdichtung & GitHub-Sync (Serie A Batch 2 & Abschluss)
+
+- Werkzeug-Fehlerklassen & Retry-Semantik (Sprint 289): Wiederholbare vs. fatale Fehler mit exponentiellem Backoff und transparentem Limit-Handling (`lib/tool-error-classification-logic.ts`)
+- Agent-Kontextfenster-Verdichtung (Sprint 290): Automatische Zusammenfassung vor Token-Überlauf unter vollständiger Konservierung aller Dateipfade und Entscheidungen (`lib/agent-context-window-logic.ts`)
+- Commit-Diff-Vorschau (Sprint 291): Transparente Hunk- und Zeilenänderungs-Vorschau im Chat vor Git-Commit (`lib/commit-preview-logic.ts`)
+- Sprint-Ziele als GitHub-Issue (Sprint 292): Transformation von Sprint-Zielen in GitHub-Issues mit Markdown-Checklisten und Sync-Steuerung (`lib/sprint-issue-bridge-logic.ts`)
+- Serie-A-Abschluss & Validierung (Sprint 293): Doku `docs/2026-09-24_SPRINTS_289-293_SERIE_A_ABSCHLUSS.md` und Tracker-Aktualisierung
+- 17 neue Tests (1.589 Tests grün in 192 Testdateien)
+
 ## 24.09.2026 — Sprints 284–288: Agent-Werkzeuge & Dev-Loop-Tiefe (Serie A Batch 1)
 
 - Live-Preview-Zyklus Chat↔Preview (Sprint 284): Zustandssynchronisation, Verfolgung und Wiederherstellung ohne Zustandsverlust (`lib/live-preview-cycle-logic.ts`)
