@@ -118,3 +118,63 @@ export function findDueForReview(items: DecisionItem[], now = Date.now): Decisio
 export function hasOpenCapacity(items: DecisionItem[]): boolean {
   return countOpenDecisions(items) < DECISION_LIMITS.maxOpen;
 }
+
+/* ==================== Nachprüfungs-Verdikt (Sprint 253) ==================== */
+
+export type ReviewVerdict = {
+  status: DecisionStatus;
+  /** Warum dieses Verdikt — nachvollziehbar, ohne Rechtfertigungs-Druck. */
+  rationale: string;
+};
+
+/**
+ * Bewertet eine Nachprüfung ehrlich: Die Erwartung wurde beim Festhalten
+ * als prüfbare Aussage formuliert. Beim Nachprüfen zählt nur der Vergleich.
+ *   - bestätigt: Die Aussage ist eingetroffen.
+ *   - nicht eingetroffen: Die Aussage ist nicht eingetroffen — ein Ergebnis,
+ *     kein Vorwurf, und die Entscheidung wird trotzdem nicht rückwirkend
+ *     dumm. Unsicherheit war beim Treffen erlaubt.
+ *   - unklar: Der Nutzer kann oder will nicht eindeutig messen — das wird
+ *     dokumentiert statt zur Zahl geschönt.
+ */
+export function buildReviewVerdict(
+  decision: DecisionItem,
+  outcomeReport: string,
+  now = Date.now,
+): ReviewVerdict {
+  const trimmed = outcomeReport.trim();
+  const today = isoDayFromTimestamp(now());
+  if (trimmed.length < 5) {
+    return { status: "unclear", rationale: "Kein Ergebnis berichtet — unklar dokumentieren ist ehrlicher als ein Verdikt aus Stille." };
+  }
+  // Explizite Unsicherheit geht vor: "schwer zu sagen" ist eine Aussage
+  // über die Messbarkeit, nicht über das Ergebnis.
+  const uncertain = /(schwer zu sagen|unklar|weiß nicht|nicht sicher|gemischt|mal besser, mal schlechter|kaum messbar)/i.test(trimmed);
+  if (uncertain) {
+    return { status: "unclear", rationale: `Bericht nennt die Messbarkeit selbst unklar — am ${today} als unklar dokumentiert, nicht geraten.` };
+  }
+  // Der Nutzer benennt das Ergebnis selbst; wir ordnen nur ehrlich ein.
+  const negative = /\b(nicht|kein\w*|weniger|gescheitert|schlechter|gefallen|abgesagt|verfehlt|verpasst)\b/i.test(trimmed);
+  const positive = /\b(bestätigt|eingetroffen|gestiegen|gewachsen|erreicht|geklappt|gelungen|erfüllt|plus)\b/i.test(trimmed);
+  if (positive && !negative) {
+    return { status: "confirmed", rationale: `Erwartung eingetroffen — dokumentiert am ${today}. Der Eintrag bleibt unverändert lesbar.` };
+  }
+  if (negative && !positive) {
+    return { status: "wrong", rationale: `Erwartung nicht eingetroffen — dokumentiert am ${today}. Ein Ergebnis, kein Vorwurf: die Entscheidung durfte unsicher sein, das Journal darf lügen nicht.` };
+  }
+  return {
+    status: "unclear",
+    rationale: `Bericht enthält beides oder keines eindeutig — am ${today} als unklar dokumentiert, nicht geraten.`,
+  };
+}
+
+/** Wendet ein Nachprüfungs-Verdikt an — nur nach Nutzer-Bestätigung aufrufbar. */
+export function applyReviewVerdict(decision: DecisionItem, verdict: ReviewVerdict, outcomeReport: string, now = Date.now): DecisionItem {
+  const timestamp = now();
+  return {
+    ...decision,
+    status: verdict.status,
+    reviewNote: outcomeReport.trim(),
+    updatedAt: timestamp,
+  };
+}

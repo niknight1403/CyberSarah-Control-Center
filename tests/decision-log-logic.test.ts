@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   DECISION_LIMITS,
   countOpenDecisions,
+  applyReviewVerdict,
+  buildReviewVerdict,
   createDecisionItem,
   decisionStatusLabel,
   findDueForReview,
@@ -55,5 +57,43 @@ describe("decision log core domain (Sprint 252)", () => {
     expect(findDueForReview([dueToday, future], now).map((item) => item.id)).toEqual([dueToday.id]);
     expect(decisionStatusLabel("confirmed")).toBe("Erwartung bestätigt");
     expect(decisionStatusLabel("wrong")).toBe("Erwartung nicht eingetroffen");
+  });
+});
+
+describe("review verdict (Sprint 253)", () => {
+  const now = () => new Date(2026, 8, 24, 12, 0).getTime();
+  const base = () => createDecisionItem({ title: "Preis für Pro um 20% erhöht", expectation: "Umsatz pro Kunde steigt um 10% bis Q4", reviewBy: "2026-09-24" }, now);
+
+  it("bestätigt klare positive Berichte mit Datum", () => {
+    const verdict = buildReviewVerdict(base(), "Umsatz pro Kunde erreicht +12%, Erwartung erfüllt", now);
+    expect(verdict.status).toBe("confirmed");
+    expect(verdict.rationale).toContain("2026-09-24");
+  });
+
+  it("dokumentiert Verfehlen als Ergebnis, nicht als Vorwurf", () => {
+    const verdict = buildReviewVerdict(base(), "Umsatz gesunken, Kunden weniger — Verfehlt", now);
+    expect(verdict.status).toBe("wrong");
+    expect(verdict.rationale).toContain("kein Vorwurf");
+  });
+
+  it("unentscheidbare Berichte werden als unklar benannt, nie geraten", () => {
+    const verdict = buildReviewVerdict(base(), "Mal besser, mal schlechter, schwer zu sagen", now);
+    expect(verdict.status).toBe("unclear");
+    expect(verdict.rationale).toContain("nicht geraten");
+  });
+
+  it("leere Berichte bleiben ehrlich unklar statt still zu bestätigen", () => {
+    const verdict = buildReviewVerdict(base(), "  ", now);
+    expect(verdict.status).toBe("unclear");
+    expect(verdict.rationale).toContain("aus Stille");
+  });
+
+  it("applyReviewVerdict setzt Status und Bericht, ändert aber die Ursprungs-Formulierung nicht", () => {
+    const decision = base();
+    const reviewed = applyReviewVerdict(decision, { status: "wrong", rationale: "r" }, "Umsatz nicht gestiegen", now);
+    expect(reviewed.status).toBe("wrong");
+    expect(reviewed.reviewNote).toBe("Umsatz nicht gestiegen");
+    expect(reviewed.expectation).toBe(decision.expectation);
+    expect(reviewed.decidedAt).toBe(decision.decidedAt);
   });
 });
