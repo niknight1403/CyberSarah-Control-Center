@@ -5,6 +5,8 @@ import {
   countOpenDecisions,
   applyReviewVerdict,
   buildReviewVerdict,
+  describeSupersedeChain,
+  supersedeDecision,
   createDecisionItem,
   decisionStatusLabel,
   findDueForReview,
@@ -95,5 +97,57 @@ describe("review verdict (Sprint 253)", () => {
     expect(reviewed.reviewNote).toBe("Umsatz nicht gestiegen");
     expect(reviewed.expectation).toBe(decision.expectation);
     expect(reviewed.decidedAt).toBe(decision.decidedAt);
+  });
+});
+
+describe("supersede with visible history (Sprint 254)", () => {
+  const now = () => new Date(2026, 8, 24, 12, 0).getTime();
+  const base = () => createDecisionItem({ title: "Preis für Pro um 20% erhöht", expectation: "Umsatz pro Kunde steigt um 10% bis Q4", reviewBy: "2026-12-31" }, now);
+
+  it("ersetzt sichtbar und bewahrt die alte Formulierung unverändert", () => {
+    const decision = base();
+    const outcome = supersedeDecision(
+      [decision],
+      decision.id,
+      { title: "Preis für Pro um 15% erhöht", expectation: "Umsatz pro Kunde steigt um 8% bis Q4, Churn unter 5%", reviewBy: "2027-01-31" },
+      now,
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    const superseded = outcome.items.find((item) => item.id === decision.id)!;
+    expect(superseded.status).toBe("superseded");
+    expect(superseded.expectation).toBe(decision.expectation);
+    expect(superseded.reviewNote).toContain("unverändert");
+    expect(outcome.items.some((item) => item.status === "open")).toBe(true);
+    expect(outcome.note).toContain("bleibt als ersetzt lesbar");
+  });
+
+  it("lehnt doppeltes Ersetzen als Verlaufslüge ab", () => {
+    const decision = base();
+    const first = supersedeDecision([decision], decision.id, { title: "Nachfolge-Entscheidung A", expectation: "Erwartung mit Termin und Zahl", reviewBy: "2026-12-31" }, now);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const second = supersedeDecision(first.items, decision.id, { title: "Nachfolge-Entscheidung B", expectation: "Erwartung mit Termin und Zahl", reviewBy: "2026-12-31" }, now);
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.reason).toContain("Verlaufslüge");
+  });
+
+  it("lehnt unbekannte Ziele und invalide Nachfolger ehrlich ab", () => {
+    const decision = base();
+    const missing = supersedeDecision([decision], "gibtsnicht", { title: "Nachfolge-Entscheidung", expectation: "Erwartung mit Termin und Zahl", reviewBy: "2026-12-31" }, now);
+    expect(missing.ok).toBe(false);
+    const invalid = supersedeDecision([decision], decision.id, { title: "Nachfolge-Entscheidung", expectation: "geht gut", reviewBy: "2026-12-31" }, now);
+    expect(invalid.ok).toBe(false);
+  });
+
+  it("beschreibt die Ersetzungs-Kette vollständig", () => {
+    const first = base();
+    const outcome = supersedeDecision([first], first.id, { title: "Zweite Entscheidung im Mai", expectation: "Erwartung mit Termin und Zahl", reviewBy: "2026-12-31" }, now);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    const chain = describeSupersedeChain(outcome.items, first.id);
+    expect(chain).toHaveLength(2);
+    expect(chain[0]).toContain("ersetzt");
+    expect(chain[1]).toContain("Zweite Entscheidung im Mai");
   });
 });

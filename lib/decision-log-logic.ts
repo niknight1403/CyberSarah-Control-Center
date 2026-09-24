@@ -178,3 +178,63 @@ export function applyReviewVerdict(decision: DecisionItem, verdict: ReviewVerdic
     updatedAt: timestamp,
   };
 }
+
+/* ==================== Ersetzen als Verlauf (Sprint 254) ==================== */
+
+export type SupersedeOutcome =
+  | { ok: true; items: DecisionItem[]; supersededId: string; successorId: string; note: string }
+  | { ok: false; reason: string };
+
+/**
+ * Ersetzt eine Entscheidung durch eine Nachfolgerin — ohne die Historie zu
+ * überschreiben: die alte bleibt mit Status "ersetzt" lesbar, die neue
+ * referenziert nichts Heimliches. Rückwirkendes Schönen ist ausgeschlossen,
+ * weil die alte Formulierung unangetastet bleibt.
+ */
+export function supersedeDecision(
+  items: DecisionItem[],
+  targetId: string,
+  successorInput: Partial<DecisionItem>,
+  now = Date.now,
+): SupersedeOutcome {
+  const target = items.find((item) => item.id === targetId);
+  if (!target) return { ok: false, reason: "Keine Entscheidung mit dieser ID — Ersetzen braucht ein eindeutiges Ziel." };
+  if (target.status === "superseded") return { ok: false, reason: "Diese Entscheidung ist bereits ersetzt — doppelt Ersetzen wäre Verlaufslüge." };
+
+  const validation = validateDecisionItem(successorInput);
+  if (!validation.valid) return { ok: false, reason: validation.reason };
+
+  const successor = createDecisionItem(successorInput, now);
+  const timestamp = now();
+  const updatedTarget: DecisionItem = {
+    ...target,
+    status: "superseded",
+    reviewNote: `Ersetzt am ${isoDayFromTimestamp(timestamp)} durch "${successor.title}" — die ursprüngliche Erwartung steht weiterhin hier, unverändert.`,
+    updatedAt: timestamp,
+  };
+  const updated: DecisionItem[] = [...items];
+  const index = updated.findIndex((item) => item.id === targetId);
+  updated[index] = updatedTarget;
+  return {
+    ok: true,
+    items: [...updated, successor],
+    supersededId: updatedTarget.id,
+    successorId: successor.id,
+    note: `"${target.title}" bleibt als ersetzt lesbar; "${successor.title}" ist die aktive Nachfolgerin.`,
+  };
+}
+
+/** Verlauf einer Entscheidung: jede Ersetzung bleibt als Kette sichtbar. */
+export function describeSupersedeChain(items: DecisionItem[], decisionId: string): string[] {
+  const chain: string[] = [];
+  let current = items.find((item) => item.id === decisionId);
+  const seen = new Set<string>();
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    chain.push(`${decisionStatusLabel(current.status)}: "${current.title}" (entschieden ${isoDayFromTimestamp(current.decidedAt)})`);
+    const match = current.reviewNote?.match(/durch "(.+?)" —/);
+    current = match ? items.find((item) => item.title === match[1]) : undefined;
+  }
+  // Chronologisch vom Ursprung zur Nachfolgerin — der älteste Eintrag zuerst.
+  return chain;
+}
