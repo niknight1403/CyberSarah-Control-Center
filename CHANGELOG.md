@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 24.09.2026 — Sprints 309–313: Serie C Abschluss
+
+- Medien-Cache (Sprint 309): TTL + Byte-Budget + Aufraeumauftrag mit ehrlichem Loesch-Bericht (`lib/media-cache-cleanup-logic.ts`)
+- Untertitel-Export (Sprint 310): SRT aus Szenen-Skript, Zeitmarken aus TTS-Schaetzung mit ehrlichem Hinweis (`lib/srt-export-logic.ts`)
+- Batch-Export (Sprint 311): mehrere Projekte mit Fehlerfortsetzung, done/partial/failed ehrlich getrennt (`lib/batch-export-logic.ts`)
+- Ergebnis-Verlauf (Sprint 312): gerenderte Medien pro Nutzer mit Status und unbekannten Groessen als "unbekannt" (`lib/media-history-logic.ts`)
+- Serie-C-Abschluss (Sprint 313): Doku + CHANGELOG + Tracker + Version 2.7.0
+- 25 neue Tests (1.795 Tests gruen in 212 Testdateien)
+
 ## 24.09.2026 — Sprints 299–303: Serie B Abschluss
 
 - Snackbar/Toast-System (Sprint 299): eine Quelle mit Severity-Dauern, ehrlichem Dedup-Zaehler, FIFO-Cap, rein berechnetem Auto-Dismiss (`lib/snackbar-logic.ts`)

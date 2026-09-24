@@ -12,7 +12,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 3 | 294–298 | ERLEDIGT | Serie B: i18n, Onboarding v2, Templates, Empty-State, Error-Fallbacks (1.684 Tests grün, 197 Testdateien) |
 | 4 | 299–303 | ERLEDIGT | Serie B Rest + Abschluss: Snackbar-System, Startzeit-Messung, A11y-Audit, Theme-Scanner (1.770 Tests gruen, 208 Testdateien) |
 | 5 | 304–308 | ERLEDIGT | Serie C Batch 1: BYO-Key, Stimmenauswahl, Render-Queue, Skript-Editor, Bild-Fallback-Kette (1.770 Tests gruen, 208 Testdateien) |
-| 6 | 309–313 | OFFEN | Serie C Rest + Abschluss |
+| 6 | 309–313 | ERLEDIGT | Serie C Abschluss: Medien-Cache, SRT-Export, Batch-Export, Ergebnis-Verlauf (1.795 Tests gruen, 212 Testdateien) |
 | 7 | 314–318 | OFFEN | Serie D: Umsatz-Reihe 2 |
 | 8 | 319–323 | OFFEN | Serie D Rest + Abschluss |
 | 9 | 324–328 | OFFEN | Serie E: Zuverlässigkeit |

@@ -26,7 +26,12 @@ const fakeResponse = (status: number, body: unknown) =>
 const GEMINI_URL = "generativelanguage.googleapis.com";
 const OPENAI_URL = "api.openai.com";
 
-describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
+describe(
+  "invokeLLM mit autonomem Key-Pool (Sprint 85)",
+  // Echtes Exponential-Backoff in invokeLLM + parallele Suite-Last
+  // sprengten den 5s-Default-Timeout (Flaky unter Last, solo gruen).
+  { timeout: 30_000 },
+  () => {
   // Test-Isolation: invokeLLM sendet seit Sprint 196/210 bei Provider-
   // Failover Telegram-Warnungen — sobald Token + Chat-ID in der Env
   // stehen, wuerden diese zusaetzlichen Fetches die Call-Zaehler
