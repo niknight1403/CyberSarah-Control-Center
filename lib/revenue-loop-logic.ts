@@ -253,3 +253,51 @@ export function recommendNextStep(loop: LoopDraft): LoopNextStep {
       return { action: "none", title: "Verworfen", reason: "Diese Schleife wird nicht weiterverfolgt.", requiresApproval: false };
   }
 }
+
+/* ==================== Experiment-Planer (Sprint 225) ==================== */
+
+export type ExperimentPlan = {
+  durationDays: number;
+  /** Empfohlene Messpunkte (Plan-Intervall, keine Pflicht). */
+  sampleIntervalDays: number;
+  expectedSamples: number;
+  caveats: string[];
+  /** Bewusst fehlende Größenordnung: Das Modul verspricht keinen Umsatz. */
+  promisedRevenue: false;
+}
+
+export const EXPERIMENT_LIMITS = { minDays: 7, maxDays: 90, minSamples: 3, minTarget: 1 } as const;
+
+/**
+ * Plant das Messfenster eines Experiments mit Plausibilitäts-Grenzen.
+ * Zu kurze Fenster oder Mini-Ziele werden abgelehnt — ein "Experiment" über
+ * zwei Tage mit Ziel 1 ist keine Messung, sondern eine Behauptung.
+ */
+export function planExperiment(loop: LoopDraft, durationDays: number): ExperimentPlan {
+  const caveats: string[] = [];
+  if (!Number.isFinite(durationDays) || durationDays < EXPERIMENT_LIMITS.minDays) {
+    throw new Error(`Ein Experiment braucht mindestens ${EXPERIMENT_LIMITS.minDays} Tage — kürzere Fenster messen nur Rauschen.`);
+  }
+  if (durationDays > EXPERIMENT_LIMITS.maxDays) {
+    caveats.push(`Auf ${durationDays} Tage geklemmt: Experimente über ${EXPERIMENT_LIMITS.maxDays} Tage veralten schneller, als sie messen.`);
+    durationDays = EXPERIMENT_LIMITS.maxDays;
+  }
+  if (loop.targetValue < 3) {
+    caveats.push("Sehr kleines Ziel: Ein einzelner Datenpunkt kann das Ergebnis bereits bestimmen — größere Stichproben sind belastbarer.");
+  }
+  const sampleIntervalDays = Math.max(1, Math.floor(durationDays / 4));
+  const expectedSamples = Math.floor(durationDays / sampleIntervalDays);
+  if (expectedSamples < EXPERIMENT_LIMITS.minSamples) {
+    caveats.push(`Nur ${expectedSamples} Messpunkte geplant — Trends brauchen mindestens ${EXPERIMENT_LIMITS.minSamples}.`);
+  }
+  if (loop.status !== "draft") {
+    caveats.push("Die Schleife läuft bereits — der Plan beschreibt das Restfenster, kein neues Experiment.");
+  }
+  return {
+    durationDays,
+    sampleIntervalDays,
+    expectedSamples,
+    caveats: caveats.length === 0 ? ["Fenster plausibel — Verlaufs-Trends bleiben Beobachtungen, keine Prognosen."] : caveats,
+    promisedRevenue: false,
+  };
+}

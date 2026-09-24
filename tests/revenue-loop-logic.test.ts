@@ -4,6 +4,7 @@ import {
   createLoopDraft,
   evaluateLoopProgress,
   recommendNextStep,
+  planExperiment,
   loopProgressPercent,
   loopStatusLabel,
   LOOP_DISCLAIMER,
@@ -139,5 +140,32 @@ describe("revenue loop next step recommendation (Sprint 224)", () => {
     const stalled = createLoopDraft(VALID, () => 1_000);
     stalled.status = "stalled";
     expect(recommendNextStep(stalled).title).toContain("Blockade");
+  });
+});
+
+describe("revenue loop experiment planner (Sprint 225)", () => {
+  const loop = createLoopDraft(VALID, () => 1_000);
+
+  it("plant Messfenster mit Intervall und verspricht nie Umsatz", () => {
+    const plan = planExperiment(loop, 28);
+    expect(plan.durationDays).toBe(28);
+    expect(plan.sampleIntervalDays).toBe(7);
+    expect(plan.expectedSamples).toBe(4);
+    expect(plan.promisedRevenue).toBe(false);
+    expect(plan.caveats[0]).toContain("keine Prognosen");
+  });
+
+  it("lehnt zu kurze Fenster ab und klemmt zu lange", () => {
+    expect(() => planExperiment(loop, 3)).toThrow("mindestens 7 Tage");
+    const long = planExperiment(loop, 365);
+    expect(long.durationDays).toBe(90);
+    expect(long.caveats.some((caveat) => caveat.includes("geklemmt"))).toBe(true);
+  });
+
+  it("warnt ehrlich bei Mini-Zielen und bereits laufenden Schleifen", () => {
+    const tiny = planExperiment({ ...loop, targetValue: 1 }, 28);
+    expect(tiny.caveats.some((caveat) => caveat.includes("Mini-Ziel") || caveat.includes("kleines Ziel"))).toBe(true);
+    const running = planExperiment({ ...loop, status: "running" }, 28);
+    expect(running.caveats.some((caveat) => caveat.includes("Restfenster"))).toBe(true);
   });
 });
