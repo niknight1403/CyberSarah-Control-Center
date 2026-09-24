@@ -3,6 +3,15 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprints 344–348: Serie G Mobile-App-Politur (Batch 13)
+
+- Navigation-Pass (Sprint 344): Per-Tab-Routen-Stacks, ehrliche Zurück-Kette, Deep-Link-Parsing (`lib/navigation-pass-logic.ts`)
+- Offline-Zustände (Sprint 345): Konnektivitäts-Entprellung, Reconnect-Plan, Offline-Banner (`lib/offline-connectivity-logic.ts`)
+- Skeleton-Lade-Erlebnis (Sprint 346): Screen-spezifische Skeleton-Presets statt universeller Spinner, Hybrid-Modus für Teil-Daten (`lib/skeleton-loading-logic.ts`)
+- Lokale Push-Benachrichtigungen (Sprint 347): 5 Kategorien, Wiederholungs-Intervalle, ehrlich ohne FCM (`lib/local-notifications-logic.ts`)
+- APK-Größen- und Startzeit-Metriken (Sprint 348): Asset-Breakdown, Budget-Bewertung, Optimierungs-Empfehlungen (`lib/apk-size-metrics-logic.ts`)
+- 30 neue Tests (1.987 Tests grün in 250 Testdateien)
+
 
 ## 25.09.2026 — Sprint 345: Offline-Zustaende (Serie G)
 

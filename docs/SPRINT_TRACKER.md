@@ -19,7 +19,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 10 | 329–333 | ERLEDIGT | Serie E Rest + Abschluss (v2.9.0) |
 | 11 | 334–338 | ERLEDIGT | Serie F: Integrationen (1.900→1.950 Tests, 230→242 Dateien) |
 | 12 | 339–343 | ERLEDIGT | Serie F Rest + Abschluss (v3.0.0) |
-| 13 | 344–348 | IN ARBEIT | Serie G: Mobile-Politur (Sprint 344-345 erledigt, 346-348 offen) |
+| 13 | 344–348 | ERLEDIGT | Serie G: Mobile-Politur (1.957→1.987 Tests, 247→250 Dateien) |
 | 14 | 349–353 | OFFEN | Serie G Rest + Abschluss |
 | 15 | 354–358 | OFFEN | Serie H: Admin & Ops |
 | 16 | 359–363 | OFFEN | Serie H Rest + Abschluss |
@@ -46,5 +46,5 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - **Batch 7+8 (Sprints 314–323):** ERLEDIGT am 25.09.2026 (Commits bbba9b6, 922367f). Quota-Mode-Schalter mit Audit, Upgrade-Prompt-UI, Checkout-Rückweg, Abrechnung, Tier-Vergleich, Testmodus-Kennzeichnung, Kündigungs-Flow, MRR v2, Ops-Payment-Alerts, Serie-D-Abschluss. v2.8.0. Tests: 1.795 → 1.840 (+45), 218 Testdateien.
 - **Batch 9+10 (Sprints 324–333):** ERLEDIGT am 25.09.2026 (Commits e35a188, a44bd4d). Strukturierte Logs mit Korrelations-ID, Rate-Limits, RLS-Deckung, Restore-Beweis, Crash-Klassifizierung, Selbstheilung, Dependency-Audit, Geheimnis-Hygiene, Health-Deep-Check, Serie-E-Abschluss. v2.9.0. Tests: 1.840 → 1.900 (+60), 230 Testdateien.
 - **Batch 11+12 (Sprints 334–343):** ERLEDIGT am 25.09.2026 (Commits 2848acd, 0aecd3e). E-Mail v2 (Anhänge+Vorlagen), Kalender-Abstraktion, Webhook-Eingang mit Signatur, Export-Center, Import-Wizard, API-Keys mit Scopes, ehrliche API-Doku, Slack/Discord-Webhooks, Integrations-Diagnose, Serie-F-Abschluss. v3.0.0. Tests: 1.900 → 1.950 (+50), 242 Testdateien.
-- **Batch 13 (Sprints 344–348):** IN ARBEIT. Sprint 344 (Navigation-Pass, Commit a49d10e) und Sprint 345 (Offline-Zustände, Commit 02b6b43) erledigt. Sprints 346-348 offen.
+- **Batch 13 (Sprints 344–348):** ERLEDIGT am 25.09.2026 (Commits a49d10e, 02b6b43, folgend). Navigation-Pass (per-Tab-Stacks, Deep-Links), Offline-Zustände (Entprellung, Reconnect-Plan, Offline-Banner), Skeleton-Lade-Logik (Screen-Presets, Hybrid-Modus, Flackern-Schutz), Lokale Notifications (5 Kategorien, ohne FCM, ehrlich), APK-Größen-Metriken (Budget, Empfehlungen, Startzeit-Optimierung). Tests: 1.957 → 1.987 (+30), 250 Testdateien.. Sprint 344 (Navigation-Pass, Commit a49d10e) und Sprint 345 (Offline-Zustände, Commit 02b6b43) erledigt. Sprints 346-348 offen.
 
