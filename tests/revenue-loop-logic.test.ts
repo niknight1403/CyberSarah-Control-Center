@@ -5,6 +5,7 @@ import {
   evaluateLoopProgress,
   recommendNextStep,
   parseLoopPrompt,
+  buildLoopResult,
   planExperiment,
   loopProgressPercent,
   loopStatusLabel,
@@ -208,5 +209,43 @@ describe("revenue loop prompt parsing (Sprint 226)", () => {
     expect(parseLoopPrompt("Starte Content-to-Lead").actions).toContain("advance");
     expect(parseLoopPrompt("Zeig alle Schleifen").actions).toContain("list");
     expect(parseLoopPrompt("Verwirf SaaS-Conversion").actions).toContain("discard");
+  });
+});
+
+describe("revenue loop honest result builder (Sprint 227)", () => {
+  const loopA = createLoopDraft(VALID, () => 1_000);
+  const loopB = createLoopDraft({ ...VALID, name: "SaaS-Conversion" }, () => 2_000);
+  const loops = [loopA, loopB];
+
+  it("listet ehrlich inklusive echtem Leerzustand", () => {
+    const result = buildLoopResult({ actions: ["list"], nameQuery: null, draft: null, sampleValue: null }, []);
+    expect(result.lines[0]).toContain("leere Zustand ist echt");
+    const listed = buildLoopResult({ actions: ["list"], nameQuery: null, draft: null, sampleValue: null }, loops);
+    expect(listed.lines[0]).toContain("2 Schleife(n)");
+    expect(listed.headline).toBe("Loop-Engineering");
+  });
+
+  it("bewertet eine eindeutige Schleife mit Fortschritt und nächstem Schritt", () => {
+    const running = { ...loopA, status: "running" as const, currentValue: 40, samples: [{ at: 1, value: 40 }] };
+    const result = buildLoopResult(parseLoopPrompt("Status von Content-to-Lead"), [running]);
+    expect(result.headline).toBe("Schleife: Content-to-Lead");
+    expect(result.lines.some((line) => line.includes("40 %"))).toBe(true);
+    expect(result.lines.some((line) => line.startsWith("Nächster Schritt:"))).toBe(true);
+  });
+
+  it("lehnt fehlende Felder und uneindeutige Namen ehrlich ab", () => {
+    const create = buildLoopResult({ actions: ["create"], nameQuery: null, draft: { name: "x" }, sampleValue: null }, []);
+    expect(create.lines.some((line) => line.includes("plausibel") || line.includes("abgelehnt"))).toBe(true);
+    const createEmpty = buildLoopResult({ actions: ["create"], nameQuery: null, draft: null, sampleValue: null }, []);
+    expect(createEmpty.lines[0]).toContain("Kein Entwurf erkannt");
+    const ambiguous = buildLoopResult({ actions: ["status"], nameQuery: "e", draft: null, sampleValue: null }, loops);
+    expect(ambiguous.lines.some((line) => line.includes("Uneindeutig"))).toBe(true);
+  });
+
+  it("Messwert und Änderungen bleiben Freigabe-Anfragen", () => {
+    const sample = buildLoopResult(parseLoopPrompt("Messpunkt für \"Content-to-Lead\": Wert 40"), loops);
+    expect(sample.lines.some((line) => line.includes("vorgemerkt") && line.includes("Bestätigung"))).toBe(true);
+    const advance = buildLoopResult(parseLoopPrompt("Starte Content-to-Lead"), loops);
+    expect(advance.lines.some((line) => line.includes("erst nach deiner Bestätigung"))).toBe(true);
   });
 });

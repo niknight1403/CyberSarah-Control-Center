@@ -347,8 +347,10 @@ export function parseLoopPrompt(prompt: string): LoopPromptCommand {
 }
 
 function extractNameQuery(prompt: string): string | null {
-  const quoted = prompt.match(/[„"']([^„"']+)[„"']/);
+  const quoted = prompt.match(/['"\u201e\u201c]([^'"\u201e\u201c]+)['"\u201e\u201c]/);
   if (quoted?.[1]) return quoted[1].trim();
+  const verbMatch = prompt.match(/\b(?:starte|start|verwirf|verwerf|lösche|status(?:\s+von)?)\s+([\w\- /]+)/i);
+  if (verbMatch?.[1]) return verbMatch[1].trim();
   const forMatch = prompt.match(/\b(?:für|von)\s+(?:die\s+)?(?:Schleife\s+)?([\w\- /]+?)(?:\s+(?:mit|über|in|und)|$)/i);
   return forMatch?.[1]?.trim() || null;
 }
@@ -381,4 +383,88 @@ function extractSampleValue(prompt: string): number | null {
   if (!match) return null;
   const value = Number(match[1].replace(",", "."));
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/* ==================== Ehrliches Prompt-Ergebnis (Sprint 227) ==================== */
+
+export type LoopResult = {
+  headline: string;
+  lines: string[];
+  disclaimer: string;
+};
+
+/**
+ * Baut die ehrliche Antwort auf ein Loop-Kommando. Fehlende/uneindeutige
+ * Ziele werden benannt; Änderungen werden nur als Freigabe-Anfrage
+ * formuliert — ausgeführt wird außerhalb (und nur nach Bestätigung).
+ */
+export function buildLoopResult(command: LoopPromptCommand, loops: LoopDraft[], nextId = 0): LoopResult {
+  const lines: string[] = [];
+  const disclaimer = LOOP_DISCLAIMER;
+
+  if (command.actions.includes("create")) {
+    if (!command.draft) {
+      lines.push("Kein Entwurf erkannt — nenne Felder mit Name:, Fluss:, Hypothese:, Experiment:, Messgröße:, Einheit: und Ziel:.");
+    } else {
+      const validation = validateLoopDraft(command.draft);
+      if (validation.valid) {
+        lines.push(`Entwurf "${command.draft.name}" ist plausibel und bereit zur Freigabe — es startet nichts von selbst.`);
+      } else {
+        lines.push(`Entwurf abgelehnt: ${validation.reason}`);
+      }
+    }
+  }
+
+  if (command.actions.includes("list") || (loops.length > 0 && command.actions.length === 0)) {
+    if (loops.length === 0) {
+      lines.push("Noch keine Schleifen vorhanden — der leere Zustand ist echt, kein Fehler.");
+    } else {
+      lines.push(`${loops.length} Schleife(n): ${loops.map((loop) => `"${loop.name}" (${loopStatusLabel(loop.status)}, ${loopProgressPercent(loop)} %)`).join(", ")}.`);
+    }
+  }
+
+  const targets = command.nameQuery ? findLoopsByName(loops, command.nameQuery) : [];
+  if (command.nameQuery && targets.length === 0 && !command.actions.includes("list")) {
+    lines.push(`Keine Schleife passt zu "${command.nameQuery}" — bitte den Namen prüfen.`);
+  }
+  if (targets.length > 1) {
+    lines.push(`Uneindeutig: ${targets.length} Schleifen passen zu "${command.nameQuery}" (${targets.map((loop) => loop.name).join(", ")}) — bitte genauer benennen.`);
+  }
+
+  for (const loop of targets.slice(0, 1)) {
+    const verdict = evaluateLoopProgress(loop);
+    const step = recommendNextStep(loop);
+    lines.push(`"${loop.name}": ${loopStatusLabel(loop.status)}, ${verdict.percent} % des Ziels (${loop.currentValue} von ${loop.targetValue} ${loop.unit}).`);
+    lines.push(`Bewertung: ${verdict.reason}`);
+    lines.push(`Nächster Schritt: ${step.title}${step.requiresApproval ? " — erfordert deine Freigabe" : ""}. ${step.reason}`);
+  }
+
+  if (command.actions.includes("sample")) {
+    if (command.sampleValue === null) {
+      lines.push("Kein Messwert erkannt — bitte Zahl nennen (z. B. „Messpunkt 40\").");
+    } else if (targets.length !== 1) {
+      lines.push(`Messwert ${command.sampleValue} wurde noch nicht zugeordnet — erst die Schleife eindeutig benennen.`);
+    } else {
+      lines.push(`Messwert ${command.sampleValue} für "${targets[0]!.name}" vorgemerkt — die Zuordnung braucht deine Bestätigung.`);
+    }
+  }
+
+  if (command.actions.includes("advance") && targets.length === 1) {
+    lines.push(`Freigabe-Anfrage für "${targets[0]!.name}" vorbereitet — ausgeführt wird erst nach deiner Bestätigung.`);
+  }
+  if (command.actions.includes("discard") && targets.length === 1) {
+    lines.push(`Verwerfen von "${targets[0]!.name}" vorbereitet — auch das braucht deine Bestätigung.`);
+  }
+
+  if (lines.length === 0) lines.push("Alles im Plan — für Details: „Zeig alle Schleifen\" oder „Status von <Name>\".");
+  const headline = command.actions.includes("create") ? "Neuer Schleifen-Entwurf" : targets.length === 1 ? `Schleife: ${targets[0]!.name}` : "Loop-Engineering";
+  void nextId;
+  return { headline, lines, disclaimer };
+}
+
+/** Findet Schleifen per Namens-Anteil (case-insensitive), nie per ID-Raten. */
+export function findLoopsByName(loops: LoopDraft[], query: string): LoopDraft[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  return loops.filter((loop) => loop.name.toLowerCase().includes(needle));
 }
