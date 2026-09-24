@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeSignals,
   annualizedVolatility,
+  DEFAULT_BACKTEST_OPTIONS,
+  DEFAULT_SIGNAL_CONFIG,
+  runBacktest,
   ema,
   formatPercentGerman,
   formatPriceGerman,
@@ -149,5 +152,44 @@ describe("micro trading signal engine (Sprint 214)", () => {
     expect(signals).toHaveLength(1);
     expect(signals[0]?.kind).toBe("no-signal");
     expect(signals[0]?.reason).toContain("keine auffällige Beobachtung");
+  });
+});
+
+describe("micro trading backtest engine (Sprint 215)", () => {
+  function oscillatingSeries(): CandleSeries {
+    // 90 Punkte: sanfte Welle — erzeugt mehrere Crossover mit klaren Abschnitten.
+    const candles: Candle[] = [];
+    for (let i = 0; i < 90; i += 1) {
+      const base = 100 + Math.sin(i / 8) * 12 + i * 0.3;
+      candles.push(candle(1_000 * (i + 1), base, base + 1, base - 1, base));
+    }
+    return series(candles);
+  }
+
+  it("simulierte Trades sind hypothetisch, gebührenbereinigt und lückenlos", () => {
+    const result = runBacktest(oscillatingSeries());
+    expect(result.hypothetical).toBe(true);
+    expect(result.trades.length).toBeGreaterThan(0);
+    for (const trade of result.trades) {
+      expect(trade.exitIndex).toBeGreaterThan(trade.entryIndex);
+      expect(trade.netReturnPercent).toBeLessThan(trade.grossReturnPercent);
+    }
+    expect(result.finalEquity).toBeGreaterThan(0);
+    expect(result.maxDrawdownPercent).toBeGreaterThanOrEqual(0);
+    expect(result.buyAndHoldReturnPercent).not.toBe(result.returnPercent);
+  });
+
+  it("lehnt ungültige Serien ab, statt Unsinn zu simulieren", () => {
+    const result = runBacktest(series([]));
+    expect(result.trades).toEqual([]);
+    expect(result.caveats[0]).toContain("Keine Kursdaten");
+    expect(result.returnPercent).toBe(0);
+  });
+
+  it("warnt ehrlich bei zu wenigen Trades und fehlenden Gebühren", () => {
+    const noFee = runBacktest(oscillatingSeries(), DEFAULT_SIGNAL_CONFIG, { ...DEFAULT_BACKTEST_OPTIONS, feePercent: 0 });
+    expect(noFee.caveats.some((caveat) => caveat.includes("Gebühren"))).toBe(true);
+    const result = runBacktest(oscillatingSeries(), DEFAULT_SIGNAL_CONFIG, { ...DEFAULT_BACKTEST_OPTIONS, minTradesForStatistics: 100 });
+    expect(result.caveats.some((caveat) => caveat.includes("statistisch nicht belastbar"))).toBe(true);
   });
 });
