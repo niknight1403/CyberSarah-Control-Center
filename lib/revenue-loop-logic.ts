@@ -129,3 +129,50 @@ export function loopProgressPercent(loop: LoopDraft): number {
   const raw = (loop.currentValue / loop.targetValue) * 100;
   return Math.max(0, Math.min(100, Math.round(raw * 10) / 10));
 }
+
+/* ==================== Fortschritts-Auswertung (Sprint 223) ==================== */
+
+export type LoopProgressVerdict = {
+  classification: "on-track" | "behind" | "stalled" | "unknown";
+  reason: string;
+  /** Anteil am Ziel in Prozent (0–100), geklemmt — nur bei belastbaren Zahlen. */
+  percent: number;
+};
+
+/**
+ * Bewertet den Fortschritt einer Schleife ehrlich:
+ *   - Ohne Messpunkte (samples/currentValue unverändert) ist alles "unknown".
+ *   - Der Trend folgt den letzten Messpunkten, nicht der Stimmung.
+ *   - Gestoppte/verworfene Schleifen werden nicht bewertet, sondern benannt.
+ */
+export function evaluateLoopProgress(loop: LoopDraft): LoopProgressVerdict {
+  if (loop.status === "discarded") {
+    return { classification: "unknown", reason: `Schleife ist verworfen — keine Bewertung mehr nötig.`, percent: 0 };
+  }
+  if (loop.status === "completed") {
+    return { classification: "on-track", reason: `Ziel erreicht (${loop.currentValue} von ${loop.targetValue} ${loop.unit}).`, percent: 100 };
+  }
+  if (loop.status === "stalled") {
+    return { classification: "stalled", reason: `Schleife ist als steckengeblieben markiert — erst Ursache klären, dann weitermachen.`, percent: loopProgressPercent(loop) };
+  }
+  if (loop.samples.length === 0 && loop.currentValue === 0) {
+    return { classification: "unknown", reason: "Noch keine Messpunkte erfasst — Fortschritt ist unbekannt, nicht null.", percent: 0 };
+  }
+  const percent = loopProgressPercent(loop);
+  if (percent >= 100) {
+    return { classification: "on-track", reason: `Zielwert erreicht (${loop.currentValue} von ${loop.targetValue} ${loop.unit}) — Abschluss erfordert deine Bestätigung.`, percent };
+  }
+  if (loop.samples.length < 2) {
+    return { classification: "unknown", reason: `Erst ${loop.samples.length} Messpunkt${loop.samples.length === 1 ? "" : "e"} — ein Trend braucht mindestens zwei.`, percent };
+  }
+  const last = loop.samples[loop.samples.length - 1]!.value;
+  const previous = loop.samples[loop.samples.length - 2]!.value;
+  const rising = last > previous;
+  if (percent >= 50) {
+    return { classification: "on-track", reason: `${percent} % des Ziels, letzte Messung ${rising ? "steigend" : "nicht steigend"} (${previous} → ${last} ${loop.unit}).`, percent };
+  }
+  if (!rising) {
+    return { classification: "behind", reason: `Nur ${percent} % des Ziels und letzte Messung nicht steigend (${previous} → ${last} ${loop.unit}) — Experiment überdenken.`, percent };
+  }
+  return { classification: "behind", reason: `${percent} % des Ziels, aber letzte Messung steigt (${previous} → ${last} ${loop.unit}).`, percent };
+}
