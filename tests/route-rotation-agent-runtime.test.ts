@@ -32,6 +32,16 @@ beforeAll(() => {
 });
 afterAll(() => {
   setModelRouterKvForTests(null);
+  // Root-Cause-Fix (Serie G): Bei isolate:false teilen sich Testdateien den
+  // Worker-Prozess. Dieser Datei-State (Modul-Spiegel + Env) WUERDE in die
+  // naechste Suite leaken und dort die Kette umsortieren (Sprint-85-Flaky).
+  resetRouteRotationStateForTests();
+  resetRouteRotationAgentForTests();
+  delete process.env.AI_GROQ_API_KEY;
+  delete process.env.AI_OPENROUTER_API_KEY;
+  delete process.env.AI_ROUTE_ROTATION;
+  delete process.env.AI_CUSTOM_API_KEY;
+  delete process.env.AI_CUSTOM_BASE_URL;
 });
 
 /** Antwort-Matrix der Probes: URL-Suchteil → HTTP-Status. */

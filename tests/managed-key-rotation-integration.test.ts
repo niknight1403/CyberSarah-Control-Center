@@ -9,6 +9,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { invokeLLM, resetManagedKeyPoolForTests } from "../server/_core/llm";
+// Root-Cause-Fix (Serie G): Modul-Spiegel des Rotations-Agenten und Quarantaene-
+// Registry muessen JEDEM Test-Start sauber sein — bei isolate:false leaken
+// sonst Zustaende aus Parallel-Dateien in diese Suite (Sprint-85-Flaky).
+import { resetRouteRotationStateForTests } from "../server/_core/route-rotation-state";
+import { resetProviderQuarantineForTests } from "../lib/live-fix-logic";
 
 type Call = { url: string; body: Record<string, unknown> };
 
@@ -44,6 +49,17 @@ describe(
 
   beforeEach(() => {
     resetManagedKeyPoolForTests();
+    resetRouteRotationStateForTests();
+    resetProviderQuarantineForTests();
+    // Env-Reste aus Parallel-Dateien (z. B. AI_GROQ_API_KEY aus der
+    // Rotations-Agent-Suite) wuerden die Kette verlaengern — hier ehrlich
+    // loeschen statt nur im afterEach (das bereinigt nur EIGENE Sets).
+    delete process.env.AI_GROQ_API_KEY;
+    delete process.env.AI_OPENROUTER_API_KEY;
+    delete process.env.GROQ_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.AI_CUSTOM_API_KEY;
+    delete process.env.AI_CUSTOM_BASE_URL;
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.BUILT_IN_FORGE_API_URL;
     delete process.env.TELEGRAM_BOT_TOKEN;
@@ -63,6 +79,8 @@ describe(
     delete process.env.AI_ALLOW_PAID_LLM_FALLBACK;
     delete process.env.GROQ_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
+    delete process.env.AI_GROQ_API_KEY;
+    delete process.env.AI_OPENROUTER_API_KEY;
     // Telegram-Env wiederherstellen, damit andere Suites/Host-Prozesse
     // unbeeinflusst bleiben.
     if (savedTelegramEnv.botToken !== undefined) {
