@@ -92,6 +92,16 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="decisions"
+          options={{
+            title: "Entscheidungen",
+            href: null,
+            tabBarIcon: ({ color, focused }) => (
+              <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="doc.text.fill" color={color} /></GlassTabIcon>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="ideas"
           options={{
             title: "Ideen",

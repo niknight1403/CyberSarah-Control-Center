@@ -11,6 +11,7 @@ describe("DRAWER_ITEMS", () => {
       "Loop Engineering",
       "Fokus & Rückblick",
       "Ideen-Inbox",
+      "Entscheidungs-Journal",
       "Workflows",
       "Designer",
       "Plugins",
