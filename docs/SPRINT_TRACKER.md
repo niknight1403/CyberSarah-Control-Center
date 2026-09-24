@@ -1,13 +1,13 @@
 # Sprint-Tracker 284–383
 
-**Stand:** 24.09.2026 · Baseline `d15bf5c` · 1560 Tests grün · Produktiv-Backend deployed · APK v2.5.6
+**Stand:** 24.09.2026 · 1572 Tests grün · Produktiv-Backend deployed · APK v2.5.6
 
 Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 
 | Batch | Sprints | Zustand | Notiz |
 |---|---|---|---|
-| 1 | 284–288 | OFFEN | Serie A: Dev-Loop |
+| 1 | 284–288 | ERLEDIGT | Serie A: Dev-Loop (1.572 Tests grün, 188 Testdateien) |
 | 2 | 289–293 | OFFEN | Serie A Rest + Abschluss |
 | 3 | 294–298 | OFFEN | Serie B: Produkt-Politur |
 | 4 | 299–303 | OFFEN | Serie B Rest + Abschluss |
@@ -30,8 +30,9 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 
 ## Sprint-Einzelverfolgung
 
-- [ ] 284 … [ ] 383 — wird pro Batch im zugehörigen Sprint-Doku-Detail geführt; hier nur Batch-Zustand.
+- [x] 284–288 — Dokumentiert in `docs/2026-09-24_SPRINTS_284-288_AGENT_WERKZEUGE_DEV_LOOP.md`
+- [ ] 289 … [ ] 383 — wird pro Batch im zugehörigen Sprint-Doku-Detail geführt; hier nur Batch-Zustand.
 
 ## Batch-Protokoll
 
-(noch keine)
+- **Batch 1 (Sprints 284–288):** ERLEDIGT am 24.09.2026. Live-Preview-Zyklus Chat↔Preview, Multi-File Refactoring (Transaktion + Rollback), Code-Suche, Test-Runner, Iterations-Limits. Tests: 1.560 → 1.572 (+12), 188 Testdateien.
