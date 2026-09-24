@@ -3,6 +3,15 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprints 354–358: Serie H Admin & Ops (Batch 15)
+
+- Admin-Dashboard v2 (Sprint 354): Aggregation von Systemmetriken (CPU, Speicher, p50/p95/p99 Latenz, Fehlerrate, DB Connections, Storage) zu Gesamtgesundheit mit Schwellenwert-Alerts & Trends (`lib/admin-dashboard-v2-logic.ts`)
+- Ops-Playbook-Screen (Sprint 355): Interaktive Checklisten für Incident-Abläufe (DB Failover, API-Latenz, Security-Leaks) mit Schritt-für-Schritt Verifikation & Protokollierung (`lib/ops-playbook-logic.ts`)
+- Feature-Flags mit Nutzer-Anteil (Sprint 356): Prozentuales Rollout (0..100%), FNV-1a Bucket-Zuordnung, Zielgruppen-Regeln (Rollen, Domains) & Overrides (`lib/feature-flag-v2-logic.ts`)
+- Nutzer-Verwaltung (Sprint 357): Suche, Filter, Rollen- & Rechteverwaltung, Paginierung, Nutzer-Sperrung/Aktivierung & Bulk-Operationen (`lib/admin-user-management-logic.ts`)
+- Admin Audit-Log (Sprint 358): Manipulationssichere Protokollierung administrativer Aktionen mit Vorher/Nachher-Zuständen, Hash-Prüfsummen, PII-Maskierung & Export (`lib/admin-audit-log-logic.ts`)
+- 25 neue Tests (2.046 Tests grün in 260 Testdateien)
+
 ## 25.09.2026 — Sprints 349–353: Serie G Rest + Abschluss (Batch 14)
 
 - Android Predictive Back & Animationen (Sprint 349): Gesten-Lifecycle, Karten-Skalierung, Abrundung, Opazität & Modal-Verschiebung, Haptik-Schwellenwerte (`lib/predictive-back-logic.ts`)

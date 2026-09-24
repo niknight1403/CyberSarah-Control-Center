@@ -1,6 +1,6 @@
 # Sprint-Tracker 284–383
 
-**Stand:** 25.09.2026 · 2.021 Tests grün · Produktiv-Backend deployed · APK v2.5.6
+**Stand:** 25.09.2026 · 2.046 Tests grün · Produktiv-Backend deployed · APK v2.5.6
 
 Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
@@ -21,7 +21,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 12 | 339–343 | ERLEDIGT | Serie F Rest + Abschluss (v3.0.0) |
 | 13 | 344–348 | ERLEDIGT | Serie G: Mobile-Politur (1.957→1.987 Tests, 247→250 Dateien) |
 | 14 | 349–353 | ERLEDIGT | Serie G Rest + Abschluss (2.021 Tests grün, 255 Testdateien) |
-| 15 | 354–358 | OFFEN | Serie H: Admin & Ops |
+| 15 | 354–358 | ERLEDIGT | Serie H: Admin & Ops (2.046 Tests grün, 260 Testdateien) |
 | 16 | 359–363 | OFFEN | Serie H Rest + Abschluss |
 | 17 | 364–368 | OFFEN | Serie I: Agent-Intelligenz |
 | 18 | 369–373 | OFFEN | Serie I Rest + Abschluss |
@@ -36,6 +36,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - [x] 294–298 — Dokumentiert in `docs/2026-09-24_SPRINTS_294-298_SERIE_B_PRODUKT_POLITUR.md`
 - [x] 344–348 — Dokumentiert in `docs/2026-09-25_SPRINTS_344-348_SERIE_G_MOBILE_POLITUR.md`
 - [x] 349–353 — Dokumentiert in `docs/2026-09-25_SPRINTS_349-353_SERIE_G_ABSCHLUSS.md`
+- [x] 354–358 — Dokumentiert in `docs/2026-09-25_SPRINTS_354-358_SERIE_H_ADMIN_OPS.md`
 
 ## Batch-Protokoll
 
@@ -50,3 +51,4 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - **Batch 11+12 (Sprints 334–343):** ERLEDIGT am 25.09.2026 (Commits 2848acd, 0aecd3e). E-Mail v2 (Anhänge+Vorlagen), Kalender-Abstraktion, Webhook-Eingang mit Signatur, Export-Center, Import-Wizard, API-Keys mit Scopes, ehrliche API-Doku, Slack/Discord-Webhooks, Integrations-Diagnose, Serie-F-Abschluss. v3.0.0. Tests: 1.900 → 1.950 (+50), 242 Testdateien.
 - **Batch 13 (Sprints 344–348):** ERLEDIGT am 25.09.2026. Navigation-Pass (per-Tab-Stacks, Deep-Links), Offline-Zustände (Entprellung, Reconnect-Plan, Offline-Banner), Skeleton-Lade-Logik (Screen-Presets, Hybrid-Modus, Flackern-Schutz), Lokale Notifications (5 Kategorien, ohne FCM, ehrlich), APK-Größen-Metriken (Budget, Empfehlungen, Startzeit-Optimierung). Tests: 1.957 → 1.987 (+30), 250 Testdateien.
 - **Batch 14 (Sprints 349–353):** ERLEDIGT am 25.09.2026. Android Predictive Back Gesten & Animationen, Tastatur-Handling & Focus-Scrolling, Tablet-Layout & Dual-Pane, App-Icon/Splash-Lifecycle & Store-Screenshots Checklist, Serie-G-Abschluss. Tests: 1.987 → 2.021 (+34), 255 Testdateien.
+- **Batch 15 (Sprints 354–358):** ERLEDIGT am 25.09.2026. Admin-Dashboard v2 mit echten Metriken & Schwellenwerten, Ops-Playbook-Screen mit interaktiven Incident-Checklisten & Verifikation, Feature-Flags mit prozentualem Rollout & Segmentierung, Nutzer-Verwaltung mit Rollen/Rechten/Suche/Sperrung, Admin Audit-Log mit Hash-Prüfsummen & PII-Maskierung. Tests: 2.021 → 2.046 (+25), 260 Testdateien.
