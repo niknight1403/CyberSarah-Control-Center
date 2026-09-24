@@ -12,6 +12,7 @@ export type DrawerRoute =
   | "/revenue-os"
   | "/micro-trading"
   | "/loop-engineering"
+  | "/focus"
   | "/superagent"
   | "/designer"
   | "/plugins"
@@ -41,6 +42,7 @@ export type DrawerItem = {
     | "chevron.left.forwardslash.chevron.right"
     | "sparkles"
     | "play.rectangle.fill"
+    | "hourglass"
     | "chart.bar.fill";
   badge?: string;
 };
@@ -51,6 +53,7 @@ export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", badge: "Neu" },
   { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill", badge: "Paper" },
   { route: "/loop-engineering", title: "Loop Engineering", icon: "wand.and.stars", badge: "Umsatz" },
+  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", badge: "Neu" },
   { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
   { route: "/designer", title: "Designer", icon: "paintpalette.fill", badge: "KI" },
   { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },

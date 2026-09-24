@@ -92,6 +92,16 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="focus"
+          options={{
+            title: "Fokus",
+            href: null,
+            tabBarIcon: ({ color, focused }) => (
+              <GlassTabIcon focused={focused} accent="amber"><IconSymbol size={22} name="hourglass" color={color} /></GlassTabIcon>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="cyber-dashboard"
           options={{
             href: null, // Sprint 195: aus Leiste ausgeblendet für Handy-Übersicht
