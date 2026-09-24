@@ -177,3 +177,82 @@ export function evaluateFocusDay(items: FocusItem[], day: string, capacity = FOC
   observations.push(`${counts.active} Punkt(e) offen, noch nichts erledigt — der Tag hat noch Platz nach oben.`);
   return { state: "open", headline: "Tagesfokus noch offen", observations, counts };
 }
+
+/* ==================== Wochenrückblick (Sprint 234) ==================== */
+
+export type WeeklyReview = {
+  /** Montag der Woche als ISO-Tag. */
+  weekStart: string;
+  headline: string;
+  summary: string;
+  observations: string[];
+  counts: { total: number; done: number; moved: number; dropped: number; active: number; daysWithFocus: number };
+};
+
+/** ISO-Montag der Woche eines Zeitstempels (lokale Zeit). */
+export function isoWeekStart(timestamp: number): string {
+  const date = new Date(timestamp);
+  const weekday = (date.getDay() + 6) % 7; // Montag = 0
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - weekday);
+  return isoDayFromTimestamp(monday.getTime());
+}
+
+function addDaysIso(day: string, days: number): string {
+  const date = new Date(`${day}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return isoDayFromTimestamp(date.getTime());
+}
+
+/**
+ * Baut den Wochenrückblick aus den echten Punkten — bewusst ohne
+ * Produktivitäts-Score: eine Zahl wäre eine Note für eine Person,
+ * dieses Modul zählt nur Beobachtungen.
+ */
+export function buildWeeklyReview(items: FocusItem[], weekStart: string): WeeklyReview {
+  if (!isIsoDay(weekStart)) throw new Error("Wochenstart muss ein ISO-Tag (YYYY-MM-DD) sein.");
+  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(weekStart, index));
+  const weekItems = items.filter((item) => days.includes(item.day));
+  const counts = {
+    total: weekItems.length,
+    done: weekItems.filter((item) => item.status === "done").length,
+    moved: weekItems.filter((item) => item.status === "moved").length,
+    dropped: weekItems.filter((item) => item.status === "dropped").length,
+    active: weekItems.filter((item) => item.status === "active").length,
+    daysWithFocus: days.filter((day) => weekItems.some((item) => item.day === day)).length,
+  };
+
+  const observations: string[] = [];
+  observations.push(`${counts.daysWithFocus} von 7 Tagen mit Fokus-Punkten.`);
+  if (counts.total === 0) {
+    return {
+      weekStart,
+      headline: "Leere Woche",
+      summary: "In dieser Woche sind keine Fokus-Punkte erfasst — ein echter Leerzustand, kein Fehler.",
+      observations: [...observations, "Ohne Punkte ist kein Rückblick möglich. Nächste Woche mit 1–3 Punkten starten — klein zählt."],
+      counts,
+    };
+  }
+
+  observations.push(`${counts.done} erledigt, ${counts.moved} verschoben, ${counts.dropped} fallen gelassen, ${counts.active} offen.`);
+  if (counts.done > 0 && counts.total > 0) {
+    observations.push(`Erledigt-Anteil: ${Math.round((counts.done / counts.total) * 100)} % — eine Beobachtung, keine Note.`);
+  } else if (counts.done === 0) {
+    observations.push("Kein Punkt wurde erledigt — zuerst klären, ob die Ziele oder die Rahmenbedingungen das Problem waren.");
+  }
+
+  const movedTitles = weekItems.filter((item) => item.status === "moved");
+  if (movedTitles.length >= 2) {
+    observations.push(`${movedTitles.length} Verschiebungen — wiederkehrende Muster zeigen Überverpflichtung, nicht Willensschwäche.`);
+  }
+  if (counts.daysWithFocus === 1) {
+    observations.push("Fokus nur an einem Tag — vermutlich war die Woche reaktiv. Das ist eine Beobachtung zum Kalender, nicht zu dir.");
+  }
+
+  return {
+    weekStart,
+    headline: `Woche ab ${weekStart}`,
+    summary: `${counts.total} Fokus-Punkt(e) in der Woche.`,
+    observations,
+    counts,
+  };
+}

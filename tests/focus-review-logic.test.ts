@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   FOCUS_LIMITS,
   evaluateFocusDay,
+  buildWeeklyReview,
+  isoWeekStart,
   countDayFocus,
   createFocusItem,
   focusStatusLabel,
@@ -109,5 +111,56 @@ describe("focus day evaluation (Sprint 233)", () => {
   it("andere Tage fließen nicht in die Bewertung ein", () => {
     const items = [createFocusItem({ ...item("Punkt A", "active"), day: "2026-09-25" })];
     expect(evaluateFocusDay(items, day).state).toBe("empty");
+  });
+});
+
+describe("weekly review (Sprint 234)", () => {
+  const weekStart = "2026-09-21"; // Montag
+
+  it("ermittelt den ISO-Montag der Woche", () => {
+    expect(isoWeekStart(new Date(2026, 8, 24, 10, 0).getTime())).toBe("2026-09-21"); // Donnerstag
+    expect(isoWeekStart(new Date(2026, 8, 20, 10, 0).getTime())).toBe("2026-09-14"); // Sonntag gehört noch zur alten Woche
+  });
+
+  it("leere Woche bleibt ein echter Leerzustand mit Start-Hinweis", () => {
+    const review = buildWeeklyReview([], weekStart);
+    expect(review.headline).toBe("Leere Woche");
+    expect(review.observations.some((line) => line.includes("1–3 Punkten"))).toBe(true);
+    expect(review.counts.daysWithFocus).toBe(0);
+  });
+
+  it("zählt die Woche ehrlich und gibt keine Note", () => {
+    const items = [
+      createFocusItem({ day: "2026-09-21", title: "Montag A", status: "done" }),
+      createFocusItem({ day: "2026-09-22", title: "Dienstag B", status: "done" }),
+      createFocusItem({ day: "2026-09-22", title: "Dienstag C", status: "moved" }),
+      createFocusItem({ day: "2026-09-25", title: "Freitag D", status: "dropped" }),
+      createFocusItem({ day: "2026-09-26", title: "Samstag offen", status: "active" }),
+    ];
+    const review = buildWeeklyReview(items, weekStart);
+    expect(review.counts.total).toBe(5);
+    expect(review.counts.done).toBe(2);
+    expect(review.counts.daysWithFocus).toBe(4);
+    expect(review.observations.some((line) => line.includes("40 %") && line.includes("keine Note"))).toBe(true);
+  });
+
+  it("Fokus nur an einem Tag wird als Kalender-Beobachtung benannt", () => {
+    const items = [createFocusItem({ day: "2026-09-23", title: "Einziger Punkt", status: "done" })];
+    const review = buildWeeklyReview(items, weekStart);
+    expect(review.observations.some((line) => line.includes("reaktiv"))).toBe(true);
+  });
+
+  it("Punkte außerhalb der Woche fließen nicht ein", () => {
+    const items = [
+      createFocusItem({ day: "2026-09-20", title: "Sonntag alte Woche", status: "done" }),
+      createFocusItem({ day: "2026-09-28", title: "Montag nächste Woche", status: "done" }),
+    ];
+    const review = buildWeeklyReview(items, weekStart);
+    expect(review.counts.total).toBe(0);
+    expect(review.headline).toBe("Leere Woche");
+  });
+
+  it("lehnt ungültige Wochenstart-Tage ab", () => {
+    expect(() => buildWeeklyReview([], "21.09.2026")).toThrow("ISO-Tag");
   });
 });
