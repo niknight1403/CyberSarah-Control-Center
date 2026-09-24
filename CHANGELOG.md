@@ -4,6 +4,20 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 25.09.2026 — Sprints 324–333: Serie E — Zuverlässigkeit & Sicherheit
+
+- Strukturierte Logs (Sprint 324): Korrelations-ID, Maskierung, Level-Gate (`lib/structured-logs-logic.ts`)
+- Rate-Limits (Sprint 325): pro Route und Nutzer mit ehrlichem Retry-After (`lib/rate-limit-logic.ts`)
+- RLS-Deckung (Sprint 326): Verifikation + verpflichtende Testfall-Namen (`lib/rls-coverage-logic.ts`)
+- Backup-Restore (Sprint 327): beweisbare Restore-Uebung, 90-Tage-Frische (`lib/backup-restore-logic.ts`)
+- Crash-Reporting v2 (Sprint 328): Muster-Klassifizierung mit Fingerprint-Dedup (`lib/crash-classification-logic.ts`)
+- Selbstheilung (Sprint 329): Muster -> Aktion, sichtbare Logs, Eskalation nach 3 (`lib/self-healing-patterns-logic.ts`)
+- Dependency-Audit (Sprint 330): Bumps einzeln, Risiko-Ordnung, ungetestet blockiert (`lib/dependency-audit-logic.ts`)
+- Geheimnis-Hygiene (Sprint 331): erweiterte Guards + Vault-Abdeckung (`lib/secret-hygiene-logic.ts`)
+- Health-Deep-Check (Sprint 332): /api/ready mit Timeouts, 503 ehrlich (`lib/health-deep-check-logic.ts`)
+- Serie-E-Abschluss (Sprint 333): Doku + CHANGELOG + Tracker + Version 2.9.0
+- 41 neue Tests (1.882 Tests gruen in 226 Testdateien)
+
 ## 25.09.2026 — Sprints 314–323: Serie D — Umsatz-Reihe 2
 
 - Quota-Enforcement-Schalter (Sprint 314): monitor <-> enforce mit Audit-Log, monitor blockiert nie (`lib/quota-mode-logic.ts`)
