@@ -11,7 +11,7 @@
 
 import { validateLoopDraft, type LoopDraft } from "@/lib/revenue-loop-logic";
 
-export const LOOP_STORE_KEY = "cybersarah.revenue-loops.v1";
+export const LOOP_STORAGE_ID = "cybersarah.revenue-loops.v1";
 export const MAX_STORED_LOOPS = 50;
 
 export type KeyValueAdapter = {
@@ -41,7 +41,7 @@ function assertValidStoredLoop(entry: unknown, index: number): LoopDraft {
 export async function loadLoops(adapter: KeyValueAdapter): Promise<{ loops: LoopDraft[]; note: string | null }> {
   let raw: string | null;
   try {
-    raw = await adapter.getItem(LOOP_STORE_KEY);
+    raw = await adapter.getItem(LOOP_STORAGE_ID);
   } catch (error) {
     throw new Error(`Lokaler Speicher nicht lesbar: ${error instanceof Error ? error.message : "unbekannter Fehler"}`);
   }
@@ -56,7 +56,7 @@ export async function loadLoops(adapter: KeyValueAdapter): Promise<{ loops: Loop
     return { loops, note: null };
   } catch (error) {
     // Kaputten Speicher ehrlich beseitigen, statt dauerhaft zu crashen.
-    await adapter.removeItem(LOOP_STORE_KEY);
+    await adapter.removeItem(LOOP_STORAGE_ID);
     return {
       loops: [],
       note: `Gespeicherte Schleifen waren beschädigt (${error instanceof Error ? error.message : "unbekannt"}) und wurden sicher entfernt.`,
@@ -69,7 +69,7 @@ export async function saveLoops(adapter: KeyValueAdapter, loops: LoopDraft[], no
   const bounded = loops.slice(0, MAX_STORED_LOOPS);
   const envelope: StoredEnvelope = { version: 1, savedAt: now(), loops: bounded };
   try {
-    await adapter.setItem(LOOP_STORE_KEY, JSON.stringify(envelope));
+    await adapter.setItem(LOOP_STORAGE_ID, JSON.stringify(envelope));
   } catch (error) {
     throw new Error(`Lokaler Speicher nicht schreibbar: ${error instanceof Error ? error.message : "unbekannter Fehler"}`);
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLoopDraft, type LoopDraft } from "../lib/revenue-loop-logic";
-import { loadLoops, LOOP_STORE_KEY, MAX_STORED_LOOPS, saveLoops, type KeyValueAdapter } from "../lib/revenue-loop-store";
+import { loadLoops, LOOP_STORAGE_ID, MAX_STORED_LOOPS, saveLoops, type KeyValueAdapter } from "../lib/revenue-loop-store";
 
 const VALID: Partial<LoopDraft> = {
   name: "Content-to-Lead",
@@ -33,37 +33,37 @@ describe("revenue loop store (Sprint 228)", () => {
     const adapter = memoryAdapter();
     const loops = Array.from({ length: MAX_STORED_LOOPS + 5 }, (_, i) => sampleLoop(`l${i}`, `Loop ${i}`));
     await saveLoops(adapter, loops, () => 42);
-    const saved = JSON.parse(adapter.data[LOOP_STORE_KEY]!) as { loops: LoopDraft[] };
+    const saved = JSON.parse(adapter.data[LOOP_STORAGE_ID]!) as { loops: LoopDraft[] };
     expect(saved.loops).toHaveLength(MAX_STORED_LOOPS);
     const loaded = await loadLoops(adapter);
     expect(loaded.loops).toHaveLength(MAX_STORED_LOOPS);
     expect(loaded.note).toBeNull();
 
     // Von außen überfüllte Daten klemmt auch der Lade-Pfad ehrlich.
-    const overfull = memoryAdapter({ [LOOP_STORE_KEY]: JSON.stringify({ version: 1, savedAt: 1, loops }) });
+    const overfull = memoryAdapter({ [LOOP_STORAGE_ID]: JSON.stringify({ version: 1, savedAt: 1, loops }) });
     const loadedOver = await loadLoops(overfull);
     expect(loadedOver.loops).toHaveLength(MAX_STORED_LOOPS);
     expect(loadedOver.note).toContain("abgeschnitten");
-    const raw = JSON.parse(adapter.data[LOOP_STORE_KEY]!) as { version: number; savedAt: number };
+    const raw = JSON.parse(adapter.data[LOOP_STORAGE_ID]!) as { version: number; savedAt: number };
     expect(raw.version).toBe(1);
     expect(raw.savedAt).toBe(42);
   });
 
   it("meldet und entsorgt korrupten Speicher statt zu crashen", async () => {
-    const adapter = memoryAdapter({ [LOOP_STORE_KEY]: "{kein json" });
+    const adapter = memoryAdapter({ [LOOP_STORAGE_ID]: "{kein json" });
     const result = await loadLoops(adapter);
     expect(result.loops).toEqual([]);
     expect(result.note).toContain("beschädigt");
-    expect(adapter.data[LOOP_STORE_KEY]).toBeUndefined();
+    expect(adapter.data[LOOP_STORAGE_ID]).toBeUndefined();
 
-    const adapter2 = memoryAdapter({ [LOOP_STORE_KEY]: JSON.stringify({ version: 9, loops: [] }) });
+    const adapter2 = memoryAdapter({ [LOOP_STORAGE_ID]: JSON.stringify({ version: 9, loops: [] }) });
     const result2 = await loadLoops(adapter2);
     expect(result2.note).toContain("beschädigt");
   });
 
   it("lehnt gespeicherte Müll-Einträge beim Laden ab", async () => {
     const bad = JSON.stringify({ version: 1, savedAt: 1, loops: [{ id: "x", name: "ab" }] });
-    const adapter = memoryAdapter({ [LOOP_STORE_KEY]: bad });
+    const adapter = memoryAdapter({ [LOOP_STORAGE_ID]: bad });
     const result = await loadLoops(adapter);
     expect(result.loops).toEqual([]);
     expect(result.note).toContain("unvollständig");

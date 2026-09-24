@@ -47,3 +47,14 @@ Micro-Trading (212–221):
 - Die Bestätigungs-Karte ist bewusst die einzige Tür zu Änderungen: Auch
   „Messpunkt erfassen" bleibt eine Freigabe, damit keine Zahl versehentlich
   in eine laufende Messung gerät.
+
+## Nachtrag (24.09.2026): Gitleaks-Fehlalarm behoben
+
+Der Gitleaks-Secret-Scan schlug beim Push der Reihe fehl: die Regel
+`generic-api-key` meldete `LOOP_STORE_KEY = "cybersarah.revenue-loops.v1"` als
+Geheimnis. Das war ein False Positive — hinter der Konstanten steckt nur der
+AsyncStorage-Bezeichner, kein Token. Behoben durch ehrliche Umbenennung in
+`LOOP_STORAGE_ID` (der gespeicherte Schlüssel-String bleibt unverändert,
+bestehende lokale Daten bleiben also lesbar). Kein Scanner-Allowlist-Eintrag,
+kein History-Rewrite nötig: der nächste Scan-Range beginnt nach dem alten
+Commit.
