@@ -10,6 +10,7 @@ describe("DRAWER_ITEMS", () => {
       "Micro Trading",
       "Loop Engineering",
       "Fokus & Rückblick",
+      "Ideen-Inbox",
       "Workflows",
       "Designer",
       "Plugins",
@@ -27,7 +28,7 @@ describe("DRAWER_ITEMS", () => {
 
   it("badgt die neuen Revenue-Einträge und Systembereiche", () => {
     const badged = DRAWER_ITEMS.filter((item) => item.badge);
-    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Micro Trading=Paper", "Loop Engineering=Umsatz", "Fokus & Rückblick=Neu", "Designer=KI", "Meetings=Neu"]);
+    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Micro Trading=Paper", "Loop Engineering=Umsatz", "Fokus & Rückblick=Neu", "Ideen-Inbox=Neu", "Designer=KI", "Meetings=Neu"]);
   });
 });
 
