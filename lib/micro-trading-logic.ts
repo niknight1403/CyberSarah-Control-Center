@@ -556,3 +556,78 @@ export function parseTradingPrompt(prompt: string): TradingPromptCommand {
 
   return { actions, symbolIds, days, stopDistancePercent };
 }
+
+/* ==================== Ehrliches Prompt-Ergebnis (Sprint 218) ==================== */
+
+export type TradingResult = {
+  headline: string;
+  lines: string[];
+  /** Fester, unverkürzbarer Hinweis: Analyse, keine Anlageberatung. */
+  disclaimer: string;
+};
+
+export const TRADING_DISCLAIMER =
+  "Papier-Analyse ohne Order-Funktion: Alle Werte sind Simulation auf historischen Daten, keine Anlageberatung, keine Renditegarantie.";
+
+const PORTFOLIO_PRESET: PaperPortfolio = { capital: 1_000, maxPositionShare: 0.2, maxLossShare: 0.01, totalRiskBudget: 0.03 };
+
+/**
+ * Baut die ehrliche Antwort auf ein analysiertes Kommando. `seriesBySymbol`
+ * liefert die (validierten oder abgelehnten) Serien; fehlende Symbole werden
+ * benannt statt übersprungen.
+ */
+export function buildTradingResult(
+  command: TradingPromptCommand,
+  seriesBySymbol: Record<string, CandleSeries>,
+  options: { config?: SignalConfig; backtestOptions?: BacktestOptions } = {},
+): TradingResult {
+  const lines: string[] = [];
+  const config = options.config ?? DEFAULT_SIGNAL_CONFIG;
+  const backtestOptions = options.backtestOptions ?? DEFAULT_BACKTEST_OPTIONS;
+  const hasSignalsAction = command.actions.includes("signals");
+  const hasBacktest = command.actions.includes("backtest");
+  const hasRisk = command.actions.includes("risk");
+
+  if (command.actions.includes("watchlist")) {
+    if (command.symbolIds.length === 0 || !hasSignalsAction && !hasBacktest && !hasRisk && !command.actions.includes("analyze")) {
+      lines.push("Watchlist (Paper-Beobachtung): BTC/USD, ETH/USD, SOL/USD, LINK/USD, AVAX/USD, DOT/USD.");
+      lines.push("Alle Kurse werden live über CoinGecko abgerufen — Verfügbarkeit ohne Garantie.");
+    }
+  }
+
+  for (const symbolId of command.symbolIds) {
+    const symbol = getSymbol(symbolId);
+    const current = seriesBySymbol[symbolId];
+    if (!current) {
+      lines.push(`${symbol?.label ?? symbolId}: Keine Daten geladen — Analyse nicht möglich.`);
+      continue;
+    }
+    const validation = validateCandleSeries(current);
+    if (!validation.valid) {
+      lines.push(`${symbol?.label ?? symbolId}: ${validation.reason}`);
+      continue;
+    }
+    const closes = current.candles.map((candle) => candle.close);
+    lines.push(`${symbol?.label ?? symbolId}: ${closes.length} Tageskurse, letzter Close ${formatPriceGerman(closes[closes.length - 1], current.currency)} (${formatPercentGerman(totalChangePercent(closes))} im Zeitraum, Volatilität ${formatPercentGerman(annualizedVolatility(closes))} p.a.).`);
+
+    if (hasSignalsAction) {
+      const signals = analyzeSignals(current, config);
+      for (const signal of signals.slice(0, 5)) {
+        lines.push(`→ ${symbol?.label ?? symbolId}: ${signal.reason} (Konfidenz ${Math.round(signal.confidence * 100)} %, Beobachtung, kein Handlungsauftrag).`);
+      }
+    }
+    if (hasBacktest) {
+      const backtest = runBacktest(current, config, backtestOptions);
+      lines.push(`→ Backtest ${backtest.strategy}: ${backtest.trades.length} hypothetische Trades, ${formatPercentGerman(backtest.returnPercent)} simulierte Rendite (Buy-and-Hold ${formatPercentGerman(backtest.buyAndHoldReturnPercent)}), Win-Rate ${formatPercentGerman(backtest.winRate).replace("+", "")}, Max-Drawdown ${formatPercentGerman(backtest.maxDrawdownPercent).replace("+", "")}.`);
+      for (const caveat of backtest.caveats) lines.push(`→ Hinweis: ${caveat}`);
+    }
+    if (hasRisk) {
+      const sizing = sizePaperPosition(PORTFOLIO_PRESET, command.stopDistancePercent ?? 5, 0);
+      lines.push(`→ Papier-Risiko (1.000 USD, 1 % Verlust-Cap, 3 % Budget): ${sizing.reason} Positionsgröße ${formatPriceGerman(sizing.positionSize)}.`);
+    }
+  }
+
+  const headline = hasBacktest ? "Hypothetischer Backtest" : hasRisk ? "Papier-Risikorechnung" : hasSignalsAction ? "Signal-Beobachtungen" : "Markt-Übersicht";
+  if (lines.length === 0) lines.push("Keine Analyse zustande gekommen — bitte Symbol und Zeitraum nennen.");
+  return { headline, lines, disclaimer: TRADING_DISCLAIMER };
+}

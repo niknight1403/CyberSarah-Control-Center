@@ -6,6 +6,8 @@ import {
   DEFAULT_BACKTEST_OPTIONS,
   drawdownGuard,
   parseTradingPrompt,
+  buildTradingResult,
+  TRADING_DISCLAIMER,
   PaperPortfolio,
   sizePaperPosition,
   validatePaperPortfolio,
@@ -268,5 +270,37 @@ describe("micro trading prompt parsing (Sprint 217)", () => {
     const clamped = parseTradingPrompt("Backtest ETH 400 Tage mit Stop bei 99 %");
     expect(clamped.days).toBe(365);
     expect(clamped.stopDistancePercent).toBe(99);
+  });
+});
+
+describe("micro trading honest result builder (Sprint 218)", () => {
+  const goodSeries: CandleSeries = series(Array.from({ length: 80 }, (_, i) => candle(1_000 * (i + 1), 100 + i, 101 + i, 99 + i, 100 + i)));
+
+  it("nennt fehlende Symbole statt sie zu überspringen", () => {
+    const result = buildTradingResult(parseTradingPrompt("Analysiere BTC"), {});
+    expect(result.lines.some((line) => line.includes("Keine Daten geladen"))).toBe(true);
+    expect(result.disclaimer).toBe(TRADING_DISCLAIMER);
+  });
+
+  it("beschreibt geladene Serien mit Kennzahlen und Disclaimer", () => {
+    const result = buildTradingResult(parseTradingPrompt("Analysiere BTC 30 Tage"), { btc: goodSeries });
+    expect(result.headline).toBe("Markt-Übersicht");
+    expect(result.lines.some((line) => line.includes("Tageskurse"))).toBe(true);
+    expect(result.lines.some((line) => line.includes("Volatilität"))).toBe(true);
+    expect(result.disclaimer).toContain("keine Anlageberatung");
+  });
+
+  it("liefert Signale nur auf Wunsch, Backtest mit Hinweisen, Risiko mit Nachvollziehbarkeit", () => {
+    const signals = buildTradingResult(parseTradingPrompt("Signale für BTC"), { btc: goodSeries });
+    expect(signals.headline).toBe("Signal-Beobachtungen");
+    expect(signals.lines.some((line) => line.includes("kein Handlungsauftrag"))).toBe(true);
+
+    const backtest = buildTradingResult(parseTradingPrompt("Backtest BTC"), { btc: goodSeries });
+    expect(backtest.headline).toBe("Hypothetischer Backtest");
+    expect(backtest.lines.some((line) => line.includes("hypothetische Trades"))).toBe(true);
+
+    const risk = buildTradingResult(parseTradingPrompt("Positionsgröße BTC mit Stop bei 4 %"), { btc: goodSeries });
+    expect(risk.headline).toBe("Papier-Risikorechnung");
+    expect(risk.lines.some((line) => line.includes("Positionsgröße"))).toBe(true);
   });
 });
