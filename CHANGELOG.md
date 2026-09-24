@@ -4,6 +4,20 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 25.09.2026 — Sprints 314–323: Serie D — Umsatz-Reihe 2
+
+- Quota-Enforcement-Schalter (Sprint 314): monitor <-> enforce mit Audit-Log, monitor blockiert nie (`lib/quota-mode-logic.ts`)
+- Upgrade-Prompt (Sprint 315): einheitlicher, druckfreier Hinweis an allen Quota-Grenzen ab 90 % — UI-Schicht neben dem bestehenden Sprint-262-Gate (`lib/upgrade-prompt-ui-logic.ts`)
+- Checkout-Rueckweg (Sprint 316): Erfolg nur aus verifizierter Session, klare Zustandsseiten (`lib/checkout-return-logic.ts`)
+- Abrechnungs-Screen (Sprint 317): Rechnungshistorie mit ehrlich getrennten Summen (`lib/billing-history-logic.ts`)
+- Tier-Vergleich (Sprint 318): Matrix aus dem Katalog, Preise nur wenn konfiguriert (`lib/tier-comparison-logic.ts`)
+- Testmodus-Kennzeichnung (Sprint 319): Stripe-Test-Modus immer sichtbar, nie Umsatz (`lib/stripe-testmode-logic.ts`)
+- Kuendigungs-Flow (Sprint 320): Vormerkung zum Periodenende mit Konsequenz-Liste und Ruecknahme (`lib/cancellation-flow-logic.ts`)
+- MRR-Dashboard v2 (Sprint 321): MRR/Churn/Neukunden ohne Preis-Schaetzungen (`lib/mrr-dashboard-logic.ts`)
+- Ops-Alerts (Sprint 322): Zahlungsausfaelle mit Dedup, Eskalation und Zustellungs-Ack (`lib/ops-payment-alert-logic.ts`)
+- Serie-D-Abschluss (Sprint 323): Doku + CHANGELOG + Tracker + Version 2.8.0
+- 46 neue Tests (1.841 Tests gruen in 217 Testdateien)
+
 ## 24.09.2026 — Sprints 309–313: Serie C Abschluss
 
 - Medien-Cache (Sprint 309): TTL + Byte-Budget + Aufraeumauftrag mit ehrlichem Loesch-Bericht (`lib/media-cache-cleanup-logic.ts`)
