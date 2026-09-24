@@ -3,6 +3,15 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprints 359–363: Serie H Admin & Ops Rest + Abschluss (Batch 16)
+
+- Deployment-Status-Screen (Sprint 359): Aggregation von Deployment-Status, Commit SHA, Umgebungsübersicht (Prod/Staging) und Health-Checks aller Systemkomponenten inkl. Rollback-Verfolgung (`lib/deployment-status-logic.ts`)
+- Konfigurations-Screen (Sprint 360): Maskierte Umgebungs-Ansicht mit automatischer Secrets-Erkennung (Tokens, Keys, DB URLs), Validierung, Kategorisierung & Audit-geschütztem Admin-Aufdecken (`lib/config-view-logic.ts`)
+- Wartungsmodus (Sprint 361): Ankündigungen mit Zeitplan, automatischer Start, Admin/IP/Token-Bypass und strukturierte Sperrbildschirm-Payloads (`lib/maintenance-mode-logic.ts`)
+- Log-Viewer im Admin (Sprint 362): Schweregrad- & Komponenten-Filterung, PII- & Credential-Maskierung (E-Mails, Telefonnummern, IP-Adressen, Tokens) im Ingestion-Filter, Paginierung & Export (`lib/admin-log-viewer-logic.ts`)
+- Serie-H-Abschluss (Sprint 363): Cross-Validierung aller 10 Admin & Ops Sprints (354–363) mit 100% grüner Bestätigung (`lib/serie-h-validation-logic.ts`)
+- 25 neue Tests (2.071 Tests grün in 265 Testdateien)
+
 ## 25.09.2026 — Sprints 354–358: Serie H Admin & Ops (Batch 15)
 
 - Admin-Dashboard v2 (Sprint 354): Aggregation von Systemmetriken (CPU, Speicher, p50/p95/p99 Latenz, Fehlerrate, DB Connections, Storage) zu Gesamtgesundheit mit Schwellenwert-Alerts & Trends (`lib/admin-dashboard-v2-logic.ts`)
