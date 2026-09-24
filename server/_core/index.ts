@@ -24,6 +24,7 @@ import {
   createLiveBillingPortalSession,
   createLiveCheckoutSession,
   processStripeWebhook,
+  StripeWebhookSignatureError,
 } from "../billing";
 import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
@@ -76,8 +77,16 @@ async function startServer() {
           "[Stripe] Webhook-Verarbeitung fehlgeschlagen:",
           error instanceof Error ? error.message : "Unbekannter Fehler",
         );
-        res.status(400).json({
-          error: "Webhook konnte nicht verifiziert oder verarbeitet werden.",
+        // Signatur-Fehler: 400 (Stripe kann dieses Event nie liefern).
+        // Verarbeitungs-Fehler: 500 — Stripe wiederholt die Zustellung.
+        if (error instanceof StripeWebhookSignatureError) {
+          res.status(400).json({
+            error: "Webhook-Signatur ungültig.",
+          });
+          return;
+        }
+        res.status(500).json({
+          error: "Webhook-Verarbeitung vorübergehend fehlgeschlagen — Stripe wird erneut zustellen.",
         });
       }
     },

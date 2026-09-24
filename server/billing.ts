@@ -325,39 +325,98 @@ export function isStripeSubscriptionEvent(eventType: string) {
   ]).has(eventType);
 }
 
+/** Signatur-Fehler: Stripe wird es nie schaffen, dieses Event zu liefern — 400. */
+export class StripeWebhookSignatureError extends Error {}
+
+/** Verarbeitungs-Fehler (Stripe-API, DB): 500, damit Stripe erneut zustellt. */
+export class StripeWebhookProcessingError extends Error {}
+
+/**
+ * Sprint 278 — Best-Effort-Dedup bereits verarbeiteter Stripe-Event-IDs.
+ * Ehrlich: In-Memory pro Instanz — übersteht keinen Neustart und kennt
+ * Nachbar-Instanzen nicht. Stripe-Events sind als Upsert idempotent
+ * entworfen; das hier reduziert nur nutzlose Doppelarbeit.
+ */
+const MAX_SEEN_EVENT_IDS = 500;
+const seenEventIds = new Set<string>();
+function markEventSeen(id: string): boolean {
+  if (seenEventIds.has(id)) return false;
+  seenEventIds.add(id);
+  if (seenEventIds.size > MAX_SEEN_EVENT_IDS) {
+    const oldest = seenEventIds.values().next().value;
+    if (oldest) seenEventIds.delete(oldest);
+  }
+  return true;
+}
+
 export async function processStripeWebhook(
   payload: Buffer,
   signature: string | undefined,
+  deps?: {
+    sendAlert?: (message: string) => Promise<unknown>;
+    markEventSeen?: (id: string) => boolean;
+  },
 ) {
   const stripe = assertLiveStripeConfiguration();
-  if (!signature) throw new Error("Stripe-Signatur fehlt.");
-  const event = stripe.webhooks.constructEvent(
-    payload,
-    signature,
-    requiredEnvironment("STRIPE_WEBHOOK_SECRET"),
-  );
-  if (isStripeSubscriptionEvent(event.type)) {
-    await syncStripeSubscription(event.data.object as Stripe.Subscription);
-  }
-  if (
-    event.type === "invoice.paid" ||
-    event.type === "invoice.payment_failed"
-  ) {
-    await syncInvoiceSubscription(stripe, event.data.object as Stripe.Invoice);
-  }
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const userId = Number(
-      session.client_reference_id ?? session.metadata?.cyberSarahUserId,
+  if (!signature) throw new StripeWebhookSignatureError("Stripe-Signatur fehlt.");
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      payload,
+      signature,
+      requiredEnvironment("STRIPE_WEBHOOK_SECRET"),
     );
-    const customerId =
-      typeof session.customer === "string"
-        ? session.customer
-        : session.customer?.id;
-    if (Number.isSafeInteger(userId) && userId > 0 && customerId)
-      await db.setStripeCustomerId(userId, customerId);
+  } catch (error) {
+    throw new StripeWebhookSignatureError(
+      error instanceof Error ? error.message : "Signaturprüfung fehlgeschlagen.",
+    );
   }
-  return { received: true, eventType: event.type };
+
+  const seen = deps?.markEventSeen ?? markEventSeen;
+  if (event.id && !seen(event.id)) {
+    return { received: true, eventType: event.type, duplicate: true as const };
+  }
+
+  try {
+    if (isStripeSubscriptionEvent(event.type)) {
+      await syncStripeSubscription(event.data.object as Stripe.Subscription);
+    }
+    if (
+      event.type === "invoice.paid" ||
+      event.type === "invoice.payment_failed"
+    ) {
+      await syncInvoiceSubscription(stripe, event.data.object as Stripe.Invoice);
+    }
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const userId = Number(
+        session.client_reference_id ?? session.metadata?.cyberSarahUserId,
+      );
+      const customerId =
+        typeof session.customer === "string"
+          ? session.customer
+          : session.customer?.id;
+      if (Number.isSafeInteger(userId) && userId > 0 && customerId)
+        await db.setStripeCustomerId(userId, customerId);
+    }
+    // Umsatzkritische Events verdienen einen Ops-Alert — ehrlich, ohne Panic:
+    // payment_failed heißt nicht sofort Kündigung, subscription.deleted schon.
+    if (event.type === "invoice.payment_failed") {
+      await deps?.sendAlert?.(
+        `Stripe: Zahlung fehlgeschlagen (${event.id ?? "ohne ID"}). Abrechnungs-Sync wurde ausgeführt.`,
+      );
+    }
+    if (event.type === "customer.subscription.deleted") {
+      await deps?.sendAlert?.(
+        `Stripe: Abonnement gekündigt (${event.id ?? "ohne ID"}). Nutzer-Stufe wurde per Sync herabgesetzt.`,
+      );
+    }
+  } catch (error) {
+    throw new StripeWebhookProcessingError(
+      error instanceof Error ? error.message : "Verarbeitung fehlgeschlagen.",
+    );
+  }
+  return { received: true, eventType: event.type, duplicate: false as const };
 }
 
 export type BillingUser = {

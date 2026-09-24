@@ -6,7 +6,14 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.## 24.09.2026 �
 
 - Alle vier DB-Backups (3 SQL-Dumps + 1 tar.gz) vollständig aus der Git-Historie von `cybersarah-revenue-os` entfernt (git filter-repo + Force-Push)
 - Ehrliche Inhaltsprüfung über alle historischen Versionen: keine personenbezogenen Daten, keine Geheimnisse — Geheimnis-Rotation daher nicht erforderlich
-- Restrisiko dokumentiert: GitHub-Cache alter SHAs bis zur internen GC
+- Restrisiko dokumentiert: GitHub-Cache alter SHAs bis zur internen GC## 24.09.2026 — Sprint 278: Stripe-Webhook-Härtung
+
+- Fehler-Trennung: Signatur-Fehler → 400, Verarbeitungs-Fehler → 500 (Stripe wiederholt)
+- Best-Effort-Dedup verarbeiteter Event-IDs pro Instanz (ehrlich: In-Memory, kein Restart-Überleben)
+- Ops-Alerts bei invoice.payment_failed und customer.subscription.deleted
+- 3 neue Tests mit echt berechneten HMAC-Testsignaturen; 1.542 Tests grün
+
+
 ## 24.09.2026 — Sprints 276–277: FLUX-Szenenbilder + Medien-Studio-UI
 
 - Szenenbild-Adapter: generateSceneImageForPipeline nutzt FLUX.1-schnell + Bild-Cache ohne Nutzer-Quote (Pipeline begrenzt über Video-Quote)
