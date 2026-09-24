@@ -176,3 +176,80 @@ export function evaluateLoopProgress(loop: LoopDraft): LoopProgressVerdict {
   }
   return { classification: "behind", reason: `${percent} % des Ziels, aber letzte Messung steigt (${previous} → ${last} ${loop.unit}).`, percent };
 }
+
+/* ==================== Nächster-Schritt-Empfehlung (Sprint 224) ==================== */
+
+export type LoopNextStep = {
+  action: "approve-start" | "record-sample" | "review-hypothesis" | "mark-stalled" | "approve-completion" | "discard" | "none";
+  title: string;
+  reason: string;
+  /** true, wenn der Schritt eine explizite Nutzer-Freigabe braucht. */
+  requiresApproval: boolean;
+};
+
+/**
+ * Deterministische Empfehlung des nächsten Schritts aus Status und Bewertung.
+ * Keine Empfehlung erfüllt sich selbst: alles mit requiresApproval bleibt
+ * hängend, bis der Nutzer bestätigt.
+ */
+export function recommendNextStep(loop: LoopDraft): LoopNextStep {
+  const verdict = evaluateLoopProgress(loop);
+  switch (loop.status) {
+    case "draft":
+      return {
+        action: "approve-start",
+        title: "Experiment starten",
+        reason: `Der Entwurf ist plausibel, aber nichts läuft ohne deine Freigabe. Beim Start verpflichtest du dich auf: ${loop.experiment}`,
+        requiresApproval: true,
+      };
+    case "running":
+      if (loop.samples.length === 0) {
+        return {
+          action: "record-sample",
+          title: "Ersten Messpunkt erfassen",
+          reason: `Ohne mindestens einen Messpunkt für ${loop.metric} bleibt der Fortschritt unbekannt.`,
+          requiresApproval: false,
+        };
+      }
+      if (verdict.classification === "on-track" && verdict.percent >= 100) {
+        return {
+          action: "approve-completion",
+          title: "Abschluss prüfen",
+          reason: `Zielwert erreicht (${loop.currentValue} von ${loop.targetValue} ${loop.unit}). Der Abschluss braucht deine Bestätigung — keine Schleife schließt sich selbst.`,
+          requiresApproval: true,
+        };
+      }
+      if (verdict.classification === "behind" && verdict.percent < 25 && loop.samples.length >= 3) {
+        return {
+          action: "review-hypothesis",
+          title: "Hypothese überdenken",
+          reason: `Nur ${verdict.percent} % des Ziels nach ${loop.samples.length} Messpunkten — die Annahme selbst ist der erste Verdächtige.`,
+          requiresApproval: false,
+        };
+      }
+      return {
+        action: "record-sample",
+        title: "Nächsten Messpunkt erfassen",
+        reason: `${verdict.percent} % des Ziels. Regelmäßige Messpunkte (${loop.metric}) machen den Trend sichtbar.`,
+        requiresApproval: false,
+      };
+    case "measuring":
+      return {
+        action: "record-sample",
+        title: "Messung abschließen",
+        reason: "Die Messung läuft — Ergebnis erfassen, dann bewerten statt raten.",
+        requiresApproval: false,
+      };
+    case "stalled":
+      return {
+        action: "review-hypothesis",
+        title: "Blockade auflösen",
+        reason: "Steckengeblieben: Erst klären, ob die Annahme falsch ist oder nur die Umsetzung hakt.",
+        requiresApproval: false,
+      };
+    case "completed":
+      return { action: "none", title: "Abgeschlossen", reason: "Ziel erreicht und bestätigt — aus dieser Schleife lernen, dann weiter.", requiresApproval: false };
+    case "discarded":
+      return { action: "none", title: "Verworfen", reason: "Diese Schleife wird nicht weiterverfolgt.", requiresApproval: false };
+  }
+}

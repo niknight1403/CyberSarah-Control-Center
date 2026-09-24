@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createLoopDraft,
   evaluateLoopProgress,
+  recommendNextStep,
   loopProgressPercent,
   loopStatusLabel,
   LOOP_DISCLAIMER,
@@ -88,5 +89,55 @@ describe("revenue loop progress evaluation (Sprint 223)", () => {
     const stalled = evaluateLoopProgress(loopWith([[1, 20], [2, 21]], "stalled"));
     expect(stalled.classification).toBe("stalled");
     expect(evaluateLoopProgress(loopWith([], "discarded")).reason).toContain("verworfen");
+  });
+});
+
+describe("revenue loop next step recommendation (Sprint 224)", () => {
+  it("drafts need explicit approval to start", () => {
+    const step = recommendNextStep(createLoopDraft(VALID, () => 1_000));
+    expect(step.action).toBe("approve-start");
+    expect(step.requiresApproval).toBe(true);
+    expect(step.reason).toContain("Freigabe");
+  });
+
+  it("running loops without samples get the honest first measurement", () => {
+    const loop = createLoopDraft(VALID, () => 1_000);
+    loop.status = "running";
+    const step = recommendNextStep(loop);
+    expect(step.action).toBe("record-sample");
+    expect(step.requiresApproval).toBe(false);
+    expect(step.reason).toContain("unbekannt");
+  });
+
+  it("reaching the target asks for approval, never self-closes", () => {
+    const loop = createLoopDraft(VALID, () => 1_000);
+    loop.status = "running";
+    loop.currentValue = 100;
+    loop.samples = [{ at: 1, value: 100 }];
+    const step = recommendNextStep(loop);
+    expect(step.action).toBe("approve-completion");
+    expect(step.requiresApproval).toBe(true);
+  });
+
+  it("persistent weak progress points to the hypothesis", () => {
+    const loop = createLoopDraft(VALID, () => 1_000);
+    loop.status = "running";
+    loop.samples = [{ at: 1, value: 2 }, { at: 2, value: 3 }, { at: 3, value: 4 }];
+    loop.currentValue = 4;
+    const step = recommendNextStep(loop);
+    expect(step.action).toBe("review-hypothesis");
+    expect(step.title).toContain("überdenken");
+  });
+
+  it("terminal states recommend nothing new", () => {
+    const done = createLoopDraft(VALID, () => 1_000);
+    done.status = "completed";
+    expect(recommendNextStep(done).action).toBe("none");
+    const discarded = createLoopDraft(VALID, () => 1_000);
+    discarded.status = "discarded";
+    expect(recommendNextStep(discarded).action).toBe("none");
+    const stalled = createLoopDraft(VALID, () => 1_000);
+    stalled.status = "stalled";
+    expect(recommendNextStep(stalled).title).toContain("Blockade");
   });
 });
