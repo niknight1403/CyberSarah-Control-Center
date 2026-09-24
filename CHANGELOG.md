@@ -4,6 +4,12 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 25.09.2026 — Sprint-85-Flaky behoben (Root-Cause-Fix)
+
+- Echte Ursache: bei `isolate: false` leakte die Rotations-Agent-Suite Modul-Spiegel (`rotationPrimary`) + Env (`AI_GROQ_API_KEY`/`AI_OPENROUTER_API_KEY`) in die Sprint-85-Suite — Kette wurde lastabhaengig umsortiert (1 statt 2 Calls) oder verlaengert (3 statt 2)
+- Fix: `afterAll`-Cleanup in der Quell-Suite, `beforeEach`-Reset von Primary/Quarantaene/Env in der Sprint-85-Suite, neuer Hook `resetProviderQuarantineForTests()` (`lib/live-fix-logic.ts`)
+- Die fruehere Backoff-Jitter-Hypothese war falsch; Doku (Serie-C-Abschluss) um Aufloesung ergaenzt
+
 ## 25.09.2026 — Sprints 334–343: Serie F — Integrationen
 
 - E-Mail v2 (Sprint 334): Anhaenge mit Limits + versionierte Vorlagen (`lib/email-attachments-logic.ts`)

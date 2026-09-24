@@ -31,3 +31,16 @@ abweichender Laeufe zeigen 1 statt 2 (Provider uebersprungen) bzw. 3 statt 2
 (`computeBackoffDelay`, server/_core/llm.ts) + lastabhaengige Pool-Beobachtungen
 (`recordKeyObservation`). Datei-Level-Timeout (30s) ergaenzt; deterministische
 Fixtur (injizierbare Clock/Jitter) ist Kandidat fuer einen Serie-D-Sprint.
+
+**Aufgeloest (25.09.2026, Serie G):** Die Backoff-Hypothese war falsch. Echte
+Ursache: Bei `isolate: false` teilen sich Testdateien den Worker-Prozess — die
+Rotations-Agent-Suite (`tests/route-rotation-agent-runtime.test.ts`) hinterliess
+den Modul-Spiegel `rotationPrimary` (Sprint 196) sowie `AI_GROQ_API_KEY` /
+`AI_OPENROUTER_API_KEY` in der Env; die Quarantaene-Registry (`live-fix-logic.ts`)
+trug zusaetzlich echte Reste. Je nachdem, welche Datei vorher im Worker lief,
+sortierte `invokeLLM` die Kette um (1 statt 2 Calls) oder verlaengerte sie
+(3 statt 2 Calls) — lastabhaengig, daher flaky. Fixes: Quell-Suite raeumt im
+`afterAll` auf; die Sprint-85-Suite resettet Primary/Quarantaene/Env JE Test
+im `beforeEach`; neuer Test-Hook `resetProviderQuarantineForTests()`.
+Stressverifikation: 3x 3-Dateien-Kombination im selben Prozess gruen,
+volle Suite 1.926 Tests gruen.
