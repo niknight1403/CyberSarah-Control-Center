@@ -4,6 +4,10 @@ import {
   analyzeSignals,
   annualizedVolatility,
   DEFAULT_BACKTEST_OPTIONS,
+  drawdownGuard,
+  PaperPortfolio,
+  sizePaperPosition,
+  validatePaperPortfolio,
   DEFAULT_SIGNAL_CONFIG,
   runBacktest,
   ema,
@@ -191,5 +195,38 @@ describe("micro trading backtest engine (Sprint 215)", () => {
     expect(noFee.caveats.some((caveat) => caveat.includes("Gebühren"))).toBe(true);
     const result = runBacktest(oscillatingSeries(), DEFAULT_SIGNAL_CONFIG, { ...DEFAULT_BACKTEST_OPTIONS, minTradesForStatistics: 100 });
     expect(result.caveats.some((caveat) => caveat.includes("statistisch nicht belastbar"))).toBe(true);
+  });
+});
+
+describe("micro trading paper risk sizing (Sprint 216)", () => {
+  const portfolio: PaperPortfolio = { capital: 1_000, maxPositionShare: 0.2, maxLossShare: 0.01, totalRiskBudget: 0.03 };
+
+  it("begrenzt die Positionsgröße auf das engste Limit", () => {
+    const sizing = sizePaperPosition(portfolio, 5, 0);
+    // Verlust-Cap: 10 USD Risiko / 5 % Stop => 200 USD Einsatz.
+    expect(sizing.positionSize).toBe(200);
+    expect(sizing.reason).toContain("Verlust-Cap");
+    expect(sizing.riskAmount).toBe(10);
+    expect(sizing.budgetUsed).toBeCloseTo(0.01, 10);
+  });
+
+  it("respektiert das Risiko-Budget bereits verbrauchter Positionen", () => {
+    const sizing = sizePaperPosition(portfolio, 5, 0.025);
+    expect(sizing.positionSize).toBeCloseTo(100, 6);
+    expect(sizing.reason).toContain("Risiko-Budget");
+  });
+
+  it("lehnt ungültige Portfolios und Stops ehrlich ab", () => {
+    expect(sizePaperPosition({ ...portfolio, capital: -1 }, 5).positionSize).toBe(0);
+    expect(sizePaperPosition({ ...portfolio, maxPositionShare: 2 }, 5).reason).toContain("Risikolimits");
+    expect(sizePaperPosition(portfolio, 0).reason).toContain("Ungültiger Stop-Abstand");
+    expect(sizePaperPosition(portfolio, 5, 1).reason).toContain("ausgeschöpft");
+    expect(validatePaperPortfolio(portfolio).valid).toBe(true);
+  });
+
+  it("blockt neue Positionen im überzogenen Drawdown", () => {
+    expect(drawdownGuard(900, 1_000, 5).allowed).toBe(false);
+    expect(drawdownGuard(990, 1_000, 5).allowed).toBe(true);
+    expect(drawdownGuard(1_100, 1_000, 5).reason).toContain("Kein Drawdown");
   });
 });

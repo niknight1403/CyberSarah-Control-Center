@@ -196,3 +196,307 @@ export function totalChangePercent(closes: number[]): number {
   if (closes.length < 2 || closes[0] === 0) return 0;
   return ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100;
 }
+
+/* ==================== Signal-Engine (Sprint 214) ==================== */
+
+export type PaperSignal = {
+  symbolId: string;
+  /** Analytische Beobachtung — ausdrücklich KEINE Kauf-/Verkaufsempfehlung. */
+  kind: "bullish-cross" | "bearish-cross" | "momentum-extrem" | "no-signal";
+  /** Index der Candle, auf der sich das Signal ergab. */
+  index: number;
+  reason: string;
+  /** Heuristische Konfidenz 0..1 — kein Wahrscheinlichkeitsmaß, nur Vergleichbarkeit. */
+  confidence: number;
+};
+
+export type SignalConfig = {
+  fastPeriod: number;
+  slowPeriod: number;
+  rsiPeriod: number;
+  rsiOverbought: number;
+  rsiOversold: number;
+};
+
+export const DEFAULT_SIGNAL_CONFIG: SignalConfig = {
+  fastPeriod: 10,
+  slowPeriod: 30,
+  rsiPeriod: 14,
+  rsiOverbought: 70,
+  rsiOversold: 30,
+};
+
+/**
+ * Analysiert eine validierte Candle-Serie auf technische Beobachtungen.
+ * Rückgabe ist bewusst eine Beobachtung mit Begründung, keine Handlung.
+ * Unzureichende Daten => "no-signal" mit ehrlicher Begründung.
+ */
+export function analyzeSignals(series: CandleSeries, config: SignalConfig = DEFAULT_SIGNAL_CONFIG): PaperSignal[] {
+  const validation = validateCandleSeries(series);
+  if (!validation.valid) {
+    return [{ symbolId: series.symbolId, kind: "no-signal", index: 0, reason: validation.reason, confidence: 0 }];
+  }
+  const closes = series.candles.map((candle) => candle.close);
+  if (closes.length < config.slowPeriod + 1) {
+    return [{
+      symbolId: series.symbolId, kind: "no-signal", index: 0,
+      reason: `Zu wenig Daten (${closes.length} Punkte) für Periode ${config.slowPeriod} — keine seriöse Analyse möglich.`,
+      confidence: 0,
+    }];
+  }
+  const fast = sma(closes, config.fastPeriod);
+  const slow = sma(closes, config.slowPeriod);
+  const momentum = rsi(closes, config.rsiPeriod);
+  const signals: PaperSignal[] = [];
+  for (let i = config.slowPeriod; i < closes.length; i += 1) {
+    const crossUp = fast[i - 1] <= slow[i - 1] && fast[i] > slow[i];
+    const crossDown = fast[i - 1] >= slow[i - 1] && fast[i] < slow[i];
+    if (crossUp) {
+      signals.push({
+        symbolId: series.symbolId, kind: "bullish-cross", index: i,
+        reason: `SMA${config.fastPeriod} überkreuzt SMA${config.slowPeriod} aufwärts (Close ${formatPriceGerman(closes[i], series.currency)}).`,
+        confidence: momentum[i] > 50 ? 0.7 : 0.5,
+      });
+    } else if (crossDown) {
+      signals.push({
+        symbolId: series.symbolId, kind: "bearish-cross", index: i,
+        reason: `SMA${config.fastPeriod} überkreuzt SMA${config.slowPeriod} abwärts (Close ${formatPriceGerman(closes[i], series.currency)}).`,
+        confidence: momentum[i] < 50 ? 0.7 : 0.5,
+      });
+    }
+    if (!Number.isNaN(momentum[i]) && (momentum[i] >= config.rsiOverbought || momentum[i] <= config.rsiOversold)) {
+      signals.push({
+        symbolId: series.symbolId, kind: "momentum-extrem", index: i,
+        reason: `RSI ${formatPercentGerman(momentum[i] - 50)} im Extrembereich — momentum-getriebene Bewegung, kein Trendnachweis.`,
+        confidence: 0.4,
+      });
+    }
+  }
+  if (signals.length === 0) {
+    signals.push({
+      symbolId: series.symbolId, kind: "no-signal", index: closes.length - 1,
+      reason: "Keine SMA-Überkreuzung und kein RSI-Extrem im Zeitraum — keine auffällige Beobachtung.",
+      confidence: 0,
+    });
+  }
+  return signals;
+}
+
+/* ==================== Backtest-Engine (Sprint 215) ==================== */
+
+export type HypotheticalTrade = {
+  /** Candle-Index des (hypothetischen) Einstiegs. */
+  entryIndex: number;
+  exitIndex: number;
+  entryPrice: number;
+  exitPrice: number;
+  /** Brutto-Rendite der Position in Prozent (ohne Gebühren). */
+  grossReturnPercent: number;
+  netReturnPercent: number;
+  holdingDays: number;
+};
+
+export type BacktestResult = {
+  symbolId: string;
+  strategy: string;
+  /** Ausdrücklich hypothetisch: Ergebnis der Vergangenheit, keine Prognose. */
+  hypothetical: true;
+  trades: HypotheticalTrade[];
+  initialCapital: number;
+  finalEquity: number;
+  returnPercent: number;
+  winRate: number;
+  /** Größter prozentualer Rückgang der Equity-Kurve (immer >= 0). */
+  maxDrawdownPercent: number;
+  buyAndHoldReturnPercent: number;
+  /** Ehrliche Warnhinweise (z. B. Überanpassung, zu wenige Trades). */
+  caveats: string[];
+};
+
+export type BacktestOptions = {
+  /** Handelsspanne in Tagen, die eine Position maximal gehalten wird. */
+  maxHoldingDays: number;
+  /** Simulierte Round-Turn-Gebühr in Prozent (z. B. 0,5 = 0,5 %). */
+  feePercent: number;
+  initialCapital: number;
+  minTradesForStatistics: number;
+};
+
+export const DEFAULT_BACKTEST_OPTIONS: BacktestOptions = {
+  maxHoldingDays: 10,
+  feePercent: 0.5,
+  initialCapital: 1_000,
+  minTradesForStatistics: 5,
+};
+
+/**
+ * Simuliert die Signal-Strategie (SMA-Cross) auf historischen Daten.
+ * Jeder bullish-cross öffnet eine hypothetische Position, die beim nächsten
+ * bearish-cross oder nach maxHoldingDays geschlossen wird. Kein Look-ahead:
+ * Einstieg/Exit erfolgen zum Close der Signal-Candle.
+ */
+export function runBacktest(series: CandleSeries, config: SignalConfig = DEFAULT_SIGNAL_CONFIG, options: BacktestOptions = DEFAULT_BACKTEST_OPTIONS): BacktestResult {
+  const validation = validateCandleSeries(series);
+  const caveats: string[] = [];
+  if (!validation.valid) {
+    return {
+      symbolId: series.symbolId, strategy: "SMA-Cross", hypothetical: true, trades: [], initialCapital: options.initialCapital,
+      finalEquity: options.initialCapital, returnPercent: 0, winRate: 0, maxDrawdownPercent: 0, buyAndHoldReturnPercent: 0,
+      caveats: [validation.reason],
+    };
+  }
+  const closes = series.candles.map((candle) => candle.close);
+  const signals = analyzeSignals(series, config);
+  const crossSignals = signals.filter((signal) => signal.kind === "bullish-cross" || signal.kind === "bearish-cross");
+  const trades: HypotheticalTrade[] = [];
+  let equity = options.initialCapital;
+  const equityCurve: number[] = [equity];
+  let openEntry: { index: number; price: number } | null = null;
+
+  const closeTrade = (entry: { index: number; price: number }, exitIndex: number, exitPrice: number) => {
+    const grossReturn = (exitPrice - entry.price) / entry.price;
+    const netReturn = grossReturn - (options.feePercent / 100) * 2;
+    const days = exitIndex - entry.index;
+    const positionSize = equity; // vereinfachte Voll-Position (Paper-Annahme)
+    equity = equity * (1 + netReturn);
+    trades.push({
+      entryIndex: entry.index, exitIndex, entryPrice: entry.price, exitPrice,
+      grossReturnPercent: grossReturn * 100, netReturnPercent: netReturn * 100, holdingDays: days,
+    });
+    equityCurve.push(equity);
+    openEntry = null;
+  };
+
+  for (let i = 0; i < closes.length; i += 1) {
+    const cross = crossSignals.find((signal) => signal.index === i);
+    if (openEntry === null) {
+      if (cross?.kind === "bullish-cross") openEntry = { index: i, price: closes[i] };
+    } else if (cross?.kind === "bearish-cross") {
+      closeTrade(openEntry, i, closes[i]);
+    } else if (i - openEntry.index >= options.maxHoldingDays) {
+      closeTrade(openEntry, i, closes[i]);
+    }
+    if (openEntry !== null && i === closes.length - 1) {
+      // Offene Position zum letzten Kurs schließen — ehrlich als Simulationsschnitt.
+      closeTrade(openEntry, i, closes[i]);
+      caveats.push("Letzte Position wurde am Datenende geschlossen, nicht durch ein Gegensignal.");
+    }
+  }
+
+  const wins = trades.filter((trade) => trade.netReturnPercent > 0).length;
+  let peak = 0;
+  let maxDrawdown = 0;
+  for (const value of equityCurve) {
+    peak = Math.max(peak, value);
+    maxDrawdown = Math.max(maxDrawdown, (peak - value) / peak);
+  }
+  if (trades.length > 0 && trades.length < options.minTradesForStatistics) {
+    caveats.push(`Nur ${trades.length} Trades — die Win-Rate ist statistisch nicht belastbar.`);
+  }
+  if (options.feePercent === 0) {
+    caveats.push("Gebühren wurden nicht simuliert; reale Ergebnisse lägen tiefer.");
+  }
+  const buyAndHold = closes.length > 0 ? ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100 : 0;
+  return {
+    symbolId: series.symbolId,
+    strategy: `SMA${config.fastPeriod}/${config.slowPeriod}-Cross`,
+    hypothetical: true,
+    trades,
+    initialCapital: options.initialCapital,
+    finalEquity: equity,
+    returnPercent: ((equity - options.initialCapital) / options.initialCapital) * 100,
+    winRate: trades.length === 0 ? 0 : (wins / trades.length) * 100,
+    maxDrawdownPercent: maxDrawdown * 100,
+    buyAndHoldReturnPercent: buyAndHold,
+    caveats,
+  };
+}
+
+/* ==================== Paper-Risiko & Positionsgrößen (Sprint 216) ==================== */
+
+export type PaperPortfolio = {
+  /** Simuliertes Gesamtkapital (USD). */
+  capital: number;
+  /** Maximaler Anteil einer einzelnen Position am Kapital (0..1). */
+  maxPositionShare: number;
+  /** Maximal simulierter Verlust je Position (0..1 vom eingsetzten Kapital). */
+  maxLossShare: number;
+  /** Gesamtes Risiko-Budget über alle offenen Positionen (0..1). */
+  totalRiskBudget: number;
+};
+
+export type PositionSizing = {
+  /** Empfohlene (simulierte) Positionsgröße in USD — 0 wenn kein Risiko frei. */
+  positionSize: number;
+  riskAmount: number;
+  /** Ehrliche Begründung der Berechnung (nachvollziehbar für die UI). */
+  reason: string;
+  /** Bestandteil des Risiko-Budgets, den diese Position verbraucht (0..1). */
+  budgetUsed: number;
+};
+
+export function validatePaperPortfolio(portfolio: PaperPortfolio): CandleValidationResult {
+  if (!Number.isFinite(portfolio.capital) || portfolio.capital <= 0) {
+    return { valid: false, reason: "Ungültiges Simulationskapital — Risiko-Rechnung abgelehnt." };
+  }
+  if (portfolio.maxPositionShare <= 0 || portfolio.maxPositionShare > 1 || portfolio.maxLossShare <= 0 || portfolio.maxLossShare > 1 || portfolio.totalRiskBudget <= 0 || portfolio.totalRiskBudget > 1) {
+    return { valid: false, reason: "Risikolimits müssen zwischen 0 % und 100 % liegen." };
+  }
+  return { valid: true, reason: "Risikolimits plausibel." };
+}
+
+/**
+ * Fixed-Fractional-Positionsgröße für die SIMULATION: Einsatz wird über den
+ * Distanz zwischen Einstand und Stop-Loss begrenzt. Stop-Abstand in Prozent
+ * (0..100). Bewusst konservativ; ein Verlust darf nie über maxLossShare gehen.
+ */
+export function sizePaperPosition(
+  portfolio: PaperPortfolio,
+  /** Stop-Loss-Abstand vom Einstand in Prozent (z. B. 5 = 5 %). */
+  stopDistancePercent: number,
+  /** Bereits durch offene Positionen verbrauchtes Risiko (0..1). */
+  riskAlreadyUsed = 0,
+): PositionSizing {
+  const validation = validatePaperPortfolio(portfolio);
+  if (!validation.valid) {
+    return { positionSize: 0, riskAmount: 0, reason: validation.reason, budgetUsed: 0 };
+  }
+  if (!Number.isFinite(stopDistancePercent) || stopDistancePercent <= 0 || stopDistancePercent > 100) {
+    return { positionSize: 0, riskAmount: 0, reason: "Ungültiger Stop-Abstand — Positionsgröße nicht berechenbar.", budgetUsed: 0 };
+  }
+  if (riskAlreadyUsed < 0 || riskAlreadyUsed >= 1) {
+    return { positionSize: 0, riskAmount: 0, reason: "Risiko-Budget bereits ausgeschöpft oder ungültig.", budgetUsed: Math.max(0, riskAlreadyUsed) };
+  }
+  const remainingBudget = Math.max(0, portfolio.totalRiskBudget - riskAlreadyUsed);
+  if (remainingBudget <= 0) {
+    return { positionSize: 0, riskAmount: 0, reason: "Kein simuliertes Risiko-Budget mehr frei.", budgetUsed: portfolio.totalRiskBudget };
+  }
+  const byLossCap = portfolio.capital * portfolio.maxLossShare / (stopDistancePercent / 100);
+  const byBudget = portfolio.capital * remainingBudget / (stopDistancePercent / 100);
+  const byShare = portfolio.capital * portfolio.maxPositionShare;
+  const positionSize = Math.min(byLossCap, byBudget, byShare);
+  const riskAmount = positionSize * (stopDistancePercent / 100);
+  const budgetUsed = portfolio.capital > 0 ? riskAmount / portfolio.capital : 0;
+  const limits: string[] = [];
+  if (positionSize === byShare) limits.push("Positionsanteil-Cap");
+  if (positionSize === byLossCap) limits.push("Verlust-Cap");
+  if (positionSize === byBudget) limits.push("Risiko-Budget");
+  return {
+    positionSize,
+    riskAmount,
+    budgetUsed,
+    reason: `Simulierte Größe durch ${limits.join(" und ")} begrenzt; Risiko ${formatPriceGerman(riskAmount)} bei ${formatPercentGerman(stopDistancePercent).replace(" %", " %")} Stop-Abstand.`,
+  };
+}
+
+/** Drawdown-Wächter für die Simulation: Bei Tieffstand wird kein neues Risiko erlaubt. */
+export function drawdownGuard(equity: number, peakEquity: number, maxDrawdownPercent: number): { allowed: boolean; reason: string } {
+  if (peakEquity <= 0 || equity > peakEquity) {
+    return { allowed: true, reason: "Kein Drawdown vorhanden." };
+  }
+  const drawdown = (peakEquity - equity) / peakEquity * 100;
+  if (!Number.isFinite(drawdown) || drawdown > maxDrawdownPercent) {
+    return { allowed: false, reason: `Simulierter Drawdown ${formatPercentGerman(drawdown)} überschreitet das Limit ${formatPercentGerman(maxDrawdownPercent)} — keine neuen Positionen.` };
+  }
+  return { allowed: true, reason: `Drawdown ${formatPercentGerman(drawdown)} innerhalb des Limits.` };
+}
