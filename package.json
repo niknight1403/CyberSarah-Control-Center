@@ -73,6 +73,7 @@
     "expo-web-browser": "~57.0.3",
     "express": "^5.2.1",
     "jose": "6.2.12",
+    "msedge-tts": "^2.0.8",
     "nativewind": "^4.2.7",
     "pg": "^8.23.0",
     "react": "19.3.0",

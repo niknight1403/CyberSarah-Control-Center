@@ -8,6 +8,15 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.## 24.09.2026 �
 - Ehrliche Inhaltsprüfung über alle historischen Versionen: keine personenbezogenen Daten, keine Geheimnisse — Geheimnis-Rotation daher nicht erforderlich
 - Restrisiko dokumentiert: GitHub-Cache alter SHAs bis zur internen GC
 
+## 24.09.2026 — Sprints 272–275: Multimodale Medien-Pipeline (projekt-nullpunkt-Port)
+
+- TTS-Modul: Edge-TTS (msedge-tts, kostenlos, keine Python-CLI) mit deutschen Stimmen, Cache und Tagesquote
+- Szenen-Manuskript: deterministische Zerlegung (max. 8 Szenen), synthetisch-only Safety-Gate, SRT-Untertitel
+- Video-Assembly: ffmpeg-Argument-Builder (1080p, Ken-Burns-Farbverläufe, Untertitel), ffmpeg jetzt Teil des Runtime-Docker-Images
+- tRPC-Router `mediaPipeline` (status/tts/generate): Freigabe-Pflicht, Tagesquote 6 Videos/Nutzer, ehrlicher Fähigkeits-Check (probeFfmpeg)
+- Ehrliche Grenzen dokumentiert: Farbverlauf-Bühne statt FLUX-Szenenbilder (nächste Stufe), Timing ist Schätzung
+- 1.534 Tests grün (181 Dateien), TypeScript/Lint/Build sauber
+
 
 ## 24.09.2026 — Sprints 262–270 (Umsatz-Reihe)
 

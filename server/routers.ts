@@ -25,6 +25,7 @@ import { secretsRouter } from "./secrets-router";
 import { wixRouter } from "./wix-router";
 import { integrationsRouter } from "./integrations-router";
 import { imageGenerationRouter } from "./image-generation-router";
+import { mediaPipelineRouter } from "./media-pipeline-router";
 import { emailRouter } from "./email-router";
 import { analyticsRouter } from "./analytics-router";
 import { externalActionsRouter } from "./external-actions-router";
@@ -36,6 +37,7 @@ export const appRouter = router({
   system: systemRouter,
   integrations: integrationsRouter,
   imageGeneration: imageGenerationRouter,
+  mediaPipeline: mediaPipelineRouter,
   email: emailRouter,
   analytics: analyticsRouter,
   externalActions: externalActionsRouter,
