@@ -3,6 +3,15 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprints 349–353: Serie G Rest + Abschluss (Batch 14)
+
+- Android Predictive Back & Animationen (Sprint 349): Gesten-Lifecycle, Karten-Skalierung, Abrundung, Opazität & Modal-Verschiebung, Haptik-Schwellenwerte (`lib/predictive-back-logic.ts`)
+- Tastatur-Handling & Focus-Scrolling (Sprint 350): Inset- & Sichtbarkeitssteuerung, automatische Scroll-Offsets, Sticky Chat-Toolbars, Formular-Fokus-Sequenzen (`lib/keyboard-handling-logic.ts`)
+- Tablet-Layout & Dual-Pane (Sprint 351): Breakpoint-Klassifizierung, Master-Detail Spaltenaufteilung, Einklapp-Steuerung, Schwellenwert-Schutz (`lib/tablet-layout-logic.ts`)
+- App-Icon, Splash & Store-Screenshots (Sprint 352): Splash-Lifecycle mit Flackern-Schutz und Timeout-Fallback, Icon-Asset-Validierung, Store-Screenshot Checklisten (`lib/app-icon-splash-logic.ts`)
+- Serie-G-Abschluss & Validierung (Sprint 353): Qualitäts- & Abdeckungsprüfung für Sprints 344–353, Verifikation aller Ehrlichkeits-Grenzen der Mobile-App-Politur (`lib/serie-g-validation-logic.ts`)
+- 34 neue Tests (2.021 Tests grün in 255 Testdateien)
+
 ## 25.09.2026 — Sprints 344–348: Serie G Mobile-App-Politur (Batch 13)
 
 - Navigation-Pass (Sprint 344): Per-Tab-Routen-Stacks, ehrliche Zurück-Kette, Deep-Link-Parsing (`lib/navigation-pass-logic.ts`)
