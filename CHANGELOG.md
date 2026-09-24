@@ -4,6 +4,11 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 25.09.2026 — Sprint 345: Offline-Zustaende (Serie G)
+
+- `lib/offline-connectivity-logic.ts`: Verbindungs-Entprellung (3 Samples), Reconnect-Plan mit dedupliziertem Einmal-Refresh + Queue-Resume, ehrlicher Offline-/Reconnect-Banner (Dauer nie aufgerundet), Queue-Resume nur bei stabilem Online
+- 6 neue Tests (1.957 Tests gruen in 247 Testdateien)
+
 ## 25.09.2026 — Superagent-Faehigkeitsparitaet gegen Base44 (kostenlos)
 
 - Skill-Registry: wiederverwendbare Skills mit Parameter-Validierung vor dem Lauf (`lib/agent-skill-registry-logic.ts`)
