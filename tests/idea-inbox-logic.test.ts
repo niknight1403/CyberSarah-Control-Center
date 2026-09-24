@@ -6,6 +6,7 @@ import {
   createIdeaItem,
   hasInboxCapacity,
   buildTriagePlan,
+  parseIdeaPrompt,
   describeIdeaAge,
   describeInboxAges,
   ideaStatusLabel,
@@ -124,5 +125,38 @@ describe("triage engine (Sprint 244)", () => {
   it("entschiedene Ideen (kept/planted/dropped) fließen nicht in die Triage", () => {
     const decided = createIdeaItem({ title: "Behaltene alte Idee", source: "chat", status: "kept" }, () => 0);
     expect(buildTriagePlan([decided], now).suggestions).toEqual([]);
+  });
+});
+
+describe("idea prompt parsing (Sprint 245)", () => {
+  it("leerer Prompt und unklarer Text enden sicher", () => {
+    expect(parseIdeaPrompt("").actions).toEqual(["list"]);
+    expect(parseIdeaPrompt("hm?").actions).toEqual(["status"]);
+  });
+
+  it("parst neue Ideen mit Titel, Notiz und Quelle", () => {
+    const command = parseIdeaPrompt("Notiere Idee: HARA-Demo als Video-Serie; Notiz: 3 Teile; Quelle: chat");
+    expect(command.actions).toContain("add");
+    expect(command.newIdea?.title).toBe("HARA-Demo als Video-Serie");
+    expect(command.newIdea?.note).toBe("3 Teile");
+    expect(command.newIdea?.source).toBe("chat");
+  });
+
+  it("Quelle fehlt nie — 'spontan' ist der ehrliche Standard", () => {
+    const command = parseIdeaPrompt("Idee: Podcast mit Kundenstimmen");
+    expect(command.newIdea?.source).toBe("spontan");
+  });
+
+  it("verneinte Aufträge werden nie ausführend", () => {
+    expect(parseIdeaPrompt("Status zeigen, aber nicht pflanzen").actions).toEqual(["status"]);
+    expect(parseIdeaPrompt("Zeig den Stand, nicht löschen").actions).toEqual(["status"]);
+  });
+
+  it("erkennt Aktionen und Bezüge über zitierte Titel", () => {
+    expect(parseIdeaPrompt('Pflanze "Video-Serie"').actions).toContain("plant");
+    expect(parseIdeaPrompt('Behalte "Video-Serie"').actions).toContain("keep");
+    expect(parseIdeaPrompt('Streiche "Video-Serie"').actions).toContain("drop");
+    expect(parseIdeaPrompt("Triage-Vorschläge bitte").actions).toContain("triage");
+    expect(parseIdeaPrompt('Pflanze "Video-Serie"').titleQuery).toBe("Video-Serie");
   });
 });

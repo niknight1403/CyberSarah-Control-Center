@@ -219,3 +219,53 @@ export function buildTriagePlan(items: IdeaItem[], now = Date.now): TriagePlan {
 
   return { suggestions, summary, requiresApproval: true };
 }
+
+/* ==================== Prompt-Parsing (Sprint 245) ==================== */
+
+export type IdeaPromptAction = "add" | "triage" | "status" | "list" | "keep" | "plant" | "drop";
+
+export type IdeaPromptCommand = {
+  actions: IdeaPromptAction[];
+  /** Titel-Bezug einer gemeinten Idee — null, wenn keiner erkannt. */
+  titleQuery: string | null;
+  newIdea: { title: string; note: string | null; source: string } | null;
+};
+
+/** Parst deutsche Ideen-Aufträge. Verneinte Aufträge bleiben Anfragen. */
+export function parseIdeaPrompt(prompt: string): IdeaPromptCommand {
+  const trimmed = prompt.trim();
+  if (!trimmed) return { actions: ["list"], titleQuery: null, newIdea: null };
+
+  const negated = /(nicht|kein\w*)\s+(pflanz|löschen|lösche|fallen|streich|behalte|behalten|triag)/i.test(trimmed);
+  if (negated) {
+    return { actions: ["status"], titleQuery: extractIdeaTitleQuery(trimmed), newIdea: null };
+  }
+
+  const actions: IdeaPromptAction[] = [];
+  if (/\b(idee|gedanke|hinzufü|füg\w*\s+hinzu|notier|notiere|sammel|sammle)/i.test(trimmed)) actions.push("add");
+  if (/\b(triage|sortier|sortiere|aufräum|aufräumen|vorschlag|vorschläge)/i.test(trimmed)) actions.push("triage");
+  if (/\b(status|stand|lage|wie viele)/i.test(trimmed)) actions.push("status");
+  if (/\b(liste|übersicht|alle|zeig|stapel)/i.test(trimmed)) actions.push("list");
+  if (/\b(behalte|behalten|keep)/i.test(trimmed)) actions.push("keep");
+  if (/\b(pflanz|pflanze|in\s+fokus|fokus-punkt)/i.test(trimmed)) actions.push("plant");
+  if (/\b(fallen\s*lassen|streich\w*|löschen|lösche|drop)/i.test(trimmed)) actions.push("drop");
+  if (actions.length === 0) actions.push("status");
+
+  const newIdea = actions.includes("add") ? extractNewIdea(trimmed) : null;
+  return { actions, titleQuery: extractIdeaTitleQuery(trimmed), newIdea };
+}
+
+function extractIdeaTitleQuery(prompt: string): string | null {
+  const quoted = prompt.match(/["'„]([^"'„]{3,})["'„]/);
+  if (quoted?.[1]) return quoted[1].trim();
+  return null;
+}
+
+function extractNewIdea(prompt: string): { title: string; note: string | null; source: string } | null {
+  const colon = prompt.match(/(?:Idee|Gedanke)\s*:([^;\n]+)/i);
+  const title = colon?.[1]?.trim();
+  if (!title || title.length < IDEA_LIMITS.title.min) return null;
+  const noteMatch = prompt.match(/Notiz\s*:([^;\n]+)/i);
+  const sourceMatch = prompt.match(/Quelle\s*:([^;\n]+)/i);
+  return { title, note: noteMatch?.[1]?.trim() ?? null, source: sourceMatch?.[1]?.trim() ?? "spontan" };
+}
