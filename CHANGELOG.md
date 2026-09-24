@@ -3,6 +3,20 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 24.09.2026 — Sprints 262–270 (Umsatz-Reihe)
+
+- **262** Ehrliche Upgrade-Prompts an Chat-Quota-Grenzen (Zahlen, Reset, kein Druck)
+- **263** Integrations-Registry mit Readiness-Status und Ausführungsgrenzen (oefentlicher Status-Router)
+- **264** Bild-Generierung via FLUX.1-schnell (HuggingFace Free-Tier): Sicherheitsgrenzen, Cache, Tagesquote, Freigabe-Pflicht
+- **265** Oeffentliche Landing-Page mit ENV-basierten Preisen und ehrlichen Tarif-Grenzen
+- **266** Resend-Transaktionsmail: Opt-in-Nachweis, Idempotenz-Schluessel, Tageslimit
+- **267** Datenschutz-arme Analytik: Tages-Buckets, Trichter-Zahlen, Retention im Code
+- **268** Level-3-Freigabe-Flow fuer externe Aktionen mit unveraenderlicher Audit-Spur
+- **269** Provider-Rotation mit Cooldown und ehrlich benanntem Antwort-Cache
+- **270** Selbstheilende Schreib-Grenze (Validierung vor jedem write_repo_file) + begrenzter Code-Index
+
+Alle 1.508 Tests gruen, TypeScript/Lint/Build sauber, CI gruen.
+
 
 ## [Unreleased — Sprint 252–261]
 

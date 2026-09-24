@@ -23,12 +23,22 @@ import { autonomousDevRouter } from "./autonomous-dev-router";
 import { keylessSearchRouter } from "./keyless-search";
 import { secretsRouter } from "./secrets-router";
 import { wixRouter } from "./wix-router";
+import { integrationsRouter } from "./integrations-router";
+import { imageGenerationRouter } from "./image-generation-router";
+import { emailRouter } from "./email-router";
+import { analyticsRouter } from "./analytics-router";
+import { externalActionsRouter } from "./external-actions-router";
 import { influencerRouter } from "./influencer-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  integrations: integrationsRouter,
+  imageGeneration: imageGenerationRouter,
+  email: emailRouter,
+  analytics: analyticsRouter,
+  externalActions: externalActionsRouter,
   ops: opsRouter,
   features: featuresRouter,
   appStatus: appStatusRouter,
