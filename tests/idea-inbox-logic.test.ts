@@ -5,6 +5,7 @@ import {
   countInboxOpen,
   createIdeaItem,
   hasInboxCapacity,
+  buildTriagePlan,
   describeIdeaAge,
   describeInboxAges,
   ideaStatusLabel,
@@ -84,5 +85,44 @@ describe("idea aging (Sprint 243)", () => {
     expect(stats.fresh).toBe(1);
     expect(stats.aging).toBe(1);
     expect(stats.withering).toBe(1);
+  });
+});
+
+describe("triage engine (Sprint 244)", () => {
+  const DAY = 86_400_000;
+  const now = () => 30 * DAY;
+
+  it("leerer Eingang bekommt einen echten Leerzustand", () => {
+    const plan = buildTriagePlan([], now);
+    expect(plan.suggestions).toEqual([]);
+    expect(plan.summary).toContain("leere Stapel ist echt");
+    expect(plan.requiresApproval).toBe(true);
+  });
+
+  it("verwelkende Ideen bekommen Fallenlassen-Vorschläge mit Begründung", () => {
+    const old = createIdeaItem({ title: "Uralte Idee ohne Ziel", source: "spontan" }, () => 2 * DAY);
+    const plan = buildTriagePlan([old], now);
+    expect(plan.suggestions).toHaveLength(1);
+    expect(plan.suggestions[0]!.kind).toBe("drop");
+    expect(plan.suggestions[0]!.reason).toContain("nie ernst gemeint");
+  });
+
+  it("zeitlich gemeinte Ideen werden zum Pflanzen vorgeschlagen", () => {
+    const timely = createIdeaItem({ title: "Rückblick bis Freitag vorbereiten", source: "rückblick" }, () => 20 * DAY);
+    const plan = buildTriagePlan([timely], now);
+    expect(plan.suggestions[0]!.kind).toBe("plant");
+    expect(plan.suggestions[0]!.reason).toContain("Fokus-Punkt pflanzen");
+  });
+
+  it("frische Ideen werden bewusst liegen gelassen", () => {
+    const fresh = createIdeaItem({ title: "Idee von gerade eben", source: "chat" }, () => 29 * DAY);
+    const plan = buildTriagePlan([fresh], now);
+    expect(plan.suggestions[0]!.kind).toBe("watch");
+    expect(plan.suggestions[0]!.reason).toContain("Pseudo-Verpflichtungen");
+  });
+
+  it("entschiedene Ideen (kept/planted/dropped) fließen nicht in die Triage", () => {
+    const decided = createIdeaItem({ title: "Behaltene alte Idee", source: "chat", status: "kept" }, () => 0);
+    expect(buildTriagePlan([decided], now).suggestions).toEqual([]);
   });
 });

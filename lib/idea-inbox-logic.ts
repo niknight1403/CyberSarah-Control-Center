@@ -140,3 +140,82 @@ export function describeInboxAges(items: IdeaItem[], now = Date.now): { fresh: n
     openTotal: open.length,
   };
 }
+
+/* ==================== Triage-Engine (Sprint 244) ==================== */
+
+export type TriageSuggestionKind = "plant" | "keep" | "drop" | "watch";
+
+export type TriageSuggestion = {
+  ideaId: string;
+  title: string;
+  kind: TriageSuggestionKind;
+  /** Warum diese Empfehlung — nachvollziehbar, nicht belehrend. */
+  reason: string;
+};
+
+export type TriagePlan = {
+  suggestions: TriageSuggestion[];
+  summary: string;
+  /** Bewusst nie automatisch: ein Plan ist ein Vorschlag, keine Ausführung. */
+  requiresApproval: true;
+};
+
+/**
+ * Baut einen deterministischen Triage-Vorschlag für offene Ideen.
+ * Kriterien sind nachvollziehbar und konservativ:
+ *   - verwelkende Ideen → Fallenlassen vorschlagen (nie ausführen)
+ *   - vergilbte Ideen mit erkennbarem Vorhabens-Charakter (Zahl, Termin, Fokus-
+ *     wort) → Pflanzen vorschlagen (Inbox → Fokus-Punkt, mit Freigabe)
+ *   - frische Ideen → liegen lassen (watch) — gut gemeinte Eile erzeugt
+ *     Pseudo-Verpflichtungen
+ */
+export function buildTriagePlan(items: IdeaItem[], now = Date.now): TriagePlan {
+  const open = items
+    .filter((item) => item.status === "inbox")
+    .map((idea) => ({ idea, age: describeIdeaAge(idea, now) }));
+
+  const suggestions: TriageSuggestion[] = [];
+  for (const { idea, age } of open) {
+    if (age.age === "withering") {
+      suggestions.push({
+        ideaId: idea.id,
+        title: idea.title,
+        kind: "drop",
+        reason: `${age.daysInInbox} Tage im Eingang ohne Entscheidung — als Impuls war sie echt, als Vorhaben nie ernst gemeint.`,
+      });
+    } else if (age.age === "aging" && /\b(bis|deadline|woche|tag(e|en)?|termin|\d+)\b/i.test(`${idea.title} ${idea.note}`)) {
+      suggestions.push({
+        ideaId: idea.id,
+        title: idea.title,
+        kind: "plant",
+        reason: `${age.daysInInbox} Tage im Eingang und erkennbar zeitlich gemeint — eher als Fokus-Punkt pflanzen als weiter lagern.`,
+      });
+    } else if (age.age === "aging") {
+      suggestions.push({
+        ideaId: idea.id,
+        title: idea.title,
+        kind: "keep",
+        reason: `${age.daysInInbox} Tage im Eingang, aber ohne Zeitdruck — behalten und beim nächsten Rückblick erneut ansehen.`,
+      });
+    } else {
+      suggestions.push({
+        ideaId: idea.id,
+        title: idea.title,
+        kind: "watch",
+        reason: "Frisch im Eingang — frühe Triage erzeugt Pseudo-Verpflichtungen; liegen lassen ist die ehrliche Empfehlung.",
+      });
+    }
+  }
+
+  const counts = {
+    plant: suggestions.filter((s) => s.kind === "plant").length,
+    keep: suggestions.filter((s) => s.kind === "keep").length,
+    drop: suggestions.filter((s) => s.kind === "drop").length,
+    watch: suggestions.filter((s) => s.kind === "watch").length,
+  };
+  const summary = open.length === 0
+    ? "Keine offenen Ideen im Eingang — der leere Stapel ist echt, kein Fehler."
+    : `${open.length} offene Idee(n): ${counts.plant}× pflanzen, ${counts.keep}× behalten, ${counts.drop}× fallen lassen, ${counts.watch}× liegen lassen — alles nur Vorschläge, nichts wird ohne dich entschieden.`;
+
+  return { suggestions, summary, requiresApproval: true };
+}
