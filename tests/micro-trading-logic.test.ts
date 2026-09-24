@@ -5,6 +5,7 @@ import {
   annualizedVolatility,
   DEFAULT_BACKTEST_OPTIONS,
   drawdownGuard,
+  parseTradingPrompt,
   PaperPortfolio,
   sizePaperPosition,
   validatePaperPortfolio,
@@ -228,5 +229,44 @@ describe("micro trading paper risk sizing (Sprint 216)", () => {
     expect(drawdownGuard(900, 1_000, 5).allowed).toBe(false);
     expect(drawdownGuard(990, 1_000, 5).allowed).toBe(true);
     expect(drawdownGuard(1_100, 1_000, 5).reason).toContain("Kein Drawdown");
+  });
+});
+
+describe("micro trading prompt parsing (Sprint 217)", () => {
+  it("leerer Prompt fällt auf die Watchlist zurück", () => {
+    const command = parseTradingPrompt("   ");
+    expect(command.actions).toEqual(["watchlist"]);
+    expect(command.days).toBe(90);
+  });
+
+  it("erkennt Aktionen und Symbole in deutschen Sätzen", () => {
+    const command = parseTradingPrompt("Backteste BTC der letzten 30 Tage und zeig die Signale");
+    expect(command.actions).toContain("backtest");
+    expect(command.actions).toContain("signals");
+    expect(command.symbolIds).toContain("btc");
+    expect(command.days).toBe(30);
+  });
+
+  it("findet Symbole auch als Fließtext (Bitcoin und Ethereum)", () => {
+    const command = parseTradingPrompt("Analysiere Bitcoin und Ethereum im Chart");
+    expect(command.symbolIds).toEqual(["btc", "eth"]);
+    expect(command.actions).toContain("analyze");
+  });
+
+  it("respektiert verneinte Signalaufträge", () => {
+    const command = parseTradingPrompt("Analysiere BTC, aber keine Signale und keine Kaufempfehlung");
+    expect(command.actions).not.toContain("signals");
+    expect(command.actions).toContain("analyze");
+  });
+
+  it("liest Stop-Abstand und klemmt Tage und Stop in sinnvolle Grenzen", () => {
+    const command = parseTradingPrompt("Positionsgröße für SOL mit Stop bei 4,5 % über 2 Tage");
+    expect(command.actions).toContain("risk");
+    expect(command.symbolIds).toContain("sol");
+    expect(command.stopDistancePercent).toBeCloseTo(4.5, 10);
+    expect(command.days).toBe(7);
+    const clamped = parseTradingPrompt("Backtest ETH 400 Tage mit Stop bei 99 %");
+    expect(clamped.days).toBe(365);
+    expect(clamped.stopDistancePercent).toBe(99);
   });
 });

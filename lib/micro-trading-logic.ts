@@ -500,3 +500,59 @@ export function drawdownGuard(equity: number, peakEquity: number, maxDrawdownPer
   }
   return { allowed: true, reason: `Drawdown ${formatPercentGerman(drawdown)} innerhalb des Limits.` };
 }
+
+/* ==================== Prompt-Parsing (Sprint 217) ==================== */
+
+export type TradingPromptAction = "watchlist" | "analyze" | "signals" | "backtest" | "risk";
+
+export type TradingPromptCommand = {
+  actions: TradingPromptAction[];
+  symbolIds: string[];
+  /** Zeitfenster in Tagen für Analyse/Backtest (Standard 90). */
+  days: number;
+  /** Risiko-Parameter, wenn der Prompt eine Positionsgröße will. */
+  stopDistancePercent?: number;
+};
+
+/**
+ * Parst deutsche Analyseaufträge. Explizite Verneinungen ("nicht kaufen",
+ * "kein Signal") landen bewusst NICHT auf signals — das Modul handelt eh nie,
+ * aber die Antwort bleibt dann rein beschreibend.
+ */
+export function parseTradingPrompt(prompt: string): TradingPromptCommand {
+  const trimmed = prompt.trim();
+  const empty: TradingPromptCommand = { actions: ["watchlist"], symbolIds: [], days: 90 };
+  if (!trimmed) return empty;
+
+  const actions: TradingPromptAction[] = [];
+  if (/backtest|zurücktest|historisch|getestet/i.test(trimmed)) actions.push("backtest");
+  if (/signal|überkreuz|crossover|indikator/i.test(trimmed)) actions.push("signals");
+  if (/risiko|positionsgröße|position sizing|stop|budget/i.test(trimmed)) actions.push("risk");
+  if (/analys|untersuch|betracht|chart|verlauf|kurs/i.test(trimmed)) actions.push("analyze");
+  if (/watchlist|beobacht|übersicht|liste|alle.*kurse/i.test(trimmed)) actions.push("watchlist");
+  if (actions.length === 0) actions.push("watchlist");
+
+  const explicitNoSignals = /(nicht|kein\w*)\s+(?:kauf|verkauf|signal|empfehlung|handel)/i.test(trimmed);
+  if (explicitNoSignals) {
+    const signalIndex = actions.indexOf("signals");
+    if (signalIndex >= 0) actions.splice(signalIndex, 1);
+  }
+
+  const symbolIds: string[] = [];
+  for (const token of trimmed.split(/[,;]|\sund\s|\s\s+/)) {
+    const id = normalizeSymbol(token);
+    if (id && !symbolIds.includes(id)) symbolIds.push(id);
+  }
+  if (symbolIds.length === 0) {
+    const mentioned = MICRO_TRADING_SYMBOLS.filter((symbol) => trimmed.toLowerCase().includes(symbol.id) || trimmed.toLowerCase().includes(symbol.name.toLowerCase()));
+    for (const symbol of mentioned) if (!symbolIds.includes(symbol.id)) symbolIds.push(symbol.id);
+  }
+
+  const daysMatch = trimmed.match(/(\d+)\s*(?:tage|tag|days|day|d\b)/i);
+  const days = daysMatch ? Math.max(7, Math.min(365, Number(daysMatch[1]))) : 90;
+
+  const stopMatch = trimmed.match(/stop(?:\s*(?:bei|abstand))?\s*(?:bei|abstand)?\s*(\d+(?:[.,]\d+)?)\s*%/i);
+  const stopDistancePercent = stopMatch ? Math.max(0.5, Math.min(99, Number(stopMatch[1].replace(",", ".")))) : undefined;
+
+  return { actions, symbolIds, days, stopDistancePercent };
+}
