@@ -4,6 +4,23 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 24.09.2026 — Sprints 299–303: Serie B Abschluss
+
+- Snackbar/Toast-System (Sprint 299): eine Quelle mit Severity-Dauern, ehrlichem Dedup-Zaehler, FIFO-Cap, rein berechnetem Auto-Dismiss (`lib/snackbar-logic.ts`)
+- Startzeit-Messung + volle Regression (Sprint 300): Phasen-Report mit Budget-Bewertung und ehrlicher Klassifikation ohne Messwerte (`lib/startup-metrics-logic.ts`); Regression: 1.770 Tests gruen, TypeCheck sauber
+- Barrierefreiheit (Sprint 301): WCAG-2.1-Kontrast-Audit und Fokus-Ordnungs-Validierung (`lib/accessibility-logic.ts`)
+- Theme-Konsistenz (Sprint 302): Hartkodierungs-Scanner mit Token-Vorschlag aus der Cyber-Palette (`lib/theme-consistency-logic.ts`)
+- Serie-B-Abschluss (Sprint 303): Doku + CHANGELOG + Tracker
+
+## 24.09.2026 — Sprints 304–308: Serie C — Medien v2 (Batch 1)
+
+- Video BYO-Key (Sprint 304): Anbieter-Key-Verwaltung mit Maskierung und Verifikations-Zustand (`lib/byo-provider-key-logic.ts`)
+- Stimmenauswahl pro Projekt (Sprint 305): Edge-TTS-Katalog mit Praeferenz-Reihenfolge und Vorschau-Validierung (`lib/tts-voice-selection-logic.ts`)
+- Render-Warteschlange (Sprint 306): ehrlicher Fortschritt nur aus abgeschlossenen Szenen, ETA nur mit Messwerten (`lib/render-queue-logic.ts`)
+- Szenen-Skript-Editor (Sprint 307): manuelle Nachbearbeitung mit Clamp, Diff und vollstaendigem Revert (`lib/scene-script-editor-logic.ts`)
+- Bild-Fallback-Kette (Sprint 308): FLUX -> Gradient mit Pflicht-Quellen-Label, Gradient nie als generiert deklariert (`lib/image-fallback-chain-logic.ts`)
+- 64 neue Tests (1.770 Tests gruen in 208 Testdateien)
+
 ## 24.09.2026 — Sprints 294–298: Produkt-Politur & i18n (Serie B Batch 3)
 
 - EN-Sprach-Toggle (Sprint 294): Vollständiges i18n-System mit DE/EN-Wörterbuch (42 UI-Keys), Sprach-Normalisierung und Persistenz-Helfern (`lib/i18n-language-logic.ts`)
