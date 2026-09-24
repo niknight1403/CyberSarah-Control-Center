@@ -4,6 +4,7 @@ import {
   DECISION_LIMITS,
   countOpenDecisions,
   applyReviewVerdict,
+  buildDecisionResult,
   buildReviewVerdict,
   describeSupersedeChain,
   supersedeDecision,
@@ -183,5 +184,55 @@ describe("decision prompt parsing (Sprint 255)", () => {
   it("leerer und unklarer Text enden sicher", () => {
     expect(parseDecisionPrompt("").actions).toEqual(["list"]);
     expect(parseDecisionPrompt("hm?").actions).toEqual(["status"]);
+  });
+});
+
+describe("decision honest result builder (Sprint 256)", () => {
+  const now = () => new Date(2026, 8, 24, 12, 0).getTime();
+  const price = () => createDecisionItem({ title: "Preis für Pro um 20% erhöht", expectation: "Umsatz pro Kunde +10% bis Q4", reviewBy: "2026-12-31" }, now);
+
+  it("listet ehrlich inklusive Fälligkeiten ohne Mahnton", () => {
+    const due = createDecisionItem({ title: "Fällige alte Entscheidung", expectation: "Messbare Erwartung mit Termin", reviewBy: "2026-09-01" }, now);
+    const result = buildDecisionResult({ actions: ["status"], titleQuery: null, newDecision: null, outcomeReport: null }, [price(), due], now);
+    expect(result.lines.some((line) => line.includes("1 zur Nachprüfung fällig"))).toBe(true);
+    expect(result.lines.some((line) => line.includes("nicht verurteilt"))).toBe(true);
+  });
+
+  it("Neuzugang ohne Nachprüf-Tag wird ehrlich abgelehnt", () => {
+    const command: import("../lib/decision-log-logic").DecisionPromptCommand = {
+      actions: ["add"],
+      titleQuery: null,
+      newDecision: { title: "Preis für Pro um 20% erhöht", context: null, expectation: "Umsatz +10% bis Q4", reviewBy: null },
+      outcomeReport: null,
+    };
+    const result = buildDecisionResult(command, [], now);
+    expect(result.lines[0]).toContain("Nachprüf-Tag");
+  });
+
+  it("Nachprüfung mit Bericht bleibt Freigabe-Anfrage", () => {
+    const parsed = parseDecisionPrompt('Nachprüfen für "Preis für Pro"; Ergebnis: Umsatz gestiegen, Erwartung erfüllt');
+    const result = buildDecisionResult(parsed, [price()], now);
+    expect(result.headline).toBe("Nachprüfung");
+    expect(result.lines.some((line) => line.includes("Bestätigung"))).toBe(true);
+  });
+
+  it("bereits nachgeprüfte Entscheidungen werden vor doppelter Prüfung bewahrt", () => {
+    const reviewed = { ...price(), status: "confirmed" as const, reviewNote: "Umsatz +12%", updatedAt: now() + 1 };
+    const parsed = parseDecisionPrompt('Nachprüfen für "Preis für Pro"; Ergebnis: nochmal gestiegen');
+    const result = buildDecisionResult(parsed, [reviewed], now);
+    expect(result.lines.some((line) => line.includes("doppelt Prüfen wäre Schönung"))).toBe(true);
+  });
+
+  it("uneindeutige Titel werden benannt, nie geraten", () => {
+    const other = createDecisionItem({ title: "Preis für Max um 20% erhöht", expectation: "Andere messbare Erwartung mit Termin", reviewBy: "2026-12-31" }, now);
+    const parsed = parseDecisionPrompt('Nachprüfen für "Preis"');
+    const result = buildDecisionResult(parsed, [price(), other], now);
+    expect(result.lines.some((line) => line.includes("Uneindeutig"))).toBe(true);
+  });
+
+  it("Disclaimer verbietet rückwirkendes Schönen", () => {
+    const result = buildDecisionResult({ actions: ["list"], titleQuery: null, newDecision: null, outcomeReport: null }, [], now);
+    expect(result.disclaimer).toContain("rückwirkend geschönt");
+    expect(result.headline).toBe("Entscheidungs-Journal");
   });
 });

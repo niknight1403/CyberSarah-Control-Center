@@ -295,3 +295,97 @@ function extractOutcomeReport(prompt: string): string | null {
   const report = prompt.match(/(?:Ergebnis|Bericht)\s*:([^;\n]+)/i);
   return report?.[1]?.trim() ?? null;
 }
+
+/* ==================== Ehrliches Prompt-Ergebnis (Sprint 256) ==================== */
+
+export type DecisionResult = {
+  headline: string;
+  lines: string[];
+  disclaimer: string;
+};
+
+/** Findet Entscheidungen per Titel-Anteil (case-insensitive) — nie per ID-Raten. */
+export function findDecisionByTitle(items: DecisionItem[], query: string): DecisionItem[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length < 3) return [];
+  return items.filter((item) => item.title.toLowerCase().includes(needle));
+}
+
+/**
+ * Baut die ehrliche Antwort auf ein Entscheidungs-Kommando: Auskunft sofort,
+ * Nachprüfen/Ersetzen nur als Freigabe-Anfrage formuliert.
+ */
+export function buildDecisionResult(command: DecisionPromptCommand, items: DecisionItem[], now = Date.now): DecisionResult {
+  const lines: string[] = [];
+  const targets = command.titleQuery ? findDecisionByTitle(items, command.titleQuery) : [];
+  const today = isoDayFromTimestamp(now());
+
+  if (command.actions.includes("add")) {
+    if (!command.newDecision) {
+      lines.push('Keine Entscheidung erkannt — z. B. "Entscheidung: <Titel>; Erwartung: <prüfbare Aussage>; Nachprüfen: <ISO-Tag>".');
+    } else if (!hasOpenCapacity(items)) {
+      lines.push(`Journal voll: max. ${DECISION_LIMITS.maxOpen} offene Entscheidungen — erst nachprüfen oder ersetzen, dann festhalten.`);
+    } else {
+      const reviewBy = command.newDecision.reviewBy && isIsoDay(command.newDecision.reviewBy) ? command.newDecision.reviewBy : null;
+      if (!reviewBy) {
+        lines.push('Die Entscheidung braucht einen prüfbaren Nachprüf-Tag (ISO, z. B. 2026-12-31) — ohne Termin wird aus Nachprüfen nie Prüfen.');
+      } else {
+        lines.push(`Entscheidung vorbereitet: "${command.newDecision.title}" mit Erwartung "${command.newDecision.expectation}", Nachprüfen bis ${reviewBy} — festgehalten wird erst nach deiner Bestätigung.`);
+      }
+    }
+  }
+
+  if (command.actions.includes("list") || command.actions.includes("status")) {
+    const open = items.filter((item) => item.status === "open");
+    const due = findDueForReview(items, now);
+    if (items.length === 0) {
+      lines.push("Keine Entscheidungen im Journal — leerer Zustand, kein Fehler.");
+    } else if (open.length === 0) {
+      lines.push(`${items.length} Entscheidung(en) gespeichert, keine offen — alles nachgeprüft oder ersetzt.`);
+    } else {
+      lines.push(`${open.length} offene Entscheidung(en), davon ${due.length} zur Nachprüfung fällig.`);
+    }
+    if (due.length > 0) {
+      lines.push(`Fällig: ${due.slice(0, 4).map((item) => `"${item.title}" (seit ${item.reviewBy})`).join(", ")}${due.length > 4 ? " …" : ""} — fällig heißt gesehen werden, nicht verurteilt werden.`);
+    }
+  }
+
+  if (command.titleQuery && targets.length === 0 && !command.actions.includes("add")) {
+    lines.push(`Keine Entscheidung passt zu "${command.titleQuery}" — bitte den Titel prüfen.`);
+  }
+  if (targets.length > 1) {
+    lines.push(`Uneindeutig: ${targets.length} Entscheidungen passen (${targets.map((item) => item.title).slice(0, 4).join(", ")}) — bitte genauer benennen.`);
+  }
+
+  if (targets.length === 1) {
+    const target = targets[0]!;
+    const statusLine = `Entscheidung "${target.title}": ${decisionStatusLabel(target.status)}, entschieden am ${isoDayFromTimestamp(target.decidedAt)}, Nachprüfen bis ${target.reviewBy}.`;
+    if (command.actions.includes("review")) {
+      if (target.status !== "open") {
+        lines.push(`${statusLine} Bereits ${target.status === "superseded" ? "ersetzt" : "nachgeprüft"} — die Nachprüfung von ${isoDayFromTimestamp(target.updatedAt)} bleibt stehen, doppelt Prüfen wäre Schönung.`);
+      } else if (!command.outcomeReport) {
+        lines.push(`${statusLine} Nachprüfung vorbereitet — bitte das Ergebnis berichten (z. B. "Ergebnis: <Beobachtung>").`);
+      } else {
+        const verdict = buildReviewVerdict(target, command.outcomeReport, now);
+        lines.push(`${statusLine} Nachprüfung vorbereitet als "${decisionStatusLabel(verdict.status)}" — eingetragen wird erst nach deiner Bestätigung.`);
+      }
+    } else if (command.actions.includes("supersede")) {
+      lines.push(`${statusLine} Ersetzen vorbereitet — die alte Formulierung bleibt unverändert lesbar, erst nach deiner Bestätigung.`);
+    } else if (!command.actions.includes("list") && !command.actions.includes("status")) {
+      lines.push(statusLine);
+      lines.push(`• Erwartung damals: "${target.expectation}"`);
+    }
+  }
+
+  if (lines.length === 0) lines.push('Alles im Plan — z. B. "Zeig das Journal" oder "Was ist zur Nachprüfung fällig?".');
+  const headline = command.actions.includes("review")
+    ? "Nachprüfung"
+    : command.actions.includes("supersede")
+      ? "Entscheidung ersetzen"
+      : command.actions.includes("add")
+        ? "Neue Entscheidung"
+        : targets.length === 1
+          ? `Entscheidung: ${targets[0]!.title}`
+          : "Entscheidungs-Journal";
+  return { headline, lines, disclaimer: DECISION_DISCLAIMER };
+}
