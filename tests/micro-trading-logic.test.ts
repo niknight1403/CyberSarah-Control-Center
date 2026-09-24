@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  analyzeSignals,
   annualizedVolatility,
   ema,
   formatPercentGerman,
@@ -106,5 +107,47 @@ describe("micro trading indicators (Sprint 213)", () => {
     expect(() => sma([1], 0)).toThrow();
     expect(() => ema([1], -1)).toThrow();
     expect(() => rsi([1], 0)).toThrow();
+  });
+});
+
+describe("micro trading signal engine (Sprint 214)", () => {
+  function trendingSeries(up: boolean): CandleSeries {
+    // 80 Punkte: 35 neutrale, dann klar auf-/abwärts — der Crossover fällt
+    // sicher in den auswertbaren Bereich (beide SMAs definiert ab Index 29).
+    const candles: Candle[] = [];
+    for (let i = 0; i < 80; i += 1) {
+      const base = up ? 100 + Math.max(0, i - 35) * 2 : 100 - Math.max(0, i - 35) * 2;
+      candles.push(candle(1_000 * (i + 1), base, base + 1, base - 1, base));
+    }
+    return series(candles);
+  }
+
+  it("erkennt einen Aufwärts-Crossover als Beobachtung mit Begründung", () => {
+    const signals = analyzeSignals(trendingSeries(true));
+    expect(signals.some((signal) => signal.kind === "bullish-cross")).toBe(true);
+    const cross = signals.find((signal) => signal.kind === "bullish-cross");
+    expect(cross?.reason).toContain("überkreuzt");
+    expect(cross?.confidence).toBeLessThanOrEqual(1);
+  });
+
+  it("erkennt einen Abwärts-Crossover", () => {
+    const signals = analyzeSignals(trendingSeries(false));
+    expect(signals.some((signal) => signal.kind === "bearish-cross")).toBe(true);
+  });
+
+  it("meldet ehrlich, wenn die Daten nicht reichen oder ungültig sind", () => {
+    const short = analyzeSignals(series(OK_CANDLES));
+    expect(short[0]?.kind).toBe("no-signal");
+    expect(short[0]?.reason).toContain("Zu wenig Daten");
+    const invalid = analyzeSignals(series([candle(1_000, 100, 90, 95, 105)]));
+    expect(invalid[0]?.reason).toContain("abgelehnt");
+  });
+
+  it("gibt no-signal bei ruhigem Markt ohne Behauptung", () => {
+    const flat = series(Array.from({ length: 40 }, (_, i) => candle(1_000 * (i + 1), 100, 101, 99, 100)));
+    const signals = analyzeSignals(flat);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.kind).toBe("no-signal");
+    expect(signals[0]?.reason).toContain("keine auffällige Beobachtung");
   });
 });
