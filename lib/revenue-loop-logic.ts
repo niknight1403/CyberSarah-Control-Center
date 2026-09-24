@@ -301,3 +301,84 @@ export function planExperiment(loop: LoopDraft, durationDays: number): Experimen
     promisedRevenue: false,
   };
 }
+
+/* ==================== Prompt-Parsing (Sprint 226) ==================== */
+
+export type LoopPromptAction = "list" | "status" | "create" | "sample" | "advance" | "discard";
+
+export type LoopPromptCommand = {
+  actions: LoopPromptAction[];
+  /** Ziel-Schleife per Name-Anteil (case-insensitive) — null wenn uneindeutig offen. */
+  nameQuery: string | null;
+  /** Neuer Entwurf (nur bei create mit Feldern). */
+  draft: Partial<LoopDraft> | null;
+  /** Neuer Messwert (nur bei sample). */
+  sampleValue: number | null;
+};
+
+/**
+ * Parst deutsche Loop-Engineering-Aufträge. Verneinte Aktionen
+ * ("nicht starten", "keine Änderung") werden als reine Statusanfragen
+ * interpretiert — das Modul ändert nie ohne Freigabe.
+ */
+export function parseLoopPrompt(prompt: string): LoopPromptCommand {
+  const trimmed = prompt.trim();
+  if (!trimmed) return { actions: ["list"], nameQuery: null, draft: null, sampleValue: null };
+
+  const actions: LoopPromptAction[] = [];
+  const lower = trimmed.toLowerCase();
+  if (/\b(erstell|leg.*an|neu(?:er|e)?\s*(?:schleife|loop)|anleg)/i.test(trimmed)) actions.push("create");
+  if (/\b(mess(?:punkt|wert)|sample|aktualisier)\b/i.test(trimmed) || /messpunkt erfassen/i.test(trimmed)) actions.push("sample");
+  if (/\b(weiter|nächster schritt|start|starten|freigeb|abschließ|abschluss)/i.test(trimmed)) actions.push("advance");
+  if (/\b(verwirf|verwerf|löschen|beenden)/i.test(trimmed)) actions.push("discard");
+  if (/\b(status|stand|wie läuft|fortschritt)/i.test(trimmed)) actions.push("status");
+  if (/\b(liste|übersicht|alle|zeig)/i.test(trimmed)) actions.push("list");
+  if (actions.length === 0) actions.push("status");
+
+  const negated = /(nicht|kein\w*)\s+(start|starten|freigeb|löschen|verwerf|ändern|abschließ)/i.test(trimmed);
+  if (negated) {
+    // Nur darstellen, nichts anstoßen.
+    return { actions: ["status"], nameQuery: extractNameQuery(trimmed), draft: null, sampleValue: null };
+  }
+
+  const draft = actions.includes("create") ? extractDraft(trimmed) : null;
+  const sampleValue = extractSampleValue(trimmed);
+  return { actions, nameQuery: extractNameQuery(trimmed), draft, sampleValue };
+}
+
+function extractNameQuery(prompt: string): string | null {
+  const quoted = prompt.match(/[„"']([^„"']+)[„"']/);
+  if (quoted?.[1]) return quoted[1].trim();
+  const forMatch = prompt.match(/\b(?:für|von)\s+(?:die\s+)?(?:Schleife\s+)?([\w\- /]+?)(?:\s+(?:mit|über|in|und)|$)/i);
+  return forMatch?.[1]?.trim() || null;
+}
+
+function extractDraft(prompt: string): Partial<LoopDraft> {
+  const field = (label: RegExp) => {
+    const match = prompt.match(label);
+    return match?.[1]?.trim();
+  };
+  const draft: Partial<LoopDraft> = {};
+  const name = field(/Name:\s*([^;\n]+)/i);
+  const flow = field(/Fluss:\s*([^;\n]+)/i) ?? field(/Flow:\s*([^;\n]+)/i);
+  const hypothesis = field(/Hypothese:\s*([^;\n]+)/i);
+  const experiment = field(/Experiment:\s*([^;\n]+)/i);
+  const metric = field(/Messgröße:\s*([^;\n]+)/i) ?? field(/Metrik:\s*([^;\n]+)/i);
+  const unit = field(/Einheit:\s*([^;\n]+)/i);
+  const target = field(/Ziel:\s*(\d+(?:[.,]\d+)?)/i);
+  if (name) draft.name = name;
+  if (flow) draft.flow = flow;
+  if (hypothesis) draft.hypothesis = hypothesis;
+  if (experiment) draft.experiment = experiment;
+  if (metric) draft.metric = metric;
+  if (unit) draft.unit = unit;
+  if (target !== undefined) draft.targetValue = Number(target.replace(",", "."));
+  return draft;
+}
+
+function extractSampleValue(prompt: string): number | null {
+  const match = prompt.match(/(?:messpunkt|messwert|wert|stand)\s*(?:von|bei)?\s*(\d+(?:[.,]\d+)?)/i);
+  if (!match) return null;
+  const value = Number(match[1].replace(",", "."));
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}

@@ -4,6 +4,7 @@ import {
   createLoopDraft,
   evaluateLoopProgress,
   recommendNextStep,
+  parseLoopPrompt,
   planExperiment,
   loopProgressPercent,
   loopStatusLabel,
@@ -167,5 +168,45 @@ describe("revenue loop experiment planner (Sprint 225)", () => {
     expect(tiny.caveats.some((caveat) => caveat.includes("Mini-Ziel") || caveat.includes("kleines Ziel"))).toBe(true);
     const running = planExperiment({ ...loop, status: "running" }, 28);
     expect(running.caveats.some((caveat) => caveat.includes("Restfenster"))).toBe(true);
+  });
+});
+
+describe("revenue loop prompt parsing (Sprint 226)", () => {
+  it("leerer und unklarer Prompt endet in einer sicheren Anfrage", () => {
+    expect(parseLoopPrompt("").actions).toEqual(["list"]);
+    expect(parseLoopPrompt("hm?").actions).toEqual(["status"]);
+  });
+
+  it("parst create mit Feldern, Einheiten und deutschem Zahlenformat", () => {
+    const command = parseLoopPrompt(
+      "Erstelle eine neue Schleife. Name: SaaS-Conversion; Fluss: Trial - Abo; Hypothese: Onboarding-Mails erhöhen die Abo-Umwandlung; Experiment: 4 Wochen gesteuerte Onboarding-Serie; Messgröße: Abo-Umwandlungen; Einheit: Abos; Ziel: 25",
+    );
+    expect(command.actions).toContain("create");
+    expect(command.draft?.name).toBe("SaaS-Conversion");
+    expect(command.draft?.flow).toBe("Trial - Abo");
+    expect(command.draft?.targetValue).toBe(25);
+    expect(validateLoopDraft({ ...VALID, ...command.draft }).valid).toBe(true);
+  });
+
+  it("parst Messpunkte mit Namensbezug", () => {
+    const command = parseLoopPrompt("Messpunkt für \"Content-to-Lead\": Wert 40");
+    expect(command.actions).toContain("sample");
+    expect(command.sampleValue).toBe(40);
+    expect(command.nameQuery).toBe("Content-to-Lead");
+  });
+
+  it("verneinte Aufträge werden niemals ausführend", () => {
+    const command = parseLoopPrompt("Zeig den Status, aber nicht starten");
+    expect(command.actions).toEqual(["status"]);
+    expect(command.draft).toBeNull();
+    expect(command.sampleValue).toBeNull();
+    const discard = parseLoopPrompt("Status von Content-to-Lead, aber nicht löschen");
+    expect(discard.actions).toEqual(["status"]);
+  });
+
+  it("erkennt Aufräumen, Start und Übersicht", () => {
+    expect(parseLoopPrompt("Starte Content-to-Lead").actions).toContain("advance");
+    expect(parseLoopPrompt("Zeig alle Schleifen").actions).toContain("list");
+    expect(parseLoopPrompt("Verwirf SaaS-Conversion").actions).toContain("discard");
   });
 });
