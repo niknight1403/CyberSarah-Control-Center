@@ -56,7 +56,7 @@ describe("revenue loop core (Sprint 222)", () => {
 });
 
 describe("revenue loop progress evaluation (Sprint 223)", () => {
-  function loopWith(samples: Array<[number, number]>, status: LoopDraft["status"] = "running", target = 100): LoopDraft {
+  function loopWith(samples: [number, number][], status: LoopDraft["status"] = "running", target = 100): LoopDraft {
     const loop = createLoopDraft({ ...VALID, targetValue: target }, () => 1_000);
     loop.samples = samples.map(([at, value]) => ({ at, value }));
     loop.currentValue = samples.at(-1)?.[1] ?? 0;

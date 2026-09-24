@@ -326,7 +326,6 @@ export function parseLoopPrompt(prompt: string): LoopPromptCommand {
   if (!trimmed) return { actions: ["list"], nameQuery: null, draft: null, sampleValue: null };
 
   const actions: LoopPromptAction[] = [];
-  const lower = trimmed.toLowerCase();
   if (/\b(erstell|leg.*an|neu(?:er|e)?\s*(?:schleife|loop)|anleg)/i.test(trimmed)) actions.push("create");
   if (/\b(mess(?:punkt|wert)|sample|aktualisier)\b/i.test(trimmed) || /messpunkt erfassen/i.test(trimmed)) actions.push("sample");
   if (/\b(weiter|nächster schritt|start|starten|freigeb|abschließ|abschluss)/i.test(trimmed)) actions.push("advance");
