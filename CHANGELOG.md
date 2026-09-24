@@ -2,7 +2,13 @@
 
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
-Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.## 24.09.2026 — Sicherheits-Bereinigung cybersarah-revenue-os
+
+- Alle vier DB-Backups (3 SQL-Dumps + 1 tar.gz) vollständig aus der Git-Historie von `cybersarah-revenue-os` entfernt (git filter-repo + Force-Push)
+- Ehrliche Inhaltsprüfung über alle historischen Versionen: keine personenbezogenen Daten, keine Geheimnisse — Geheimnis-Rotation daher nicht erforderlich
+- Restrisiko dokumentiert: GitHub-Cache alter SHAs bis zur internen GC
+
+
 ## 24.09.2026 — Sprints 262–270 (Umsatz-Reihe)
 
 - **262** Ehrliche Upgrade-Prompts an Chat-Quota-Grenzen (Zahlen, Reset, kein Druck)
