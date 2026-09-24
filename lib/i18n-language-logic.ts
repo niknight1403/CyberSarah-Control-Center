@@ -18,7 +18,7 @@ export type AppLanguage = "de" | "en";
 
 export const DEFAULT_LANGUAGE: AppLanguage = "de";
 export const SUPPORTED_LANGUAGES: readonly AppLanguage[] = ["de", "en"];
-export const LANGUAGE_STORAGE_KEY = "cybersarah.lang.v1";
+export const LANGUAGE_STORAGE_KEY = "cybersarah.lang.v1"; // gitleaks:allow
 
 /** Normalisiert einen rohen Storage-Wert in eine gueltige Sprache (Fallback DE). */
 export function normalizeLanguage(value: unknown): AppLanguage {

@@ -12,7 +12,7 @@
  * ("optimalere Vorschläge") werden als Beta gekennzeichnet.
  */
 
-export const ONBOARDING_V2_STORAGE_KEY = "cybersarah.onboarding.v2";
+export const ONBOARDING_V2_STORAGE_KEY = "cybersarah.onboarding.v2"; // gitleaks:allow
 
 /** Die 3 gefuehrten Schritte (feste Reihenfolge). */
 export type OnboardingV2StepId = "expectations" | "setup" | "ready";
