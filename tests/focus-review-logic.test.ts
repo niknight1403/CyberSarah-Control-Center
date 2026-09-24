@@ -5,6 +5,7 @@ import {
   evaluateFocusDay,
   buildWeeklyReview,
   isoWeekStart,
+  selectReflectionPrompts,
   countDayFocus,
   createFocusItem,
   focusStatusLabel,
@@ -162,5 +163,59 @@ describe("weekly review (Sprint 234)", () => {
 
   it("lehnt ungültige Wochenstart-Tage ab", () => {
     expect(() => buildWeeklyReview([], "21.09.2026")).toThrow("ISO-Tag");
+  });
+});
+
+describe("reflection prompts (Sprint 235)", () => {
+  const weekStart = "2026-09-21";
+
+  it("leere Woche bekommt Start-Hilfe statt Vorwürfen", () => {
+    const prompts = selectReflectionPrompts(buildWeeklyReview([], weekStart));
+    expect(prompts).toHaveLength(2);
+    expect(prompts[0].question).toContain("eine Punkt");
+    expect(prompts[1].rationale).toContain("Kalender-Problem");
+  });
+
+  it("viele Verschiebungen fragen nach der Punktgröße, nicht nach Willenskraft", () => {
+    const items = [1, 2, 3].map((n) => createFocusItem({ day: `2026-09-2${n}`, title: `Punkt ${n}`, status: "moved" }));
+    const prompts = selectReflectionPrompts(buildWeeklyReview(items, weekStart));
+    const overcommit = prompts.find((prompt) => prompt.id === "overcommitment");
+    expect(overcommit?.rationale).toContain("Überverpflichtung");
+  });
+
+  it("starke Woche fragt nach der wiederholbaren Bedingung", () => {
+    const items = [1, 2, 3].map((n) => createFocusItem({ day: `2026-09-2${n}`, title: `Punkt ${n}`, status: "done" }));
+    const prompts = selectReflectionPrompts(buildWeeklyReview(items, weekStart));
+    expect(prompts.some((prompt) => prompt.id === "sustain")).toBe(true);
+  });
+
+  it("offene Punkte erben nicht stillschweigend, sondern über eine Frage", () => {
+    const items = [createFocusItem({ day: "2026-09-25", title: "Offener Punkt", status: "active" })];
+    const prompts = selectReflectionPrompts(buildWeeklyReview(items, weekStart));
+    expect(prompts.some((prompt) => prompt.id === "open-rest" && prompt.rationale.includes("Entscheidung"))).toBe(true);
+  });
+
+  it("gibt nie mehr als zwei Fragen und keine vorgefertigten Antworten", () => {
+    const items = [
+      createFocusItem({ day: "2026-09-21", title: "Punkt A mit echtem Titel", status: "moved" }),
+      createFocusItem({ day: "2026-09-22", title: "Punkt B mit echtem Titel", status: "moved" }),
+      createFocusItem({ day: "2026-09-23", title: "Punkt C mit echtem Titel", status: "dropped" }),
+      createFocusItem({ day: "2026-09-24", title: "Punkt D mit echtem Titel", status: "dropped" }),
+      createFocusItem({ day: "2026-09-25", title: "Punkt E mit echtem Titel", status: "active" }),
+    ];
+    const prompts = selectReflectionPrompts(buildWeeklyReview(items, weekStart));
+    expect(prompts.length).toBeLessThanOrEqual(2);
+    expect(prompts.every((prompt) => prompt.question.endsWith("?"))).toBe(true);
+  });
+
+  it("ruhige Woche: offene Punkte zuerst, dann eine ehrliche Standardfrage", () => {
+    const items = [
+      createFocusItem({ day: "2026-09-22", title: "Punkt A", status: "done" }),
+      createFocusItem({ day: "2026-09-23", title: "Punkt B", status: "active" }),
+    ];
+    const prompts = selectReflectionPrompts(buildWeeklyReview(items, weekStart));
+    expect(prompts).toHaveLength(2);
+    expect(prompts[0].id).toBe("open-rest");
+    expect(prompts[1].id).toBe("default-honest");
   });
 });

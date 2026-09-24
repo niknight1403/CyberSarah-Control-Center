@@ -256,3 +256,109 @@ export function buildWeeklyReview(items: FocusItem[], weekStart: string): Weekly
     counts,
   };
 }
+
+/* ==================== Reflexions-Fragen (Sprint 235) ==================== */
+
+export type ReflectionPrompt = {
+  id: string;
+  question: string;
+  /** Warum gerade diese Frage gestellt wird — damit sie nicht belehrend wirkt. */
+  rationale: string;
+};
+
+/**
+ * Wählt deterministisch 2 Reflexionsfragen passend zum Muster der Woche.
+ * Der Katalog ist bewusst klein und ehrlich: keine Motivations-Fassaden,
+ * keine Fragen, die die Antwort schon vorgeben.
+ */
+export function selectReflectionPrompts(review: WeeklyReview): ReflectionPrompt[] {
+  const prompts: ReflectionPrompt[] = [];
+  const { counts } = review;
+
+  if (counts.total === 0) {
+    prompts.push({
+      id: "start-small",
+      question: "Was ist nächste Woche der eine Punkt, der die Woche besser macht?",
+      rationale: "Ohne diese Woche gibt es nichts zu bewerten — eine kleine Verpflichtung ist besser als eine große Planung.",
+    });
+    prompts.push({
+      id: "calendar-reality",
+      question: "Wann hatte diese Woche real 90 ungestörte Minuten?",
+      rationale: "Fokus braucht Kalenderplätze. Die leere Woche zeigt meist ein Kalender-Problem, kein Disziplin-Problem.",
+    });
+    return prompts;
+  }
+
+  if (counts.moved >= 2) {
+    prompts.push({
+      id: "overcommitment",
+      question: "Welcher verschobene Punkt war von Anfang an zu groß für einen Tag?",
+      rationale: `${counts.moved} Verschiebungen zeigen Überverpflichtung — die Punktgröße prüfen, nicht die Willenskraft.`,
+    });
+  }
+  if (counts.done === 0 && counts.total > 0) {
+    prompts.push({
+      id: "zero-done",
+      question: "Was hat die Punkte konkret blockiert — Ziel, Zeit oder Energie?",
+      rationale: "Nichts Erledigtes ist ein Signal, aber erst die Ursache macht es nützlich.",
+    });
+  }
+  if (counts.done > 0 && counts.done >= counts.total * 0.7) {
+    prompts.push({
+      id: "sustain",
+      question: "Was hat diesmal funktioniert, das du nächste Woche wiederholen willst?",
+      rationale: "Gute Wochen sind keine Zufälle — die Bedingung benennen, sonst wiederholt sie sich nicht.",
+    });
+  }
+  if (counts.active > 0) {
+    prompts.push({
+      id: "open-rest",
+      question: "Welcher offene Punkt verdient es, in die nächste Woche zu wandern — und welcher nicht?",
+      rationale: `${counts.active} offene Punkte vererben sich nicht von selbst — jeder braucht eine Entscheidung.`,
+    });
+  }
+  if (counts.daysWithFocus === 1 && counts.total > 0) {
+    prompts.push({
+      id: "spread",
+      question: "Warum hat der Fokus nur an einem einzigen Tag stattgefunden?",
+      rationale: `Fokus an ${counts.daysWithFocus} von 7 Tagen — ein Muster im Kalender, kein Charakterzug.`,
+    });
+  }
+  if (counts.dropped >= 2) {
+    prompts.push({
+      id: "dropped-honesty",
+      question: "War der fallen gelassene Punkt jemals wichtig — oder nur laut?",
+      rationale: "Fallen gelassen ist erlaubt. Die Prüfung verhindert, dass laute Punkte wöchentlich wiederkommen.",
+    });
+  }
+
+  const defaults: ReflectionPrompt[] = [
+    {
+      id: "default-honest",
+      question: "Was nimmst du aus dieser Woche für die nächste mit?",
+      rationale: "Eine ruhige Woche — ohne Auffälligkeit ist die einfachste Frage die richtige.",
+    },
+    {
+      id: "default-capacity",
+      question: "Wie viele Fokus-Punkte sind nächste Woche realistisch — ehrlich geschätzt?",
+      rationale: "Drei Punkte sind das Tageslimit, aber die Woche darf weniger wollen.",
+    },
+  ];
+  for (const fallback of defaults) {
+    if (prompts.length >= 2) break;
+    prompts.push(fallback);
+  }
+  if (prompts.length === 0) {
+    prompts.push({
+      id: "default-honest",
+      question: "Was nimmst du aus dieser Woche für die nächste mit?",
+      rationale: "Eine ruhige Woche — ohne Auffälligkeit ist die einfachste Frage die richtige.",
+    });
+    prompts.push({
+      id: "default-capacity",
+      question: "Wie viele Fokus-Punkte sind nächste Woche realistisch — ehrlich geschätzt?",
+      rationale: "Drei Punkte sind das Tageslimit, aber die Woche darf weniger wollen.",
+    });
+  }
+  return prompts.slice(0, 2);
+}
