@@ -107,3 +107,73 @@ export function createFocusItem(input: Partial<FocusItem>, now = Date.now): Focu
     updatedAt: timestamp,
   };
 }
+
+/* ==================== Tages-Bewertung (Sprint 233) ==================== */
+
+export type FocusDayVerdict = {
+  /** Was der Tag ehrlich ist — inkl. gültigem Leerzustand. */
+  state: "empty" | "open" | "partially-done" | "done" | "overtime";
+  headline: string;
+  /** Beobachtungen in Klartext, ohne Bewertung der Person. */
+  observations: string[];
+  counts: { active: number; done: number; moved: number; dropped: number };
+};
+
+/**
+ * Bewertet einen Fokus-Tag ehrlich:
+ *   - Ein Tag ohne Punkte ist gültig und kein Versäumnis.
+ *   - Erledigt-Quoten sind Beobachtungen, keine Noten.
+ *   - „Übererfüllt" entsteht nur, wenn mehr Punkte erledigt wurden als das
+ *     Limit pro Tag erlaubt (z. B. nach Rückverschiebungen) — sichtbar,
+ *     nicht versteckt.
+ */
+export function evaluateFocusDay(items: FocusItem[], day: string, capacity = FOCUS_LIMITS.maxPerDay): FocusDayVerdict {
+  const daysItems = items.filter((item) => item.day === day);
+  const counts = {
+    active: daysItems.filter((item) => item.status === "active").length,
+    done: daysItems.filter((item) => item.status === "done").length,
+    moved: daysItems.filter((item) => item.status === "moved").length,
+    dropped: daysItems.filter((item) => item.status === "dropped").length,
+  };
+  const observations: string[] = [];
+  const total = daysItems.length;
+
+  if (total === 0) {
+    return {
+      state: "empty",
+      headline: "Kein Fokus für diesen Tag geplant",
+      observations: ["Der Tag ist bewusst leer — kein Punkt ist kein Versäumnis. Falls das öfter passiert, ist das ein Planungshinweis, kein Vorwurf."],
+      counts,
+    };
+  }
+
+  if (counts.done > capacity) {
+    observations.push(`${counts.done} Punkte erledigt — mehr als das Tageslimit (${capacity}). Stark, aber kein Standard zum Verplanen.`);
+  }
+  if (counts.moved > 0) {
+    observations.push(`${counts.moved} Punkt(e) verschoben — sichtbar bleiben, damit der Rückblick die echte Geschichte erzählt.`);
+  }
+  if (counts.dropped > 0) {
+    observations.push(`${counts.dropped} Punkt(e) fallen gelassen — auch das zählt, sonst verplant sich der nächste Tag.`);
+  }
+
+  if (counts.active === 0 && counts.done > 0) {
+    observations.push(counts.done >= capacity
+      ? `Alle ${counts.done} geplanten Punkte erledigt.`
+      : `${counts.done} von ${total} Punkten erledigt, Rest wurde verschoben oder fallen gelassen.`);
+    return {
+      state: counts.done > capacity ? "overtime" : "done",
+      headline: counts.done > capacity ? "Übererfüllt" : "Tagesfokus abgeschlossen",
+      observations,
+      counts,
+    };
+  }
+
+  if (counts.done > 0) {
+    observations.push(`${counts.done} von ${total} Punkten erledigt — der Rest liegt noch offen.`);
+    return { state: "partially-done", headline: "Teilweise erledigt", observations, counts };
+  }
+
+  observations.push(`${counts.active} Punkt(e) offen, noch nichts erledigt — der Tag hat noch Platz nach oben.`);
+  return { state: "open", headline: "Tagesfokus noch offen", observations, counts };
+}
