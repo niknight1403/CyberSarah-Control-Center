@@ -362,3 +362,93 @@ export function selectReflectionPrompts(review: WeeklyReview): ReflectionPrompt[
   }
   return prompts.slice(0, 2);
 }
+
+/* ==================== Prompt-Parsing (Sprint 236) ==================== */
+
+export type FocusPromptAction = "add" | "complete" | "move" | "drop" | "review" | "day" | "list";
+
+export type FocusPromptCommand = {
+  actions: FocusPromptAction[];
+  /** Titel des gemeinten Punktes — null, wenn keiner erkannt wurde. */
+  titleQuery: string | null;
+  /** ISO-Tag aus Klartext (heute/morgen/Wochentag/ISO) — null, wenn keiner erkannt. */
+  day: string | null;
+  newFocus: { title: string; day: string | null; note: string | null } | null;
+};
+
+const WEEKDAY_NAMES: Record<string, number> = {
+  montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6, sonntag: 0,
+};
+
+function isoWeekday(offsetDays: number, now = Date.now): string {
+  const date = new Date(now());
+  date.setDate(date.getDate() + offsetDays);
+  return isoDayFromTimestamp(date.getTime());
+}
+
+/**
+ * Parst deutsche Fokus-Aufträge. Verneinte Aufträge ("nicht erledigen",
+ * "keine Änderung") werden als reine Statusanfragen behandelt — das Modul
+ * ändert nie ohne Freigabe.
+ */
+export function parseFocusPrompt(prompt: string, now = Date.now): FocusPromptCommand {
+  const trimmed = prompt.trim();
+  if (!trimmed) return { actions: ["list"], titleQuery: null, day: null, newFocus: null };
+  const day = parseFocusDay(trimmed, now);
+
+  const negated = /(nicht|kein\w*)\s+(erledig|verschieb|löschen|lösche|fallen|start|hinzufü|ändern)/i.test(trimmed);
+  if (negated) {
+    return { actions: ["day"], titleQuery: extractTitleQuery(trimmed), day, newFocus: null };
+  }
+
+  const actions: FocusPromptAction[] = [];
+  if (/\b(fokus|hinzufü|füg\w*\s+hinzu|plan\w*|neuer punkt|anleg)/i.test(trimmed)) actions.push("add");
+  if (/\b(erledig\w*|abgeschlossen|fertig|complete)/i.test(trimmed)) actions.push("complete");
+  if (/\b(verschieb\w*|move)/i.test(trimmed)) actions.push("move");
+  if (/\b(fallen\s*gelassen|fallen\s*lassen|streich\w*|drop|löschen|lösche)/i.test(trimmed)) actions.push("drop");
+  if (/\b(wochenrückblick|rückblick|reflexion)/i.test(trimmed)) actions.push("review");
+  if (/\b(status|stand|heute|tag|wie läuft)/i.test(trimmed)) actions.push("day");
+  if (/\b(liste|übersicht|alle|zeig)/i.test(trimmed)) actions.push("list");
+  if (actions.length === 0) actions.push("day");
+
+  // Ohne erkennbaren Tag landet ein neuer Punkt bewusst auf heute — kein
+  // unbekannter Tag, keine stillschweigende Verplanung auf morgen.
+  const effectiveDay = day ?? (actions.includes("add") ? isoDayFromTimestamp(now()) : null);
+  const newFocus = actions.includes("add") ? extractNewFocus(trimmed, effectiveDay) : null;
+  return { actions, titleQuery: extractTitleQuery(trimmed), day, newFocus };
+}
+
+function parseFocusDay(prompt: string, now = Date.now): string | null {
+  if (/\bheute\b/i.test(prompt)) return isoDayFromTimestamp(now());
+  if (/\bmorgen\b/i.test(prompt)) return isoWeekday(1, now);
+  if (/\bgestern\b/i.test(prompt)) return isoWeekday(-1, now);
+  for (const [name, weekday] of Object.entries(WEEKDAY_NAMES)) {
+    if (new RegExp(`\\b${name}\\b`, "i").test(prompt)) {
+      const date = new Date(now());
+      const current = (date.getDay() + 6) % 7; // Montag = 0
+      let delta = weekday === 0 ? 6 : weekday - 1 - current;
+      if (/\bnächste\w*\b/i.test(prompt) && delta < 7) delta += 7;
+      else if (delta < 0) delta += 7; // kommender Wochentag
+      date.setDate(date.getDate() + delta);
+      return isoDayFromTimestamp(date.getTime());
+    }
+  }
+  const iso = prompt.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (iso?.[1] && isIsoDay(iso[1])) return iso[1];
+  return null;
+}
+
+function extractTitleQuery(prompt: string): string | null {
+  const quoted = prompt.match(/["'„]([^"'„]{3,})["'„]/);
+  if (quoted?.[1]) return quoted[1].trim();
+  const colon = prompt.match(/\b(?:für|von)\s+(?:den\s+Punkt\s+)?([\w\- /!?:.,&+]+)/i);
+  return colon?.[1]?.trim() || null;
+}
+
+function extractNewFocus(prompt: string, day: string | null): { title: string; day: string | null; note: string | null } | null {
+  const colon = prompt.match(/(?:Punkt|Fokus)\s*:([^;\n]+)/i);
+  const title = colon?.[1]?.trim();
+  if (!title || title.length < FOCUS_LIMITS.title.min) return null;
+  const noteMatch = prompt.match(/Notiz\s*:([^;\n]+)/i);
+  return { title, day, note: noteMatch?.[1]?.trim() ?? null };
+}

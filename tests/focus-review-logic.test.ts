@@ -6,6 +6,7 @@ import {
   buildWeeklyReview,
   isoWeekStart,
   selectReflectionPrompts,
+  parseFocusPrompt,
   countDayFocus,
   createFocusItem,
   focusStatusLabel,
@@ -217,5 +218,45 @@ describe("reflection prompts (Sprint 235)", () => {
     expect(prompts).toHaveLength(2);
     expect(prompts[0].id).toBe("open-rest");
     expect(prompts[1].id).toBe("default-honest");
+  });
+});
+
+describe("focus prompt parsing (Sprint 236)", () => {
+  it("leerer und unklarer Prompt endet sicher", () => {
+    expect(parseFocusPrompt("").actions).toEqual(["list"]);
+    expect(parseFocusPrompt("hm?").actions).toEqual(["day"]);
+  });
+
+  it("parst neue Fokus-Punkte mit Tag und Notiz", () => {
+    const command = parseFocusPrompt("Plane Fokus: LinkedIn-Post finalisieren; Notiz: Kernaussage zuerst", () => new Date(2026, 8, 24, 9, 0).getTime());
+    expect(command.actions).toContain("add");
+    expect(command.newFocus).not.toBeNull();
+    expect(command.newFocus?.title).toBe("LinkedIn-Post finalisieren");
+    expect(command.newFocus?.note).toBe("Kernaussage zuerst");
+    expect(command.newFocus?.day).toBe("2026-09-24");
+    expect(validateFocusItem({ day: command.newFocus!.day!, title: command.newFocus!.title }).valid).toBe(true);
+  });
+
+  it("erkennt relative und absolute Tage", () => {
+    const now = () => new Date(2026, 8, 24, 12, 0).getTime(); // Donnerstag
+    expect(parseFocusPrompt("Fokus heute", now).day).toBe("2026-09-24");
+    expect(parseFocusPrompt("Fokus morgen", now).day).toBe("2026-09-25");
+    expect(parseFocusPrompt("Fokus am Montag", now).day).toBe("2026-09-28");
+    expect(parseFocusPrompt("Rückblick für 2026-09-21", now).day).toBe("2026-09-21");
+  });
+
+  it("verneinte Aufträge werden nie ausführend", () => {
+    const command = parseFocusPrompt("Zeig den Status, aber nicht erledigen");
+    expect(command.actions).toEqual(["day"]);
+    expect(command.newFocus).toBeNull();
+    expect(parseFocusPrompt("Status, aber nicht löschen").actions).toEqual(["day"]);
+  });
+
+  it("erkennt Aktionen und Namensbezüge", () => {
+    expect(parseFocusPrompt('Erledige "Post finalisieren"').actions).toContain("complete");
+    expect(parseFocusPrompt('Verschiebe "Post finalisieren"').actions).toContain("move");
+    expect(parseFocusPrompt('Streiche "Post finalisieren"').actions).toContain("drop");
+    expect(parseFocusPrompt("Wochenrückblick").actions).toContain("review");
+    expect(parseFocusPrompt('Erledige "Post finalisieren"').titleQuery).toBe("Post finalisieren");
   });
 });
