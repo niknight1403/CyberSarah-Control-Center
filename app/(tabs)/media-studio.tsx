@@ -24,6 +24,17 @@ export default function MediaStudioScreen() {
   const [approved, setApproved] = useState(false);
 
   const statusQuery = trpc.mediaPipeline.status.useQuery();
+  const packsQuery = trpc.assetPacks.list.useQuery();
+  const packCreate = trpc.assetPacks.create.useMutation({ onSuccess: () => packsQuery.refetch() });
+  const packActivate = trpc.assetPacks.activate.useMutation({ onSuccess: () => packsQuery.refetch() });
+  const packRemove = trpc.assetPacks.remove.useMutation({ onSuccess: () => packsQuery.refetch() });
+  const [packKind, setPackKind] = useState<"outfit" | "sets">("outfit");
+  const [packName, setPackName] = useState("");
+  const [packModifiers, setPackModifiers] = useState("");
+  const [packColorFrom, setPackColorFrom] = useState("1e293b");
+  const [packColorTo, setPackColorTo] = useState("7c3aed");
+  const packs = packsQuery.data?.packs ?? [];
+  const activePacks = packsQuery.data?.active ?? { outfit: null, sets: null };
   const generateMutation = trpc.mediaPipeline.generate.useMutation({
     onSuccess: () => undefined,
   });
@@ -142,6 +153,71 @@ export default function MediaStudioScreen() {
             )}
           </GlassCard>
 
+          <GlassCard accent="purple" style={styles.formCard}>
+            <Text style={styles.heroTitle}>Asset-Packs (Outfit & Sets)</Text>
+            <Text style={styles.body}>
+              Wirksam beim nächsten Render: {activePacks.outfit ? `Outfit "${activePacks.outfit.name}"` : "kein Outfit-Pack"}
+              {activePacks.sets ? `, Set "${activePacks.sets.name}"` : ", kein Sets-Pack"}. Pack-Modifikatoren wirken auf die FLUX-Bilder;
+              die Rückfall-Farben nutzen die Farbverlauf-Bühne, wenn FLUX nicht verfügbar ist.
+            </Text>
+            {packs.length === 0 && <Text style={styles.errorHint}>Noch keine Packs — erstelle unten das erste.</Text>}
+            {packs.map((pack) => (
+              <View key={pack.id} style={styles.packRow}>
+                <View style={styles.headingCopy}>
+                  <Text style={styles.packName}>{pack.kind === "outfit" ? "O" : "S"} · {pack.name}</Text>
+                  <Text style={styles.packMeta}>{pack.active ? "aktiv" : "inaktiv"} · {pack.promptModifiers.join(", ")}</Text>
+                </View>
+                <Pressable
+                  onPress={() => packActivate.mutate({ packId: pack.id, active: !pack.active })}
+                  style={[styles.packButton, pack.active && styles.packButtonActive]}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.packButtonText}>{pack.active ? "Aus" : "An"}</Text>
+                </Pressable>
+                <Pressable onPress={() => packRemove.mutate({ packId: pack.id })} style={styles.packButton} accessibilityRole="button">
+                  <Text style={styles.packButtonText}>Löschen</Text>
+                </Pressable>
+              </View>
+            ))}
+            {packCreate.data && !packCreate.data.ok && (
+              <Text style={styles.errorBody}>Fehler: {packCreate.data.error}</Text>
+            )}
+            <Text style={styles.label}>NEUES PACK</Text>
+            <View style={styles.voiceRow}>
+              <Pressable onPress={() => setPackKind("outfit")} style={[styles.voiceChip, packKind === "outfit" && styles.voiceChipActive]} accessibilityRole="button">
+                <Text style={[styles.voiceChipText, packKind === "outfit" && styles.voiceChipTextActive]}>Outfit</Text>
+              </Pressable>
+              <Pressable onPress={() => setPackKind("sets")} style={[styles.voiceChip, packKind === "sets" && styles.voiceChipActive]} accessibilityRole="button">
+                <Text style={[styles.voiceChipText, packKind === "sets" && styles.voiceChipTextActive]}>Sets</Text>
+              </Pressable>
+            </View>
+            <TextInput style={styles.input} value={packName} onChangeText={setPackName} placeholder="Name (3–48 Zeichen)" placeholderTextColor={glassSurface.textMuted} />
+            <TextInput
+              style={styles.input}
+              value={packModifiers}
+              onChangeText={setPackModifiers}
+              placeholder="Modifikatoren, Komma-getrennt (1–5)"
+              placeholderTextColor={glassSurface.textMuted}
+            />
+            <View style={styles.voiceRow}>
+              <TextInput style={styles.colorInput} value={packColorFrom} onChangeText={setPackColorFrom} placeholder="0f172a" placeholderTextColor={glassSurface.textMuted} />
+              <TextInput style={styles.colorInput} value={packColorTo} onChangeText={setPackColorTo} placeholder="38bdf8" placeholderTextColor={glassSurface.textMuted} />
+            </View>
+            <Pressable
+              onPress={() => {
+                const modifiers = packModifiers.split(",").map((m) => m.trim()).filter(Boolean);
+                packCreate.mutate({ kind: packKind, name: packName.trim(), promptModifiers: modifiers, fallbackColors: [packColorFrom.trim(), packColorTo.trim()] });
+                setPackName("");
+                setPackModifiers("");
+              }}
+              disabled={packCreate.isPending || packName.trim().length < 3 || !packModifiers.trim()}
+              style={[styles.generateButton, (packCreate.isPending || packName.trim().length < 3 || !packModifiers.trim()) && styles.generateButtonDisabled]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.generateButtonText}>Pack anlegen</Text>
+            </Pressable>
+          </GlassCard>
+
           <Text style={styles.disclaimer}>
             Ehrliche Grenzen: Szenenbilder kommen aus FLUX.1-schnell (Free-Tier) — fällt der Provider aus, rendert die
             Pipeline deterministische Farbverlauf-Bühnen und zählt das ehrlich mit. Timing ist eine Schätzung aus Textlänge.
@@ -189,6 +265,13 @@ function createStyles() {
     resultBox: { marginTop: 14, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: `${glassPalette.purple}55` },
     resultTitle: { fontSize: 13, fontWeight: "800", color: glassSurface.textPrimary, marginBottom: 6 },
     resultBody: { fontSize: 12, color: glassSurface.textSecondary, lineHeight: 17 },
+    packRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: glassSurface.border },
+    packName: { fontSize: 13, fontWeight: "800", color: glassSurface.textPrimary },
+    packMeta: { fontSize: 11, color: glassSurface.textSecondary, marginTop: 2 },
+    packButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: glassSurface.border },
+    packButtonActive: { borderColor: glassPalette.purple },
+    packButtonText: { fontSize: 11, fontWeight: "700", color: glassSurface.textSecondary },
+    colorInput: { flex: 1, borderWidth: 1, borderColor: glassSurface.border, borderRadius: 12, padding: 10, color: glassSurface.textPrimary, fontSize: 13, backgroundColor: glassSurface.card },
     disclaimer: { fontSize: 11, color: glassSurface.textSecondary, lineHeight: 16, paddingHorizontal: 8, paddingBottom: 24 },
     content: { padding: 20, paddingTop: 8 },
   });

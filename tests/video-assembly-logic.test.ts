@@ -92,3 +92,43 @@ describe("ffmpeg-Szenen-Argumente mit echtem FLUX-Bild (Sprint 276)", () => {
     expect(fallback.join(" ")).not.toContain("-loop 1");
   });
 });
+
+describe("Asset-Pack-Integration (Sprint 282)", () => {
+  it("nutzt Pack-Farben im Gradient-Rückfall statt Legacy-Presets", () => {
+    const args = buildSceneFfmpegArgs({
+      sceneId: "s1",
+      seconds: 4,
+      audioPath: "/tmp/s1.mp3",
+      outputPath: "/tmp/s1.mp4",
+      gradientIndex: 0,
+      imagePath: null,
+      gradientColors: { from: "0f172a", to: "38bdf8" },
+    });
+    const gradient = args.find((a) => a.startsWith("gradients="));
+    expect(gradient).toContain("c0=0x0f172a");
+    expect(gradient).toContain("c1=0x38bdf8");
+  });
+
+  it("fällt ohne Pack-Farben deterministisch auf die Legacy-Presets zurück", () => {
+    const args = buildSceneFfmpegArgs({
+      sceneId: "s1",
+      seconds: 4,
+      audioPath: "/tmp/s1.mp3",
+      outputPath: "/tmp/s1.mp4",
+      gradientIndex: 2,
+      imagePath: null,
+      gradientColors: null,
+    });
+    expect(args.find((a) => a.startsWith("gradients="))).toContain("c3");
+  });
+
+  it("unterscheidet Cache-Keys bei unterschiedlichen Pack-Signaturen", () => {
+    const base = { source: "Gleicher Text", voice: "de-DE-KatjaNeural" };
+    const ohne = buildVideoCacheKey(base);
+    const mit = buildVideoCacheKey({ ...base, packsSignature: "pack_a:Outfit|pack_b:Set" });
+    const mitAnders = buildVideoCacheKey({ ...base, packsSignature: "pack_c:Outfit|-" });
+    expect(mit).not.toBe(ohne);
+    expect(mitAnders).not.toBe(mit);
+    expect(buildVideoCacheKey({ ...base, packsSignature: "pack_a:Outfit|pack_b:Set" })).toBe(mit);
+  });
+});

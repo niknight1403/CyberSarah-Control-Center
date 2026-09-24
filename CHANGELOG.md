@@ -13,6 +13,14 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.## 24.09.2026 �
 - Ops-Alerts bei invoice.payment_failed und customer.subscription.deleted
 - 3 neue Tests mit echt berechneten HMAC-Testsignaturen; 1.542 Tests grün
 
+## 24.09.2026 — Sprints 279–283: Asset-Packs (Outfit & Sets) + Bugfix Szenenbilder
+
+- Neues Modul Asset-Packs: pure Logik, nutzer-scoped Persistenz, tRPC-Router assetPacks (list/create/activate/remove/status)
+- Pipeline-Integration: FLUX-Prompts mit Outfit-/Sets-Modifikatoren, Pack-Farben im Gradient-Rückfall, Cache-Key mit Pack-Signatur
+- Medien-Studio: Pack-Verwaltung und Anzeige der für den nächsten Render wirksamen Packs
+- Bugfix (Sprint 276): FfmpegAssembler verworf imagePath — FLUX-Szenenbilder wären in Produktion nie gerendert worden
+- 15 neue Tests; 1.560 Tests grün (183 Dateien)
+
 
 ## 24.09.2026 — Sprints 276–277: FLUX-Szenenbilder + Medien-Studio-UI
 

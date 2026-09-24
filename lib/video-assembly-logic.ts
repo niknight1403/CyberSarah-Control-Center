@@ -40,8 +40,10 @@ export function buildSceneFfmpegArgs(input: {
   outputPath: string;
   gradientIndex: number;
   imagePath?: string | null;
+  /** Sprint 282: Pack-Farben für den Gradient-Rückfall (Hex ohne #); null = Legacy-Presets. */
+  gradientColors?: { from: string; to: string } | null;
 }): string[] {
-  const { seconds, audioPath, outputPath, gradientIndex, imagePath } = input;
+  const { seconds, audioPath, outputPath, gradientIndex, imagePath, gradientColors } = input;
   const frames = Math.max(1, Math.round(seconds * VIDEO_LIMITS.fps));
   const zoompan = `zoompan=z='min(zoom+0.0008,1.12)':d=${frames}:s=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:fps=${VIDEO_LIMITS.fps}`;
   const codecArgs = [
@@ -69,7 +71,9 @@ export function buildSceneFfmpegArgs(input: {
     ];
   }
 
-  const gradient = `gradients=size=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:speed=0.0015:c${(gradientIndex % 5) + 1}`;
+  const gradient = gradientColors
+    ? `gradients=size=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:speed=0.0015:c0=0x${gradientColors.from}:c1=0x${gradientColors.to}`
+    : `gradients=size=${VIDEO_LIMITS.width}x${VIDEO_LIMITS.height}:speed=0.0015:c${(gradientIndex % 5) + 1}`;
   return [
     "-y",
     "-f", "lavfi",
@@ -125,7 +129,7 @@ export type VideoCapabilityProbe =
 
 export interface VideoAssembler {
   /** Rendert EINE Szene (Video-Pfad bei Erfolg); imagePath = FLUX-Bild oder null für Farbverlauf. */
-  renderScene(args: { audioPath: string; seconds: number; sceneId: string; gradientIndex: number; outputPath: string; imagePath?: string | null }): Promise<
+  renderScene(args: { audioPath: string; seconds: number; sceneId: string; gradientIndex: number; outputPath: string; imagePath?: string | null; gradientColors?: { from: string; to: string } | null }): Promise<
     | { ok: true }
     | { ok: false; reason: string }
   >;
@@ -136,9 +140,9 @@ export interface VideoAssembler {
   >;
 }
 
-export function buildVideoCacheKey(input: { source: string; voice: string }): string {
+export function buildVideoCacheKey(input: { source: string; voice: string; packsSignature?: string }): string {
   let hash = 2166136261;
-  const payload = `${input.voice}::${input.source}`;
+  const payload = `${input.voice}::${input.source}::${input.packsSignature ?? ""}`;
   for (let i = 0; i < payload.length; i += 1) {
     hash ^= payload.charCodeAt(i);
     hash = Math.imul(hash, 16777619);

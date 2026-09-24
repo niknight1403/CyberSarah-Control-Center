@@ -38,6 +38,15 @@ import {
   type VideoCapabilityProbe,
   type VideoAssembler,
 } from "../lib/video-assembly-logic";
+import { listAssetPacksForUser } from "./asset-packs";
+import {
+  composeSceneImagePrompt,
+  describePacksInNote,
+  packGradientForScene,
+  pickActivePacks,
+  packsSignature,
+  type AssetPack,
+} from "../lib/asset-packs-logic";
 
 const CACHE_KEY_PREFIX = "video.cache.";
 const run = promisify(execFile);
@@ -74,13 +83,15 @@ export async function probeFfmpeg(): Promise<VideoCapabilityProbe> {
 
 /** Produktions-Assembler: ruft ffmpeg als Kind-Prozess auf. */
 class FfmpegAssembler implements VideoAssembler {
-  async renderScene(args: { audioPath: string; seconds: number; sceneId: string; gradientIndex: number; outputPath: string }) {
+  async renderScene(args: { audioPath: string; seconds: number; sceneId: string; gradientIndex: number; outputPath: string; imagePath?: string | null; gradientColors?: { from: string; to: string } | null }) {
     const argv = buildSceneFfmpegArgs({
       sceneId: args.sceneId,
       seconds: args.seconds,
       audioPath: args.audioPath,
       outputPath: args.outputPath,
       gradientIndex: args.gradientIndex,
+      imagePath: args.imagePath ?? null,
+      gradientColors: args.gradientColors ?? null,
     });
     try {
       await run("ffmpeg", argv, { timeout: 120_000 });
@@ -148,6 +159,8 @@ export async function renderVideoRun(
     assembler: VideoAssembler;
     synthesize: (text: string, voice: TtsVoice) => Promise<{ ok: true; source: "cache" | "provider"; base64Mp3: string; bytes: number; note: string } | { ok: false; reason: string; retryHint: string | null }>;
     sceneImage?: SceneImageProvider;
+    /** Sprint 282: aktive Asset-Packs (Outfit/Sets) — null = keine. */
+    packs?: { outfit: AssetPack | null; sets: AssetPack | null };
   },
 ): Promise<GenerateVideoResult> {
   const script = createSceneScript(input.text);
@@ -184,9 +197,11 @@ export async function renderVideoRun(
 
       // Sprint 276: FLUX-Szenenbild, wenn verfügbar — sonst ehrlicher
       // Farbverlauf-Rückfall pro Szene (niemals still, immer gezählt).
+      const packs = deps.packs ?? { outfit: null, sets: null };
+      const scenePrompt = composeSceneImagePrompt(scene.visualPrompt, packs);
       let imagePath: string | null = null;
       if (deps.sceneImage) {
-        const imageResult = await deps.sceneImage(scene.visualPrompt);
+        const imageResult = await deps.sceneImage(scenePrompt);
         if (imageResult.ok) {
           const imagePathCandidate = path.join(workDir, `${scene.id}.png`);
           const base64 = imageResult.dataUrl.slice(imageResult.dataUrl.indexOf(",") + 1);
@@ -208,6 +223,9 @@ export async function renderVideoRun(
         gradientIndex: scene.index,
         outputPath,
         imagePath,
+        // Pack-Farben wirken nur im Gradient-Rückfall — mit echtem FLUX-Bild
+        // hat die Bühne keine Wirkung. Beides wird ehrlich gezählt.
+        gradientColors: packGradientForScene(packs, scene.index),
       });
       if (!rendered.ok) {
         return { ok: false, reason: rendered.reason, retryHint: "Szenen-Render erneut versuchen.", configured: true };
@@ -238,7 +256,7 @@ export async function renderVideoRun(
       ok: true,
       source: "render",
       dataUrl: `data:video/mp4;base64,${bytes.toString("base64")}`,
-      note: `${script.scenes.length} Szenen, ~${script.estimatedTotalSeconds}s, 1080p mit Untertiteln — ${visualNote}, Stimme ${input.voice}.`,
+      note: `${script.scenes.length} Szenen, ~${script.estimatedTotalSeconds}s, 1080p mit Untertiteln — ${visualNote}, Stimme ${input.voice}. ${describePacksInNote(deps.packs ?? { outfit: null, sets: null })}.`,
       sceneCount: script.scenes.length,
       totalSeconds: script.estimatedTotalSeconds,
       sceneImages: imageStats,
@@ -267,8 +285,9 @@ export async function generateVideoForUser(
   const quota = await checkAndConsumeDailyQuota(openId);
   if (!quota.ok) return { ok: false, reason: quota.reason, retryHint: null, configured };
 
+  const packs = pickActivePacks(await listAssetPacksForUser(openId));
   const cache = kvCacheAdapter();
-  const cacheKey = buildVideoCacheKey({ source: input.text.trim(), voice });
+  const cacheKey = buildVideoCacheKey({ source: input.text.trim(), voice, packsSignature: packsSignature(packs) });
   const cached = await cache.get(cacheKey);
   if (cached && cached.base64Mp4) {
     return {
@@ -287,6 +306,7 @@ export async function generateVideoForUser(
     assembler: new FfmpegAssembler(),
     synthesize: synthesizeSpeech,
     sceneImage: generateSceneImageForPipeline,
+    packs,
   });
   if (!result.ok) return result;
 
