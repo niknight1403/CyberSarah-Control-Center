@@ -4,6 +4,13 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 232–241]
+
+### Added — Fokus & Rückblick-Modul (ehrliche Tagesverpflichtung)
+- **Neuer Fokus-Tab** (Drawer: „Fokus & Rückblick"): max. 3 Fokus-Punkte pro Tag als bewusstes Kapazitätslimit, Status aktiv/erledigt/verschoben/fallen gelassen — Anlegen, Erledigen, Verschieben und Streichen laufen ausschließlich über eine Bestätigungs-Karte.
+- **Ehrlicher Wochenrückblick** ohne Produktivitäts-Noten: Erledigt-Anteil als ausdrücklich gekennzeichnete Beobachtung, Muster-Benennung (reaktive Woche, Überverpflichtung) und genau zwei deterministische Reflexionsfragen, deren Rationale mitgeliefert wird.
+- **Reine Logik in `lib/focus-review-logic.ts`** (33 Tests) und **Persistenz in `lib/focus-review-store.ts`** (6 Tests): injizierbarer KV-Adapter, max. 400 Punkte chronologisch, korrupter Speicher wird gemeldet und sicher entfernt. Hook `hooks/use-focus-review.ts` orchestriert mit Freigabe-Pflicht (`approvePending`).
+
 ## [Unreleased — Sprint 222–231]
 
 ### Added — Loop-Engineering-Modul (echte Umsatz-Schleifen-Entwürfe)

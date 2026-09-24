@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 
 describe("DRAWER_ITEMS", () => {
-  it("enthaelt genau die neun erwarteten Einträge in Reihenfolge", () => {
+  it("enthaelt genau die erwarteten Einträge in Reihenfolge", () => {
     expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
       "Chat",
       "Revenue OS",
       "Micro Trading",
       "Loop Engineering",
+      "Fokus & Rückblick",
       "Workflows",
       "Designer",
       "Plugins",
@@ -26,7 +27,7 @@ describe("DRAWER_ITEMS", () => {
 
   it("badgt die neuen Revenue-Einträge und Systembereiche", () => {
     const badged = DRAWER_ITEMS.filter((item) => item.badge);
-    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Micro Trading=Paper", "Loop Engineering=Umsatz", "Designer=KI", "Meetings=Neu"]);
+    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Micro Trading=Paper", "Loop Engineering=Umsatz", "Fokus & Rückblick=Neu", "Designer=KI", "Meetings=Neu"]);
   });
 });
 
