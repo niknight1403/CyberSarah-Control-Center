@@ -4,6 +4,13 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 222–231]
+
+### Added — Loop-Engineering-Modul (echte Umsatz-Schleifen-Entwürfe)
+- **Loop-Engineering-Tab ist jetzt echt:** statt vier hartkodierter Beispiel-Karten verwaltet der Screen echte, lokal gespeicherte Schleifen-Entwürfe (Hypothese → Experiment → Messwert → nächster Schritt) mit Fortschritt, ehrlicher Bewertung und deterministischer Nächster-Schritt-Empfehlung. Erstellen, Start, Messwert, Abschluss und Verwerfen laufen ausschließlich über eine explizite Bestätigungs-Karte — nichts führt sich selbst aus, keine Umsatzversprechen (fester Disclaimer).
+- **Reine Logik in `lib/revenue-loop-logic.ts`** (24 Tests): strenge Entwurfs-Validierung, ehrliche Fortschritts-Auswertung („unbekannt" statt fake-null, Trend erst ab zwei Messpunkten), Nächster-Schritt-Engine mit Freigabe-Pflicht, Experiment-Planer (7–90 Tage, `promisedRevenue: false`), deutsches Prompt-Parsing inklusive verneinter Aufträge, ehrlicher Ergebnis-Builder (uneindeutige Namen werden benannt statt geraten).
+- **Persistenz in `lib/revenue-loop-store.ts`** (5 Tests): injizierbarer KV-Adapter (AsyncStorage), max. 50 Schleifen, korrupter Speicher wird gemeldet und sicher entfernt statt zu crashen. Hook `hooks/use-loop-engineering.ts` orchestriert; jede Mutation nur über `approvePending`.
+
 ## [Unreleased — Sprint 212–221]
 
 ### Added — Micro-Trading-Analysemodul (Paper Only, CoinGecko live)
