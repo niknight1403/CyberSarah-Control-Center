@@ -357,7 +357,7 @@ export function runBacktest(series: CandleSeries, config: SignalConfig = DEFAULT
     const grossReturn = (exitPrice - entry.price) / entry.price;
     const netReturn = grossReturn - (options.feePercent / 100) * 2;
     const days = exitIndex - entry.index;
-    const positionSize = equity; // vereinfachte Voll-Position (Paper-Annahme)
+    // Vereinfachte Voll-Position (Paper-Annahme): das gesamte Kapital je Trade.
     equity = equity * (1 + netReturn);
     trades.push({
       entryIndex: entry.index, exitIndex, entryPrice: entry.price, exitPrice,

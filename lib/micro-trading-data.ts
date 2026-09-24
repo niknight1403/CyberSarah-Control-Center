@@ -33,7 +33,7 @@ export type FetchMarketOptions = {
   status?: MarketDataStatus;
 };
 
-type CoinGeckoMarketChart = { prices: Array<[number, number]> };
+type CoinGeckoMarketChart = { prices: [number, number][] };
 
 function buildUrl(coingeckoId: string, days: number): string {
   const safeDays = Math.max(1, Math.min(365, Math.floor(days)));
@@ -101,7 +101,7 @@ export async function fetchMarketSeries(symbolId: string, days: number, options:
 }
 
 /** Wandelt [timestampMs, price]-Paare in OHLC-freie Tages-Candles (close=price) um. */
-export function toCandles(prices: Array<[number, number]>, symbolId: string): Candle[] {
+export function toCandles(prices: [number, number][], symbolId: string): Candle[] {
   const candles: Candle[] = [];
   let lastDay: number | null = null;
   for (const [time, price] of prices) {

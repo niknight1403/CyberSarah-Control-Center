@@ -4,6 +4,13 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 212–221]
+
+### Added — Micro-Trading-Analysemodul (Paper Only, CoinGecko live)
+- **Micro-Trading-Tab ist jetzt echt:** statt hartkodierter Fake-Kurse ("-1,8 %") lädt der Screen Live-Tageskurse über die kostenlose CoinGecko-API (kein Key, kein Konto). Ausdrücklich rein analytisch: keine Broker-, Wallet- oder Order-Funktion — nur Beobachtung, Signal-Analyse, hypothetische Backtests und Papier-Risikorechnung. Fester Disclaimer in jedem Ergebnis: keine Anlageberatung.
+- **Reine Analyse-Logik in `lib/micro-trading-logic.ts`** (deterministisch, 27 Tests): Candle-Validierung (widersprüchliche/ungeordigte Daten werden abgelehnt statt gerechnet), SMA/EMA/RSI/Volatilität mit ehrlichen Warmup-Lücken, Signal-Engine (SMA-Crossover + RSI-Extrem als Beobachtung mit Begründung und Konfidenz, kein Handlungsauftrag), Backtest-Engine (Gebühren, Win-Rate, Max-Drawdown, Buy-and-Hold-Vergleich, Caveats bei dünnen Daten), Fixed-Fractional-Positionsgröße mit Verlust-/Budget-Caps und Drawdown-Wächter, deutsches Prompt-Parsing inklusive verneinter Signalaufträge.
+- **Daten-Schicht `lib/micro-trading-data.ts`:** CoinGecko-Client mit injizierbarem fetch (Tests ohne Netz), 10-s-Zeitlimit, Retry nur bei 5xx, 429-Rate-Limit mit sichtbarem Cooldown statt Blind-Retry, JSON-Sicherheit über fetch-safety-logic. Hook `hooks/use-micro-trading.ts` orchestriert Watchlist-Liveabruf (ein Kurs pro Symbol, 2 Tage) und Prompt-Analyse; Ladefehler erscheinen als ehrliche Einzelzeilen statt leerer Liste.
+
 ## [Unreleased — Sprint 201]
 
 ### Added — Interner Speicher-Manager (Prompt-gesteuert, Test-Modul)
