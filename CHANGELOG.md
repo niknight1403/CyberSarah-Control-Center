@@ -4,6 +4,14 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 242–251]
+
+### Added — Ideen-Inbox (Rohgedanken ehrlich vergilben lassen)
+- **Neuer Ideen-Tab** (Drawer: „Ideen-Inbox"): max. 30 offene Ideen, sichtbare Reifung (frisch/vergilbt/verwelkend mit Tageszahl) statt stiller Ablage; Anlegen, Behalten und Fallenlassen laufen ausschließlich über die Bestätigungs-Karte.
+- **Deterministische Triage** als Vorschlag mit Begründung: verwelkende Ideen → Fallenlassen, zeitlich gemeinte → Pflanzen, frische → bewusst liegen lassen; entscheidet wird nur per Freigabe.
+- **Single-Writer-Brücke zum Fokus-Modul** (`lib/idea-focus-bridge.ts`): prüft Tageskapazität und Titel-Eignung ehrlich; angelegt wird der Fokus-Punkt ausschließlich im Fokus-Tab mit dessen Bestätigungs-Flow.
+- **Persistenz** (`lib/idea-inbox-store.ts`): injizierbarer KV-Adapter, max. 300 Punkte — entschiedene Ideen werden bei Platznot zuerst geopfert, offene zuletzt; korrupter Speicher wird gemeldet und sicher entfernt. 33 neue Tests (Logik, Store, Brücke).
+
 ## [Unreleased — Sprint 232–241]
 
 ### Added — Fokus & Rückblick-Modul (ehrliche Tagesverpflichtung)
