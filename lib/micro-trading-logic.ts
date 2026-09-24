@@ -111,3 +111,88 @@ export function validateCandleSeries(series: CandleSeries): CandleValidationResu
   }
   return { valid: true, reason: "Kursdaten strukturell plausibel." };
 }
+
+/* ==================== Indikatoren (Sprint 213) ==================== */
+
+/** Einfacher gleitender Durchschnitt; liefert null, solange die Periode nicht gefüllt ist. */
+export function sma(values: number[], period: number): number[] {
+  if (period < 1) throw new Error("SMA-Periode muss mindestens 1 sein.");
+  const result: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < values.length; i += 1) {
+    sum += values[i];
+    if (i >= period) sum -= values[i - period];
+    result.push(i >= period - 1 ? sum / period : Number.NaN);
+  }
+  return result;
+}
+
+/** Exponentieller gleitender Durchschnitt (Standard-Alpha 2/(period+1)). */
+export function ema(values: number[], period: number): number[] {
+  if (period < 1) throw new Error("EMA-Periode muss mindestens 1 sein.");
+  const alpha = 2 / (period + 1);
+  const result: number[] = [];
+  let previous: number | null = null;
+  for (let i = 0; i < values.length; i += 1) {
+    if (i < period - 1) {
+      result.push(Number.NaN);
+      continue;
+    }
+    if (previous === null) {
+      // Seed: SMA der ersten `period` Werte (Standard-Praxis, deterministisch).
+      const seed = values.slice(0, period).reduce((acc, value) => acc + value, 0) / period;
+      previous = seed;
+    } else {
+      previous = alpha * values[i] + (1 - alpha) * previous;
+    }
+    result.push(previous);
+  }
+  return result;
+}
+
+/** RSI (Wilder, Periode typisch 14) auf Schlusskursen — Werte 0..100, null-artig als NaN vor Warmup. */
+export function rsi(closes: number[], period = 14): number[] {
+  if (period < 1) throw new Error("RSI-Periode muss mindestens 1 sein.");
+  const result: number[] = [Number.NaN];
+  let avgGain = 0;
+  let avgLoss = 0;
+  for (let i = 1; i < closes.length; i += 1) {
+    const change = closes[i] - closes[i - 1];
+    const gain = Math.max(0, change);
+    const loss = Math.max(0, -change);
+    if (i <= period) {
+      avgGain += gain / period;
+      avgLoss += loss / period;
+      result.push(i === period ? computeRsi(avgGain, avgLoss) : Number.NaN);
+      continue;
+    }
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    result.push(computeRsi(avgGain, avgLoss));
+  }
+  return result;
+}
+
+function computeRsi(avgGain: number, avgLoss: number): number {
+  if (avgLoss === 0) return avgGain === 0 ? 50 : 100;
+  const rs = avgGain / avgLoss;
+  return 100 - 100 / (1 + rs);
+}
+
+/** Jahres-normalisierte Volatilität aus täglichen Schlusskurs-Renditen (Standardabweichung). */
+export function annualizedVolatility(closes: number[]): number {
+  if (closes.length < 2) return 0;
+  const returns: number[] = [];
+  for (let i = 1; i < closes.length; i += 1) {
+    returns.push(Math.log(closes[i] / closes[i - 1]));
+  }
+  const mean = returns.reduce((acc, value) => acc + value, 0) / returns.length;
+  const variance = returns.reduce((acc, value) => acc + (value - mean) ** 2, 0) / returns.length;
+  return Math.sqrt(variance) * Math.sqrt(365);
+}
+
+/** Prozent-Änderung zwischen erstem und letztem Kurs einer Serie. */
+export function totalChangePercent(closes: number[]): number {
+  if (closes.length < 2 || closes[0] === 0) return 0;
+  return ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100;
+}
