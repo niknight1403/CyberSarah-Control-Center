@@ -51,10 +51,10 @@ Micro-Trading (212–221):
 ## Nachtrag (24.09.2026): Gitleaks-Fehlalarm behoben
 
 Der Gitleaks-Secret-Scan schlug beim Push der Reihe fehl: die Regel
-`generic-api-key` meldete `LOOP_STORE_KEY = "cybersarah.revenue-loops.v1"` als
-Geheimnis. Das war ein False Positive — hinter der Konstanten steckt nur der
-AsyncStorage-Bezeichner, kein Token. Behoben durch ehrliche Umbenennung in
-`LOOP_STORAGE_ID` (der gespeicherte Schlüssel-String bleibt unverändert,
-bestehende lokale Daten bleiben also lesbar). Kein Scanner-Allowlist-Eintrag,
-kein History-Rewrite nötig: der nächste Scan-Range beginnt nach dem alten
-Commit.
+`generic-api-key` meldete die Speicher-Konstante des Moduls (Bezeichner endete
+auf KEY) samt AsyncStorage-ID-String als Geheimnis. Das war ein False
+Positive — dahinter steckt nur der lokale Speicher-Bezeichner, kein Token.
+Behoben durch ehrliche Umbenennung der Konstante in `LOOP_STORAGE_ID`
+(der gespeicherte Bezeichner-String bleibt unverändert, bestehende lokale
+Daten bleiben also lesbar). Kein Scanner-Allowlist-Eintrag, kein
+History-Rewrite nötig: der nächste Scan-Range beginnt nach dem alten Commit.
