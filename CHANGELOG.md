@@ -4,6 +4,14 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## [Unreleased — Sprint 252–261]
+
+### Added — Entscheidungs-Journal (Wetten auf die Zukunft ehrlich nachprüfen)
+- **Neuer Entscheidungs-Tab** (Drawer: „Entscheidungs-Journal"): Entscheidungen werden mit prüfbarer Erwartung und Pflicht-Nachprüf-Tag festgehalten; Anlegen, Nachprüfen und Ersetzen laufen ausschließlich über die Bestätigungs-Karte.
+- **Ehrliche Nachprüfungs-Verdikte**: bestätigt / nicht eingetroffen / unklar — ein Verfehlen ist ein Ergebnis, kein Vorwurf; bereits Geprüftes wird vor doppelter Prüfung bewahrt.
+- **Ersetzen als sichtbarer Verlauf:** ersetzte Entscheidungen bleiben Wort für Wort lesbar, doppelt Ersetzen wird als Verlaufslüge abgelehnt, die Ersetzungs-Kette wird chronologisch angezeigt.
+- **Persistenz** (`lib/decision-log-store.ts`): injizierbarer KV-Adapter, max. 250 Einträge — entschiedene zuerst geopfert, offene zuletzt. 31 neue Tests (Logik + Store).
+
 ## [Unreleased — Sprint 242–251]
 
 ### Added — Ideen-Inbox (Rohgedanken ehrlich vergilben lassen)
