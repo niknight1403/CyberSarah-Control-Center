@@ -269,3 +269,93 @@ function extractNewIdea(prompt: string): { title: string; note: string | null; s
   const sourceMatch = prompt.match(/Quelle\s*:([^;\n]+)/i);
   return { title, note: noteMatch?.[1]?.trim() ?? null, source: sourceMatch?.[1]?.trim() ?? "spontan" };
 }
+
+/* ==================== Ehrliches Prompt-Ergebnis (Sprint 246) ==================== */
+
+export type IdeaResult = {
+  headline: string;
+  lines: string[];
+  disclaimer: string;
+};
+
+/** Findet Ideen per Titel-Anteil (case-insensitive) — nie per ID-Raten. */
+export function findIdeaByTitle(items: IdeaItem[], query: string): IdeaItem[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length < 3) return [];
+  return items.filter((item) => item.title.toLowerCase().includes(needle));
+}
+
+/**
+ * Baut die ehrliche Antwort auf ein Ideen-Kommando: Auskunft sofort,
+ * Triage-Vorschläge als Vorschläge, Änderungen nur als Freigabe-Anfrage.
+ */
+export function buildIdeaResult(command: IdeaPromptCommand, items: IdeaItem[], now = Date.now): IdeaResult {
+  const lines: string[] = [];
+  const targets = command.titleQuery ? findIdeaByTitle(items, command.titleQuery) : [];
+
+  if (command.actions.includes("add")) {
+    if (!command.newIdea) {
+      lines.push('Keine Idee erkannt — z. B. "Notiere Idee: <Titel>; Notiz: …; Quelle: …".');
+    } else if (!hasInboxCapacity(items)) {
+      lines.push(`Eingang voll: max. ${IDEA_LIMITS.maxInboxOpen} offene Ideen — erst Triage, dann sammeln. Ein endloser Stapel ist eine Ablage.`);
+    } else {
+      lines.push(`Idee vorbereitet: "${command.newIdea.title}" (Quelle: ${command.newIdea.source}) — gespeichert wird erst nach deiner Bestätigung.`);
+    }
+  }
+
+  if (command.actions.includes("list") || command.actions.includes("status")) {
+    const open = items.filter((item) => item.status === "inbox");
+    if (items.length === 0) {
+      lines.push("Keine Ideen gespeichert — leerer Stapel, kein Fehler.");
+    } else if (open.length === 0) {
+      lines.push(`${items.length} Idee(n) gespeichert, keine offen — alles entschieden. Neue Ideen dürfen jederzeit in den Eingang.`);
+    } else {
+      const ages = describeInboxAges(items, now);
+      lines.push(`${open.length} offene Idee(n): ${ages.fresh} frisch, ${ages.aging} vergilbt, ${ages.withering} verwelkend.`);
+    }
+  }
+
+  if (command.titleQuery && targets.length === 0 && !command.actions.includes("add")) {
+    lines.push(`Keine Idee passt zu "${command.titleQuery}" — bitte den Titel prüfen.`);
+  }
+  if (targets.length > 1) {
+    lines.push(`Uneindeutig: ${targets.length} Ideen passen (${targets.map((item) => item.title).slice(0, 4).join(", ")}) — bitte genauer benennen.`);
+  }
+
+  if (targets.length === 1) {
+    const target = targets[0]!;
+    const age = describeIdeaAge(target, now);
+    const statusLine = `Idee "${target.title}" (${target.source}): ${ideaStatusLabel(target.status)}, ${age.label} (${age.daysInInbox} Tage).`;
+    if (command.actions.includes("plant") && target.status === "planted") {
+      lines.push(`${statusLine} Sie ist bereits gepflanzt — doppelt pflanzen wäre unehrlich.`);
+    } else if (command.actions.includes("plant")) {
+      lines.push(`${statusLine} Pflanzen in den Fokus vorbereitet — erst nach deiner Bestätigung.`);
+    } else if (command.actions.includes("keep")) {
+      lines.push(`${statusLine} Behalten vorbereitet — erst nach deiner Bestätigung.`);
+    } else if (command.actions.includes("drop")) {
+      lines.push(`${statusLine} Fallen lassen ist endgültig sichtbar — erst nach deiner Bestätigung.`);
+    } else if (!command.actions.includes("triage")) {
+      lines.push(statusLine);
+      lines.push(`• ${age.observation}`);
+    }
+  }
+
+  if (command.actions.includes("triage")) {
+    const plan = buildTriagePlan(items, now);
+    lines.push(plan.summary);
+    for (const suggestion of plan.suggestions.slice(0, 6)) {
+      lines.push(`• ${suggestion.title} → ${suggestion.kind === "plant" ? "pflanzen" : suggestion.kind === "keep" ? "behalten" : suggestion.kind === "drop" ? "fallen lassen" : "liegen lassen"}: ${suggestion.reason}`);
+    }
+    lines.push("Alles Vorschläge — entschieden wird nur mit deiner Freigabe.");
+  }
+
+  if (lines.length === 0) lines.push('Alles im Plan — z. B. "Zeig alle Ideen" oder "Triage-Vorschläge".');
+  const headline = command.actions.includes("triage")
+    ? "Triage-Vorschläge"
+    : command.actions.includes("add")
+      ? "Neue Idee"
+      : targets.length === 1
+        ? `Idee: ${targets[0]!.title}`
+        : "Ideen-Inbox";
+  return { headline, lines, disclaimer: IDEA_DISCLAIMER };
+}

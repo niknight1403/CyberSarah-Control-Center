@@ -6,6 +6,7 @@ import {
   createIdeaItem,
   hasInboxCapacity,
   buildTriagePlan,
+  buildIdeaResult,
   parseIdeaPrompt,
   describeIdeaAge,
   describeInboxAges,
@@ -158,5 +159,51 @@ describe("idea prompt parsing (Sprint 245)", () => {
     expect(parseIdeaPrompt('Streiche "Video-Serie"').actions).toContain("drop");
     expect(parseIdeaPrompt("Triage-Vorschläge bitte").actions).toContain("triage");
     expect(parseIdeaPrompt('Pflanze "Video-Serie"').titleQuery).toBe("Video-Serie");
+  });
+});
+
+describe("idea honest result builder (Sprint 246)", () => {
+  const DAY = 86_400_000;
+  const now = () => 30 * DAY;
+  const fresh = createIdeaItem({ title: "Podcast mit Kundenstimmen", source: "chat" }, () => 29 * DAY);
+  const planted = createIdeaItem({ title: "Alte gepflanzte Idee", source: "chat", status: "planted" }, () => 5 * DAY);
+
+  it("listet ehrlich inklusive Alters-Statistik", () => {
+    const result = buildIdeaResult({ actions: ["status"], titleQuery: null, newIdea: null }, [fresh], now);
+    expect(result.lines[0]).toContain("1 offene Idee");
+    expect(result.lines[0]).toContain("1 frisch");
+  });
+
+  it("bereitet neue Ideen vor und lehnt vollen Eingang ab", () => {
+    const full = Array.from({ length: 30 }, (_, i) => createIdeaItem({ title: `Idee ${i}`, source: "spontan" }, () => 1_000 + i));
+    const result = buildIdeaResult({ actions: ["add"], titleQuery: null, newIdea: { title: "Zu viel", note: null, source: "spontan" } }, full, now);
+    expect(result.lines[0]).toContain("Eingang voll");
+    expect(result.headline).toBe("Neue Idee");
+    const free = buildIdeaResult({ actions: ["add"], titleQuery: null, newIdea: { title: "Gute neue Idee", note: null, source: "spontan" } }, [fresh], now);
+    expect(free.lines[0]).toContain("Bestätigung");
+  });
+
+  it("doppelt Pflanzen wird als unehrlich abgelehnt", () => {
+    const result = buildIdeaResult(parseIdeaPrompt('Pflanze "gepflanzte Idee"'), [planted], now);
+    expect(result.lines.some((line) => line.includes("bereits gepflanzt"))).toBe(true);
+  });
+
+  it("Triage listet Vorschläge mit Begründung und Freigabe-Merkmal", () => {
+    const old = createIdeaItem({ title: "Uralt ohne Ziel", source: "spontan" }, () => 1 * DAY);
+    const result = buildIdeaResult(parseIdeaPrompt("Triage-Vorschläge bitte"), [old, fresh], now);
+    expect(result.headline).toBe("Triage-Vorschläge");
+    expect(result.lines.some((line) => line.includes("fallen lassen:"))).toBe(true);
+    expect(result.lines.some((line) => line.includes("nur mit deiner Freigabe"))).toBe(true);
+  });
+
+  it("uneindeutige Titel werden benannt, nie geraten", () => {
+    const other = createIdeaItem({ title: "Podcast-Sonderserie", source: "spontan" }, () => 28 * DAY);
+    const result = buildIdeaResult(parseIdeaPrompt('Pflanze "Podcast"'), [fresh, other], now);
+    expect(result.lines.some((line) => line.includes("Uneindeutig"))).toBe(true);
+  });
+
+  it("Disclaimer verbietet automatische Umwandlung", () => {
+    const result = buildIdeaResult({ actions: ["status"], titleQuery: null, newIdea: null }, [], now);
+    expect(result.disclaimer).toContain("ausschließlich nach deiner Bestätigung");
   });
 });
