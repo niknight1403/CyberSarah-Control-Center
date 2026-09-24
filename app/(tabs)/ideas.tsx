@@ -136,10 +136,12 @@ export default function IdeasScreen() {
             <GlassCard accent="blue" style={styles.card}>
               <Text style={styles.cardTitle}>{state.plantProposal.label}</Text>
               <Text style={styles.body}>{state.plantProposal.detail}</Text>
-              <Text style={styles.body}>
-                Der Fokus-Punkt für {state.plantProposal.title} wird im Fokus-Tab als Vorschlag vorbereitet — Anlegen dort mit {"Plane Fokus: "}
-                {state.plantProposal.title} und Bestätigung.
-              </Text>
+              {state.plantProposal.verdict.plantable && (
+                <Text style={styles.body}>
+                  Anlegen im Fokus-Tab mit {"Plane Fokus: "} {state.plantProposal.verdict.draftTitle} und Bestätigung — die Idee wird danach hier als
+                  gepflanzt markiert.
+                </Text>
+              )}
             </GlassCard>
           )}
 

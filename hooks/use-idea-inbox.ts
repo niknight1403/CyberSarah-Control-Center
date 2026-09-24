@@ -12,6 +12,9 @@ import {
   type IdeaResult,
   type IdeaStatus,
 } from "@/lib/idea-inbox-logic";
+import { checkPlantVerdict, type PlantVerdict } from "@/lib/idea-focus-bridge";
+import type { FocusItem } from "@/lib/focus-review-logic";
+import { loadFocusItems, type KeyValueAdapter } from "@/lib/focus-review-store";
 import { loadIdeaItems, saveIdeaItems, type IdeaKeyValueAdapter } from "@/lib/idea-inbox-store";
 
 /**
@@ -32,6 +35,8 @@ export type PlantProposal = {
   note: string;
   label: string;
   detail: string;
+  /** Sprint 250: ehrlicher Pflanzen-Befund aus der Fokus-Brücke. */
+  verdict: PlantVerdict;
 };
 
 export type IdeaInboxState = {
@@ -51,6 +56,8 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
     items: [], storeNote: null, loading: true, saveError: null, lastPrompt: "", result: null, pending: null, plantProposal: null,
   });
   const itemsRef = useRef<IdeaItem[]>([]);
+  /** Read-only-Sicht auf Fokus-Punkte — nur für den Pflanzen-Befund, nie schreibend. */
+  const focusItemsRef = useRef<FocusItem[]>([]);
 
   const storage = useCallback((): IdeaKeyValueAdapter => {
     if (adapter) return adapter;
@@ -63,6 +70,10 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
 
   useEffect(() => {
     let active = true;
+    // Fokus-Punkte nur lesen: Die Brücke prüft Kapazität, schreibt bleibt im Fokus-Modul.
+    loadFocusItems(storage() as unknown as KeyValueAdapter)
+      .then((loaded) => { focusItemsRef.current = loaded.items; })
+      .catch(() => { focusItemsRef.current = []; });
     loadIdeaItems(storage())
       .then((loaded) => {
         itemsRef.current = loaded.items;
@@ -108,12 +119,16 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
     } else if (targets.length === 1) {
       const target = targets[0]!;
       if (command.actions.includes("plant") && target.status !== "planted") {
+        const verdict = checkPlantVerdict(target, focusItemsRef.current, null);
         plantProposal = {
           ideaId: target.id,
           title: target.title,
           note: target.note,
           label: "In den Fokus pflanzen",
-          detail: `"${target.title}" wird nach Bestätigung als Fokus-Punkt angelegt und die Idee als gepflanzt markiert.`,
+          detail: verdict.plantable
+            ? `"${target.title}": ${verdict.detail}`
+            : `"${target.title}" ist aktuell nicht pflanzbar — ${verdict.reason}`,
+          verdict,
         };
       } else if (command.actions.includes("keep")) {
         pending = { kind: "status", ideaId: target.id, label: "Behalten", detail: `"${target.title}"`, status: "kept" };
