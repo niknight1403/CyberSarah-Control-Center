@@ -17,6 +17,7 @@ on:
           - db
           - live
           - beides
+          - sprint373-e2e-live
         default: beides
 
 permissions:
@@ -70,3 +71,10 @@ jobs:
           ADMIN_EMAIL: niko.oeben@gmail.com
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: node scripts/live-check-admin.mjs
+      - name: Sprint 373 E2E-LIVE (Login-Gate + Kampagnen-Bruecke, echtes pending Artefakt)
+        if: ${{ inputs.mode == 'sprint373-e2e-live' }}
+        env:
+          LIVE_API_BASE_URL: ${{ secrets.RENDER_PUBLIC_URL || 'https://cybersarah-control-center.onrender.com' }}
+          ADMIN_EMAIL: niko.oeben@gmail.com
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: node scripts/sprint373-e2e-live.mjs
