@@ -3,6 +3,14 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 371: tRPC-Vollintegration — agents-, system- und revenue-Router
+
+- **Bestandsaufnahme**: tRPC-Kern (server/_core/trpc.ts mit superjson, Rate-Limit-Guard, protected/adminProcedure), Express-Mount (/api/trpc), Frontend-Client (lib/trpc.ts mit httpBatchLink + Session-Header) und alle Abhängigkeiten (@trpc/server/client/react-query ^11.18.0, @tanstack/react-query, zod) waren bereits vorhanden — der Sprint schließt die im Arbeitsplan fehlenden Router
+- **agents-Router (neu)**: getStatus (Agenten des Nutzers inkl. Live-Telemetrie: gepufferte Loop-Events, Live-Abonnenten, Status-Zusammenfassung), control (Zod-validiert: activate/pause/archive auf den super_agent_status-Enum, strikt nutzer-gescoped — fremde IDs sind NOT_FOUND, Aktivierung toucht lastActiveAt), getLogs (Replay des Session-Telemetrie-Bus ab sinceEventId, Limit-Clamp 1..240, Ownership-Check gegen die Agenten-Liste)
+- **system.getResourceUsage (neu)**: admin-gateder ehrlicher Prozess-Snapshot — Memory (rss/heap), CPU-Zeit, Uptime, Load-Averages, Node-Version; keine Netzaufrufe, keine Fake-Werte
+- **revenue-Router (neu)**: getMetrics kombiniert Kontometrie des Control Centers (Plan/Verbrauch/Credits, Sprint-144-Admin-Elite-Garantie bleibt wirksam) mit dem read-only Revenue-OS-Snapshot — nur fuer Admins; ohne REVENUE_OS_DATABASE_URL ehrlicher not-configured-Zustand
+- **Verifikation**: 6 neue Logik-Tests (Aktions-Mapping, Status-Aggregation, Telemetrie-Sicht, ISO-Serialisierung, Limit-Clamp), Gesamt 2.212 Tests gruen (282 Dateien), tsc --noEmit gruen
+
 ## 25.09.2026 — Sprint 370: X-OAuth2-Auto-Refresh — Live-Modus haelt dauerhaft
 
 - **Token-Rotations-Persistenz (Migration 0012)**: Neue Tabelle platform_tokens speichert den aktuell gueltigen X-Tokensatz — X rotiert bei JEDEM Refresh den Access- UND Refresh-Token, deshalb ist Env nur der Bootstrap (X_PUBLISH_TOKEN/X_REFRESH_TOKEN) und die DB die Quelle der Wahrheit

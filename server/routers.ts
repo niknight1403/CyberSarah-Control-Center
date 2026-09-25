@@ -31,6 +31,8 @@ import { analyticsRouter } from "./analytics-router";
 import { externalActionsRouter } from "./external-actions-router";
 import { influencerRouter } from "./influencer-router";
 import { publishingRouter } from "./publishing-router";
+import { agentsRouter } from "./agents-router";
+import { revenueRouter } from "./revenue-router";
 import { draftEngineRouter } from "./draft-engine-router";
 import { pillarsRouter } from "./pillars-router";
 import { publicProcedure, router } from "./_core/trpc";
@@ -38,6 +40,8 @@ import { publicProcedure, router } from "./_core/trpc";
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  agents: agentsRouter,
+  revenue: revenueRouter,
   integrations: integrationsRouter,
   imageGeneration: imageGenerationRouter,
   mediaPipeline: mediaPipelineRouter,
