@@ -64,7 +64,7 @@ export type PillarSelfTest = {
 
 export function selfTestPillarRegistry(requiredIds: readonly string[] = ["saas-factory", "content-engine", "outreach-agent"]): PillarSelfTest {
   const problems: string[] = [];
-  const registered = PILLARS.map((pillar) => pillar.id);
+  const registered: string[] = PILLARS.map((pillar) => pillar.id);
   for (const required of requiredIds) {
     if (!registered.includes(required)) problems.push(`Saeule fehlt in der Registry: ${required}`);
   }
