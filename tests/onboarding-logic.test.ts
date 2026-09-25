@@ -9,11 +9,9 @@ import { DEFAULT_DESIGN_THEME, DESIGN_THEMES } from "@/lib/design-theme-logic";
 import {
   clampOnboardingStepIndex,
   getOnboardingStepState,
-  getOnboardingThemeChoices,
   normalizeOnboardingCompletion,
   normalizeOnboardingDesignTheme,
   ONBOARDING_SLIDES,
-  ONBOARDING_THEME_CHOICES,
   shouldCompleteOnboarding,
 } from "@/lib/onboarding-logic";
 import { normalizeThemePreference, themePreferenceLabel } from "@/lib/theme-preference-logic";
@@ -68,27 +66,17 @@ describe("Sprint 117: Slides und Schritt-Zustaende", () => {
   });
 });
 
-describe("Sprint 117: kuratierte Theme-Auswahl", () => {
-  it("alle unterscheidbaren Designs aus der Registry", () => {
-    const choices = getOnboardingThemeChoices();
-    expect(choices).toHaveLength(DESIGN_THEMES.length);
-    expect(new Set(choices.map((choice) => choice.theme)).size).toBe(DESIGN_THEMES.length);
-    for (const choice of choices) {
-      expect(DESIGN_THEMES).toContain(choice.theme);
-      expect(choice.label.length).toBeGreaterThan(0);
-      expect(choice.description.length).toBeGreaterThan(0);
-    }
+describe("Sprint 355: keine Design-Auswahl mehr — Aurora Flow ist fix", () => {
+  it("es gibt genau ein Design und keine Auswahl-Registry im Onboarding", () => {
+    expect(DESIGN_THEMES).toEqual(["aurora"]);
+    expect(DEFAULT_DESIGN_THEME).toBe("aurora");
   });
 
-  it("Standard-Design steht an erster Stelle der Auswahl", () => {
-    expect(ONBOARDING_THEME_CHOICES[0]).toBe(DEFAULT_DESIGN_THEME);
-    expect(getOnboardingThemeChoices()[0].theme).toBe(DEFAULT_DESIGN_THEME);
-  });
-
-  it("unbekannte Design-Waelse faellen auf das Standard-Design zurueck", () => {
-    expect(normalizeOnboardingDesignTheme("aurora", DEFAULT_DESIGN_THEME)).toBe(DEFAULT_DESIGN_THEME); // Sprint 128: entferntes Theme faellt auf Standard
-    expect(normalizeOnboardingDesignTheme("halluzination", DEFAULT_DESIGN_THEME)).toBe(DEFAULT_DESIGN_THEME);
-    expect(normalizeOnboardingDesignTheme(42, DEFAULT_DESIGN_THEME)).toBe(DEFAULT_DESIGN_THEME);
+  it("jede Design-Wahl (auch Legacy) faellt auf Aurora Flow zurueck", () => {
+    expect(normalizeOnboardingDesignTheme("aurora", DEFAULT_DESIGN_THEME)).toBe("aurora");
+    expect(normalizeOnboardingDesignTheme("pulse", DEFAULT_DESIGN_THEME)).toBe("aurora");
+    expect(normalizeOnboardingDesignTheme("halluzination", DEFAULT_DESIGN_THEME)).toBe("aurora");
+    expect(normalizeOnboardingDesignTheme(42, DEFAULT_DESIGN_THEME)).toBe("aurora");
   });
 });
 

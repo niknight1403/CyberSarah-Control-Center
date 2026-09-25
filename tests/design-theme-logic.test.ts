@@ -1,28 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { baseSchemePalettes, resolveDesignEffects, resolveDesignPalette, resolveDesignRuntimePalette } from "../lib/_core/design-theme-palettes";
-import { DESIGN_THEMES, DESIGN_THEME_STORAGE_KEY, designThemeDescription, designThemeIcon, designThemeLabel, normalizeDesignTheme } from "../lib/design-theme-logic";
+import { DEFAULT_DESIGN_THEME, DESIGN_THEMES, DESIGN_THEME_STORAGE_KEY, designThemeDescription, designThemeIcon, designThemeLabel, normalizeDesignTheme } from "../lib/design-theme-logic";
 
 describe("design theme logic", () => {
   it("normalizes the four new Neon designs and migrates legacy values", () => {
-    for (const theme of ["pulse", "orbit", "synthwave", "minimal"]) expect(normalizeDesignTheme(theme)).toBe(theme);
-    for (const legacy of ["neon", "slate", "glass", "ember", "forest", "aurora", undefined, "unexpected"]) expect(normalizeDesignTheme(legacy)).toBe("pulse");
+    // Sprint 355 — Aurora Flow ist das einzige Design: ALLE gespeicherten
+    // Werte (auch die 9 entfernten Neon-Varianten) migrieren auf "aurora".
+    for (const theme of ["pulse", "orbit", "synthwave", "minimal", "oracle", "borealis", "quantum", "nebula", "phoenix"]) expect(normalizeDesignTheme(theme)).toBe("aurora");
+    for (const legacy of ["neon", "slate", "glass", "ember", "forest", "aurora", undefined, "unexpected", null, 42]) expect(normalizeDesignTheme(legacy)).toBe("aurora");
   });
 
-  it("exposes die Neon- und magischen Design-Auswahlen (Sprint 350)", () => {
-    expect(DESIGN_THEMES).toEqual(["pulse", "orbit", "synthwave", "minimal", "oracle", "borealis", "quantum", "nebula", "phoenix"]);
-    expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v5");
-    expect(designThemeLabel("pulse")).toBe("Neon Pulse");
-    expect(designThemeLabel("orbit")).toBe("Cyber Orbit");
-    expect(designThemeLabel("synthwave")).toBe("Neon Synthwave");
-    expect(designThemeLabel("minimal")).toBe("Neon Minimal");
-    expect(designThemeIcon("pulse")).toBe("bolt.fill");
-    expect(designThemeIcon("orbit")).toBe("chart.bar.fill");
-    expect(designThemeIcon("synthwave")).toBe("sparkles");
-    expect(designThemeIcon("minimal")).toBe("wand.and.stars");
-    for (const theme of DESIGN_THEMES) expect(designThemeDescription(theme).length).toBeGreaterThan(10);
+  it("exposes genau EIN Design: Aurora Flow (Sprint 355)", () => {
+    expect(DESIGN_THEMES).toEqual(["aurora"]);
+    expect(DEFAULT_DESIGN_THEME).toBe("aurora");
+    expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v6");
+    expect(designThemeLabel("aurora")).toBe("Aurora Flow");
+    expect(designThemeIcon("aurora")).toBe("sparkles");
+    expect(designThemeDescription("aurora").length).toBeGreaterThan(10);
   });
 
-  it("resolves complete palettes and effects for every Neon design", () => {
+  it("resolves complete palettes and effects for Aurora Flow", () => {
     const tokenNames = Object.keys(baseSchemePalettes.light);
     for (const theme of DESIGN_THEMES) {
       for (const scheme of ["light", "dark"] as const) {
@@ -34,13 +31,11 @@ describe("design theme logic", () => {
     }
   });
 
-  it("keeps the new designs visually distinct", () => {
-    expect(resolveDesignPalette("pulse", "dark").primary).toBe("#52D8FF");
-    expect(resolveDesignPalette("orbit", "dark").primary).toBe("#8B5CFF");
-    expect(resolveDesignPalette("synthwave", "dark").primary).toBe("#FF4FD8");
-    expect(resolveDesignPalette("minimal", "dark").primary).toBe("#00F5D4");
-    expect(resolveDesignPalette("pulse", "dark").background).toBe("#0A0D12");
-    expect(resolveDesignPalette("orbit", "dark").background).toBe("#080D24");
+  it("traegt die Aurora-Flow-Signaturfarben (Violett → Cyan auf Nachtblau)", () => {
+    expect(resolveDesignPalette("aurora", "dark").primary).toBe("#00F2FE");
+    expect(resolveDesignPalette("aurora", "dark").accent).toBe("#7C3AED");
+    expect(resolveDesignPalette("aurora", "dark").background).toBe("#0A0E1A");
+    expect(resolveDesignPalette("aurora", "light").primary).toBe("#7C3AED");
   });
 
   it("builds the runtime Colors shape", () => {

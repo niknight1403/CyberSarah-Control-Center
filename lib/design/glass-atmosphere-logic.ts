@@ -44,7 +44,7 @@ export interface GridMeshSpec {
 
 export interface AuroraSpec {
   /** Farbverlaufs-Stops fuer den vertikalen Verlauf (RGBA-Strings). */
-  colors: [string, string];
+  colors: [string, string, ...string[]];
   /** Drift-Amplitude in px (sanfte Pendelbewegung). */
   driftAmplitudePx: number;
   /** Drift-Dauer fuer eine Richtung in ms. */
@@ -91,7 +91,15 @@ export function buildAurora(hex: string): AuroraSpec {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return {
-    colors: [`rgba(${r}, ${g}, ${b}, 0.12)`, `rgba(${r}, ${g}, ${b}, 0)`],
+    // Sprint 355 — Aurora Flow: die Akzentfarbe schmilzt mit Violett und
+    // Petrol zu einer Polarlicht-Welle (vertikaler 4-Stufen-Verlauf).
+    colors: [
+      `rgba(${r}, ${g}, ${b}, 0.14)`,
+      `rgba(124, 58, 237, 0.09)`,
+      `rgba(0, 242, 254, 0.06)`,
+      `rgba(0, 229, 176, 0.04)`,
+      "rgba(0, 229, 176, 0)",
+    ],
     driftAmplitudePx: 28,
     driftMs: 26_000,
   };

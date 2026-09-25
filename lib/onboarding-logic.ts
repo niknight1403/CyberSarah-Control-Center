@@ -51,8 +51,8 @@ export const ONBOARDING_SLIDES: readonly OnboardingSlide[] = [
   },
   {
     id: "theme",
-    title: "Dein Look",
-    text: "Waehle ein Design und ob die App hell, dunkel oder dem System folgen soll. Jederzeit im Konto-Tab aenderbar.",
+    title: "Dein Erscheinungsbild",
+    text: "Aurora Flow ist fest eingestellt. Lege nur fest, ob die App hell, dunkel oder dem System folgen soll — jederzeit im Konto-Tab aenderbar.",
     icon: "wand.and.stars",
   },
 ];
@@ -88,38 +88,14 @@ export function getOnboardingStepState(index: number, slides: readonly Onboardin
   };
 }
 
-/* ==================== Theme-Auswahl ==================== */
+/* ==================== Erscheinungsbild ==================== */
 
 /**
- * Kuratierte Design-Auswahl im Onboarding. Die Registry ist die einzige
- * Quelle, damit neue produktive Paletten nicht nur im Konto-Tab erscheinen.
+ * Sprint 355 — Design-Auswahl entfernt: Aurora Flow ist das einzige Design.
+ * Der Onboarding-Schritt fragt nur noch die Hell/Dunkel-Präferenz ab.
  */
-// Sprint 127 — "neon" (Cyber Neon) ist das Standard-Design und steht an erster Stelle.
-export const ONBOARDING_THEME_CHOICES: readonly DesignTheme[] = DESIGN_THEMES;
-
-export type OnboardingThemeChoice = {
-  theme: DesignTheme;
-  label: string;
-  description: string;
-  icon: ReturnType<typeof designThemeIcon>;
-};
-
-/**
- * Theme-Metadaten fuer die Auswahl-Karten; nur bekannte Designs aus der
- * Registry kommen durch (unbekannte Wahl → Fallback Standard-Design).
- */
-export function getOnboardingThemeChoices(): OnboardingThemeChoice[] {
-  return ONBOARDING_THEME_CHOICES.filter((theme) => DESIGN_THEMES.includes(theme)).map((theme) => ({
-    theme,
-    label: designThemeLabel(theme),
-    description: designThemeDescription(theme),
-    icon: designThemeIcon(theme),
-  }));
-}
-
-/** Validiert eine Design-Wahl aus dem Onboarding (unbekannt → Standard). */
 export function normalizeOnboardingDesignTheme(value: unknown, fallback: DesignTheme): DesignTheme {
-  return typeof value === "string" && (DESIGN_THEMES as readonly string[]).includes(value) ? (value as DesignTheme) : fallback;
+  return "aurora";
 }
 
 /* ==================== Abschluss ==================== */
