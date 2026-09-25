@@ -38,6 +38,7 @@ import { describeLlmError } from "@/lib/llm-error-logic";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { SecretsPanel } from "@/components/secrets/secrets-panel";
+import { AgentLoopStreamPanel } from "@/components/glass/agent-loop-stream-panel";
 import { useStudioSettings } from "@/lib/studio-settings";
 import { addSoftBreakOpportunities } from "@/lib/text-wrap-logic";
 
@@ -83,6 +84,8 @@ export default function SuperagentScreen() {
   const runMutation = trpc.orchestrator.run.useMutation();
   const { settings: studioSettings } = useStudioSettings();
   const [vaultOpen, setVaultOpen] = useState(false);
+  // Sprint 354 — Live-Telemetrie-Panel (SSE-Stream aus Sprint 353) einklappbar.
+  const [loopPanelOpen, setLoopPanelOpen] = useState(false);
   const toolsQuery = trpc.orchestrator.tools.useQuery(undefined, { enabled: isAdmin });
 
   // Sprint 197 — Optimizer ist NICHT mehr in der UI vertreten. Er laeuft
@@ -282,9 +285,14 @@ export default function SuperagentScreen() {
             <Text style={styles.toolCountText} numberOfLines={1}>
               {toolCount > 0 ? `${toolCount} TOOLS BEREIT · OPTIMIZER IM HINTERGRUND` : "OPTIMIZER IM HINTERGRUND"}
             </Text>
-            <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
-              <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
-            </Pressable>
+            <View style={styles.chipRow}>
+              <Pressable style={styles.vaultChip} onPress={() => setLoopPanelOpen((open) => !open)}>
+                <Text style={styles.vaultChipText}>{loopPanelOpen ? "LOOP-TELEMETRIE · AN" : "LOOP-TELEMETRIE"}</Text>
+              </Pressable>
+              <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
+                <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Sprint 167: Secrets-Bereich des Superagenten-Chats */}
@@ -308,6 +316,9 @@ export default function SuperagentScreen() {
               </ScrollView>
             </View>
           </Modal>
+
+          {/* Sprint 354 — Live-Telemetrie des Agentic-Loop (Echtzeit-SSE). */}
+          {loopPanelOpen && <AgentLoopStreamPanel sessionId="superagent-loop-live" />}
 
           {/* Chat-Strom */}
           <FlatList
@@ -540,6 +551,10 @@ const styles = StyleSheet.create({
   githubConnectedDot: { position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: glassPalette.green },
   sendButtonDisabled: { opacity: 0.45 },
   sendButtonText: { color: glassDepth.void, fontWeight: "900", fontSize: 16 },
+  chipRow: {
+    flexDirection: "row",
+    gap: 8,
+  } as const,
   vaultChip: {
     alignSelf: "flex-start",
     borderRadius: glassRadii.pill,
