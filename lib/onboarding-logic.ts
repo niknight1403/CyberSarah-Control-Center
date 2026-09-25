@@ -101,7 +101,7 @@ export type OnboardingThemeChoice = {
   theme: DesignTheme;
   label: string;
   description: string;
-  icon: "bolt.fill" | "chart.bar.fill" | "sparkles" | "wand.and.stars";
+  icon: ReturnType<typeof designThemeIcon>;
 };
 
 /**

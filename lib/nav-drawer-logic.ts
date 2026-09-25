@@ -16,7 +16,6 @@ export type DrawerRoute =
   | "/ideas"
   | "/decisions"
   | "/superagent"
-  | "/designer"
   | "/plugins"
   | "/meetings"
   | "/cyber-terminal"
@@ -59,7 +58,6 @@ export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", badge: "Neu" },
   { route: "/decisions", title: "Entscheidungs-Journal", icon: "tablecells.fill" },
   { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
-  { route: "/designer", title: "Designer", icon: "paintpalette.fill", badge: "KI" },
   { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },
   { route: "/meetings", title: "Meetings", icon: "video.fill", badge: "Neu" },
   // Sprint 199: ehemals sichtbare Tabs — jetzt hier, damit die Tab-Leiste schlank bleibt.

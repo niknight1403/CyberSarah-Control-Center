@@ -13,7 +13,6 @@ import { memoryRouter } from "./memory-router";
 import { meteringRouter } from "./metering-router";
 import { mcpRouter } from "./mcp-router";
 import { orchestratorRouter } from "./orchestrator-router";
-import { designRouter } from "./design/design-router";
 import { monetizationRouter } from "./monetization-router";
 import { crashReportingRouter, selfHealingRouter } from "./self-healing-router";
 import { projectsRouter } from "./projects-router";
@@ -31,6 +30,7 @@ import { emailRouter } from "./email-router";
 import { analyticsRouter } from "./analytics-router";
 import { externalActionsRouter } from "./external-actions-router";
 import { influencerRouter } from "./influencer-router";
+import { draftEngineRouter } from "./draft-engine-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -52,7 +52,6 @@ export const appRouter = router({
   metering: meteringRouter,
   mcp: mcpRouter,
   orchestrator: orchestratorRouter,
-  design: designRouter,
   monetization: monetizationRouter,
   selfHealing: selfHealingRouter,
   crashReporting: crashReportingRouter,
@@ -67,6 +66,7 @@ export const appRouter = router({
   secrets: secretsRouter,
   wix: wixRouter,
   influencer: influencerRouter,
+  draftEngine: draftEngineRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.

@@ -8,8 +8,8 @@ describe("design theme logic", () => {
     for (const legacy of ["neon", "slate", "glass", "ember", "forest", "aurora", undefined, "unexpected"]) expect(normalizeDesignTheme(legacy)).toBe("pulse");
   });
 
-  it("exposes the new Neon design choices", () => {
-    expect(DESIGN_THEMES).toEqual(["pulse", "orbit", "synthwave", "minimal"]);
+  it("exposes die Neon- und magischen Design-Auswahlen (Sprint 350)", () => {
+    expect(DESIGN_THEMES).toEqual(["pulse", "orbit", "synthwave", "minimal", "oracle", "borealis", "quantum", "nebula", "phoenix"]);
     expect(DESIGN_THEME_STORAGE_KEY).toBe("cybersarah.design-theme.v5");
     expect(designThemeLabel("pulse")).toBe("Neon Pulse");
     expect(designThemeLabel("orbit")).toBe("Cyber Orbit");

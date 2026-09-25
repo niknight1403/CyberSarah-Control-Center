@@ -92,6 +92,73 @@ export const DesignThemeDefinitions: Record<DesignTheme, DesignThemeDefinition> 
     },
     effects: effects("rgba(0,245,212,.4)", "rgba(0,245,155,.22)", "#061513", "#0C2420", "4px"),
   },
+  // Sprint 350 — Fuenf magische Themen: Aurum Oracle, Aurora Veil, Quantum
+  // Rift, Nebula Drift, Phoenix Ember. Volle 14-Token-Decke fuer light+dark.
+  oracle: {
+    light: {
+      background: "#FBF6E9", backgroundElevated: "#F5EEDC", surface: "#FDFAF2", surfaceStrong: "#F2EAD5",
+      border: "#E5C86B", foreground: "#221A0E", primary: "#B8860B", muted: "#6E6250", icon: "#5D5344",
+      success: "#2E7D4F", warning: "#B07400", error: "#C04545", accent: "#5B4BC9", shadow: "rgba(34, 26, 14, 0.16)",
+    },
+    dark: {
+      background: "#0B0A14", backgroundElevated: "#141222", surface: "#191730", surfaceStrong: "#231F42",
+      border: "#F5C542", foreground: "#F7F1DE", primary: "#F5C542", muted: "#A99F8A", icon: "#C4B48C",
+      success: "#77D9A0", warning: "#F6C96B", error: "#FF8B8B", accent: "#8E7BFF", shadow: "rgba(6, 5, 14, 0.58)",
+    },
+    effects: effects("rgba(245,197,66,.45)", "rgba(142,123,255,.30)", "#0B0A14", "#191730"),
+  },
+  borealis: {
+    light: {
+      background: "#EAFBF4", backgroundElevated: "#DDF5ED", surface: "#F5FEFA", surfaceStrong: "#D2F1E6",
+      border: "#6FE8C4", foreground: "#0A211C", primary: "#0FA97A", muted: "#4E6E65", icon: "#3E5B54",
+      success: "#0A9B5C", warning: "#B57E00", error: "#D64D66", accent: "#6F7BE0", shadow: "rgba(10, 33, 28, 0.14)",
+    },
+    dark: {
+      background: "#04121A", backgroundElevated: "#071B26", surface: "#0A222E", surfaceStrong: "#0F2E3C",
+      border: "#4FFFC1", foreground: "#EAFBF7", primary: "#4FFFC1", muted: "#8FB0AA", icon: "#74A79E",
+      success: "#4FFFC1", warning: "#F6D66B", error: "#FF7C8E", accent: "#9D8BFF", shadow: "rgba(2, 8, 12, 0.58)",
+    },
+    effects: effects("rgba(79,255,193,.42)", "rgba(157,139,255,.26)", "#04121A", "#0A222E"),
+  },
+  quantum: {
+    light: {
+      background: "#F0EDFE", backgroundElevated: "#E6E1FC", surface: "#FAF8FF", surfaceStrong: "#E9E3FF",
+      border: "#A79CFF", foreground: "#160F35", primary: "#5F45E4", muted: "#5F5786", icon: "#504975",
+      success: "#0F9D6B", warning: "#AE7600", error: "#CC4468", accent: "#2FC8E8", shadow: "rgba(22, 15, 53, 0.14)",
+    },
+    dark: {
+      background: "#0A0518", backgroundElevated: "#130A28", surface: "#190E38", surfaceStrong: "#22134A",
+      border: "#8E7BFF", foreground: "#F1ECFE", primary: "#8E7BFF", muted: "#9A90BD", icon: "#B3A9DE",
+      success: "#58E6A8", warning: "#F6C96B", error: "#FF6F8E", accent: "#2FC8E8", shadow: "rgba(5, 2, 12, 0.6)",
+    },
+    effects: effects("rgba(142,123,255,.48)", "rgba(47,200,232,.30)", "#0A0518", "#190E38"),
+  },
+  nebula: {
+    light: {
+      background: "#FCEEF8", backgroundElevated: "#F8E2F2", surface: "#FEF5FC", surfaceStrong: "#F4D9EE",
+      border: "#F49DE0", foreground: "#2B0E24", primary: "#C1299A", muted: "#7A5470", icon: "#694A62",
+      success: "#159A63", warning: "#B37700", error: "#CE4169", accent: "#7B5BE0", shadow: "rgba(43, 14, 36, 0.15)",
+    },
+    dark: {
+      background: "#120714", backgroundElevated: "#1B0C1F", surface: "#241029", surfaceStrong: "#321539",
+      border: "#FF5AD1", foreground: "#FBEFFA", primary: "#FF5AD1", muted: "#B18CAD", icon: "#D9A9C9",
+      success: "#6FE0A5", warning: "#F6C96B", error: "#FF8B9E", accent: "#7B5BE0", shadow: "rgba(8, 3, 9, 0.6)",
+    },
+    effects: effects("rgba(255,90,209,.44)", "rgba(123,91,224,.32)", "#120714", "#241029"),
+  },
+  phoenix: {
+    light: {
+      background: "#FFF1E8", backgroundElevated: "#FBE4D6", surface: "#FFF8F2", surfaceStrong: "#F7DAC9",
+      border: "#F2A06B", foreground: "#2A1409", primary: "#D45E0E", muted: "#77604F", icon: "#67513F",
+      success: "#1E9356", warning: "#B26E00", error: "#C43B4B", accent: "#E0435E", shadow: "rgba(42, 20, 9, 0.15)",
+    },
+    dark: {
+      background: "#140805", backgroundElevated: "#1F0E08", surface: "#29130B", surfaceStrong: "#38190E",
+      border: "#FF7A3D", foreground: "#FFF0E4", primary: "#FF7A3D", muted: "#BD9C86", icon: "#D9B299",
+      success: "#74E09A", warning: "#F6BA5E", error: "#FF6B6B", accent: "#E0435E", shadow: "rgba(9, 4, 2, 0.6)",
+    },
+    effects: effects("rgba(255,122,61,.48)", "rgba(224,67,94,.32)", "#140805", "#29130B"),
+  },
 };
 
 export function resolveDesignPalette(designTheme: DesignTheme, scheme: ColorScheme): DesignPalette {
