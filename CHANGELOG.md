@@ -3,6 +3,14 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 366: Publishing-Logik fuer ALLE 5 Plattformen finalisiert — Instagram & TikTok live-faehig
+
+- **Instagram-Adapter (Graph-API, 2-Schritt)**: Container anlegen (image_url + Caption) -> media_publish; live nur mit Token + IG-User-ID + Asset-URL (Env INSTAGRAM_PUBLISH_TOKEN, INSTAGRAM_PUBLISH_USER_ID)
+- **TikTok-Adapter (Content-Posting-API)**: PULL_FROM_URL aus gehosteter Video-URL (.mp4) mit Titel und Privacy-Level (Default SELF_ONLY); live nur mit Token + Asset-URL (Env TIKTOK_PUBLISH_TOKEN)
+- **Asset-Pipeline** (Migration 0010: publishingJobs.asset_url): optionale Asset-URL je Kampagne (enqueueCampaign) oder nachtraeglich pro Job (tRPC publishing.setAsset, nur im Status geplant, nur gueltige http(s)-URLs); Medien-Jobs ohne Asset bleiben ehrlich im Sandbox-Modus mit klar benanntem Grund — kein Blind-Post
+- **Modus-Aufloesung ehrlich pro Job**: X/LinkedIn/Threads live mit Token (LinkedIn zusaetzlich Person-URN, Threads zusaetzlich User-ID), Instagram/TikTok live nur mit Token UND Asset; alle Base-URLs via Env ueberschreibbar (X_API_BASE_URL etc.) — E2E-testbar ohne echte APIs
+- **E2E-Vollautomatik verifiziert** (lokale Mock-APIs als echte HTTP-Endpunkte): Autopilot veroeffentlichte 5/5 Jobs live (x-mock-123, li-mock-456, th-mock-789, ig-publish-42 via 2-Schritt, tt-mock-999 via PULL_FROM_URL), IG-ohne-Asset blieb ehrlich sandbox_veroeffentlicht mit Grund; 2188 Tests gruen, verify:system GREEN mit 18 Kernmodulen
+
 ## 25.09.2026 — Sprint 365: Autonomes Social-Media-Publishing — Warteschlange, Autopilot & ehrliche Live-/Sandbox-Modi
 
 - **Publishing-Tabelle** (Migration 0009): `publishingJobs` je Nutzer mit Status-Enum (geplant, sandbox_veroeffentlicht, veroeffentlicht, fehlgeschlagen, abgebrochen), Queue-Index (Nutzer, Status, Zeitpunkt) und Uniqueness je Kampagnen-Slot (Produkt x Persona x Plattform x Tag) — doppelte Einreihung ist damit ausgeschlossen

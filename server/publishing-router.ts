@@ -6,6 +6,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import {
   cancelPublishingJob,
+  setPublishingJobAsset,
   enqueueCampaignForUser,
   getPublishingModeOverview,
   listPublishingJobsForUser,
@@ -19,6 +20,7 @@ export const publishingRouter = router({
         product: z.string().trim().min(3).max(500),
         goal: z.enum(["aufmerksamkeit", "wachstum", "umsatz"]),
         days: z.number().int().min(1).max(30).optional(),
+        assetUrl: z.string().url().max(1000).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -26,6 +28,7 @@ export const publishingRouter = router({
         product: input.product,
         goal: input.goal,
         days: input.days,
+        assetUrl: input.assetUrl,
       });
       return {
         planned: result.planned,
@@ -61,6 +64,10 @@ export const publishingRouter = router({
         modes,
       };
     }),
+
+  setAsset: protectedProcedure
+    .input(z.object({ jobId: z.number().int().positive(), assetUrl: z.string().url().max(1000) }))
+    .mutation(async ({ ctx, input }) => ({ updated: await setPublishingJobAsset(ctx.user.openId, input.jobId, input.assetUrl) })),
 
   cancel: protectedProcedure
     .input(z.object({ jobId: z.number().int().positive() }))

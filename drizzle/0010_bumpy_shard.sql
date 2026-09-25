@@ -1,0 +1,1 @@
+ALTER TABLE "publishingJobs" ADD COLUMN "asset_url" text;

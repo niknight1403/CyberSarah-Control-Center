@@ -56,15 +56,31 @@ describe("publishing queue logic (Sprint 365)", () => {
 
     const sandbox = resolvePublishingMode("x", {});
     expect(sandbox.mode).toBe("sandbox");
-    expect(sandbox.reason).toContain("Kein X-Token");
-
-    const ig = resolvePublishingMode("instagram", {});
-    expect(ig.mode).toBe("sandbox");
-    expect(ig.reason).toContain("mehrstufige Medien-Uploads");
+    expect(sandbox.reason).toContain("Kein x-Token");
 
     const li = resolvePublishingMode("linkedin", { linkedin: { token: "tok" } });
     expect(li.mode).toBe("sandbox");
     expect(li.reason).toContain("LinkedIn");
+
+    const th = resolvePublishingMode("threads", { threads: { token: "tok" } });
+    expect(th.mode).toBe("sandbox");
+    expect(th.reason).toContain("Threads");
+  });
+
+  it("Medien-Plattformen (Sprint 366): live nur mit Token UND Asset", () => {
+    const igCred = { instagram: { token: "tok", endpointUserId: "1789001" } };
+    expect(resolvePublishingMode("instagram", igCred).mode).toBe("sandbox"); // ohne Asset
+    expect(resolvePublishingMode("instagram", igCred, { hasAsset: true }).mode).toBe("live");
+    expect(resolvePublishingMode("instagram", igCred).reason).toContain("Asset-URL");
+
+    const igNoUser = resolvePublishingMode("instagram", { instagram: { token: "tok" } }, { hasAsset: true });
+    expect(igNoUser.mode).toBe("sandbox");
+    expect(igNoUser.reason).toContain("IG-User-ID");
+
+    const ttCred = { tiktok: { token: "tok" } };
+    expect(resolvePublishingMode("tiktok", ttCred, { hasAsset: true }).mode).toBe("live");
+    expect(resolvePublishingMode("tiktok", ttCred).mode).toBe("sandbox");
+    expect(resolvePublishingMode("tiktok", {}).reason).toContain("TIKTOK_PUBLISH_TOKEN");
   });
 
   it("schaltet den Autopilot per Env-Flag aus", () => {

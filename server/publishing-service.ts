@@ -54,6 +54,11 @@ export function readPlatformCredentialsFromEnv(): PlatformCredentials {
       process.env.THREADS_PUBLISH_TOKEN && process.env.THREADS_PUBLISH_USER_ID
         ? { token: process.env.THREADS_PUBLISH_TOKEN, endpointUserId: process.env.THREADS_PUBLISH_USER_ID }
         : undefined,
+    instagram:
+      process.env.INSTAGRAM_PUBLISH_TOKEN && process.env.INSTAGRAM_PUBLISH_USER_ID
+        ? { token: process.env.INSTAGRAM_PUBLISH_TOKEN, endpointUserId: process.env.INSTAGRAM_PUBLISH_USER_ID }
+        : undefined,
+    tiktok: process.env.TIKTOK_PUBLISH_TOKEN ? { token: process.env.TIKTOK_PUBLISH_TOKEN } : undefined,
   };
 }
 
@@ -75,7 +80,7 @@ async function insertPlannedJobs(rows: InsertPublishingJobRow[]): Promise<number
 
 export async function enqueueCampaignForUser(
   userOpenId: string,
-  input: { product: string; goal: InfluencerGoal; days?: number }
+  input: { product: string; goal: InfluencerGoal; days?: number; assetUrl?: string | null }
 ): Promise<{ planned: number; inserted: number; focusPersona: string; firstSlotAt: Date }> {
   if (!userOpenId) throw new Error("Nutzerkontext fehlt — Kampagne nicht einreihbar.");
   const plan = planInfluencerCampaign(input.product, input.goal, { days: input.days });
@@ -89,6 +94,7 @@ export async function enqueueCampaignForUser(
     campaignDay: job.campaignDay,
     dedupeKey: job.dedupeKey,
     scheduledFor: job.scheduledFor,
+    assetUrl: input.assetUrl ?? null,
   }));
   const inserted = await insertPlannedJobs(rows);
   return {
@@ -97,6 +103,30 @@ export async function enqueueCampaignForUser(
     focusPersona: plan.focusPersona,
     firstSlotAt: rows.length ? rows[0].scheduledFor : new Date(),
   };
+}
+
+
+export async function setPublishingJobAsset(
+  userOpenId: string,
+  jobId: number,
+  assetUrl: string
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const url = assetUrl.trim();
+  if (!/^https?:\/\/.+/.test(url)) return false;
+  const updated = await db
+    .update(publishingJobs)
+    .set({ assetUrl: url, updatedAt: new Date() })
+    .where(
+      and(
+        eq(publishingJobs.id, jobId),
+        eq(publishingJobs.userOpenId, userOpenId),
+        eq(publishingJobs.status, "geplant")
+      )
+    )
+    .returning({ id: publishingJobs.id });
+  return updated.length > 0;
 }
 
 export async function listPublishingJobsForUser(
@@ -173,9 +203,11 @@ async function generateJobContent(job: PublishingJobRow): Promise<string> {
 
 function platformClient(platform: string, token: string): AxiosInstance {
   const baseURLs: Record<string, string> = {
-    x: "https://api.x.com/2",
-    linkedin: "https://api.linkedin.com/v2",
-    threads: "https://graph.threads.net/v1.0",
+    x: process.env.X_API_BASE_URL ?? "https://api.x.com/2",
+    linkedin: process.env.LINKEDIN_API_BASE_URL ?? "https://api.linkedin.com/v2",
+    threads: process.env.THREADS_API_BASE_URL ?? "https://graph.threads.net/v1.0",
+    instagram: process.env.INSTAGRAM_API_BASE_URL ?? "https://graph.facebook.com/v21.0",
+    tiktok: process.env.TIKTOK_API_BASE_URL ?? "https://open.tiktokapis.com/v2",
   };
   return create({
     baseURL: baseURLs[platform],
@@ -184,11 +216,12 @@ function platformClient(platform: string, token: string): AxiosInstance {
   });
 }
 
-/** Ein-Schritt-Live-Publishing fuer Text-Plattformen. Wirft bei Fehlern ehrlich. */
+/** Live-Publishing fuer alle Plattformen (Text einstufig, IG 2-Schritt, TikTok PULL_FROM_URL). Wirft bei Fehlern ehrlich. */
 async function publishLive(
   platform: string,
   content: string,
-  credentials: PlatformCredentials
+  credentials: PlatformCredentials,
+  assetUrl?: string | null
 ): Promise<{ externalId: string }> {
   const cred = credentials[platform as keyof PlatformCredentials];
   if (!cred?.token) throw new Error(`Kein ${platform}-Token — Live-Publishing nicht moeglich.`);
@@ -219,6 +252,34 @@ async function publishLive(
       params: { access_token: cred.token, text: content.slice(0, 500), media_type: "TEXT" },
     });
     return { externalId: String(response.data?.id ?? "threads-unknown") };
+  }
+  if (platform === "instagram") {
+    // Graph-API 2-Schritt: Container anlegen, dann veroeffentlichen (Sprint 366).
+    if (!cred.endpointUserId) throw new Error("Instagram-User-ID fehlt (INSTAGRAM_PUBLISH_USER_ID).");
+    if (!assetUrl) throw new Error("Instagram braucht eine Asset-URL (Bild) — Job ohne Asset nicht live.");
+    const container = await client.post(`/${cred.endpointUserId}/media`, null, {
+      params: { access_token: cred.token, image_url: assetUrl, caption: content.slice(0, 2200) },
+    });
+    const containerId = container.data?.id;
+    if (!containerId) throw new Error("Instagram-Container konnte nicht angelegt werden — keine Container-ID.");
+    const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
+      params: { access_token: cred.token, creation_id: containerId },
+    });
+    return { externalId: String(publish.data?.id ?? `ig-${containerId}`) };
+  }
+  if (platform === "tiktok") {
+    // Content-Posting-API mit PULL_FROM_URL: Video muss als URL erreichbar sein (Sprint 366).
+    if (!assetUrl) throw new Error("TikTok braucht eine gehostete Video-URL (.mp4) — Job ohne Asset nicht live.");
+    const response = await client.post("/post/publish/video/init/", {
+      post_info: {
+        title: content.slice(0, 90),
+        privacy_level: "SELF_ONLY",
+        source_info: { source: "PULL_FROM_URL", video_url: assetUrl },
+      },
+    });
+    const publishId = response.data?.data?.publish_id;
+    if (!publishId) throw new Error("TikTok-Publish konnte nicht initialisiert werden — keine publish_id.");
+    return { externalId: String(publishId) };
   }
   throw new Error(`Kein Live-Adapter fuer "${platform}" — Plattform unterstuetzt nur Sandbox.`);
 }
@@ -252,12 +313,12 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
   for (const job of due) {
     if (!isJobDue(job, now)) continue;
     outcome.processed += 1;
-    const resolution = resolvePublishingMode(job.platform, credentials);
+    const resolution = resolvePublishingMode(job.platform, credentials, { hasAsset: Boolean(job.assetUrl) });
 
     try {
       const content = await generateJobContent(job);
       if (resolution.mode === "live") {
-        const { externalId } = await publishLive(job.platform, content, credentials);
+        const { externalId } = await publishLive(job.platform, content, credentials, job.assetUrl);
         await db
           .update(publishingJobs)
           .set({
@@ -349,7 +410,8 @@ export function getPublishingModeOverview(): Record<string, { mode: PublishingMo
   const credentials = readPlatformCredentialsFromEnv();
   const overview: Record<string, { mode: PublishingMode; reason: string }> = {};
   for (const platform of ["instagram", "tiktok", "linkedin", "x", "threads"]) {
-    const resolution = resolvePublishingMode(platform, credentials);
+    // Uebersicht zeigt den Modus MIT Asset (Kontext: Medien-Jobs brauchen eines)
+    const resolution = resolvePublishingMode(platform, credentials, { hasAsset: true });
     overview[platform] = { mode: resolution.mode, reason: resolution.reason };
   }
   return overview;

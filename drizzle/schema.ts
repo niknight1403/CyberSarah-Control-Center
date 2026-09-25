@@ -309,6 +309,7 @@ export const publishingJobs = pgTable(
     lastError: text("last_error"),
     mode: text("mode"),
     externalId: text("external_id"),
+    assetUrl: text("asset_url"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

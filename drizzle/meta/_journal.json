@@ -71,6 +71,13 @@
       "when": 1790302375704,
       "tag": "0009_nifty_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790304087679,
+      "tag": "0010_bumpy_shard",
+      "breakpoints": true
     }
   ]
 }

@@ -12,9 +12,10 @@
  *     Modus steht in jedem Job und wird nie als Live-Erfolg ausgegeben.
  *   - Live-Publishing braucht Nutzer-Credentials in Env-Variablen; ohne
  *     sie wird nicht getan, als waeren sie da.
- *   - Instagram/TikTok erfordern Medien-Uploads mehrstufiger APIs: diese
- *     Plattformen bleiben im Sandbox-Modus, bis ein Medien-Pfad konfiguriert
- *     ist, und melden das als ehrlichen Grund.
+ *   - Instagram (Graph-API, 2-Schritt: Container -> media_publish) und TikTok
+ *     (Content-Posting-API, PULL_FROM_URL) sind vollstaendig implementiert und
+ *     gehen live, wenn Token + Asset-URL vorliegen; ohne Asset bleibt es
+ *     ehrlicher Sandbox-Modus mit klar benanntem Grund.
  */
 
 import type { CampaignPlan, InfluencerGoal } from "./influencer-reach-logic";
@@ -35,7 +36,7 @@ export const MEDIA_PLATFORMS = ["instagram", "tiktok"] as const;
 
 /** Plattform-Credentials (aus Env, niemals aus der DB). */
 export type PlatformCredentials = Partial<
-  Record<"linkedin" | "x" | "threads", { token: string; endpointUserId?: string }>
+  Record<"linkedin" | "x" | "threads" | "instagram" | "tiktok", { token: string; endpointUserId?: string }>
 >;
 
 export type PlannedPublishJob = {
@@ -99,29 +100,31 @@ export type ModeResolution = {
 
 /**
  * Löst den Publishing-Modus pro Plattform auf — ehrlich statt optimistisch:
- * live nur mit vollstaendigen Credentials und nur fuer Text-Plattformen mit
- * einschrittiger API; sonst Sandbox mit klar benanntem Grund.
+ * live nur mit vollstaendigen Credentials. Text-Plattformen (X, LinkedIn,
+ * Threads) brauchen nur den Token; Medien-Plattformen (Instagram, TikTok)
+ * brauchen zusaetzlich ein Asset (Bild-URL bzw. gehostetes Video), sonst
+ * Sandbox mit klar benanntem Grund — kein Live ohne Asset.
  */
 export function resolvePublishingMode(
   platform: string,
-  credentials: PlatformCredentials
+  credentials: PlatformCredentials,
+  options: { hasAsset?: boolean } = {}
 ): ModeResolution {
   const cred = credentials[platform as keyof PlatformCredentials];
-  if ((MEDIA_PLATFORMS as readonly string[]).includes(platform)) {
-    return {
-      mode: "sandbox",
-      platform,
-      reason: `${platform} benoetigt mehrstufige Medien-Uploads (Asset-Pipeline) — bleibt im Sandbox-Modus, bis diese konfiguriert ist.`,
-    };
-  }
-  if (!(TEXT_PLATFORMS as readonly string[]).includes(platform)) {
+  const isMedia = (MEDIA_PLATFORMS as readonly string[]).includes(platform);
+  const isText = (TEXT_PLATFORMS as readonly string[]).includes(platform);
+
+  if (!isMedia && !isText) {
     return { mode: "sandbox", platform, reason: `Unbekannte Plattform "${platform}" — Sandbox statt Blindflug.` };
   }
   if (!cred?.token) {
+    const envName = isMedia
+      ? `${platform === "instagram" ? "INSTAGRAM" : "TIKTOK"}_PUBLISH_TOKEN`
+      : `${platform.toUpperCase()}_PUBLISH_TOKEN`;
     return {
       mode: "sandbox",
       platform,
-      reason: `Kein ${platform.toUpperCase()}-Token in der Umgebung (Env ${platform.toUpperCase()}_PUBLISH_TOKEN) — Sandbox statt Vortaeuschung.`,
+      reason: `Kein ${platform}-Token in der Umgebung (Env ${envName}) — Sandbox statt Vortaeuschung.`,
     };
   }
   if (platform === "linkedin" && !cred.endpointUserId) {
@@ -130,6 +133,30 @@ export function resolvePublishingMode(
       platform,
       reason: "LinkedIn braucht neben dem Token die Autorisierungs-Person (Env LINKEDIN_PUBLISH_USER_URN) — Sandbox.",
     };
+  }
+  if (platform === "threads" && !cred.endpointUserId) {
+    return {
+      mode: "sandbox",
+      platform,
+      reason: "Threads braucht neben dem Token die User-ID (Env THREADS_PUBLISH_USER_ID) — Sandbox.",
+    };
+  }
+  if (isMedia && !cred.endpointUserId && platform === "instagram") {
+    return {
+      mode: "sandbox",
+      platform,
+      reason: "Instagram braucht neben dem Token die IG-User-ID (Env INSTAGRAM_PUBLISH_USER_ID) — Sandbox.",
+    };
+  }
+  if (isMedia) {
+    if (!options.hasAsset) {
+      return {
+        mode: "sandbox",
+        platform,
+        reason: `${platform} ist ein Medien-Post ohne Asset-URL — Sandbox statt Blind-Post; Asset per enqueueCampaign oder Job-Update setzen.`,
+      };
+    }
+    return { mode: "live", platform, reason: `Credentials und Asset vorhanden — Live-Publishing auf ${platform}.` };
   }
   return { mode: "live", platform, reason: `Credentials vollstaendig — Live-Publishing auf ${platform}.` };
 }
