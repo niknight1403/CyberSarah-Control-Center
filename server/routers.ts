@@ -31,6 +31,7 @@ import { analyticsRouter } from "./analytics-router";
 import { externalActionsRouter } from "./external-actions-router";
 import { influencerRouter } from "./influencer-router";
 import { draftEngineRouter } from "./draft-engine-router";
+import { pillarsRouter } from "./pillars-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -67,6 +68,7 @@ export const appRouter = router({
   wix: wixRouter,
   influencer: influencerRouter,
   draftEngine: draftEngineRouter,
+  pillars: pillarsRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.
