@@ -15,6 +15,7 @@ on:
           - chat-clear-delete
           - publishing-enqueue-live-test
           - publishing-status
+          - publishing-diagnose
         default: chat-clear-preview
 
 permissions:

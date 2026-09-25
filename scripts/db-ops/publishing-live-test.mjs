@@ -88,9 +88,35 @@ async function status() {
   }
 }
 
+
+async function diagnose() {
+  const client = await pool.connect();
+  try {
+    const info = await client.query(
+      "SELECT current_database() AS db, current_user AS usr, inet_server_addr()::text AS host, current_setting('search_path', true) AS search_path",
+    );
+    console.log("[db-ops] Ziel-DB:", JSON.stringify(info.rows[0]));
+    const tables = await client.query(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
+    );
+    console.log("[db-ops] public-Tabellen (" + tables.rows.length + "):", tables.rows.map((r) => r.table_name).join(", "));
+    const journal = await client.query(
+      "SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 5",
+    ).catch((err) => ({ rows: [], journalError: err.message }));
+    if (journal.journalError) {
+      console.log("[db-ops] Kein Drizzle-Journal:", journal.journalError);
+    } else {
+      console.log("[db-ops] Journal (neueste 5):", journal.rows.map((r) => r.hash.slice(0, 16)).join(", "));
+    }
+  } finally {
+    client.release();
+  }
+}
+
 try {
   if (OP === "publishing-enqueue-live-test") await enqueue();
   else if (OP === "publishing-status") await status();
+  else if (OP === "publishing-diagnose") await diagnose();
   else {
     console.error(`[db-ops] Unbekannte Publishing-Operation: ${OP}`);
     process.exit(1);
