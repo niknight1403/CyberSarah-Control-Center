@@ -271,6 +271,8 @@ function makeAppEnvBuilder(databaseUrl) {
     "INSTAGRAM_PUBLISH_TOKEN",
     "INSTAGRAM_PUBLISH_USER_ID",
     "TIKTOK_PUBLISH_TOKEN",
+    "BLUESKY_APP_PASSWORD",
+    "BLUESKY_IDENTIFIER",
     "PUBLIC_APP_ORIGIN",
   ]) {
     const value = env(key, "").trim();

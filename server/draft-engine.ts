@@ -37,7 +37,7 @@ const CONTENT_TOPIC_SEEDS = [
   "Creator-Wirtschaft: Aufmerksamkeit planbar machen",
 ] as const;
 
-const CONTENT_PLATFORMS = ["instagram", "tiktok", "linkedin", "x", "threads"] as const;
+const CONTENT_PLATFORMS = ["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"] as const;
 
 function seedIndexForDay(nowMs: number, offset: number): number {
   return Math.floor(nowMs / 86_400_000 + offset) % CONTENT_TOPIC_SEEDS.length;

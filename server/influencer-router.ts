@@ -14,7 +14,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 const personaIdSchema = z.enum(
   INFLUENCER_PERSONAS.map((persona) => persona.id) as [InfluencerPersonaId, ...InfluencerPersonaId[]]
 );
-const platformSchema = z.enum(["instagram", "tiktok", "linkedin", "x", "threads"]);
+const platformSchema = z.enum(["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"]);
 
 export const influencerRouter = router({
   personas: protectedProcedure.query(() => INFLUENCER_PERSONAS),

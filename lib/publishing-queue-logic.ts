@@ -31,12 +31,12 @@ export type PublishingStatus = (typeof PUBLISHING_STATUSES)[number];
 
 export const MAX_PUBLISH_ATTEMPTS = 3;
 export const RETRY_BACKOFF_MINUTES = [10, 60, 360] as const;
-export const TEXT_PLATFORMS = ["linkedin", "x", "threads"] as const;
+export const TEXT_PLATFORMS = ["linkedin", "x", "threads", "bluesky"] as const;
 export const MEDIA_PLATFORMS = ["instagram", "tiktok"] as const;
 
 /** Plattform-Credentials (aus Env, niemals aus der DB). */
 export type PlatformCredentials = Partial<
-  Record<"linkedin" | "x" | "threads" | "instagram" | "tiktok", { token: string; endpointUserId?: string }>
+  Record<"linkedin" | "x" | "threads" | "bluesky" | "instagram" | "tiktok", { token: string; endpointUserId?: string }>
 >;
 
 export type PlannedPublishJob = {
@@ -132,6 +132,13 @@ export function resolvePublishingMode(
       mode: "sandbox",
       platform,
       reason: "LinkedIn braucht neben dem Token die Autorisierungs-Person (Env LINKEDIN_PUBLISH_USER_URN) — Sandbox.",
+    };
+  }
+  if (platform === "bluesky" && !cred.endpointUserId) {
+    return {
+      mode: "sandbox",
+      platform,
+      reason: "Bluesky braucht neben dem App-Passwort den Handle (Env BLUESKY_IDENTIFIER) — Sandbox.",
     };
   }
   if (platform === "threads" && !cred.endpointUserId) {

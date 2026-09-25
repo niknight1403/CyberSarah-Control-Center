@@ -62,7 +62,16 @@ describe("publishing queue logic (Sprint 365)", () => {
     expect(li.mode).toBe("sandbox");
     expect(li.reason).toContain("LinkedIn");
 
-    const th = resolvePublishingMode("threads", { threads: { token: "tok" } });
+    // Sprint 372: Bluesky (AT Protocol, kostenlos) als X-Alternative
+  const bsFull = { bluesky: { token: "app-password", endpointUserId: "handle.bsky.social" } };
+  expect(resolvePublishingMode("bluesky", bsFull).mode).toBe("live");
+  expect(resolvePublishingMode("bluesky", {}).mode).toBe("sandbox");
+  expect(resolvePublishingMode("bluesky", {}).reason).toContain("BLUESKY");
+  const bsNoHandle = resolvePublishingMode("bluesky", { bluesky: { token: "app-password" } });
+  expect(bsNoHandle.mode).toBe("sandbox");
+  expect(bsNoHandle.reason).toContain("BLUESKY_IDENTIFIER");
+
+  const th = resolvePublishingMode("threads", { threads: { token: "tok" } });
     expect(th.mode).toBe("sandbox");
     expect(th.reason).toContain("Threads");
   });

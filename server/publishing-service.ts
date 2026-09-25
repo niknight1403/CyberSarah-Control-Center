@@ -80,6 +80,12 @@ export function readPlatformCredentialsFromEnv(): PlatformCredentials {
         ? { token: process.env.INSTAGRAM_PUBLISH_TOKEN, endpointUserId: process.env.INSTAGRAM_PUBLISH_USER_ID }
         : undefined,
     tiktok: process.env.TIKTOK_PUBLISH_TOKEN ? { token: process.env.TIKTOK_PUBLISH_TOKEN } : undefined,
+    // Sprint 372 (X-Alternative): Bluesky via AT Protocol — komplett
+    // kostenlos, kein Tier/Limit. Token = App-Passwort, User = Handle.
+    bluesky:
+      process.env.BLUESKY_APP_PASSWORD && process.env.BLUESKY_IDENTIFIER
+        ? { token: process.env.BLUESKY_APP_PASSWORD, endpointUserId: process.env.BLUESKY_IDENTIFIER }
+        : undefined,
   };
 }
 
@@ -291,6 +297,7 @@ async function generateJobContent(job: PublishingJobRow): Promise<string> {
 function platformClient(platform: string, token: string): AxiosInstance {
   const baseURLs: Record<string, string> = {
     x: process.env.X_API_BASE_URL ?? "https://api.x.com/2",
+    bluesky: process.env.BLUESKY_API_BASE_URL ?? "https://bsky.social/xrpc",
     linkedin: process.env.LINKEDIN_API_BASE_URL ?? "https://api.linkedin.com/v2",
     threads: process.env.THREADS_API_BASE_URL ?? "https://graph.threads.net/v1.0",
     instagram: process.env.INSTAGRAM_API_BASE_URL ?? "https://graph.facebook.com/v21.0",
@@ -316,6 +323,26 @@ async function publishLive(
   if (!cred?.token) throw new Error(`Kein ${platform}-Token — Live-Publishing nicht moeglich.`);
   const client = platformClient(platform, cred.token);
 
+  if (platform === "bluesky") {
+    // Sprint 372 (X-Alternative): Bluesky via AT Protocol — Session aus
+    // Handle + App-Passwort, dann createRecord. Komplett kostenlos.
+    const session = await client.post("/com.atproto.server.createSession", {
+      identifier: cred.endpointUserId,
+      password: cred.token,
+    });
+    const accessJwt = session.data?.accessJwt;
+    const did = session.data?.did;
+    if (!accessJwt || !did) {
+      throw new Error("Bluesky-Session ohne accessJwt/did — Live-Publishing nicht moeglich.");
+    }
+    const recordClient = platformClient("bluesky", accessJwt);
+    const response = await recordClient.post("/com.atproto.repo.createRecord", {
+      repo: did,
+      collection: "app.bsky.feed.post",
+      record: { text: content.slice(0, 300), createdAt: new Date().toISOString() },
+    });
+    return { externalId: String(response.data?.uri ?? "bluesky-unknown") };
+  }
   if (platform === "x") {
     // Sprint 370 (X-Auto-Refresh): bei 401 einmal frisch rotieren und neu
     // senden — ein zweiter 401 ist ein ehrlicher Fehler (kein Blind-Retry).
@@ -689,7 +716,7 @@ export async function runPublishingAutopilotTickOnce(): Promise<void> {
 export function getPublishingModeOverview(): Record<string, { mode: PublishingMode; reason: string }> {
   const credentials = readPlatformCredentialsFromEnv();
   const overview: Record<string, { mode: PublishingMode; reason: string }> = {};
-  for (const platform of ["instagram", "tiktok", "linkedin", "x", "threads"]) {
+  for (const platform of ["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"]) {
     // Uebersicht zeigt den Modus MIT Asset (Kontext: Medien-Jobs brauchen eines)
     const resolution = resolvePublishingMode(platform, credentials, { hasAsset: true });
     overview[platform] = { mode: resolution.mode, reason: resolution.reason };
