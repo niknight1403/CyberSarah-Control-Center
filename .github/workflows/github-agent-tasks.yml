@@ -1,0 +1,29 @@
+name: GitHub-Agenten-Tasks
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Jede Stunde
+  workflow_dispatch:     # Manuelle Auslösung
+
+jobs:
+  run-agent-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Run Agent Tasks
+        run: node -e "require('./modules/github-agent/agent-tasks').assignTasks();"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
