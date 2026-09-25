@@ -48,7 +48,7 @@ jobs:
           node chat-clear.mjs
 
       - name: Publishing Live-Test Operation (Sprint 370)
-        if: startsWith(github.event.inputs.operation, 'publishing-')
+        if: startsWith(github.event.inputs.operation, 'publishing-') || github.event.inputs.operation == 'x-diagnose'
         working-directory: scripts/db-ops
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
