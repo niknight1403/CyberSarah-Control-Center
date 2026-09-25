@@ -250,6 +250,14 @@ function makeAppEnvBuilder(databaseUrl) {
   // Sprint 367: Publishing-Tokens via GitHub Secrets — nur gesetzt, wenn das
   // Secret existiert (Modus-Aufloesung laesst Plattformen ohne Token im
   // ehrlichen Sandbox-Modus statt mit leerem Token zu scheitern).
+  // Sprint 369: Optionale KI-Provider-Keys (z. B. Hugging Face fuer den
+  // Model-Router) — nur gesetzt, wenn das GitHub-Secret existiert.
+  const aiProviderExtra = [];
+  for (const key of ["AI_HUGGINGFACE_API_KEY", "HF_TOKEN"]) {
+    const value = env(key, "").trim();
+    if (value) aiProviderExtra.push(`${key}=${value}`);
+  }
+
   const publishingExtra = [];
   for (const key of [
     "X_PUBLISH_TOKEN",
@@ -289,7 +297,7 @@ function makeAppEnvBuilder(databaseUrl) {
       stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
       stripeProductId: env("STRIPE_PRICE_ID"),
       trustProxy: env("TRUST_PROXY", "1"),
-      extra: [...workspaceExtra, ...publishingExtra],
+      extra: [...workspaceExtra, ...aiProviderExtra, ...publishingExtra],
     });
 }
 

@@ -74,6 +74,9 @@ jobs:
           # Secrets bleiben leer, der Router ignoriert inaktive Provider.
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Sprint 369: Hugging Face als optionaler KI-Provider (Model-Router).
+          AI_HUGGINGFACE_API_KEY: ${{ secrets.AI_HUGGINGFACE_API_KEY }}
+          HF_TOKEN: ${{ secrets.AI_HUGGINGFACE_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}

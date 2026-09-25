@@ -3,6 +3,13 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 369: Hugging Face als KI-Provider im Deploy verdrahtet
+
+- **Model-Router-Anbindung**: Der bestehende Model-Router (Zero-Cost + BYO) liest Hugging Face via AI_HUGGINGFACE_API_KEY/HF_TOKEN — der validierte HF-Token des Owners liegt jetzt als GitHub-Secret AI_HUGGINGFACE_API_KEY (whoami verifiziert, Account Niknight1981)
+- **Deploy-Sync erweitert**: render-deploy.mjs uebertraegt jetzt optionale KI-Provider-Keys (AI_HUGGINGFACE_API_KEY, HF_TOKEN) nur bei existierendem Secret an die Render-App; render-deploy.yml reicht das GitHub-Secret an den Deploy durch
+- **Ehrlich wie immer**: Ohne Secret bleibt HF einfach ein inaktiver Provider im Router — kein Deploy-Fehler, keine leeren Token im Live-Betrieb
+- **Regression gruen**: 38 Deploy-/Config-Tests, verify:system GREEN (18 Kernmodule, 280 Tests)
+
 ## 25.09.2026 — Sprint 368: Conversion-Loop — Insights fliesst in die Reichweiten-Engine zurueck
 
 - **Performance-Aggregation (reine Logik)**: computePersonaPerformance fasst Publishing-Jobs je Persona zusammen — nur Live-Publishes mit Insights zaehlen (reach/impressions), fehlgeschlagene/abgebrochene Jobs erzeugen eine Fehlerquote; Sandbox-Jobs liefern bewusst kein Signal
