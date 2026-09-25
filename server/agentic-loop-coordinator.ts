@@ -23,6 +23,14 @@ import {
   type IterationOutcome,
   type OutputValidator,
 } from "../lib/agentic-loop-logic";
+import {
+  buildIterationStartEvent,
+  buildLoopStartEvent,
+  buildReflectionFailedEvent,
+  buildTerminalEvent,
+  buildValidationSuccessEvent,
+} from "../lib/agentic-loop-telemetry-logic";
+import type { AgenticLoopTelemetryBus } from "./agentic-loop-telemetry";
 
 export type AgentStepFn = (
   iteration: number,
@@ -36,6 +44,10 @@ export type CoordinatorOptions = Partial<AgenticLoopConfig> & {
   agentStep: AgentStepFn;
   /** Injizierbare Uhr fuer deterministische Tests; Produktiv: Date.now. */
   now?: () => number;
+  /** Sprint 353 — optionale Telemetrie: gesetzt => Lifecycle-Events. */
+  telemetryBus?: AgenticLoopTelemetryBus;
+  sessionId?: string;
+  task?: string;
 };
 
 export type AgenticLoopRunResult = {
@@ -53,9 +65,18 @@ export async function runAgenticLoop(options: CoordinatorOptions): Promise<Agent
   let state = initAgenticLoopState();
   const startedAt = now();
   let consecutiveAgentErrors = 0;
+  const telemetry = options.telemetryBus && options.sessionId ? { bus: options.telemetryBus, sessionId: options.sessionId } : null;
+
+  if (telemetry) {
+    telemetry.bus.emit(telemetry.sessionId, buildLoopStartEvent(telemetry.sessionId, config, options.task ?? "Unbenannte Aufgabe"));
+  }
 
   while (shouldContinue(state, config, now() - startedAt)) {
     const remainingMs = config.timeoutMs - Math.max(now() - startedAt, state.elapsedMs);
+
+    if (telemetry) {
+      telemetry.bus.emit(telemetry.sessionId, buildIterationStartEvent(telemetry.sessionId, state.iteration + 1, state.reflectionContext));
+    }
 
     let output = "";
     let tokensUsed = 0;
@@ -101,6 +122,19 @@ export async function runAgenticLoop(options: CoordinatorOptions): Promise<Agent
       agentError,
     } satisfies IterationOutcome);
 
+    // Sprint 353 — Ergebnis-Telemetrie nach jedem Zyklus.
+    if (telemetry) {
+      const lastRecord = state.history[state.history.length - 1];
+      if (lastRecord) {
+        telemetry.bus.emit(
+          telemetry.sessionId,
+          lastRecord.valid
+            ? buildValidationSuccessEvent(telemetry.sessionId, lastRecord, output)
+            : buildReflectionFailedEvent(telemetry.sessionId, lastRecord, state.reflectionContext),
+        );
+      }
+    }
+
     // Resilienz-Buchhaltung: aufeinanderfolgende Abstuerze beenden hart.
     if (agentError) {
       consecutiveAgentErrors += 1;
@@ -138,6 +172,10 @@ export async function runAgenticLoop(options: CoordinatorOptions): Promise<Agent
     } else {
       state = { ...state, status: "failed", haltedReason: `Schleife uneroeffnet beendet (unerwarteter Zustand nach ${elapsed} ms).` };
     }
+  }
+
+  if (telemetry) {
+    telemetry.bus.emit(telemetry.sessionId, buildTerminalEvent(telemetry.sessionId, state));
   }
 
   return {

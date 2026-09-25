@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { runAgenticLoop } from "../server/agentic-loop-coordinator";
 import { combineValidators, jsonOutputValidator, structureValidator } from "../lib/agentic-loop-logic";
+import { AgenticLoopTelemetryBus } from "../server/agentic-loop-telemetry";
+import { assertLoopEventSequence, type AgenticLoopEvent } from "../lib/agentic-loop-telemetry-logic";
 
 const validate = combineValidators([jsonOutputValidator(), structureValidator([{ key: "answer", type: "string" }])]);
 
@@ -138,5 +140,89 @@ describe("Agentic Loop Koordinator — Integration", () => {
     });
     expect(result.iterations).toBe(1);
     expect(result.state.status).toBe("halted_max_loops");
+  });
+});
+
+describe("Koordinator — Telemetrie-Integration (Sprint 353)", () => {
+  it("ohne Telemetrie-Optionen bleibt das Verhalten unveraendert (non-breaking)", async () => {
+    const result = await runAgenticLoop({
+      validate,
+      agentStep: async () => ({ output: '{"answer":"ok"}', tokensUsed: 10 }),
+    });
+    expect(result.state.status).toBe("succeeded");
+  });
+
+  it("kompletter Lifecycle feuert die Events in korrekter Reihenfolge", async () => {
+    const bus = new AgenticLoopTelemetryBus();
+    const events: AgenticLoopEvent[] = [];
+    bus.subscribe("loop-live", (event) => events.push(event));
+
+    const result = await runAgenticLoop({
+      validate,
+      telemetryBus: bus,
+      sessionId: "loop-live",
+      task: "Demo-Aufgabe",
+      maxLoops: 3,
+      agentStep: async (iteration) =>
+        iteration === 1
+          ? { output: "ungueltig", tokensUsed: 40 }
+          : { output: '{"answer":"geheilt"}', tokensUsed: 50 },
+    });
+    expect(result.state.status).toBe("succeeded");
+    expect(events.map((event) => event.event)).toEqual([
+      "loop:start",
+      "iteration:start", "reflection:failed",
+      "iteration:start", "validation:success",
+      "loop:complete",
+    ]);
+    const sequence = assertLoopEventSequence(events);
+    expect(sequence.ok).toBe(true);
+    expect(events[0].payload.task).toBe("Demo-Aufgabe");
+    expect(events[0].payload.maxLoops).toBe(3);
+    const failed = events.find((event) => event.event === "reflection:failed");
+    expect((failed?.payload.errors as string[]).join(" ")).toContain("JSON");
+    const complete = events.find((event) => event.event === "loop:complete");
+    expect(complete?.payload.status).toBe("succeeded");
+    expect(complete?.payload.totalTokens).toBe(90);
+  });
+
+  it("max_loops-Erschoepfung sendet loop:max_reached mit allen Zwischen-Fehlern", async () => {
+    const bus = new AgenticLoopTelemetryBus();
+    const events: AgenticLoopEvent[] = [];
+    bus.subscribe("loop-doom", (event) => events.push(event));
+    await runAgenticLoop({
+      validate,
+      telemetryBus: bus,
+      sessionId: "loop-doom",
+      maxLoops: 2,
+      agentStep: async () => ({ output: "müll", tokensUsed: 30 }),
+    });
+    expect(events.map((event) => event.event)).toEqual([
+      "loop:start",
+      "iteration:start", "reflection:failed",
+      "iteration:start", "reflection:failed",
+      "loop:max_reached",
+    ]);
+    expect(assertLoopEventSequence(events).ok).toBe(true);
+    const maxReached = events.find((event) => event.event === "loop:max_reached");
+    expect(maxReached?.payload.status).toBe("halted_max_loops");
+    expect(maxReached?.payload.iterations).toBe(2);
+  });
+
+  it("Reconnect sieht den kompletten Lauf per Last-Event-ID-Replay", async () => {
+    const bus = new AgenticLoopTelemetryBus();
+    await runAgenticLoop({
+      validate,
+      telemetryBus: bus,
+      sessionId: "loop-replay",
+      maxLoops: 3,
+      agentStep: async () => ({ output: '{"answer":"einmal reicht"}', tokensUsed: 10 }),
+    });
+    // "Verbindung" erst NACH dem Lauf: Replay muss alles nachliefern
+    const replayed: AgenticLoopEvent[] = [];
+    const { replayed: events } = bus.subscribeWithReplay("loop-replay", () => undefined, 0);
+    replayed.push(...events);
+    expect(replayed.map((event) => event.event)).toEqual(["loop:start", "iteration:start", "validation:success", "loop:complete"]);
+    expect(assertLoopEventSequence(replayed).ok).toBe(true);
   });
 });

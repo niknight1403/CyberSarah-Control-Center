@@ -43,6 +43,8 @@ import {
   installRuntimeLogger,
   subscribeRuntimeLogs,
 } from "../runtime-logger";
+import { agenticLoopTelemetryBus } from "../agentic-loop-telemetry";
+import { isValidLoopSessionId } from "../../lib/agentic-loop-telemetry-logic";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
   try {
@@ -243,6 +245,38 @@ async function startServer() {
       query: typeof req.query.query === "string" ? req.query.query : undefined,
     });
     res.json({ entries: filtered.slice(-limit).reverse(), total: filtered.length });
+  });
+
+  // Sprint 353 — Agentic-Loop-Telemetrie: SSE-Stream pro Session-ID.
+  // Reconnect-Sicherheit: Last-Event-ID wird nachgeliefert (atomares
+  // subscribeWithReplay), danach folgt der Live-Stream; Heartbeat haelt
+  // Proxies waerme, close raeumt Abonnenten und Timer ab.
+  app.get("/api/agentic-loops/:sessionId/stream", async (req, res) => {
+    const sessionId = String(req.params.sessionId ?? "");
+    if (!isValidLoopSessionId(sessionId)) {
+      res.status(400).json({ error: "Ungueltige Session-ID (4-64 Zeichen, [A-Za-z0-9_-])." });
+      return;
+    }
+    if (!(await requireRuntimeUser(req, res))) return;
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.write(": loop-telemetrie verbunden\n\n");
+    const sinceHeader = req.headers["last-event-id"];
+    const sinceEventId = Number.isFinite(Number(sinceHeader)) ? Number(sinceHeader) : 0;
+    const { unsubscribe } = agenticLoopTelemetryBus.subscribeWithReplay(sessionId, (event) => {
+      res.write(`id: ${event.id}\nevent: ${event.event}\ndata: ${JSON.stringify(event)}\n\n`);
+    }, sinceEventId);
+    const heartbeat = setInterval(() => {
+      res.write(`: ping ${Date.now()}\n\n`);
+    }, 15_000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
   });
 
   app.get("/api/runtime/logs/stream", async (req, res) => {
