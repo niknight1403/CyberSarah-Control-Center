@@ -10,7 +10,9 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { getRouteRotationStatus, startRouteRotationAgent } from "./route-rotation-agent";
 import {
   aggregatePillarStatus,
+  DEPARTMENTS,
   getPillar,
+  listDepartmentsForPillar,
   PILLARS,
   routePillarTask,
   selfTestPillarRegistry,
@@ -24,7 +26,19 @@ import { buildOutreachSequence, rankLeads, type Lead } from "../modules/outreach
 function pillarRouteSnapshots() {
   // Rotator-Status liefern die Health-Entscheidungen; die Modell-Leiter
   // wird serverseitig nicht erkundet (kein Blocking-Call im Hot-Pfad).
-  return PILLARS.map((pillar) => ({ id: pillar.id, title: pillar.title, mission: pillar.mission, module: pillar.module }));
+  return PILLARS.map((pillar) => ({
+    id: pillar.id,
+    title: pillar.title,
+    mission: pillar.mission,
+    module: pillar.module,
+    departments: listDepartmentsForPillar(pillar.id).map((department) => ({
+      id: department.id,
+      title: department.title,
+      kind: department.kind,
+      modulePath: department.modulePath,
+      integration: department.integration,
+    })),
+  }));
 }
 
 export const pillarsRouter = router({
@@ -33,6 +47,7 @@ export const pillarsRouter = router({
     const selfTest = selfTestPillarRegistry();
     return {
       pillars: pillarRouteSnapshots(),
+      departments: DEPARTMENTS.map((department) => ({ id: department.id, title: department.title, kind: department.kind, pillar: department.pillar, modulePath: department.modulePath })),
       selfTest,
       status: selfTest.ok ? ("green" as const) : ("red" as const),
     };

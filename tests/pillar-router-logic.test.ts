@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregatePillarStatus, getPillar, PILLARS, routePillarTask, selfTestPillarRegistry } from "../core/router/pillar-router-logic";
+import { aggregatePillarStatus, DEPARTMENTS, getDepartment, getPillar, listDepartmentsForPillar, PILLARS, routePillarTask, selfTestPillarRegistry } from "../core/router/pillar-router-logic";
 import { assessFleetHealth, type InferenceProbe } from "../lib/ollama-fleet-logic";
 
 const probe = (over: Partial<InferenceProbe>): InferenceProbe => ({ model: "qwen2.5:0.5b", latencyMs: 800, tokensPerSecond: 50, ok: true, ...over });
@@ -35,5 +35,33 @@ describe("Kern-Router (Agenten-Rotator & Tool-Integrator)", () => {
     expect(aggregatePillarStatus([{ id: "saas-factory", status: "green" }, { id: "content-engine", status: "yellow" }, { id: "outreach-agent", status: "green" }])).toBe("yellow");
     expect(aggregatePillarStatus([{ id: "saas-factory", status: "red" }, { id: "content-engine", status: "green" }, { id: "outreach-agent", status: "green" }])).toBe("red");
     expect(aggregatePillarStatus([])).toBe("red");
+  });
+});
+
+describe("Abteilungs-Integration (Sprint 351b)", () => {
+  it("fuehrt alle fuenf Agenten-Abteilungen in einer Registry zusammen", () => {
+    expect(DEPARTMENTS.map((department) => department.id)).toEqual([
+      "saas-factory",
+      "content-engine",
+      "outreach-agent",
+      "ai-health-influencer",
+      "revenue-os",
+    ]);
+    expect(getDepartment("revenue-os").kind).toBe("embedded-app");
+    expect(getDepartment("ai-health-influencer").kind).toBe("python-pipeline");
+  });
+
+  it("ordnet jede Abteilung einer existierenden Saeule zu", () => {
+    const pillarIds = PILLARS.map((pillar) => pillar.id);
+    for (const department of DEPARTMENTS) {
+      expect(department.pillar === null || pillarIds.includes(department.pillar)).toBe(true);
+      expect(department.integration.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("jede Saeule hat mindestens eine zugeordnete Abteilung", () => {
+    for (const pillar of PILLARS) {
+      expect(listDepartmentsForPillar(pillar.id).length).toBeGreaterThan(0);
+    }
   });
 });
