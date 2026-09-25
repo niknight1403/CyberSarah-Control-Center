@@ -91,6 +91,9 @@ jobs:
           # Sprint 367: Publishing-Tokens (optional — leere Secrets bleiben
           # leer, die Modus-Aufloesung ignoriert inaktive Plattformen).
           X_PUBLISH_TOKEN: ${{ secrets.X_PUBLISH_TOKEN }}
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
           LINKEDIN_PUBLISH_TOKEN: ${{ secrets.LINKEDIN_PUBLISH_TOKEN }}
           LINKEDIN_PUBLISH_USER_URN: ${{ secrets.LINKEDIN_PUBLISH_USER_URN }}
           THREADS_PUBLISH_TOKEN: ${{ secrets.THREADS_PUBLISH_TOKEN }}

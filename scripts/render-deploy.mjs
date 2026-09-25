@@ -261,6 +261,9 @@ function makeAppEnvBuilder(databaseUrl) {
   const publishingExtra = [];
   for (const key of [
     "X_PUBLISH_TOKEN",
+    "X_CLIENT_ID",
+    "X_CLIENT_SECRET",
+    "X_REFRESH_TOKEN",
     "LINKEDIN_PUBLISH_TOKEN",
     "LINKEDIN_PUBLISH_USER_URN",
     "THREADS_PUBLISH_TOKEN",

@@ -13,7 +13,9 @@
  * Instagram/TikTok brauchen mehrstufige Medien-Uploads und bleiben im
  * Sandbox-Modus, bis die Asset-Pipeline konfiguriert ist.
  *
- * Tokens liegen NUR in Env-Variablen — niemals in der Datenbank.
+ * Tokens bootstrappen aus Env-Variablen; Sprint 370 persistiert die ROTIERTEN
+ * X-Tokens (Access+Refresh, X invalidiert alte Sets bei jedem Refresh) in der
+ * Tabelle platform_tokens — der Autopilot frischt vor Ablauf selbst nach.
  */
 
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
@@ -41,6 +43,7 @@ import {
   type PublishingMode,
 } from "../lib/publishing-queue-logic";
 import { getDb } from "./db";
+import { resolveXToken } from "./x-token-service";
 import { invokeLLM } from "./_core/llm";
 
 const PUBLISHING_HTTP_TIMEOUT_MS = 15_000;
@@ -306,15 +309,28 @@ async function publishLive(
   content: string,
   credentials: PlatformCredentials,
   assetUrl?: string | null,
-  assetUrls?: string[]
+  assetUrls?: string[],
+  options: { onXUnauthorized?: () => Promise<string | null> } = {}
 ): Promise<{ externalId: string }> {
   const cred = credentials[platform as keyof PlatformCredentials];
   if (!cred?.token) throw new Error(`Kein ${platform}-Token — Live-Publishing nicht moeglich.`);
   const client = platformClient(platform, cred.token);
 
   if (platform === "x") {
-    const response = await client.post("/tweets", { text: content.slice(0, 280) });
-    return { externalId: String(response.data?.data?.id ?? "x-unknown") };
+    // Sprint 370 (X-Auto-Refresh): bei 401 einmal frisch rotieren und neu
+    // senden — ein zweiter 401 ist ein ehrlicher Fehler (kein Blind-Retry).
+    try {
+      const response = await client.post("/tweets", { text: content.slice(0, 280) });
+      return { externalId: String(response.data?.data?.id ?? "x-unknown") };
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status !== 401 || !options.onXUnauthorized) throw error;
+      const freshToken = await options.onXUnauthorized();
+      if (!freshToken) throw error;
+      const retryClient = platformClient("x", freshToken);
+      const retry = await retryClient.post("/tweets", { text: content.slice(0, 280) });
+      return { externalId: String(retry.data?.data?.id ?? "x-unknown") };
+    }
   }
   if (platform === "linkedin") {
     if (!cred.endpointUserId) throw new Error("LinkedIn-Person-URN fehlt.");
@@ -490,6 +506,16 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
     .limit(AUTOPILOT_BATCH);
 
   const credentials = readPlatformCredentialsFromEnv();
+
+  // Sprint 370: X-Access-Token wird vor jedem Tick frisch aufgeloest
+  // (DB-Satz mit Rotations-Persistenz, Env nur Bootstrap) — inklusive
+  // automatischem Auffrischen, bevor der Token nach ~2h ablaeuft.
+  const xResolution = await resolveXToken({ now });
+  credentials.x = xResolution.token ? { token: xResolution.token } : undefined;
+  if (!xResolution.token && xResolution.reason) {
+    console.warn(`[Publishing] X-Live nicht bereit: ${xResolution.reason}`);
+  }
+
   const outcome: AutopilotOutcome = { processed: 0, live: 0, sandbox: 0, failed: 0 };
 
   for (const job of due) {
@@ -513,7 +539,9 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
     try {
       const content = await generateJobContent(job);
       if (resolution.mode === "live") {
-        const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls);
+        const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls, {
+          onXUnauthorized: () => resolveXToken({ now, force: true }).then((resolution) => resolution.token),
+        });
         await db
           .update(publishingJobs)
           .set({

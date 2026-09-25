@@ -3,6 +3,15 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 370: X-OAuth2-Auto-Refresh — Live-Modus haelt dauerhaft
+
+- **Token-Rotations-Persistenz (Migration 0012)**: Neue Tabelle platform_tokens speichert den aktuell gueltigen X-Tokensatz — X rotiert bei JEDEM Refresh den Access- UND Refresh-Token, deshalb ist Env nur der Bootstrap (X_PUBLISH_TOKEN/X_REFRESH_TOKEN) und die DB die Quelle der Wahrheit
+- **Automatischer Refresh (Sprint 370)**: resolveXToken frischt den Access-Token 10 Minuten vor Ablauf selbst nach (grant_type=refresh_token, Basic-Auth aus X_CLIENT_ID/X_CLIENT_SECRET) — der Autopilot bleibt ohne manuelles Eingreifen live; fehlgeschlagene Refreshes haben einen 5-Minuten-Cooldown gegen Endpoint-Hammering
+- **401-Retry im Publish-Pfad**: Ein X-Post mit abgelaufenem Token rotiert einmal frisch und sendet einmal neu — ein zweiter 401 ist ein ehrlicher Fehler, kein Blind-Retry
+- **Ehrliche Fallback-Kette**: Frischer DB-Satz > Refresh > Bestands-/Env-Bootstrap-Token > Sandbox-Modus mit Grund; force-Retry akzeptiert nur ein frisches Ergebnis (kein blindes Wiederholen toter Token)
+- **Deploy-Sync erweitert**: render-deploy.mjs/yml uebertragen jetzt auch X_CLIENT_ID, X_CLIENT_SECRET und X_REFRESH_TOKEN an die Render-App
+- **E2E verifiziert**: 14 neue Tests (Puffer-, Cooldown-, Fallback- und Endpunkt-Fehlerfaelle gegen Mock-Token-Endpoint), 2.206 Tests gruen (281 Dateien), Typecheck gruen
+
 ## 25.09.2026 — Sprint 369: Hugging Face als KI-Provider im Deploy verdrahtet
 
 - **Model-Router-Anbindung**: Der bestehende Model-Router (Zero-Cost + BYO) liest Hugging Face via AI_HUGGINGFACE_API_KEY/HF_TOKEN — der validierte HF-Token des Owners liegt jetzt als GitHub-Secret AI_HUGGINGFACE_API_KEY (whoami verifiziert, Account Niknight1981)

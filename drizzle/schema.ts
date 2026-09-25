@@ -323,5 +323,27 @@ export const publishingJobs = pgTable(
   ],
 );
 
+
+// Sprint 370 — Rotierte Plattform-Tokens (X-OAuth2-Auto-Refresh).
+// X rotiert bei JEDEM Refresh den Access- UND Refresh-Token; die Umgebung
+// liefert nur den Bootstrap-Satz. Der aktuell gueltige Tokensatz wird hier
+// persistiert, damit der Autopilot den Live-Modus dauerhaft haelt.
+export const platformTokens = pgTable(
+  "platform_tokens",
+  {
+    id: serial("id").primaryKey(),
+    platform: text("platform").notNull(),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("platform_tokens_platform_idx").on(table.platform)],
+);
+
+export type PlatformTokenRow = typeof platformTokens.$inferSelect;
+export type InsertPlatformTokenRow = typeof platformTokens.$inferInsert;
+
 export type PublishingJobRow = typeof publishingJobs.$inferSelect;
 export type InsertPublishingJobRow = typeof publishingJobs.$inferInsert;

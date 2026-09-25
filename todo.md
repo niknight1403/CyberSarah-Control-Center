@@ -1,5 +1,6 @@
 # Project TODO
 
+- [x] Sprint 370: X-OAuth2-Auto-Refresh — platform_tokens-Tabelle (Migration 0012) persistiert rotierte Tokensaetze; resolveXToken frischt 10 min vor Ablauf automatisch nach (5-min-Cooldown bei Fehlern), 401-Publish-Retry rotiert einmal; Deploy-Sync um X_CLIENT_ID/X_CLIENT_SECRET/X_REFRESH_TOKEN erweitert; 2.206 Tests gruen.
 - [x] Sprint 369: Hugging Face als KI-Provider verdrahtet — validierter HF-Token (whoami 200) als GitHub-Secret AI_HUGGINGFACE_API_KEY, render-deploy.mjs/yml synchronisieren ihn optional zur Render-App; Router laesst HF ohne Key inaktiv.
 - [x] Sprint 368: Conversion-Loop — IG-Insights (reach/impressions) aggregieren je Persona und geben bis +15/-10 Punkte Bonus in der Fokus-Persona-Wahl; Sandbox liefert kein Signal; E2E: juno uebernimmt nach 2 Live-Posts (10k Reichweite) den Fokus von orion.
 - [x] Sprint 367: Instagram-Medien-Pipeline finalisiert (Issue #45) — Container-Polling, Auto-Karten (app-gehostet, PNG ohne Bild-Libs), Reels/Carousel, vorabige Asset-Validierung, Insights-Rueckkanal (Migration 0011); Publishing-Tokens fliessen via GitHub Secrets in den Render-Deploy; E2E 6/6 gruen.
