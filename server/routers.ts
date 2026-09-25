@@ -34,6 +34,7 @@ import { publishingRouter } from "./publishing-router";
 import { agentsRouter } from "./agents-router";
 import { revenueRouter } from "./revenue-router";
 import { draftEngineRouter } from "./draft-engine-router";
+import { campaignBridgeRouter } from "./campaign-bridge-router";
 import { pillarsRouter } from "./pillars-router";
 import { publicProcedure, router } from "./_core/trpc";
 
@@ -74,6 +75,7 @@ export const appRouter = router({
   influencer: influencerRouter,
   publishing: publishingRouter,
   draftEngine: draftEngineRouter,
+  campaignBridge: campaignBridgeRouter,
   pillars: pillarsRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)

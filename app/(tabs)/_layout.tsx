@@ -2,6 +2,8 @@ import { router, Tabs } from "expo-router";
 import { useEffect } from "react";
 
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { authGateRoute, resolveAuthGate } from "@/lib/auth-gate-logic";
+import { trpc } from "@/lib/trpc";
 import { HapticTab } from "@/components/haptic-tab";
 import { DualSidebar } from "@/components/responsive/dual-sidebar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -19,11 +21,18 @@ export default function TabLayout() {
   const glass = useGlassTheme();
   // Sprint 117: erster Start → Willkommensflow mit Theme-Auswahl, einmalig.
   const { status: onboardingStatus } = useOnboarding();
+  // Sprint 373: Login-Bereich als Start der App — das Gate entscheidet rein
+  // (lib/auth-gate-logic.ts): Login hat Vorrang vor dem einmaligen Onboarding.
+  const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
+  const gatePhase = resolveAuthGate({
+    meResolved: accountQuery.isSuccess || accountQuery.isError,
+    user: accountQuery.data ?? null,
+    onboardingStatus: onboardingStatus === "incomplete" ? "incomplete" : onboardingStatus === "checking" ? "loading" : "complete",
+  });
   useEffect(() => {
-    if (onboardingStatus === "incomplete") {
-      router.replace("/onboarding");
-    }
-  }, [onboardingStatus]);
+    const route = authGateRoute(gatePhase);
+    if (route) router.replace(route);
+  }, [gatePhase]);
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
 

@@ -3,6 +3,15 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 373: Login-Gate beim App-Start + autonome Ideen→Influencer-Kampagnen-Bruecke
+
+- **Login-Bereich als App-Einstieg**: Neuer Screen app/login.tsx (Login + Registrierung, reale account-Router-Mutations, Session-Token via _core/auth); Auth-Gate (lib/auth-gate-logic.ts, rein + getestet) in (tabs)/_layout.tsx — Login hat Vorrang vor dem einmaligen Onboarding, kein Login-Flackern fuer Angemeldete (Phase "loading" bis die Session-Abfrage entschieden ist)
+- **Autonome Kampagnen-Bruecke (kostenlos, nacheinander)**: lib/campaign-bridge-logic.ts leitet aus offenen Inbox-Ideen Kampagnenziel (Keyword-Inferenz), Thema und via Reichweiten-Engine (Sprint 364) Fokus-Persona + Plattform ab — pro Zyklus max. 2 Briefs, sequenziell, Budget gegen die content-Freigabe-Queue
+- **Server (server/campaign-bridge.ts + Router)**: queueFromIdeas (admin-only, Zod-validiert, max. 3 Briefs) erzeugt pro Brief echten Persona-Content im Free-Tier-LLM-Pool der Draft-Engine und legt ihn als pending-Entwurf in der Freigabe-Queue ab — LLM-Fehler/ungueltiges JSON werden ehrlich uebersprungen, nie ein Fake-Entwurf; parseLlmJson/insertPendingDraft der Draft-Engine wiederverwendet (nur exportiert)
+- **Ledger (lib/campaign-bridge-ledger.ts)**: verbrueckte Ideen-IDs persistent + idempotent — kein Doppel-Brief auch nach App-Neustart; korrupte Daten werden verworfen und gemeldet, nie still repariert
+- **Admin-Autonomie nach Login**: useAutonomousCampaignBridge laeuft still auf jedem Screen (via useAdminFullIntegration, 2-Minuten-Zyklen) — Ideen fliessen vollautonom ins Influencer-Marketing; HITL bleibt: veroeffentlicht wird erst nach menschlicher Freigabe (Sprint-346-Regel), die Idee selbst bleibt unangetastet in der Inbox (Sprint-242-Regel)
+- **Verifikation**: 24 neue deterministische Tests (Gate-Phasen, Ziel-Inferenz, Thema-Bau, Zyklus-Limits, Budget, Ledger-Roundtrip/-Korruption), Gesamt gruen, tsc --noEmit gruen; Live-Verifikation gegen app.cybersarah-ki.com nach Deploy
+
 ## 25.09.2026 — Sprint 371: tRPC-Vollintegration — agents-, system- und revenue-Router
 
 - **Bestandsaufnahme**: tRPC-Kern (server/_core/trpc.ts mit superjson, Rate-Limit-Guard, protected/adminProcedure), Express-Mount (/api/trpc), Frontend-Client (lib/trpc.ts mit httpBatchLink + Session-Header) und alle Abhängigkeiten (@trpc/server/client/react-query ^11.18.0, @tanstack/react-query, zod) waren bereits vorhanden — der Sprint schließt die im Arbeitsplan fehlenden Router

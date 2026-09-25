@@ -43,7 +43,7 @@ function seedIndexForDay(nowMs: number, offset: number): number {
   return Math.floor(nowMs / 86_400_000 + offset) % CONTENT_TOPIC_SEEDS.length;
 }
 
-function parseLlmJson(text: string): unknown {
+export function parseLlmJson(text: string): unknown {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   const start = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
@@ -82,7 +82,7 @@ export async function countPendingDraftsByKind(): Promise<Record<DraftKind, numb
   return counts;
 }
 
-async function insertPendingDraft(kind: DraftKind, title: string, payload: DraftPayloadByKind[DraftKind], createdBy: string): Promise<void> {
+export async function insertPendingDraft(kind: DraftKind, title: string, payload: DraftPayloadByKind[DraftKind], createdBy: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Datenbank nicht verfuegbar — Entwurf nicht speicherbar.");
   const row: InsertDraftQueueRow = { kind, title, payload, status: "pending", createdBy };
