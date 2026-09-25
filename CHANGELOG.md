@@ -3,6 +3,14 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 368: Conversion-Loop — Insights fliesst in die Reichweiten-Engine zurueck
+
+- **Performance-Aggregation (reine Logik)**: computePersonaPerformance fasst Publishing-Jobs je Persona zusammen — nur Live-Publishes mit Insights zaehlen (reach/impressions), fehlgeschlagene/abgebrochene Jobs erzeugen eine Fehlerquote; Sandbox-Jobs liefern bewusst kein Signal
+- **Performance-Bonus im Kampagnen-Ranking**: performanceBonus gewaehrt bis +15 Punkte fuer nachgewiesene Reichweite pro Live-Post (Reach/400, gekappt) und zieht bis -10 Punkte fuer hohe Fehlerquoten ab; ohne Live-Daten bleibt 0 (neue Personas ohne Nachteil)
+- **Fokus-Persona-Wahl optimiert**: enqueueCampaignForUser laedt via getPersonaPerformanceForUser die Live-Historie des Nutzers und reicht sie an planInfluencerCampaign weiter — bewaehrte Personas steigen im Fokus-Ranking auf (Conversion-Optimierung aus dem Sprint-367-Rueckkanal)
+- **Guardrail ergaenzt**: Performance-Bonus ist eine Heuristik und nur mit nachgewiesenen Live-Insights aktiv
+- **E2E verifiziert**: Baseline-Fokus orion; nach 2 Live-Posts mit 10.000 Reichweite uebernimmt juno den Fokus (4 Jobs eingereiht); Sandbox-Seed (99.999 Reach) bleibt ohne Wirkung; 280 Tests gruen, verify:system GREEN (18 Kernmodule); 367-E2E Regression gruen
+
 ## 25.09.2026 — Sprint 367: Instagram-Medien-Pipeline finalisiert (Issue #45) + Publishing-Tokens via GitHub Secrets
 
 - **Container-Status-Polling (Optimierung 1)**: Vor media_publish wird der Container-Status gepollt (GET /{container-id}?fields=status) bis FINISHED — IN_PROGRESS wartet, ERROR/EXPIRED bricht ehrlich ab, nach max. Versuchen Timeout statt Blind-Publish (Env IG_CONTAINER_POLL_MAX_ATTEMPTS / IG_CONTAINER_POLL_DELAY_MS)

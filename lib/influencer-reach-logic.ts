@@ -122,10 +122,53 @@ export type CampaignPlan = {
  * Plant eine deterministische Kampagne: beste Fokus-Persona, bis zu drei
  * unterstuetzende Personas, Kanalmix und Posting-Slots fuer `days` Tage.
  */
+export type PersonaPerformance = {
+  livePosts: number;
+  failedPosts: number;
+  reach: number;
+  impressions: number;
+};
+
+/**
+ * Sprint 368 (Conversion-Loop): Aggregiert Publishing-Ergebnisse je Persona —
+ * reine Logik, Sandbox-Jobs liefern bewusst kein Signal (keine echten Daten).
+ */
+export function computePersonaPerformance(
+  jobs: Array<{ persona: string; status: string; mode: string | null; insights: Record<string, number> }>
+): Record<string, PersonaPerformance> {
+  const result: Record<string, PersonaPerformance> = {};
+  for (const job of jobs) {
+    const entry = (result[job.persona] ??= { livePosts: 0, failedPosts: 0, reach: 0, impressions: 0 });
+    if (job.status === "veroeffentlicht" && job.mode === "live") {
+      entry.livePosts += 1;
+      entry.reach += Number(job.insights?.reach ?? 0);
+      entry.impressions += Number(job.insights?.impressions ?? 0);
+    } else if (job.status === "fehlgeschlagen" || job.status === "abgebrochen") {
+      entry.failedPosts += 1;
+    }
+  }
+  return result;
+}
+
+/**
+ * Sprint 368: Performance-Bonus aus nachgewiesener Reichweite (gekoppelt,
+ * ehrlich bleibt die Heuristik): bis +15 Punkte fuer Reichweite pro Live-Post,
+ * bis -10 Punkte fuer eine hohe Fehlerquote. Ohne Live-Daten: 0 (kein Nachteil
+ * fuer neue Personas).
+ */
+export function performanceBonus(perf?: PersonaPerformance): number {
+  if (!perf || perf.livePosts === 0) return 0;
+  const avgReach = perf.reach / perf.livePosts;
+  const failureRate = perf.failedPosts / Math.max(perf.failedPosts + perf.livePosts, 1);
+  const reachBonus = Math.min(Math.round(avgReach / 400), 15);
+  const failurePenalty = Math.min(Math.round(failureRate * 20), 10);
+  return reachBonus - failurePenalty;
+}
+
 export function planInfluencerCampaign(
   product: string,
   goal: InfluencerGoal,
-  options: { days?: number; personasPerDay?: number } = {}
+  options: { days?: number; personasPerDay?: number; performance?: Record<string, PersonaPerformance> } = {}
 ): CampaignPlan {
   const trimmed = product.trim();
   if (trimmed.length < 3) throw new Error("Das Produkt muss mindestens 3 Zeichen enthalten.");
@@ -139,7 +182,10 @@ export function planInfluencerCampaign(
       const score = scoreCampaignFit(persona.id, platform, trimmed, goal);
       if (score > best.score) best = { platform, score };
     }
-    return { persona: persona.id, ...best, match: scorePersonaForProduct(persona.id, trimmed) };
+    // Sprint 368: nachgewiesene Reichweite hebt bewaehrte Personas im Ranking
+    // (Conversion-Loop aus den gespeicherten Insights der letzten Kampagnen).
+    const bonus = performanceBonus(options.performance?.[persona.id]);
+    return { persona: persona.id, ...best, score: best.score + bonus, match: scorePersonaForProduct(persona.id, trimmed) };
   }).sort((a, b) => b.score - a.score || a.persona.localeCompare(b.persona));
 
   const focusPersona = ranked[0].persona;
@@ -175,6 +221,7 @@ export function planInfluencerCampaign(
       `Maximal ${MAX_POSTS_PER_PERSONA_PER_DAY} Posts pro Persona und Tag.`,
       "Keine Einnahme- oder Renditeversprechen; KI-Transparenz bleibt Pflicht.",
       "ProjectedReachIndex ist eine Heuristik (0..100+) — keine Garantie.",
+      "Performance-Bonus (max. +15) nur mit nachgewiesenen Live-Insights — Sandbox zaehlt nicht.",
     ],
   };
 }

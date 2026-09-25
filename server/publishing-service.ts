@@ -28,7 +28,7 @@ import {
 
 import { publishingJobs, type InsertPublishingJobRow, type PublishingJobRow } from "../drizzle/schema";
 import { buildInfluencerPrompt, getInfluencerPersona, type InfluencerPersonaId, type InfluencerPlatform } from "../lib/influencer-persona-logic";
-import { planInfluencerCampaign, type InfluencerGoal } from "../lib/influencer-reach-logic";
+import { computePersonaPerformance, planInfluencerCampaign, type InfluencerGoal } from "../lib/influencer-reach-logic";
 import {
   buildDedupeKey,
   campaignToPlannedJobs,
@@ -96,12 +96,35 @@ async function insertPlannedJobs(rows: InsertPublishingJobRow[]): Promise<number
   return inserted.length;
 }
 
+/** Sprint 368: Aggregierte Live-Performance je Persona aus den Publishing-Jobs. */
+export async function getPersonaPerformanceForUser(
+  userOpenId: string
+): Promise<Record<string, { livePosts: number; failedPosts: number; reach: number; impressions: number }>> {
+  const db = await getDb();
+  if (!db) return {};
+  const rows = await db
+    .select({
+      persona: publishingJobs.persona,
+      status: publishingJobs.status,
+      mode: publishingJobs.mode,
+      insights: publishingJobs.insights,
+    })
+    .from(publishingJobs)
+    .where(eq(publishingJobs.userOpenId, userOpenId));
+  return computePersonaPerformance(
+    rows.map((row) => ({ persona: row.persona, status: row.status, mode: row.mode, insights: row.insights ?? {} }))
+  );
+}
+
 export async function enqueueCampaignForUser(
   userOpenId: string,
   input: { product: string; goal: InfluencerGoal; days?: number; assetUrl?: string | null; assetUrls?: string[] }
 ): Promise<{ planned: number; inserted: number; focusPersona: string; firstSlotAt: Date }> {
   if (!userOpenId) throw new Error("Nutzerkontext fehlt — Kampagne nicht einreihbar.");
-  const plan = planInfluencerCampaign(input.product, input.goal, { days: input.days });
+  // Sprint 368 (Conversion-Loop): Insights vergangener Jobs fliessen in die
+  // Fokus-Persona-Wahl ein — bewaehrte Personas steigen im Ranking auf.
+  const performance = await getPersonaPerformanceForUser(userOpenId);
+  const plan = planInfluencerCampaign(input.product, input.goal, { days: input.days, performance });
   const jobs = campaignToPlannedJobs(plan);
   const rows: InsertPublishingJobRow[] = jobs.map((job) => ({
     userOpenId,
