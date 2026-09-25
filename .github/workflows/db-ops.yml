@@ -13,6 +13,8 @@ on:
         options:
           - chat-clear-preview
           - chat-clear-delete
+          - publishing-enqueue-live-test
+          - publishing-status
         default: chat-clear-preview
 
 permissions:
@@ -33,6 +35,7 @@ jobs:
           node-version: 20
 
       - name: Chat-Verlauf Operation
+        if: startsWith(github.event.inputs.operation, 'chat-clear')
         working-directory: scripts/db-ops
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -41,3 +44,14 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install pg --no-audit --no-fund >/dev/null 2>&1
           node chat-clear.mjs
+
+      - name: Publishing Live-Test Operation (Sprint 370)
+        if: startsWith(github.event.inputs.operation, 'publishing-')
+        working-directory: scripts/db-ops
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OP: ${{ github.event.inputs.operation }}
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install pg --no-audit --no-fund >/dev/null 2>&1
+          node publishing-live-test.mjs
