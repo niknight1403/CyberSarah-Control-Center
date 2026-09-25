@@ -9,7 +9,7 @@ import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/com
 
 /**
  * Sprint 132 — "Meetings"-Tab (Drawer): Einstiegspunkt des anstehenden
- * Meeting-/Voice-Moduls. Bewusst ehrlicher Platzhalter: keine vorgetäu-
+ * Meeting-/Voice-Moduls. Ehrlicher Status-Screen: keine vorgetäu-
  * schte Funktionalitaet, sondern Status und Roadmap des geplanten Moduls
  * (Agenten-Zusammenfassungen von Terminen, Voice-Bridge).
  */

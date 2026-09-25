@@ -64,7 +64,7 @@ export default defineConfig({
     // damit langsame CI-Runner nicht an der 5-s-Vorgabe scheitern.
     isolate: false,
     testTimeout: 180_000,
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/**/*.test.{ts,tsx}", "tests/*.test.{ts,tsx}"],
     watch: false,
     coverage: {
       provider: "v8",

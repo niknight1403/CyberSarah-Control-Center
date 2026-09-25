@@ -25,7 +25,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 16 | 359–363 | ERLEDIGT | Serie H Rest + Abschluss (2.071 Tests grün, 265 Testdateien) |
 | 17 | 364–368 | OFFEN | Serie I: Agent-Intelligenz |
 | 18 | 369–373 | OFFEN | Serie I Rest + Abschluss |
-| 19 | 374–378 | OFFEN | Serie J: Finale |
+| 19 | 374–378 | IN ARBEIT | Serie J: Finale |
 | 20 | 379–383 | OFFEN | Serie J Rest + Abschluss-Validierung |
 
 ## Sprint-Einzelverfolgung
@@ -41,6 +41,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 
 ## Batch-Protokoll
 
+- **Batch 17 (Sprint 374):** ERLEDIGT am 25.09.2026. Platzhalter-Sweep (0 nutzer-sichtbare Platzhalter in Produktionspfaden), Volle Regression der Suite, Test-Lücken geschlossen (Auth/Session, Billing/Quota, Publishing-Queue, Kampagnen-Brücke, tRPC-Router, Draft-Engine). Tests: 2.236 → 2.252 (+16), 286 Testdateien.
 - **Batch 1 (Sprints 284–288):** ERLEDIGT am 24.09.2026. Live-Preview-Zyklus Chat↔Preview, Multi-File Refactoring (Transaktion + Rollback), Code-Suche, Test-Runner, Iterations-Limits. Tests: 1.560 → 1.572 (+12), 188 Testdateien.
 - **Batch 2 (Sprints 289–293):** ERLEDIGT am 24.09.2026. Werkzeug-Fehlerklassen & Retry-Semantik, Kontextfenster-Verdichtung ohne Informationsverlust, Commit-Diff-Vorschau im Chat, Sprint-Ziele als GitHub-Issues, Serie-A-Abschluss. Tests: 1.572 → 1.589 (+17), 192 Testdateien.
 - **Batch 3 (Sprints 294–298):** ERLEDIGT am 24.09.2026. EN-Sprach-Toggle (i18n), Onboarding v2 mit ehrlichen Erwartungen, Template-Galerie (7 Vorlagen, 4 Kategorien), Chat-Empty-State mit Starter-Prompts, Fehlerbildschirme mit sprechenden Fallbacks. Tests: 1.589 → 1.684 (+95), 197 Testdateien.

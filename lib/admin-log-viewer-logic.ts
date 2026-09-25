@@ -83,7 +83,7 @@ class AdminLogViewerManager {
 
   private initDefaultLogs(): void {
     const now = Date.now();
-    const mockLogs: Omit<LogEntry, "id">[] = [
+    const initialLogs: Omit<LogEntry, "id">[] = [
       {
         timestamp: now - 120000,
         level: "info",
@@ -127,7 +127,7 @@ class AdminLogViewerManager {
       },
     ];
 
-    mockLogs.forEach((log) => this.ingestLog(log));
+    initialLogs.forEach((log) => this.ingestLog(log));
   }
 
   public ingestLog(rawEntry: Omit<LogEntry, "id">): LogEntry {

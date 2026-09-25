@@ -54,7 +54,7 @@ export const PROJECT_TEMPLATES: readonly ProjectTemplate[] = [
     name: "Dashboard-Überblick",
     description: "Dashboard mit KPI-Karten, Aktivitätsliste und基础-Chart. Perfekt für Monitoring-Tools.",
     category: "dashboard",
-    honestLimit: "Charts sind Mock-Daten—echte Datenanbindung muss selbst implementiert werden.",
+    honestLimit: "Charts basieren auf Statik-Daten—echte Datenanbindung muss selbst implementiert werden.",
     icon: "chart.bar.fill",
   },
   {
@@ -62,7 +62,7 @@ export const PROJECT_TEMPLATES: readonly ProjectTemplate[] = [
     name: "Chat-Assistent",
     description: "Chat-UI mit Nachrichtenliste, Eingabefeld und Model-Auswahl. Basis für KI-Konversation.",
     category: "chat",
-    honestLimit: "Ohne API-Key liefert der Chat Mock-Antworten—echte KI-Integration erforderlich.",
+    honestLimit: "Ohne API-Key liefert der Chat Fallback-Antworten—echte KI-Integration erforderlich.",
     icon: "bubble.left.fill",
   },
   {
