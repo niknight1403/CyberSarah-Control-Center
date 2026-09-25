@@ -26,11 +26,11 @@ if (!connectionString) {
 const pool = new Pool({ connectionString });
 
 async function adminOpenId(client) {
-  const admin = await client.query("SELECT open_id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
-  if (admin.rows.length > 0) return admin.rows[0].open_id;
+  const admin = await client.query("SELECT "openId" FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
+  if (admin.rows.length > 0) return admin.rows[0].openId;
   // Ehrlicher Fallback: einzelner Nutzer, wenn kein Admin existiert.
-  const any = await client.query("SELECT open_id, COUNT(*) OVER() AS total FROM users ORDER BY id LIMIT 2");
-  if (any.rows.length === 1) return any.rows[0].open_id;
+  const any = await client.query("SELECT "openId", COUNT(*) OVER() AS total FROM users ORDER BY id LIMIT 2");
+  if (any.rows.length === 1) return any.rows[0].openId;
   throw new Error("Kein eindeutiger Ziel-Nutzer (Admin) gefunden — Abbruch.");
 }
 
