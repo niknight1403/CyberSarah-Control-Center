@@ -30,6 +30,7 @@ import { emailRouter } from "./email-router";
 import { analyticsRouter } from "./analytics-router";
 import { externalActionsRouter } from "./external-actions-router";
 import { influencerRouter } from "./influencer-router";
+import { publishingRouter } from "./publishing-router";
 import { draftEngineRouter } from "./draft-engine-router";
 import { pillarsRouter } from "./pillars-router";
 import { publicProcedure, router } from "./_core/trpc";
@@ -67,6 +68,7 @@ export const appRouter = router({
   secrets: secretsRouter,
   wix: wixRouter,
   influencer: influencerRouter,
+  publishing: publishingRouter,
   draftEngine: draftEngineRouter,
   pillars: pillarsRouter,
   auth: router({

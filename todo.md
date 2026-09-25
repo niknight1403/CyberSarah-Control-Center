@@ -1,5 +1,6 @@
 # Project TODO
 
+- [x] Sprint 365: Autonomes Social-Media-Publishing — Publishing-Tabelle (Migration 0009), Warteschlange mit Dedupe/Retry-Backoff, Autopilot im 60-Sekunden-Takt (live mit Credentials auf X/LinkedIn/Threads, ehrlich Sandbox sonst), tRPC-Router + Orchestrator-Tools, E2E gegen Sandbox-PG verifiziert.
 - [x] Sprint 364: Autonomie-Maximierung — 10 Influencer-Personas, Reichweiten-/Revenue-Engine, Projekt-Superagenten-Fabrik mit Bot-Villa (8 Live-Kern, Pool-Kapazitaet 5000, Spawn-on-Demand, HITL-Schienen fuer Geld/Sends).
 - [x] Sprint 163 (portiert auf V4.2): Repo-Chat-Service (Tarball-Indizierung, Budget-Deckel, Index-Cache) + repo.searchCode-Orchestrator-Tool, live verifiziert (1.161 Dateien / 19.676 Symbole).
 - [x] Define the portrait-first Custom AI Studio Mobile design and remote-workspace boundary.

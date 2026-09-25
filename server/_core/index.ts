@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
 import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
+import { startPublishingAutopilot } from "../publishing-service";
 import {
   isWebFallbackCandidate,
   mapUrlPathToWebFile,
@@ -382,6 +383,7 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
     startOptimizerLoop();
+    startPublishingAutopilot();
   });
 }
 

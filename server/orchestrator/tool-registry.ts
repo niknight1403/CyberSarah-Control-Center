@@ -31,6 +31,11 @@ import { buildVillaBlueprint, planWorkerSpawn } from "../../lib/bot-villa-logic"
 import { planInfluencerCampaign } from "../../lib/influencer-reach-logic";
 import { createProjectSuperagentBlueprint } from "../../lib/project-superagent-factory-logic";
 import { searchRepoCode } from "../repo-chat-service";
+import {
+  enqueueCampaignForUser,
+  getPublishingModeOverview,
+  listPublishingJobsForUser,
+} from "../publishing-service";
 
 export interface ToolResult {
   ok: boolean;
@@ -49,6 +54,8 @@ export interface ToolSpec {
 }
 
 const DEFAULT_REPO = process.env.ORCHESTRATOR_GITHUB_REPO ?? "niknight1403/CyberSarah-Control-Center";
+/** Sprint 365 — Nutzer-Kontext fuer Publishing-Tools (Env, Default: Admin-Nutzer). */
+const DEFAULT_USER_OPEN_ID = process.env.ORCHESTRATOR_USER_OPEN_ID ?? "admin";
 const HETZNER_API = "https://api.hetzner.cloud/v1";
 const TOOL_TIMEOUT_MS = 15_000;
 const SANDBOX_ROOT = path.join(os.tmpdir(), "cybersarah-orchestrator-workspace");
@@ -348,6 +355,80 @@ const tools: ToolSpec[] = [
             encoding: data?.encoding,
             content: tooLarge ? text.slice(0, 400_000) : text,
             truncated: Boolean(tooLarge),
+          },
+        };
+      }),
+  },
+  {
+    name: "publishing.enqueueCampaign",
+    description:
+      "Reiht eine Influencer-Kampagne in die autonome Publishing-Warteschlange ein (Sprint 365): " +
+      "plant Slots (max. 3/Persona/Tag), legt Jobs in der DB an (Dedupe per Produkt|Persona|Plattform|Tag) " +
+      "und der Autopilot veroeffentlicht sie im 60-Sekunden-Takt — live mit Credentials, sonst ehrlich im Sandbox-Modus.",
+    parameters: {
+      type: "object",
+      properties: {
+        product: { type: "string", description: "Produkt/Angebot (3-500 Zeichen)" },
+        goal: { type: "string", enum: ["aufmerksamkeit", "wachstum", "umsatz"], description: "Kampagnenziel" },
+        days: { type: "number", description: "Optional: Kampagnenlaenge in Tagen (1-30, Default 7)" },
+      },
+      required: ["product", "goal"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const result = await enqueueCampaignForUser(DEFAULT_USER_OPEN_ID, {
+          product: String(args.product ?? ""),
+          goal: String(args.goal ?? "aufmerksamkeit") as never,
+          days: typeof args.days === "number" ? args.days : undefined,
+        });
+        return {
+          ok: true,
+          result: {
+            planned: result.planned,
+            inserted: result.inserted,
+            skipped: result.planned - result.inserted,
+            focusPersona: result.focusPersona,
+            firstSlotAt: result.firstSlotAt.toISOString(),
+            note: "Autopilot verarbeitet faellige Jobs im 60-Sekunden-Takt (Sandbox ohne Plattform-Tokens).",
+          },
+        };
+      }),
+  },
+  {
+    name: "publishing.status",
+    description:
+      "Liest die Publishing-Warteschlange (Sprint 365): Jobs je Status, Plattform-Modi " +
+      "(live/sandbox inkl. Gruenden). Read-only.",
+    parameters: {
+      type: "object",
+      properties: {
+        statuses: {
+          type: "array",
+          items: { type: "string", enum: ["geplant", "sandbox_veroeffentlicht", "veroeffentlicht", "fehlgeschlagen", "abgebrochen"] },
+          description: "Optional: Status-Filter",
+        },
+      },
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const jobs = await listPublishingJobsForUser(DEFAULT_USER_OPEN_ID, {
+          statuses: Array.isArray(args.statuses) ? (args.statuses as string[]) : undefined,
+        });
+        return {
+          ok: true,
+          result: {
+            count: jobs.length,
+            jobs: jobs.slice(0, 20).map((job) => ({
+              id: job.id,
+              persona: job.persona,
+              platform: job.platform,
+              day: job.campaignDay,
+              status: job.status,
+              mode: job.mode,
+              scheduledFor: job.scheduledFor.toISOString(),
+              lastError: job.lastError,
+            })),
+            modes: getPublishingModeOverview(),
           },
         };
       }),

@@ -3,6 +3,16 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 365: Autonomes Social-Media-Publishing — Warteschlange, Autopilot & ehrliche Live-/Sandbox-Modi
+
+- **Publishing-Tabelle** (Migration 0009): `publishingJobs` je Nutzer mit Status-Enum (geplant, sandbox_veroeffentlicht, veroeffentlicht, fehlgeschlagen, abgebrochen), Queue-Index (Nutzer, Status, Zeitpunkt) und Uniqueness je Kampagnen-Slot (Produkt x Persona x Plattform x Tag) — doppelte Einreihung ist damit ausgeschlossen
+- **Warteschlangen-Logik** (`lib/publishing-queue-logic.ts`): Kampagnen-Slots der 10 Personas werden deterministisch zu Jobs (Start 09:00 lokal, ein Slot pro Kampagnentag), Faelligkeitspruefung, exponentieller Retry-Backoff (10 Min / 60 Min / 6 h, max. 3 Versuche), ehrliche Modus-Aufloesung: live nur mit vollstaendigen Credentials und nur fuer Text-Plattformen mit einschrittiger API (X, LinkedIn, Threads) — Instagram/TikTok bleiben bis zur Asset-Pipeline im Sandbox-Modus, mit klar benanntem Grund statt Vortaeuschung
+- **Publishing-Autopilot** (`server/publishing-service.ts`): startet mit dem Server (60-Sekunden-Takt, Re-Entry-Schutz, via PUBLISHING_AUTOPILOT=off deaktivierbar), verarbeitet faellige Jobs aller Nutzer, generiert den Inhalt zur Veroeffentlichungszeit mit der LLM (Persona-Prompt) und veroeffentlicht live oder ehrlich im Sandbox-Modus; Live-Fehler (z. B. 401/403) landen im Retry-Pfad mit Backoff und nach 3 Versuchen im Status fehlgeschlagen (nie still)
+- **Plattform-Adapter**: X (POST /2/tweets, 280 Zeichen), LinkedIn (ugcPosts, Person-URN), Threads (Text-Post); Tokens liegen AUSSCHLIESSLICH in Env-Variablen (X_PUBLISH_TOKEN, LINKEDIN_PUBLISH_TOKEN + LINKEDIN_PUBLISH_USER_URN, THREADS_PUBLISH_TOKEN + THREADS_PUBLISH_USER_ID), niemals in der DB
+- **tRPC-Router** (`publishingRouter`, nutzer-gescoped): enqueueCampaign, status (Jobs + Plattform-Modi mit Gruenden), cancel, retryFailed
+- **Orchestrator-Tools**: publishing.enqueueCampaign und publishing.status (read-only bzw. nutzer-gebundene Einreihung)
+- **E2E verifiziert gegen Sandbox-PG** (Migration 0000-0009): kompletter Kreislauf Einreihen -> Faellig -> LLM-Inhalt -> Sandbox-Veroeffentlichung; Dedupe-Relaunch 0 neu; Live-Fehlerschlag mit Fake-X-Token ehrlich als 403 mit Backoff-Eskalation bis fehlgeschlagen, danach Requeue und Abbruch; 2180 Tests gruen, verify:system GREEN mit 18 Kernmodulen
+
 ## 25.09.2026 — Sprint 364: Autonomie-Maximierung — 10 Influencer-Personas, Reichweiten-Engine, Projekt-Superagenten-Fabrik & Bot-Villa
 
 - **10 KI-Influencer-Personas** (+Orion Tech & Gadgets, +Ava Gesundheit & Fitness, +Rio Food & Genuss, +Nala Reisen & Nomadenleben): Router-Auswahl dynamisch aus der Registry abgeleitet, Revenue-OS-Accents erweitert; bestehende 6 Personas unveraendert kompatibel

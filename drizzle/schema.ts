@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -277,3 +278,46 @@ export const draftQueue = pgTable("draftQueue", {
 
 export type DraftQueueRow = typeof draftQueue.$inferSelect;
 export type InsertDraftQueueRow = typeof draftQueue.$inferInsert;
+
+// Sprint 365 — Autonomes Social-Media-Publishing (Warteschlange je Nutzer).
+// Kampagnen-Slots der 10 Influencer-Personas landen als Jobs hier; der
+// Publishing-Autopilot verarbeitet faellige Eintraege autonom (live, wenn
+// Plattform-Credentials vorhanden, sonst ehrlich im Sandbox-Modus).
+// Tokens liegen NUR in Env-Variablen, niemals in der DB.
+export const publishingStatus = pgEnum("publishing_status", [
+  "geplant",
+  "sandbox_veroeffentlicht",
+  "veroeffentlicht",
+  "fehlgeschlagen",
+  "abgebrochen",
+]);
+
+export const publishingJobs = pgTable(
+  "publishingJobs",
+  {
+    id: serial("id").primaryKey(),
+    userOpenId: text("user_open_id").notNull(),
+    product: text("product").notNull(),
+    goal: text("goal").notNull(),
+    persona: text("persona").notNull(),
+    platform: text("platform").notNull(),
+    campaignDay: integer("campaign_day").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    status: publishingStatus("status").notNull().default("geplant"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    mode: text("mode"),
+    externalId: text("external_id"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("publishing_jobs_queue_idx").on(table.userOpenId, table.status, table.scheduledFor),
+    uniqueIndex("publishing_jobs_dedupe_idx").on(table.userOpenId, table.dedupeKey),
+  ],
+);
+
+export type PublishingJobRow = typeof publishingJobs.$inferSelect;
+export type InsertPublishingJobRow = typeof publishingJobs.$inferInsert;
