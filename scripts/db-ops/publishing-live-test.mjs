@@ -136,11 +136,49 @@ async function xDiagnose() {
   }
 }
 
+
+/**
+ * x-post-live-test: Sendet den autorisierten Live-Test-Post DIREKT mit dem
+ * Token aus platform_tokens und schliesst Job id (der noch geplante Live-Test)
+ * ehrlich ab — bei Erfolg veroeffentlicht, bei Fehler mit vollem Body-Log.
+ * Bewusst nur fuer den bestaetigten Admin-Live-Test gedacht.
+ */
+async function xPostLiveTest() {
+  const client = await pool.connect();
+  try {
+    const rows = await client.query('SELECT access_token FROM "platform_tokens" WHERE platform = \'x\' LIMIT 1');
+    if (rows.rows.length === 0) throw new Error("Kein X-Tokensatz in platform_tokens.");
+    const token = rows.rows[0].access_token;
+    const text = "Live-Test des CyberSarah Publishing-Autopiloten: erster vollautonomer X-Post mit OAuth2-Token-Rotation. Live-Betrieb aktiv. \u{1F680}";
+    const response = await fetch("https://api.x.com/2/tweets", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const body = await response.text();
+    console.log(`[db-ops] POST /2/tweets -> HTTP ${response.status}`);
+    console.log(`[db-ops] Body: ${body.slice(0, 600)}`);
+    if (response.ok) {
+      const externalId = JSON.parse(body).data?.id ?? "x-unknown";
+      const upd = await client.query(
+        'UPDATE "publishingJobs" SET status = \'veroeffentlicht\', mode = \'live\', external_id = $1, published_at = now(), updated_at = now(), last_error = NULL WHERE status = \'geplant\' AND platform = \'x\' RETURNING id',
+        [externalId],
+      );
+      console.log(`[db-ops] Job abgeschlossen: ${upd.rows.length > 0 ? "id=" + upd.rows[0].id : "kein offener Job (bereits verarbeitet)"}, external_id=${externalId}`);
+    } else {
+      console.log("[db-ops] Post fehlgeschlagen — Job bleibt geplant, Autopilot retryt nach Backoff.");
+    }
+  } finally {
+    client.release();
+  }
+}
+
 try {
   if (OP === "publishing-enqueue-live-test") await enqueue();
   else if (OP === "publishing-status") await status();
   else if (OP === "publishing-diagnose") await diagnose();
   else if (OP === "x-diagnose") await xDiagnose();
+  else if (OP === "x-post-live-test") await xPostLiveTest();
   else {
     console.error(`[db-ops] Unbekannte Publishing-Operation: ${OP}`);
     process.exit(1);

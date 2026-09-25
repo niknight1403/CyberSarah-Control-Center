@@ -17,6 +17,7 @@ on:
           - publishing-status
           - publishing-diagnose
           - x-diagnose
+          - x-post-live-test
         default: chat-clear-preview
 
 permissions:
@@ -48,7 +49,7 @@ jobs:
           node chat-clear.mjs
 
       - name: Publishing Live-Test Operation (Sprint 370)
-        if: startsWith(github.event.inputs.operation, 'publishing-') || github.event.inputs.operation == 'x-diagnose'
+        if: startsWith(github.event.inputs.operation, 'publishing-') || startsWith(github.event.inputs.operation, 'x-')
         working-directory: scripts/db-ops
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
