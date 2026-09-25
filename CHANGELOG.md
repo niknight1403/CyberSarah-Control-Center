@@ -3,6 +3,13 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 163 nachgezogen: Repo-Chat-Service & repo.searchCode (Portierung auf V4.2-Stand)
+
+- `server/repo-chat-service.ts`: GitHub-Tarball-Indizierung fuer Code-Abfragen mit Dateipfad:Zeile — Download via codeload, Entpacken in gebundenen Sandbox-Temp-Ordner, Budget-Deckel (nur Code-Endungen, max. 256 KB je Datei, max. 1500 Dateien), In-Memory-Index-Cache pro repo@branch (TTL 60 min, Build-Lock gegen parallele Downloads); ehrlicher Fehlerzustand ohne GITHUB_TOKEN/Netzwerk
+- Orchestrator-Tool `repo.searchCode` (read-only, HITL-unbedenklich): Symbol- und Pfadsuche gegen den aktuellen Repo-Stand, Treffer als `Dateipfad:Zeile`
+- `lib/repo-chat-logic.ts`: `isIndexableCodeFile()` / `collectIndexableFiles()` (rein, getestet)
+- Live verifiziert gegen den eigenen Repo-Stand: 1.161 Dateien, 19.676 Symbole indiziert; 16 Repo-Chat-Tests gruen, verify:system GREEN (11 Kernmodule)
+
 ## 25.09.2026 — Sprints 359–363: Serie H Admin & Ops Rest + Abschluss (Batch 16)
 
 - Deployment-Status-Screen (Sprint 359): Aggregation von Deployment-Status, Commit SHA, Umgebungsübersicht (Prod/Staging) und Health-Checks aller Systemkomponenten inkl. Rollback-Verfolgung (`lib/deployment-status-logic.ts`)

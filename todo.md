@@ -1,5 +1,6 @@
 # Project TODO
 
+- [x] Sprint 163 (portiert auf V4.2): Repo-Chat-Service (Tarball-Indizierung, Budget-Deckel, Index-Cache) + repo.searchCode-Orchestrator-Tool, live verifiziert (1.161 Dateien / 19.676 Symbole).
 - [x] Define the portrait-first Custom AI Studio Mobile design and remote-workspace boundary.
 - [x] Replace the template with the dark Workspace, Agent, Preview, and Settings experience.
 - [x] Build a typed local workspace model with file selection, editing, logs, and agent proposals.

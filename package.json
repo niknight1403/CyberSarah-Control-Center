@@ -39,6 +39,7 @@
     "@trpc/react-query": "^11.18.0",
     "@trpc/server": "^11.18.0",
     "@types/crypto-js": "^4.2.2",
+    "@types/tar": "^6.1.13",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",
     "compression": "^1.8.2",
@@ -90,6 +91,7 @@
     "stripe": "^22.6.1",
     "superjson": "^2.2.6",
     "tailwind-merge": "^3.6.0",
+    "tar": "^7.5.22",
     "zod": "^4.2.1"
   },
   "devDependencies": {

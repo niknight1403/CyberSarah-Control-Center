@@ -27,6 +27,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 
 import { evaluateHITLRisk } from "../../lib/hitl-guard-logic";
+import { searchRepoCode } from "../repo-chat-service";
 
 export interface ToolResult {
   ok: boolean;
@@ -344,6 +345,48 @@ const tools: ToolSpec[] = [
             encoding: data?.encoding,
             content: tooLarge ? text.slice(0, 400_000) : text,
             truncated: Boolean(tooLarge),
+          },
+        };
+      }),
+  },
+  {
+    name: "repo.searchCode",
+    description:
+      "Durchsucht den Quellcode des GitHub-Repos (Sprint 163, V4.0 Repo Chat): " +
+      "liefert Treffer mit Dateipfad und Zeilennummer (Symbolname, Pfad-Suche). " +
+      "Der Index wird pro Branch gecacht; read-only, ohne confirm nutzbar.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Suchbegriff: Symbolname (z. B. evaluateHITLRisk) oder Pfadfragment." },
+        repo: { type: "string", description: "Optional: owner/repo (Default: ORCHESTRATOR_GITHUB_REPO)." },
+        branch: { type: "string", description: "Optional: Branch (Default: main)." },
+      },
+      required: ["query"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const query = String(args.query ?? "").trim();
+        if (!query) return { ok: false, error: "Parameter query fehlt." };
+        const response = await searchRepoCode(query, {
+          repo: typeof args.repo === "string" && args.repo.trim() ? args.repo.trim() : undefined,
+          branch: typeof args.branch === "string" && args.branch.trim() ? args.branch.trim() : undefined,
+        });
+        if (!response.ok || !response.result) {
+          return { ok: false, error: response.error ?? "Code-Suche fehlgeschlagen." };
+        }
+        return {
+          ok: true,
+          result: {
+            query,
+            repo: response.repo,
+            branch: response.branch,
+            symbols: response.result.symbols.map((symbol) => ({
+              kind: symbol.kind,
+              name: symbol.name,
+              location: `${symbol.filePath}:${symbol.line}`,
+            })),
+            files: response.result.files.map((file) => file.path),
           },
         };
       }),

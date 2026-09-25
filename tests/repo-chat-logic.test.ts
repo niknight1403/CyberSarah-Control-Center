@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   answerCodeQuery,
+  collectIndexableFiles,
   DEFAULT_REPO_EXCLUDES,
+  INDEXABLE_FILE_LIMIT,
+  INDEXABLE_MAX_FILE_BYTES,
+  isIndexableCodeFile,
   extractSymbols,
   indexRepoFiles,
   isExcludedPath,
@@ -143,5 +147,49 @@ describe("answerCodeQuery", () => {
   it("leere Abfrage liefert leeres Ergebnis, Limit wird respektiert", () => {
     expect(answerCodeQuery("", index).symbols).toEqual([]);
     expect(answerCodeQuery("e", index, 1).symbols.length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("isIndexableCodeFile / collectIndexableFiles (Sprint 163 — Tarball-Budget)", () => {
+  it("erkennt Code-Endungen und wirft Nicht-Code sowie Ausgeschlossenes raus", () => {
+    expect(isIndexableCodeFile("lib/server.ts")).toBe(true);
+    expect(isIndexableCodeFile("components/App.tsx")).toBe(true);
+    expect(isIndexableCodeFile("scripts/tool.mjs")).toBe(true);
+    expect(isIndexableCodeFile("README.md")).toBe(false);
+    expect(isIndexableCodeFile("assets/logo.png")).toBe(false);
+    expect(isIndexableCodeFile("node_modules/pkg/index.js")).toBe(false);
+    expect(isIndexableCodeFile("dist/bundle.js")).toBe(false);
+  });
+
+  it("respektiert Dateigroessen-Budget deterministisch", () => {
+    const entries = [
+      { path: "a.ts", size: 100 },
+      { path: "b.ts", size: INDEXABLE_MAX_FILE_BYTES + 1 },
+      { path: "c.ts", size: -5 },
+      { path: "d.ts", size: 42 },
+      { path: "e.txt", size: 10 },
+    ];
+    expect(collectIndexableFiles(entries)).toEqual([
+      { path: "a.ts", size: 100 },
+      { path: "d.ts", size: 42 },
+    ]);
+  });
+
+  it("kappt bei INDEXABLE_FILE_LIMIT (Budget-Deckel fuer grosse Repos)", () => {
+    const entries = Array.from({ length: INDEXABLE_FILE_LIMIT + 50 }, (_, index) => ({
+      path: `src/file${index}.ts`,
+      size: 10,
+    }));
+    const collected = collectIndexableFiles(entries);
+    expect(collected).toHaveLength(INDEXABLE_FILE_LIMIT);
+    expect(collected[0].path).toBe("src/file0.ts");
+  });
+
+  it("ungueltige Groessenangaben werden uebersprungen, nicht abgebrochen", () => {
+    const entries = [
+      { path: "bad.ts", size: Number.NaN },
+      { path: "good.ts", size: 7 },
+    ];
+    expect(collectIndexableFiles(entries)).toEqual([{ path: "good.ts", size: 7 }]);
   });
 });
