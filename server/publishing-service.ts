@@ -18,6 +18,13 @@
 
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import { create, type AxiosInstance } from "axios";
+import {
+  autoCardAssetUrl,
+  buildPublishingCardPng,
+  validateAssetUrl,
+  IMAGE_ASSET_EXTENSIONS,
+  VIDEO_ASSET_EXTENSIONS,
+} from "../lib/asset-card-logic";
 
 import { publishingJobs, type InsertPublishingJobRow, type PublishingJobRow } from "../drizzle/schema";
 import { buildInfluencerPrompt, getInfluencerPersona, type InfluencerPersonaId, type InfluencerPlatform } from "../lib/influencer-persona-logic";
@@ -43,6 +50,17 @@ const AUTOPILOT_BATCH = 10;
 let autopilotTimer: ReturnType<typeof setInterval> | null = null;
 
 /** Credentials aus Env lesen (Live-Slots; niemals persistiert). */
+/** Oeffentliche Basis-URL der App — Grundlage fuer Auto-Karten-Assets (Sprint 367, Optimierung 2+5). */
+export function publicAssetBaseUrl(): string | null {
+  const base = (
+    process.env.PUBLIC_APP_ORIGIN ??
+    process.env.RENDER_PUBLIC_URL ??
+    process.env.PUBLIC_BASE_URL ??
+    ""
+  ).trim();
+  return base || null;
+}
+
 export function readPlatformCredentialsFromEnv(): PlatformCredentials {
   return {
     x: process.env.X_PUBLISH_TOKEN ? { token: process.env.X_PUBLISH_TOKEN } : undefined,
@@ -80,7 +98,7 @@ async function insertPlannedJobs(rows: InsertPublishingJobRow[]): Promise<number
 
 export async function enqueueCampaignForUser(
   userOpenId: string,
-  input: { product: string; goal: InfluencerGoal; days?: number; assetUrl?: string | null }
+  input: { product: string; goal: InfluencerGoal; days?: number; assetUrl?: string | null; assetUrls?: string[] }
 ): Promise<{ planned: number; inserted: number; focusPersona: string; firstSlotAt: Date }> {
   if (!userOpenId) throw new Error("Nutzerkontext fehlt — Kampagne nicht einreihbar.");
   const plan = planInfluencerCampaign(input.product, input.goal, { days: input.days });
@@ -95,6 +113,7 @@ export async function enqueueCampaignForUser(
     dedupeKey: job.dedupeKey,
     scheduledFor: job.scheduledFor,
     assetUrl: input.assetUrl ?? null,
+    assetUrls: input.assetUrls ?? [],
   }));
   const inserted = await insertPlannedJobs(rows);
   return {
@@ -127,6 +146,48 @@ export async function setPublishingJobAsset(
     )
     .returning({ id: publishingJobs.id });
   return updated.length > 0;
+}
+
+/** Laedt die Karten-Daten (Persona, Produkt, Headline) eines Jobs fuer die Auto-Karten-Route. */
+export async function getPublishingJobCard(
+  jobId: number
+): Promise<{ personaId: string; product: string; headline: string } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [job] = await db.select().from(publishingJobs).where(eq(publishingJobs.id, jobId)).limit(1);
+  if (!job) return null;
+  return { personaId: job.persona, product: job.product, headline: job.product };
+}
+
+/** Sprint 367 (Optimierung 3): Carousel-Assets (2-10 valide Bild-URLs) auf einen geplanten Job setzen. */
+export async function setPublishingJobAssets(
+  userOpenId: string,
+  jobId: number,
+  assetUrls: string[]
+): Promise<{ updated: boolean; reason?: string }> {
+  const db = await getDb();
+  if (!db) return { updated: false, reason: "Datenbank nicht verfuegbar." };
+  if (assetUrls.length < 2) return { updated: false, reason: "Carousel braucht mindestens 2 Assets." };
+  if (assetUrls.length > 10) return { updated: false, reason: "Carousel unterstuetzt max. 10 Assets." };
+  const cleaned: string[] = [];
+  for (const url of assetUrls) {
+    const trimmed = url.trim();
+    const check = validateAssetUrl(trimmed, "image");
+    if (!check.valid) return { updated: false, reason: `Asset ungueltig: ${check.reason}` };
+    cleaned.push(trimmed);
+  }
+  const updated = await db
+    .update(publishingJobs)
+    .set({ assetUrls: cleaned, updatedAt: new Date() })
+    .where(
+      and(
+        eq(publishingJobs.id, jobId),
+        eq(publishingJobs.userOpenId, userOpenId),
+        eq(publishingJobs.status, "geplant")
+      )
+    )
+    .returning({ id: publishingJobs.id });
+  return { updated: updated.length > 0 };
 }
 
 export async function listPublishingJobsForUser(
@@ -221,7 +282,8 @@ async function publishLive(
   platform: string,
   content: string,
   credentials: PlatformCredentials,
-  assetUrl?: string | null
+  assetUrl?: string | null,
+  assetUrls?: string[]
 ): Promise<{ externalId: string }> {
   const cred = credentials[platform as keyof PlatformCredentials];
   if (!cred?.token) throw new Error(`Kein ${platform}-Token — Live-Publishing nicht moeglich.`);
@@ -254,18 +316,8 @@ async function publishLive(
     return { externalId: String(response.data?.id ?? "threads-unknown") };
   }
   if (platform === "instagram") {
-    // Graph-API 2-Schritt: Container anlegen, dann veroeffentlichen (Sprint 366).
     if (!cred.endpointUserId) throw new Error("Instagram-User-ID fehlt (INSTAGRAM_PUBLISH_USER_ID).");
-    if (!assetUrl) throw new Error("Instagram braucht eine Asset-URL (Bild) — Job ohne Asset nicht live.");
-    const container = await client.post(`/${cred.endpointUserId}/media`, null, {
-      params: { access_token: cred.token, image_url: assetUrl, caption: content.slice(0, 2200) },
-    });
-    const containerId = container.data?.id;
-    if (!containerId) throw new Error("Instagram-Container konnte nicht angelegt werden — keine Container-ID.");
-    const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
-      params: { access_token: cred.token, creation_id: containerId },
-    });
-    return { externalId: String(publish.data?.id ?? `ig-${containerId}`) };
+    return publishInstagramLive(client, { token: cred.token, endpointUserId: cred.endpointUserId }, content, assetUrl, assetUrls);
   }
   if (platform === "tiktok") {
     // Content-Posting-API mit PULL_FROM_URL: Video muss als URL erreichbar sein (Sprint 366).
@@ -296,6 +348,113 @@ export type AutopilotOutcome = {
 };
 
 /** Verarbeitet alle faelligen Jobs eines Nutzers. Ehrlich bei jedem Fehler. */
+
+/** Wartet, bis ein IG-Container FINISHED ist (Sprint 367, Optimierung 1) — ehrlich mit Timeout. */
+async function waitForInstagramContainer(
+  client: AxiosInstance,
+  cred: { token: string },
+  containerId: string
+): Promise<void> {
+  const maxAttempts = Number(process.env.IG_CONTAINER_POLL_MAX_ATTEMPTS ?? 20);
+  const delayMs = Number(process.env.IG_CONTAINER_POLL_DELAY_MS ?? 3000);
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const status = await client.get(`/${containerId}`, { params: { fields: "status", access_token: cred.token } });
+    const code = String(status.data?.status ?? "").toUpperCase();
+    if (code === "FINISHED") return;
+    if (code === "ERROR" || code === "EXPIRED") {
+      throw new Error(`Instagram-Container-Status ${code} — Asset wurde abgelehnt (Sprint-367-Polling).`);
+    }
+    if (attempt === maxAttempts) {
+      throw new Error(`Instagram-Container nicht rechtzeitig FINISHED (${maxAttempts} Versuche) — ehrlicher Abbruch statt Blind-Publish.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+}
+
+/** Erzeugt einen einzelnen IG-Media-Container (Bild, Video/Reels). */
+async function createInstagramContainer(
+  client: AxiosInstance,
+  cred: { token: string; endpointUserId: string },
+  params: Record<string, string>
+): Promise<string> {
+  const response = await client.post(`/${cred.endpointUserId}/media`, null, {
+    params: { ...params, access_token: cred.token },
+  });
+  const id = response.data?.id;
+  if (!id) throw new Error("Instagram-Container konnte nicht angelegt werden — keine Container-ID.");
+  return String(id);
+}
+
+/**
+ * Instagram-Live-Publishing (Sprint 366/367): Bild, Reels (Video) oder Carousel
+ * (max. 10 Assets), jeweils mit Status-Polling des Containers vor media_publish
+ * und vorabiger Asset-Validierung statt Blind-Versuch.
+ */
+async function publishInstagramLive(
+  client: AxiosInstance,
+  cred: { token: string; endpointUserId: string },
+  content: string,
+  assetUrl: string | null | undefined,
+  assetUrls: string[] | undefined
+): Promise<{ externalId: string }> {
+  const caption = content.slice(0, 2200);
+  const assets = (assetUrls && assetUrls.length > 0 ? assetUrls : assetUrl ? [assetUrl] : [])
+    .map((url) => url.trim())
+    .filter(Boolean);
+
+  if (assets.length > 1) {
+    // Carousel (Optimierung 3): max. 10 Kinder, alle muessen valide Bilder sein.
+    if (assets.length > 10) throw new Error(`Carousel unterstuetzt max. 10 Assets — ${assets.length} gegeben (Sprint 367).`);
+    for (const url of assets) {
+      const check = validateAssetUrl(url, "image");
+      if (!check.valid) throw new Error(`Carousel-Asset ungueltig: ${check.reason}`);
+    }
+    const children: string[] = [];
+    for (const url of assets) {
+      children.push(await createInstagramContainer(client, cred, { image_url: url, is_carousel_item: "true" }));
+    }
+    const carouselId = await createInstagramContainer(client, cred, {
+      media_type: "CAROUSEL",
+      children: children.join(","),
+      caption,
+    });
+    await waitForInstagramContainer(client, cred, carouselId);
+    const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
+      params: { access_token: cred.token, creation_id: carouselId },
+    });
+    return { externalId: String(publish.data?.id ?? `ig-${carouselId}`) };
+  }
+
+  if (assets.length === 1) {
+    const url = assets[0];
+    const isVideo = VIDEO_ASSET_EXTENSIONS.some((ext) => url.toLowerCase().split("?")[0].endsWith(ext));
+    if (isVideo) {
+      const check = validateAssetUrl(url, "video");
+      if (!check.valid) throw new Error(`Reels-Asset ungueltig: ${check.reason}`);
+      const containerId = await createInstagramContainer(client, cred, {
+        media_type: "REELS",
+        video_url: url,
+        caption,
+      });
+      await waitForInstagramContainer(client, cred, containerId);
+      const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
+        params: { access_token: cred.token, creation_id: containerId },
+      });
+      return { externalId: String(publish.data?.id ?? `ig-${containerId}`) };
+    }
+    const check = validateAssetUrl(url, "image");
+    if (!check.valid) throw new Error(`Bild-Asset ungueltig: ${check.reason}`);
+    const containerId = await createInstagramContainer(client, cred, { image_url: url, caption });
+    await waitForInstagramContainer(client, cred, containerId);
+    const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
+      params: { access_token: cred.token, creation_id: containerId },
+    });
+    return { externalId: String(publish.data?.id ?? `ig-${containerId}`) };
+  }
+
+  throw new Error("Instagram braucht mindestens eine Asset-URL — Job ohne Asset nicht live.");
+}
+
 export async function processDueJobsForUser(userOpenId: string, now = new Date()): Promise<AutopilotOutcome> {
   const db = await getDb();
   if (!db) return { processed: 0, live: 0, sandbox: 0, failed: 0 };
@@ -313,12 +472,25 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
   for (const job of due) {
     if (!isJobDue(job, now)) continue;
     outcome.processed += 1;
-    const resolution = resolvePublishingMode(job.platform, credentials, { hasAsset: Boolean(job.assetUrl) });
+
+    // Sprint 367 (Optimierung 2+5): Instagram-Job ohne Asset -> automatisch
+    // generierte, app-gehostete PNG-Karte im Persona-Stil statt manueller URL.
+    let jobAssetUrl = job.assetUrl;
+    const hasCarousel = Array.isArray(job.assetUrls) && job.assetUrls.length > 0;
+    if (job.platform === "instagram" && !jobAssetUrl && !hasCarousel) {
+      const base = publicAssetBaseUrl();
+      if (base) {
+        jobAssetUrl = autoCardAssetUrl(base, job.id);
+        await db.update(publishingJobs).set({ assetUrl: jobAssetUrl, updatedAt: new Date() }).where(eq(publishingJobs.id, job.id));
+      }
+    }
+
+    const resolution = resolvePublishingMode(job.platform, credentials, { hasAsset: Boolean(jobAssetUrl) || hasCarousel });
 
     try {
       const content = await generateJobContent(job);
       if (resolution.mode === "live") {
-        const { externalId } = await publishLive(job.platform, content, credentials, job.assetUrl);
+        const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls);
         await db
           .update(publishingJobs)
           .set({
@@ -364,7 +536,64 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
       outcome.failed += 1;
     }
   }
+
+  // Sprint 367 (Optimierung 6): Engagement-Rueckkanal — IG-Insights nach dem
+  // Publish abholen (best effort, nie fatal fuer den Tick).
+  await collectInstagramInsightsForUser(userOpenId);
   return outcome;
+}
+
+/**
+ * Sprint 367 (Optimierung 6): Instagram-Insights (Impressions, Reichweite)
+ * fuer veroeffentlichte Live-Jobs abholen und am Job speichern — Grundlage
+ * fuer die Conversion-Optimierung der Reichweiten-Engine.
+ */
+export async function collectInstagramInsightsForUser(userOpenId: string, now = new Date()): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const credentials = readPlatformCredentialsFromEnv();
+  const ig = credentials.instagram;
+  if (!ig?.token || !ig.endpointUserId) return 0;
+
+  const candidates = await db
+    .select()
+    .from(publishingJobs)
+    .where(
+      and(
+        eq(publishingJobs.userOpenId, userOpenId),
+        eq(publishingJobs.status, "veroeffentlicht"),
+        eq(publishingJobs.platform, "instagram"),
+        eq(publishingJobs.mode, "live")
+      )
+    );
+
+  let collected = 0;
+  for (const job of candidates) {
+    if (job.insightsFetchedAt) continue;
+    if (!job.externalId || job.externalId.startsWith("sandbox-")) continue;
+    if (!job.publishedAt || now.getTime() - job.publishedAt.getTime() < 60_000) continue;
+    try {
+      const client = platformClient("instagram", ig.token);
+      const response = await client.get(`/${job.externalId}/insights`, {
+        params: { metric: "impressions,reach", access_token: ig.token },
+      });
+      const rows = Array.isArray(response.data?.data) ? response.data.data : [];
+      const insights: Record<string, number> = { ...job.insights };
+      for (const row of rows) {
+        const value = Number(row?.values?.[0]?.value ?? 0);
+        if (Number.isFinite(value)) insights[String(row?.name ?? "metric")] = value;
+      }
+      await db
+        .update(publishingJobs)
+        .set({ insights, insightsFetchedAt: now, updatedAt: now })
+        .where(eq(publishingJobs.id, job.id));
+      collected += 1;
+    } catch (error) {
+      // Insights sind ein Rueckkanal, kein Pflichtteil — Fehler wird nur geloggt.
+      console.warn(`[Publishing] Insights fuer Job ${job.id} nicht abholbar:`, error instanceof Error ? error.message : "unbekannt");
+    }
+  }
+  return collected;
 }
 
 let autopilotBusy = false;

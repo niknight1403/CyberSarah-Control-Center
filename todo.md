@@ -1,5 +1,6 @@
 # Project TODO
 
+- [x] Sprint 367: Instagram-Medien-Pipeline finalisiert (Issue #45) — Container-Polling, Auto-Karten (app-gehostet, PNG ohne Bild-Libs), Reels/Carousel, vorabige Asset-Validierung, Insights-Rueckkanal (Migration 0011); Publishing-Tokens fliessen via GitHub Secrets in den Render-Deploy; E2E 6/6 gruen.
 - [x] Sprint 366: Publishing-Logik fuer alle 5 Plattformen finalisiert — Instagram (Graph-API 2-Schritt) und TikTok (PULL_FROM_URL) live-faehig mit Asset-Pipeline (Migration 0010, enqueue/setAsset), ehrliche Modus-Aufloesung pro Job, E2E-Vollautomatik gegen Mock-APIs verifiziert (5/5 live).
 - [x] Sprint 365: Autonomes Social-Media-Publishing — Publishing-Tabelle (Migration 0009), Warteschlange mit Dedupe/Retry-Backoff, Autopilot im 60-Sekunden-Takt (live mit Credentials auf X/LinkedIn/Threads, ehrlich Sandbox sonst), tRPC-Router + Orchestrator-Tools, E2E gegen Sandbox-PG verifiziert.
 - [x] Sprint 364: Autonomie-Maximierung — 10 Influencer-Personas, Reichweiten-/Revenue-Engine, Projekt-Superagenten-Fabrik mit Bot-Villa (8 Live-Kern, Pool-Kapazitaet 5000, Spawn-on-Demand, HITL-Schienen fuer Geld/Sends).

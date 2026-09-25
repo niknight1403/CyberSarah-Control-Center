@@ -85,6 +85,17 @@ jobs:
           # Fallback: gleiches Token wie der Workspace-Service selbst (SERVICE_ACCESS_TOKEN)
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          # Sprint 367: Publishing-Tokens (optional — leere Secrets bleiben
+          # leer, die Modus-Aufloesung ignoriert inaktive Plattformen).
+          X_PUBLISH_TOKEN: ${{ secrets.X_PUBLISH_TOKEN }}
+          LINKEDIN_PUBLISH_TOKEN: ${{ secrets.LINKEDIN_PUBLISH_TOKEN }}
+          LINKEDIN_PUBLISH_USER_URN: ${{ secrets.LINKEDIN_PUBLISH_USER_URN }}
+          THREADS_PUBLISH_TOKEN: ${{ secrets.THREADS_PUBLISH_TOKEN }}
+          THREADS_PUBLISH_USER_ID: ${{ secrets.THREADS_PUBLISH_USER_ID }}
+          INSTAGRAM_PUBLISH_TOKEN: ${{ secrets.INSTAGRAM_PUBLISH_TOKEN }}
+          INSTAGRAM_PUBLISH_USER_ID: ${{ secrets.INSTAGRAM_PUBLISH_USER_ID }}
+          TIKTOK_PUBLISH_TOKEN: ${{ secrets.TIKTOK_PUBLISH_TOKEN }}
+          PUBLIC_APP_ORIGIN: ${{ secrets.PUBLIC_APP_ORIGIN }}
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
         run: node scripts/render-deploy.mjs --migrate

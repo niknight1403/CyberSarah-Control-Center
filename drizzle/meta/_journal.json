@@ -78,6 +78,13 @@
       "when": 1790304087679,
       "tag": "0010_bumpy_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790305752206,
+      "tag": "0011_silky_stranger",
+      "breakpoints": true
     }
   ]
 }

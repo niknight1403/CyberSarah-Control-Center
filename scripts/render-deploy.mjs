@@ -247,6 +247,25 @@ function makeAppEnvBuilder(databaseUrl) {
   if (workspaceServiceUrl) workspaceExtra.push(`WORKSPACE_SERVICE_URL=${workspaceServiceUrl}`);
   if (workspaceServiceToken) workspaceExtra.push(`WORKSPACE_SERVICE_TOKEN=${workspaceServiceToken}`);
 
+  // Sprint 367: Publishing-Tokens via GitHub Secrets — nur gesetzt, wenn das
+  // Secret existiert (Modus-Aufloesung laesst Plattformen ohne Token im
+  // ehrlichen Sandbox-Modus statt mit leerem Token zu scheitern).
+  const publishingExtra = [];
+  for (const key of [
+    "X_PUBLISH_TOKEN",
+    "LINKEDIN_PUBLISH_TOKEN",
+    "LINKEDIN_PUBLISH_USER_URN",
+    "THREADS_PUBLISH_TOKEN",
+    "THREADS_PUBLISH_USER_ID",
+    "INSTAGRAM_PUBLISH_TOKEN",
+    "INSTAGRAM_PUBLISH_USER_ID",
+    "TIKTOK_PUBLISH_TOKEN",
+    "PUBLIC_APP_ORIGIN",
+  ]) {
+    const value = env(key, "").trim();
+    if (value) publishingExtra.push(`${key}=${value}`);
+  }
+
   return (baseUrl) =>
     buildServiceEnv({
       databaseUrl,
@@ -270,7 +289,7 @@ function makeAppEnvBuilder(databaseUrl) {
       stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
       stripeProductId: env("STRIPE_PRICE_ID"),
       trustProxy: env("TRUST_PROXY", "1"),
-      extra: workspaceExtra,
+      extra: [...workspaceExtra, ...publishingExtra],
     });
 }
 

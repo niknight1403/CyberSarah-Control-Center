@@ -3,6 +3,17 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 367: Instagram-Medien-Pipeline finalisiert (Issue #45) + Publishing-Tokens via GitHub Secrets
+
+- **Container-Status-Polling (Optimierung 1)**: Vor media_publish wird der Container-Status gepollt (GET /{container-id}?fields=status) bis FINISHED — IN_PROGRESS wartet, ERROR/EXPIRED bricht ehrlich ab, nach max. Versuchen Timeout statt Blind-Publish (Env IG_CONTAINER_POLL_MAX_ATTEMPTS / IG_CONTAINER_POLL_DELAY_MS)
+- **Automatische Asset-Generierung (Optimierung 2)**: IG-Jobs ohne Asset bekommen automatisch eine app-gehostete PNG-Karte im Persona-Stil — deterministischer 5x7-Bitmap-Font, Persona-Paletten, Format 1:1/4:5, reiner PNG-Encoder via Node-zlib (keine Bild-Libraries); oeffentliche Route GET /api/publishing/assets/{jobId}.png
+- **Format-Support (Optimierung 3)**: neben Einzelbildern jetzt Reels (Video, media_type=REELS) und Carousels (2-10 Assets, Kinder-Container + CAROUSEL-Container); tRPC publishing.setAssets (nur geplant, nur valide Bild-URLs, max. 10)
+- **Asset-Validierung vorab (Optimierung 4)**: nur http(s)-URLs, nur passende Endungen (.jpg/.jpeg/.png/.webp fuer Bilder, .mp4/.mov fuer Video) — ungültige Assets werden mit klarem Grund abgelehnt statt Live-Versuch ins Blaue (E2E: GIF ehrlich abgelehnt, Job bleibt im Retry-Pfad)
+- **App-gehostete Assets (Optimierung 5)**: eigene Karte auf eigener Route — keine externen Hosting-Dienste; Basis-URL aus PUBLIC_APP_ORIGIN/RENDER_PUBLIC_URL/PUBLIC_BASE_URL
+- **Engagement-Rueckkanal (Optimierung 6)**: collectInstagramInsightsForUser holt nach dem Publish Impressions/Reach (GET /{externalId}/insights) und speichert sie am Job (Migration 0011: insights, insights_fetched_at, asset_urls); Best-Effort — Insights-Fehler brechen den Autopilot-Tick nie
+- **Publishing-Tokens via GitHub Secrets**: render-deploy.mjs synchronisiert X/LINKEDIN/THREADS/INSTAGRAM/TIKTOK-PUBLISH-Tokens aus GitHub Secrets zur Render-App (nur gesetzt, wenn das Secret existiert — Plattformen ohne Token bleiben ehrlich im Sandbox-Modus); render-deploy.yml uebergibt die Secrets an den Deploy
+- **E2E verifiziert**: Auto-Karte live (app-gehostet), Carousel mit 3 Kindern, Reels, ungueltiges Asset ehrlich abgelehnt, Polling IN_PROGRESS->FINISHED, Insights (reach 567 / impressions 1234) eingesammelt und gespeichert; 2195 Tests gruen, verify:system GREEN mit 18 Kernmodulen
+
 ## 25.09.2026 — Sprint 366: Publishing-Logik fuer ALLE 5 Plattformen finalisiert — Instagram & TikTok live-faehig
 
 - **Instagram-Adapter (Graph-API, 2-Schritt)**: Container anlegen (image_url + Caption) -> media_publish; live nur mit Token + IG-User-ID + Asset-URL (Env INSTAGRAM_PUBLISH_TOKEN, INSTAGRAM_PUBLISH_USER_ID)

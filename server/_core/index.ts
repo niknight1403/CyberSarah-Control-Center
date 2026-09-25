@@ -5,7 +5,8 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
 import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
-import { startPublishingAutopilot } from "../publishing-service";
+import { startPublishingAutopilot, getPublishingJobCard } from "../publishing-service";
+import { buildPublishingCardPng, type IgRatioKey } from "../../lib/asset-card-logic";
 import {
   isWebFallbackCandidate,
   mapUrlPathToWebFile,
@@ -157,6 +158,30 @@ async function startServer() {
       res.status(result.status).json({ ok: result.ok, maskedKey: result.maskedKey, message: result.safeMessage });
     } catch {
       res.status(500).json({ ok: false, error: "Interner Fehler beim Rotations-Webhook." });
+    }
+  });
+
+  // Sprint 367: App-gehostete Auto-Karten fuer Instagram-Jobs (public, da die
+  // Graph-API die URL serverseitig abrufen muss). Deterministisch aus dem Job.
+  app.get("/api/publishing/assets/:jobId.png", async (req, res) => {
+    const jobId = Number(req.params.jobId);
+    if (!Number.isInteger(jobId) || jobId <= 0) {
+      res.status(400).json({ error: "Ungueltige Job-ID." });
+      return;
+    }
+    try {
+      const card = await getPublishingJobCard(jobId);
+      if (!card) {
+        res.status(404).json({ error: "Job nicht gefunden." });
+        return;
+      }
+      const png = buildPublishingCardPng({ ...card, ratio: (req.query.ratio as IgRatioKey) ?? "square" });
+      res.setHeader("content-type", "image/png");
+      res.setHeader("cache-control", "public, max-age=86400");
+      res.status(200).send(png);
+    } catch (error) {
+      console.error("[Publishing] Auto-Karte fehlgeschlagen:", error instanceof Error ? error.message : "unbekannt");
+      res.status(500).json({ error: "Karte konnte nicht generiert werden." });
     }
   });
 
