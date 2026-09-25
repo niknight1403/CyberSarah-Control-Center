@@ -7,6 +7,7 @@ import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { ScreenContainer } from "@/components/screen-container";
 import { useIdeaInbox } from "@/hooks/use-idea-inbox";
+import { AutonomousDraftsCard } from "@/components/glass/autonomous-drafts";
 import {
   describeIdeaAge,
   describeInboxAges,
@@ -33,7 +34,7 @@ const PROMPT_HINTS = [
  */
 export default function IdeasScreen() {
   const drawer = useNavDrawer();
-  const { state, runPrompt, approvePending, dismissPending } = useIdeaInbox();
+  const { state, runPrompt, approvePending, dismissPending, adoptIdea } = useIdeaInbox();
   const [prompt, setPrompt] = useState("");
   const styles = useMemo(() => createStyles(), []);
   const [snapshotAt] = useState(() => Date.now());
@@ -167,6 +168,15 @@ export default function IdeasScreen() {
               </Text>
             ))}
           </GlassCard>
+
+          <AutonomousDraftsCard
+            kinds={["idea"]}
+            accent="purple"
+            onAdoptIdea={async (payload) => {
+              const result = await adoptIdea(payload.note, `${payload.note} — ${payload.rationale}`, "autonom");
+              return result;
+            }}
+          />
 
           <Text style={styles.disclaimer}>{IDEA_DISCLAIMER}</Text>
         </ScrollView>

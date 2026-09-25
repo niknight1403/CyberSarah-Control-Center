@@ -251,3 +251,29 @@ export const superAgents = pgTable("superAgents", {
 
 export type SuperAgentRow = typeof superAgents.$inferSelect;
 export type InsertSuperAgentRow = typeof superAgents.$inferInsert;
+
+/**
+ * Sprint 346 — Autonome Draft-Engine: Freigabe-Queue (HITL).
+ * Die Engine (Cron/admin) erzeugt NUR "pending"-Zeilen; "approved"/
+ * "rejected" entscheidet ausschliesslich ein Mensch. Nichts wird ohne
+ * Freigabe veroeffentlicht oder ausgefuehrt.
+ */
+export const draftKind = pgEnum("draft_kind", ["content", "revenue-loop", "idea"]);
+export const draftStatus = pgEnum("draft_status", ["pending", "approved", "rejected"]);
+
+export const draftQueue = pgTable("draftQueue", {
+  id: serial("id").primaryKey(),
+  kind: draftKind("kind").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  payload: jsonb("payload").notNull(),
+  status: draftStatus("status").notNull().default("pending"),
+  createdBy: varchar("createdBy", { length: 64 }).notNull().default("draft-engine"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decidedBy: varchar("decidedBy", { length: 64 }),
+}, (table) => [
+  index("draftQueue_status_kind_idx").on(table.status, table.kind),
+]);
+
+export type DraftQueueRow = typeof draftQueue.$inferSelect;
+export type InsertDraftQueueRow = typeof draftQueue.$inferInsert;

@@ -156,9 +156,29 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
     await persist(next);
   }, [state.pending, persist]);
 
+  /**
+   * Sprint 346 — Autonome Ideen-Vorschlaege: legt eine freigegebene Idee
+   * direkt in die Inbox (Klick auf "Uebernehmen" = die Freigabe). Ehrlich:
+   * bei voller Inbox wird nichts ueberschrieben, sondern abgelehnt.
+   */
+  const adoptIdea = useCallback(async (title: string, note: string, source: string): Promise<{ ok: boolean; reason: string }> => {
+    const items = itemsRef.current;
+    if (!hasInboxCapacity(items)) {
+      return { ok: false, reason: "Inbox voll — erst Ideen verarbeiten." };
+    }
+    if (!validateIdeaItem({ title, note, source }).valid) {
+      return { ok: false, reason: "Vorschlag unvollstaendig." };
+    }
+    const next = [...items, createIdeaItem({ title, note, source })];
+    itemsRef.current = next;
+    setState((prev) => ({ ...prev, items: next }));
+    await persist(next);
+    return { ok: true, reason: "" };
+  }, [persist]);
+
   const dismissPending = useCallback((): void => {
     setState((prev) => ({ ...prev, pending: null }));
   }, []);
 
-  return { state, runPrompt, approvePending, dismissPending };
+  return { state, runPrompt, approvePending, dismissPending, adoptIdea };
 }

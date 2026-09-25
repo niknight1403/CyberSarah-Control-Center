@@ -32,6 +32,7 @@ import { checkDatabaseHealth } from "../db";
 import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
 import { restoreRouteRotationState } from "../route-rotation-agent";
+import { runDraftEngine } from "../draft-engine";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -169,6 +170,27 @@ async function startServer() {
   });
 
   app.get("/api/metrics", metricsHandler);
+
+  // Sprint 346 — Autonome Draft-Engine: taeglicher Cron-Endpoint. Nutzt
+  // bewusst METRICS_TOKEN als gemeinsames Ops-Token (bereits auf Render UND
+  // als GitHub-Secret konfiguriert) — kein neues Secret noetig. Erzeugt
+  // NUR pending-Entwuerfe; Freigabe bleibt dem Menschen vorbehalten.
+  app.post("/api/cron/draft-engine", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runDraftEngine();
+      console.info("[Draft-Engine] Lauf abgeschlossen:", JSON.stringify(result));
+      res.json({ ok: true, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Draft-Engine] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
 
   // Sprint 66 — Live-Runtime-Endpunkte fuer das Preview-Panel (auth-pflichtig).
   installRuntimeLogger();

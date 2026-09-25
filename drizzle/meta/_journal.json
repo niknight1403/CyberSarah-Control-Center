@@ -57,6 +57,13 @@
       "when": 1789801109642,
       "tag": "0007_sharp_sage",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790292424313,
+      "tag": "0008_crazy_guardsmen",
+      "breakpoints": true
     }
   ]
 }
