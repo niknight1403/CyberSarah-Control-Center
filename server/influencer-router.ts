@@ -11,7 +11,9 @@ import {
 import { invokeLLM } from "./_core/llm";
 import { protectedProcedure, router } from "./_core/trpc";
 
-const personaIdSchema = z.enum(["nova", "mira", "juno", "lina", "kaya", "zara"]);
+const personaIdSchema = z.enum(
+  INFLUENCER_PERSONAS.map((persona) => persona.id) as [InfluencerPersonaId, ...InfluencerPersonaId[]]
+);
 const platformSchema = z.enum(["instagram", "tiktok", "linkedin", "x", "threads"]);
 
 export const influencerRouter = router({

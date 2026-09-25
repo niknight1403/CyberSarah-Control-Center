@@ -3,6 +3,15 @@
 Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
+## 25.09.2026 — Sprint 364: Autonomie-Maximierung — 10 Influencer-Personas, Reichweiten-Engine, Projekt-Superagenten-Fabrik & Bot-Villa
+
+- **10 KI-Influencer-Personas** (+Orion Tech & Gadgets, +Ava Gesundheit & Fitness, +Rio Food & Genuss, +Nala Reisen & Nomadenleben): Router-Auswahl dynamisch aus der Registry abgeleitet, Revenue-OS-Accents erweitert; bestehende 6 Personas unveraendert kompatibel
+- **Reichweiten- & Revenue-Engine** (`lib/influencer-reach-logic.ts`): Nischen-Matching gegen 10 Personas, Plattform-Effektivitaetsmatrix (5 Kanäle), Zielgewichte Aufmerksamkeit/Wachstum/Umsatz, deterministische Kampagnenplanung mit Fokus-/Support-Cast, Posting-Slots (max. 3 pro Persona/Tag, max. 30 Tage) und ehrlichem Reichweite-Index (Heuristik, keine Garantie); Guardrails gegen Einnahmeversprechen
+- **Bot-Villa** (`lib/bot-villa-logic.ts`): 14-Spezialitaeten-Katalog, Kern-Team aus 8 Live-Workern je Projektart, Pool von bis zu 5000 Worker-Definitionen (Spawn-on-Demand), gleichzeitige Aktivitaet auf 24 gedeckelt — 5000 ist Pool-Kapazitaet, kein Dauerbetrieb; Invarianten-Validierung und ehrliche Spawn-Planung ohne Treffer-Taeuschung
+- **Projekt-Superagenten-Fabrik** (`lib/project-superagent-factory-logic.ts` + `server/project-superagent-factory.ts`): pro Projekt/Produkt ein dedizierter Superagent inkl. Villa-Blueprint, Werkzeug-Grants je Projektart und Autonomie-Profil "maximal" mit harten HITL-Schienen (Zahlungen, externe Sends, Loeschungen bleiben bestaetigungspflichtig); Persistenz nur ueber geschuetzte tRPC-Prozedur (`superAgentsRouter.createFromProject`), Dupełlatz-Schutz
+- **Orchestrator-Tools** (read-only): `project.planSuperagent`, `influencer.planCampaign`, `villa.planSpawn` — Planung autonom nutzbar, ausloesende Aktionen laufen weiter ueber die geschuetzten App-APIs
+- Live verifiziert (Sonde): Villa 8 Kern / 4989 Pool / Kapazitaet 5000 / 24 live max; Kampagnen-Fokus juno fuer B2B-SaaS mit 6 Slots; 18 neue/erweiterte Tests, verify:system GREEN mit 15 Kernmodulen
+
 ## 25.09.2026 — Sprint 163 nachgezogen: Repo-Chat-Service & repo.searchCode (Portierung auf V4.2-Stand)
 
 - `server/repo-chat-service.ts`: GitHub-Tarball-Indizierung fuer Code-Abfragen mit Dateipfad:Zeile — Download via codeload, Entpacken in gebundenen Sandbox-Temp-Ordner, Budget-Deckel (nur Code-Endungen, max. 256 KB je Datei, max. 1500 Dateien), In-Memory-Index-Cache pro repo@branch (TTL 60 min, Build-Lock gegen parallele Downloads); ehrlicher Fehlerzustand ohne GITHUB_TOKEN/Netzwerk

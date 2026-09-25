@@ -16,10 +16,11 @@ type Accent = "cyan" | "purple" | "magenta" | "blue" | "green" | "amber";
 
 const PERSONA_ACCENTS: Record<InfluencerPersonaId, Accent> = {
   nova: "cyan", mira: "purple", juno: "magenta", lina: "blue", kaya: "green", zara: "amber",
+  orion: "cyan", ava: "green", rio: "magenta", nala: "blue",
 };
 
 const SECTIONS: { key: Section; label: string; icon: string; accent: "cyan" | "purple" | "magenta" | "blue" | "green" }[] = [
-  { key: "influencer", label: "6 Personas", icon: "✦", accent: "cyan" },
+  { key: "influencer", label: "10 Personas", icon: "✦", accent: "cyan" },
   { key: "hara", label: "HARA", icon: "⚡", accent: "purple" },
   { key: "saas", label: "SaaS", icon: "▦", accent: "magenta" },
   { key: "loop", label: "Loop Revenue", icon: "↻", accent: "blue" },

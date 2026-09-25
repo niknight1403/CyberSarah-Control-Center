@@ -27,6 +27,9 @@ import path from "path";
 import { randomUUID } from "crypto";
 
 import { evaluateHITLRisk } from "../../lib/hitl-guard-logic";
+import { buildVillaBlueprint, planWorkerSpawn } from "../../lib/bot-villa-logic";
+import { planInfluencerCampaign } from "../../lib/influencer-reach-logic";
+import { createProjectSuperagentBlueprint } from "../../lib/project-superagent-factory-logic";
 import { searchRepoCode } from "../repo-chat-service";
 
 export interface ToolResult {
@@ -345,6 +348,119 @@ const tools: ToolSpec[] = [
             encoding: data?.encoding,
             content: tooLarge ? text.slice(0, 400_000) : text,
             truncated: Boolean(tooLarge),
+          },
+        };
+      }),
+  },
+  {
+    name: "villa.planSpawn",
+    description:
+      "Plant Spawn-on-Demand aus der Bot-Villa eines Projekts (Sprint 364): " +
+      "waehlt passende Pool-Worker fuer eine Aufgabe. Ehrliche Grenze: " +
+      "max. 24 gleichzeitig aktive Live-Worker, Pool ist Kapazitaet, kein Dauerbetrieb.",
+    parameters: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: ["web-app", "mobile-app", "saas", "content", "automation", "forschung"],
+          description: "Projektart der Villa",
+        },
+        task: { type: "string", description: "Aufgabenbeschreibung, z. B. 'api-service Endpoint bauen'" },
+      },
+      required: ["kind", "task"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const villa = buildVillaBlueprint(String(args.kind ?? "web-app") as never);
+        const spawn = planWorkerSpawn(villa, String(args.task ?? ""));
+        return {
+          ok: true,
+          result: {
+            workers: spawn.workers.map((worker) => `${worker.id} (${worker.specialty})`),
+            liveWorkerCap: spawn.liveWorkerCap,
+            note: spawn.note,
+          },
+        };
+      }),
+  },
+  {
+    name: "project.planSuperagent",
+    description:
+      "Plant einen dedizierten Projekt-Superagenten inkl. Bot-Villa (Sprint 364): " +
+      "Kern-Team aus 8 Live-Workern + Pool von bis zu 5000 Worker-Definitionen, " +
+      "Werkzeuge und Autonomie-Profil (HITL-Pflicht fuer Zahlungen/externe Sends). " +
+      "Nur Planung — die Persistenz laeuft ueber die geschuetzte App-API.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Projektname (2-80 Zeichen)" },
+        kind: {
+          type: "string",
+          enum: ["web-app", "mobile-app", "saas", "content", "automation", "forschung"],
+          description: "Projektart",
+        },
+        goal: { type: "string", description: "Projektziel (3-400 Zeichen)" },
+        poolSize: { type: "number", description: "Optional: Pool-Groesse bis 5000 (Default: Maximum)" },
+      },
+      required: ["name", "kind", "goal"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const blueprint = createProjectSuperagentBlueprint({
+          name: String(args.name ?? ""),
+          kind: String(args.kind ?? "web-app") as never,
+          goal: String(args.goal ?? ""),
+          poolSize: typeof args.poolSize === "number" ? args.poolSize : undefined,
+        });
+        return {
+          ok: true,
+          result: {
+            superagent: blueprint.superagent,
+            villa: {
+              projectKind: blueprint.villa.projectKind,
+              coreTeam: blueprint.villa.coreTeam.map((worker) => `${worker.id} (${worker.specialty})`),
+              poolSize: blueprint.villa.pool.length,
+              poolCapacity: blueprint.villa.poolCapacity,
+              liveWorkerCap: blueprint.villa.liveWorkerCap,
+            },
+            toolGrants: blueprint.toolGrants,
+            autonomy: blueprint.autonomy,
+            hint: "Persistenz ueber superAgentsRouter.createFromProject (geschuetzte App-API).",
+          },
+        };
+      }),
+  },
+  {
+    name: "influencer.planCampaign",
+    description:
+      "Plant eine Influencer-Kampagne mit den 10 KI-Personas (Sprint 364): " +
+      "bewertet Produkt-Nischen-Match, waehlt Fokus-/Support-Personas, Kanalmix und " +
+      "Posting-Slots. Deterministisch, read-only, ohne Publishing.",
+    parameters: {
+      type: "object",
+      properties: {
+        product: { type: "string", description: "Produkt/Angebot (3-500 Zeichen)" },
+        goal: { type: "string", enum: ["aufmerksamkeit", "wachstum", "umsatz"], description: "Kampagnenziel" },
+        days: { type: "number", description: "Optional: Kampagnenlaenge in Tagen (1-30, Default 7)" },
+      },
+      required: ["product", "goal"],
+    },
+    handler: async (args) =>
+      guarded(async () => {
+        const plan = planInfluencerCampaign(String(args.product ?? ""), String(args.goal ?? "aufmerksamkeit") as never, {
+          days: typeof args.days === "number" ? args.days : undefined,
+        });
+        return {
+          ok: true,
+          result: {
+            focusPersona: plan.focusPersona,
+            supportingPersonas: plan.supportingPersonas,
+            platformMix: plan.platformMix,
+            slotCount: plan.slots.length,
+            slots: plan.slots.slice(0, 10),
+            projectedReachIndex: plan.projectedReachIndex,
+            guardrails: plan.guardrails,
           },
         };
       }),

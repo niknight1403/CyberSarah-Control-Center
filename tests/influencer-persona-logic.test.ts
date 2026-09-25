@@ -8,10 +8,12 @@ import {
 } from "@/lib/influencer-persona-logic";
 
 describe("influencer persona logic", () => {
-  it("contains six unique selectable personas", () => {
-    expect(INFLUENCER_PERSONAS).toHaveLength(6);
-    expect(new Set(INFLUENCER_PERSONAS.map((persona) => persona.id)).size).toBe(6);
-    expect(INFLUENCER_PERSONAS.map((persona) => persona.name)).toEqual(["Nova", "Mira", "Juno", "Lina", "Kaya", "Zara"]);
+  it("contains ten unique selectable personas (Sprint 364)", () => {
+    expect(INFLUENCER_PERSONAS).toHaveLength(10);
+    expect(new Set(INFLUENCER_PERSONAS.map((persona) => persona.id)).size).toBe(10);
+    expect(INFLUENCER_PERSONAS.map((persona) => persona.name)).toEqual([
+      "Nova", "Mira", "Juno", "Lina", "Kaya", "Zara", "Orion", "Ava", "Rio", "Nala",
+    ]);
   });
 
   it("builds a persona-specific prompt for every persona", () => {

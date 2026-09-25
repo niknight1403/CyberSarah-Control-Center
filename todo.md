@@ -1,5 +1,6 @@
 # Project TODO
 
+- [x] Sprint 364: Autonomie-Maximierung — 10 Influencer-Personas, Reichweiten-/Revenue-Engine, Projekt-Superagenten-Fabrik mit Bot-Villa (8 Live-Kern, Pool-Kapazitaet 5000, Spawn-on-Demand, HITL-Schienen fuer Geld/Sends).
 - [x] Sprint 163 (portiert auf V4.2): Repo-Chat-Service (Tarball-Indizierung, Budget-Deckel, Index-Cache) + repo.searchCode-Orchestrator-Tool, live verifiziert (1.161 Dateien / 19.676 Symbole).
 - [x] Define the portrait-first Custom AI Studio Mobile design and remote-workspace boundary.
 - [x] Replace the template with the dark Workspace, Agent, Preview, and Settings experience.
