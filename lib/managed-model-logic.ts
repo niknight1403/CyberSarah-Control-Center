@@ -8,6 +8,14 @@
  * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
  * KOSTENFREIES Modell pro Source waehlt.
  */
+/**
+ * Sprint 349 — Ollama-Fleet-Default: Ohne explizites AI_OLLAMA_MODEL waehlt
+ * die Aufloesung das Chat-Tier der Qwen-2.5-Leiter (kleinstes ausreichendes
+ * Modell = qwen2.5:1.5b) statt blind des Coder-7B. Die Leiter liegt voll
+ * vor, wenn scripts/ollama-server-setup.sh gelaufen ist.
+ */
+import { pickQwenForTask, QWEN_LADDER } from "./ollama-fleet-logic";
+
 export type ManagedModelSource =
   | "forge"
   | "gemini"
@@ -35,7 +43,7 @@ export function resolveManagedModel(
   }
 
   if (source === "local-ollama") {
-    return env.AI_OLLAMA_MODEL?.trim() || "qwen2.5-coder:7b";
+    return env.AI_OLLAMA_MODEL?.trim() || (pickQwenForTask("chat", QWEN_LADDER) ?? "qwen2.5:1.5b");
   }
 
   if (source === "local-lmstudio") {
