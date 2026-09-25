@@ -113,10 +113,34 @@ async function diagnose() {
   }
 }
 
+
+async function xDiagnose() {
+  const client = await pool.connect();
+  try {
+    const rows = await client.query('SELECT access_token, expires_at FROM "platform_tokens" WHERE platform = \'x\' LIMIT 1');
+    if (rows.rows.length === 0) {
+      console.log("[db-ops] Kein X-Tokensatz in platform_tokens — Autopilot lief nur mit Env-Bootstrap (falls ueberhaupt).");
+      return;
+    }
+    const token = rows.rows[0].access_token;
+    const expiresAt = new Date(rows.rows[0].expires_at);
+    console.log(`[db-ops] X-Tokensatz vorhanden, laeuft ab: ${expiresAt.toISOString()} (${Math.round((expiresAt - Date.now()) / 60000)} min)`);
+    const response = await fetch("https://api.x.com/2/users/me?user.fields=public_metrics", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = await response.text();
+    console.log(`[db-ops] GET /2/users/me -> HTTP ${response.status}`);
+    console.log(`[db-ops] Body: ${body.slice(0, 500)}`);
+  } finally {
+    client.release();
+  }
+}
+
 try {
   if (OP === "publishing-enqueue-live-test") await enqueue();
   else if (OP === "publishing-status") await status();
   else if (OP === "publishing-diagnose") await diagnose();
+  else if (OP === "x-diagnose") await xDiagnose();
   else {
     console.error(`[db-ops] Unbekannte Publishing-Operation: ${OP}`);
     process.exit(1);
