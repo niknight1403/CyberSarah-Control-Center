@@ -39,13 +39,13 @@ async function enqueue() {
   try {
     const openId = await adminOpenId(client);
     const dedupeKey = `sprint370-live-test-${new Date().toISOString().slice(0, 10)}`;
-    const existing = await client.query("SELECT id FROM publishingJobs WHERE user_open_id = $1 AND dedupe_key = $2", [openId, dedupeKey]);
+    const existing = await client.query('SELECT id FROM "publishingJobs" WHERE user_open_id = $1 AND dedupe_key = $2', [openId, dedupeKey]);
     if (existing.rows.length > 0) {
       console.log(`[db-ops] Job existiert bereits (id ${existing.rows[0].id}) — kein Duplikat eingereiht.`);
       return;
     }
     const result = await client.query(
-      `INSERT INTO publishingJobs
+      `INSERT INTO "publishingJobs"
          (user_open_id, product, goal, persona, platform, campaign_day, dedupe_key, status, scheduled_for)
        VALUES ($1, $2, $3, $4, 'x', 1, $5, 'geplant', now())
        RETURNING id, scheduled_for`,
@@ -69,7 +69,7 @@ async function status() {
   try {
     const result = await client.query(
       `SELECT id, platform, persona, status, mode, external_id, attempts, last_error, scheduled_for, published_at
-         FROM publishingJobs ORDER BY id DESC LIMIT 5`,
+         FROM "publishingJobs" ORDER BY id DESC LIMIT 5`,
     );
     if (result.rows.length === 0) {
       console.log("[db-ops] Keine Publishing-Jobs vorhanden.");
