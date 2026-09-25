@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -102,7 +102,7 @@ export function MarkdownLiteContent({ content }: { content: string }) {
  * Bubbles als Glass Layers"). User-Bubble: Cyan-Verlauf-Glow-Rand,
  * rechtsbuendig. Agent-Bubble: Purple-Akzentkante, CyberGlass-Flaeche.
  */
-export function MessageBubble({
+function MessageBubbleInner({
   message,
   showTimestamp,
   agentLabel,
@@ -150,6 +150,13 @@ export function MessageBubble({
     </Animated.View>
   );
 }
+
+/**
+ * Sprint 347 — Flacker-Fix: memo, damit ein Re-Render des Chat-Screens
+ * (z. B. durch einensekundlichen Takt) existierende Bubbles unberuehrt
+ * laesst. Props sind bewusst primitive Werte — stabile Referenzen.
+ */
+export const MessageBubble = memo(MessageBubbleInner);
 
 function createStyles() {
   return StyleSheet.create({

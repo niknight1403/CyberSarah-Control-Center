@@ -98,7 +98,7 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { darken, lighten, withAlpha } from "@/lib/theme-color-utils";
-import { useNow } from "@/hooks/use-now";
+import { useNowEvery } from "@/hooks/use-now";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal };
 type ChatAttachment = MediaAttachment;
@@ -145,7 +145,9 @@ export default function AgentScreen() {
   const [chatError, setChatError] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   // Sprint 172: Aktuelle Zeit im Render ueber die Tick-Uhr (kein Date.now waehrend des Renderns).
-  const nowMs = useNow();
+  // Sprint 347 — Flacker-Fix: 30-Sekunden-Takt statt Sekundentakt. Der
+  // Sekundentakt re-renderte den kompletten Agent-Tab (inkl. Animationen).
+  const nowMs = useNowEvery(30_000);
   const [backupPassword, setBackupPassword] = useState("");
   const [backupPasswordRepeat, setBackupPasswordRepeat] = useState("");
   const [backupState, setBackupState] = useState<

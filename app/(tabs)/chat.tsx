@@ -38,7 +38,7 @@ import { DEFAULT_CONNECTOR_PREFERENCES, enabledConnectorCount, normalizeConnecto
 import { DEFAULT_SKILL_PREFERENCES, enabledSkillCount, normalizeSkillPreferences, SKILL_PREFERENCE_STORAGE_KEY, toggleSkill, type SkillId, type SkillPreferences } from "@/lib/skill-preferences-logic";
 import { FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ListRenderItemInfo } from "react-native";
 import { darken, withAlpha } from "@/lib/theme-color-utils";
-import { useNow } from "@/hooks/use-now";
+import { useNowEvery } from "@/hooks/use-now";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal; timestampMs?: number };
 type ChatAttachment = MediaAttachment;
@@ -88,7 +88,6 @@ export default function ChatScreen() {
   const [connectorPreferences, setConnectorPreferences] = useState<ConnectorPreferences>(DEFAULT_CONNECTOR_PREFERENCES);
   const [connectorTests, setConnectorTests] = useState<Record<ConnectorId, ConnectorTestState>>({ workspace: { status: "idle" }, github: { status: "idle" }, provider: { status: "idle" } });
   // Sprint 172: Aktuelle Zeit im Render ueber die Tick-Uhr statt Date.now().
-  const nowMs = useNow();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   // Sprint 199 — Antwort-zum-Anfang: Y-Offsets der Agent-Nachrichten
   // messen, damit neue Antworten an IHREM ANFANG erscheinen.
@@ -313,7 +312,7 @@ export default function ChatScreen() {
   const statusIcon = (st: ConnectorTestStatus) => st === "success" ? "OK" : st === "error" ? "X" : st === "testing" ? "…" : "○";
   const canSend = Boolean(prompt.trim()) && !isThinking && readyForChat;
 
-  const renderMessage = ({ item: msg, index }: ListRenderItemInfo<ChatMessage>) => {
+  const renderMessage = useCallback(({ item: msg, index }: ListRenderItemInfo<ChatMessage>) => {
     if (msg.id.startsWith("thinking-")) {
       return <TypingIndicator />;
     }
@@ -324,7 +323,7 @@ export default function ChatScreen() {
         {showDay && msg.timestampMs != null ? (
           <View style={s.dayDividerRow}>
             <View style={s.dayDividerLine} />
-            <Text style={s.dayDividerText}>{formatChatDay(msg.timestampMs, nowMs)}</Text>
+            <ChatDayDivider timestampMs={msg.timestampMs} />
             <View style={s.dayDividerLine} />
           </View>
         ) : null}
@@ -338,7 +337,7 @@ export default function ChatScreen() {
         {msg.role === "agent" && msg.devTrace?.length ? <DevTracePanel trace={msg.devTrace} /> : null}
       </>
     );
-  };
+  }, [messages]);
 
   return (
     <GlassBackdrop accent="cyan">
@@ -548,6 +547,17 @@ export default function ChatScreen() {
       </ScreenContainer>
     </GlassBackdrop>
   );
+}
+
+/**
+ * Sprint 347 — Flacker-Fix: Der Tages-Trenner abonniert NUR fuersich die
+ * Uhr (Minutentakt — Labels aendern sich hoechstens bei Tageswechsel).
+ * Der Screen selbst zeichnet sich dadurch nicht mehr sekundlich neu,
+ * was das Flackern der Chat-Tabs behob.
+ */
+function ChatDayDivider({ timestampMs }: { timestampMs: number }) {
+  const nowMs = useNowEvery(60_000);
+  return <Text style={s.dayDividerText}>{formatChatDay(timestampMs, nowMs)}</Text>;
 }
 
 function createStyles() {
