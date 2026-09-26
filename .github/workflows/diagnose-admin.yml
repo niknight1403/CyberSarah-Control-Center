@@ -18,6 +18,7 @@ on:
           - live
           - beides
           - sprint373-e2e-live
+          - sprint379-smoke-live
         default: beides
 
 permissions:
@@ -78,3 +79,10 @@ jobs:
           ADMIN_EMAIL: niko.oeben@gmail.com
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: node scripts/sprint373-e2e-live.mjs
+      - name: Sprint 379 Staging-Smoke + Revenue-Maschinerie live (keine echten Zahlungen)
+        if: ${{ inputs.mode == 'sprint379-smoke-live' }}
+        env:
+          LIVE_API_BASE_URL: ${{ secrets.RENDER_PUBLIC_URL || 'https://cybersarah-control-center.onrender.com' }}
+          ADMIN_EMAIL: niko.oeben@gmail.com
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: node scripts/sprint379-smoke-live.mjs
