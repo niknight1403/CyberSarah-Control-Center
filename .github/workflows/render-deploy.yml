@@ -88,6 +88,13 @@ jobs:
           # Fallback: gleiches Token wie der Workspace-Service selbst (SERVICE_ACCESS_TOKEN)
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          # Sprint 112 — Integrations-Keys fuer Daten-Hub, Dev-Agent-Tools und
+          # Content-Kanaele. CCC_ADMIN_GITHUB_TOKEN wird auf den Namen gemappt,
+          # den der Server liest (ADMIN_GITHUB_TOKEN, Vorrang vor GITHUB_TOKEN).
+          ADMIN_GITHUB_TOKEN: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           # Sprint 367: Publishing-Tokens (optional — leere Secrets bleiben
           # leer, die Modus-Aufloesung ignoriert inaktive Plattformen).
           X_PUBLISH_TOKEN: ${{ secrets.X_PUBLISH_TOKEN }}
@@ -150,4 +157,9 @@ jobs:
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN || 'app.cybersarah-ki.com' }}
           CUSTOM_DOMAIN_WAIT_MINUTES: '15'
+          # Sprint 112 — gleiche Integrations-Keys wie im App-Deploy (oben).
+          ADMIN_GITHUB_TOKEN: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: node scripts/render-deploy.mjs --domain

@@ -258,6 +258,29 @@ function makeAppEnvBuilder(databaseUrl) {
     if (value) aiProviderExtra.push(`${key}=${value}`);
   }
 
+  // Sprint 112 — Daten- und Integrations-Keys, die der Server liest
+  // (Dev-Agent-Tools, Content-Kanaele, E-Mail). Wie bei den Publishing-Tokens:
+  // nur gesetzt, wenn das GitHub-Secret existiert; fehlende Keys bleiben leer
+  // und der Server meldet ehrlich "nicht konfiguriert".
+  const integrationExtra = [];
+  for (const key of [
+    "ADMIN_GITHUB_TOKEN",
+    "TIKTOK_CLIENT_KEY",
+    "TIKTOK_CLIENT_SECRET",
+    "TIKTOK_ACCESS_TOKEN",
+    "GA4_PROPERTY_ID",
+    "GA4_ACCESS_TOKEN",
+    "HUBSPOT_ACCESS_TOKEN",
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
+    "PERPLEXITY_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "TIKTOK_SYMPHONY_API_KEY",
+  ]) {
+    const value = env(key, "").trim();
+    if (value) integrationExtra.push(`${key}=${value}`);
+  }
+
   const publishingExtra = [];
   for (const key of [
     "X_PUBLISH_TOKEN",
@@ -302,7 +325,7 @@ function makeAppEnvBuilder(databaseUrl) {
       stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
       stripeProductId: env("STRIPE_PRICE_ID"),
       trustProxy: env("TRUST_PROXY", "1"),
-      extra: [...workspaceExtra, ...aiProviderExtra, ...publishingExtra],
+      extra: [...workspaceExtra, ...aiProviderExtra, ...integrationExtra, ...publishingExtra],
     });
 }
 
