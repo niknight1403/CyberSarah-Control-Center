@@ -97,19 +97,26 @@ def find_service() -> dict:
 
 
 def get_env_vars(service_id: str) -> list:
+    # GET /v1/services/{id}/env-vars liefert {"cursor":..., "envVar": {...}}
     status, data = req("GET", f"/services/{service_id}/env-vars?limit=100")
     if status != 200:
         print(f"  Env-Vars nicht abrufbar ({status}): {data}")
         return []
-    return data
+    out = []
+    for entry in data if isinstance(data, list) else []:
+        if isinstance(entry, dict) and isinstance(entry.get("envVar"), dict):
+            out.append(entry["envVar"])
+        elif isinstance(entry, dict) and entry.get("key"):
+            out.append(entry)
+    return out
 
 
 def masked_env_report(env_vars: list) -> None:
     print("Aktuelle Env-Vars (Werte maskiert):")
     for v in env_vars:
         key = v.get("key", "?")
-        sync = v.get("readonly")
-        print(f"  - {key} (readonly={sync})")
+        ro = v.get("readonly")
+        print(f"  - {key} (readonly={ro})")
 
 
 def set_env_var(service_id: str, key: str, value: str) -> bool:
