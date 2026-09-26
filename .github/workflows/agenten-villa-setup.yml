@@ -1,0 +1,50 @@
+name: Agenten-Villa Render-Setup
+
+# Traegt die Laufzeit-Credentials des Agenten-Villa-Projekts als
+# Render-Umgebungsvariablen ein und deployt den Service.
+# Der Render-API-Key liegt hier als Secret (gleicher Render-Account),
+# die Werte als AGENTEN_VILLA_*-Secrets.
+# Ausloesen: GitHub UI -> Actions -> "Agenten-Villa Render-Setup" -> Run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Was tun?"
+        type: choice
+        options:
+          - env-and-deploy
+          - deploy-only
+          - status
+        default: env-and-deploy
+      dry_run:
+        description: "Nur pruefen, nichts aendern"
+        type: choice
+        options:
+          - "false"
+          - "true"
+        default: "false"
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Env-Vars setzen + Deploy + Health-Check
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          AV_OPENROUTER_API_KEY: ${{ secrets.AGENTEN_VILLA_OPENROUTER_API_KEY }}
+          AV_GITHUB_TOKEN: ${{ secrets.AGENTEN_VILLA_GITHUB_TOKEN }}
+          AV_GOOGLE_CLIENT_ID: ${{ secrets.AGENTEN_VILLA_GOOGLE_CLIENT_ID }}
+          AV_JWT_SECRET: ${{ secrets.AGENTEN_VILLA_JWT_SECRET }}
+          AV_AGENT_ADMIN_EMAIL: ${{ secrets.AGENTEN_VILLA_AGENT_ADMIN_EMAIL }}
+          AV_ACTION: ${{ inputs.action }}
+          AV_DRY_RUN: ${{ inputs.dry_run }}
+        run: python scripts/agenten_villa_render_setup.py
