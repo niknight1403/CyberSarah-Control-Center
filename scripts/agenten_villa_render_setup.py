@@ -75,27 +75,22 @@ def find_service() -> dict:
     status, data = req("GET", "/services?limit=100")
     if status != 200:
         fail(f"Serviceliste nicht abrufbar ({status}): {data}")
-    services = data if isinstance(data, list) else []
+    # GET /v1/services liefert Eintraege der Form {"cursor": ..., "service": {...}}
+    raw = data if isinstance(data, list) else []
+    services = []
+    for entry in raw:
+        if isinstance(entry, dict) and isinstance(entry.get("service"), dict):
+            services.append(entry["service"])
+        elif isinstance(entry, dict):
+            services.append(entry)
     print("Services im Render-Account:")
-    if services:
-        first = services[0]
-        print(f"  [debug] Struktur des ersten Eintrags: Typ={type(first).__name__}")
-        if isinstance(first, dict):
-            print(f"  [debug] Keys: {sorted(first.keys())}")
-        for s in services:
-            if isinstance(s, dict):
-                name = s.get("name") or s.get("serviceName") or (s.get("service") or {}).get("name") if isinstance(s.get("service"), dict) else s.get("name")
-                surl = ""
-                sd = s.get("serviceDetails") or (s.get("service") or {}).get("serviceDetails") if isinstance(s.get("service"), dict) else None
-                if isinstance(sd, dict):
-                    surl = sd.get("url") or ""
-                print(f"  - {s.get('id')}: {name} ({s.get('type')}, {surl or 'ohne URL'})")
-            else:
-                print(f"  - (unbekannter Eintragstyp: {s!r:.200})")
+    for s in services:
+        sd = s.get("serviceDetails") or {}
+        print(f"  - {s.get('name')} ({s.get('type')}, {sd.get('url') or 'ohne URL'})")
     exact = [s for s in services if s.get("name") == SERVICE_NAME]
     if exact:
         return exact[0]
-    loose = [s for s in services if "agenten" in s.get("name", "").lower()]
+    loose = [s for s in services if "agenten" in (s.get("name") or "").lower()]
     if len(loose) == 1:
         return loose[0]
     fail(f"Service '{SERVICE_NAME}' nicht eindeutig gefunden (Treffer: {len(loose)})")
