@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 26.09.2026 — Sprints 364–368: Serie I (Agent-Intelligenz — Batch 17)
+
+- **Sprint 364 (Prompt-Versionierung + A/B-Vergleichsmetrik)**: Verwaltung von Prompt-Varianten (`lib/prompt-versioning-ab-logic.ts`), Erfassung von Ausführungsmetriken (Erfolgsrate, Qualitäts-Score, p95 Latenz, Token-Verbrauch) und statistischer A/B-Evaluierung mit ehrlichen Stichproben-Schwellenwerten (`evaluateABTest`) sowie deterministischem Traffic-Splitting per Hash-Seed.
+- **Sprint 365 (Selbst-Kritik-Schritt)**: Deterministische Selbstkritik-Logik (`lib/agent-self-critique-logic.ts`) zur Überprüfung von Agenten-Lösungen gegen vorgegebene Akzeptanzkriterien vor Task-Abschluss. Generiert strukturierte Kriterien-Auswertungen, Qualitäts-Scores und konkrete Nachbesserungs-Instruktionen bei Verfehlungen.
+- **Sprint 366 (Werkzeug-Auswahlstatistik)**: Messung der Werkzeug-Nutzung (`lib/tool-usage-stats-logic.ts`) mit Aufrufzählung, Erfolgsraten, Latenzen und Inaktivitätszeiträumen. Erzeugt ehrliche Bereinigungspläne (`generatePruningPlan`) zur Deaktivierung ungenutzter Nicht-Kern-Werkzeuge ("Nie-Nutzung"), während geschützte Kern-Werkzeuge (z. B. `bash`, `read_file`) garantiert unberührt bleiben.
+- **Sprint 367 (Gedächtnis-Konsolidierung v2)**: Erweiterte Gedächtnis-Konsolidierung (`lib/agent-memory-consolidation-v2-logic.ts`) mit automatischer Kategorisierung (`UserPreference`, `ProjectRules`, `SystemArchitecture`, `EphemeralTaskState`), Duplikat-Bereinigung und konfliktfreier Zusammenführung zugunsten nutzerbestätigter/neuerer Fakten sowie automatischem Verfall alter flüchtiger Zustände.
+- **Sprint 368 (Aufgaben-Zerlegung)**: Zerlegungs-Engine (`lib/task-decomposition-logic.ts`) für komplexe Hauptziele in prüfbare Teilschritte mit expliziten Abhängigkeiten, Akzeptanzkriterien und topologischer Ausführungsreihenfolge. Bietet Fortschrittsverfolgung und automatische Blockade-Propagierung bei Fehlern sowie ehrliche Rückfragen bei vagen Zielformulierungen.
+- **Verifikation**: 22 neue deterministische Tests (insgesamt 2.274 Tests in 291 Testdateien 100% grün), `npx tsc --noEmit` 0 Fehler.
+
 ## 25.09.2026 — Sprint 374: Volle Regression + Test-Lücken schließen (Serie J)
 
 - **Platzhalter-Sweep (Owner-Gebot)**: Systematischer Audit über `app/`, `components/`, `lib/`, `server/` auf TODOs/FIXMEs, Dummies, Mocks und Platzhalter. Allen Fundstellen echt gelöst oder als ehrlichen Systemzustand ausgezeichnet (z.B. tRPC Router Clean-up in `server/routers.ts`, sicherer Callback-Origin in `app/oauth/callback.tsx`, saubere System-Startup-Logs im Admin Log Viewer `lib/admin-log-viewer-logic.ts`, ehrliche Template-Limit-Beschreibungen in `lib/template-gallery-logic.ts`). Null nutzer- oder produktionssichtbare Platzhalter verbleiben.

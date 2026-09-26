@@ -1,6 +1,6 @@
 # Sprint-Tracker 284–383
 
-**Stand:** 25.09.2026 · 2.071 Tests grün · Produktiv-Backend deployed · APK v2.5.6
+**Stand:** 26.09.2026 · 2.274 Tests grün · Produktiv-Backend deployed · APK v2.5.6
 
 Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
@@ -23,7 +23,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 14 | 349–353 | ERLEDIGT | Serie G Rest + Abschluss (2.021 Tests grün, 255 Testdateien) |
 | 15 | 354–358 | ERLEDIGT | Serie H: Admin & Ops (2.046 Tests grün, 260 Testdateien) |
 | 16 | 359–363 | ERLEDIGT | Serie H Rest + Abschluss (2.071 Tests grün, 265 Testdateien) |
-| 17 | 364–368 | OFFEN | Serie I: Agent-Intelligenz |
+| 17 | 364–368 | ERLEDIGT | Serie I: Agent-Intelligenz (2.274 Tests grün, 291 Testdateien) |
 | 18 | 369–373 | OFFEN | Serie I Rest + Abschluss |
 | 19 | 374–378 | IN ARBEIT | Serie J: Finale |
 | 20 | 379–383 | OFFEN | Serie J Rest + Abschluss-Validierung |
@@ -38,9 +38,11 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - [x] 349–353 — Dokumentiert in `docs/2026-09-25_SPRINTS_349-353_SERIE_G_ABSCHLUSS.md`
 - [x] 354–358 — Dokumentiert in `docs/2026-09-25_SPRINTS_354-358_SERIE_H_ADMIN_OPS.md`
 - [x] 359–363 — Dokumentiert in `docs/2026-09-25_SPRINTS_359-363_SERIE_H_ABSCHLUSS.md`
+- [x] 364–368 — Dokumentiert in `docs/2026-09-26_SPRINTS_364-368_SERIE_I_AGENT_INTELLIGENZ.md`
 
 ## Batch-Protokoll
 
+- **Batch 17 (Sprints 364–368):** ERLEDIGT am 26.09.2026. Prompt-Versionierung & A/B-Tests, Selbst-Kritik-Schritt gegen Akzeptanzkriterien, Werkzeug-Auswahlstatistik & Nie-Nutzung-Bereinigung, Gedächtnis-Konsolidierung v2 (Kategorisierung + Konfliktlösung), Aufgaben-Zerlegung in prüfbare Teilschritte. Tests: 2.252 → 2.274 (+22), 291 Testdateien.
 - **Batch 17 (Sprint 374):** ERLEDIGT am 25.09.2026. Platzhalter-Sweep (0 nutzer-sichtbare Platzhalter in Produktionspfaden), Volle Regression der Suite, Test-Lücken geschlossen (Auth/Session, Billing/Quota, Publishing-Queue, Kampagnen-Brücke, tRPC-Router, Draft-Engine). Tests: 2.236 → 2.252 (+16), 286 Testdateien.
 - **Batch 1 (Sprints 284–288):** ERLEDIGT am 24.09.2026. Live-Preview-Zyklus Chat↔Preview, Multi-File Refactoring (Transaktion + Rollback), Code-Suche, Test-Runner, Iterations-Limits. Tests: 1.560 → 1.572 (+12), 188 Testdateien.
 - **Batch 2 (Sprints 289–293):** ERLEDIGT am 24.09.2026. Werkzeug-Fehlerklassen & Retry-Semantik, Kontextfenster-Verdichtung ohne Informationsverlust, Commit-Diff-Vorschau im Chat, Sprint-Ziele als GitHub-Issues, Serie-A-Abschluss. Tests: 1.572 → 1.589 (+17), 192 Testdateien.
