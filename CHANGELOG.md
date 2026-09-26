@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 26.09.2026 — Sprints 369–373: Serie I Rest + Abschluss (Agent-Intelligenz — Batch 18)
+
+- **Sprint 369 (Fortschritts-Berichte)**: Verfolgung mehrstufiger und langlaufender Agenten-Aufgaben (`lib/agent-progress-report-logic.ts`) mit Prozentfortschritt, Zeitschätzungen basierend auf historischen Schrittdurchschnitten und automatischer Inaktivitäts-Erkennung (`stalled`).
+- **Sprint 370 (Qualitäts-Tore)**: Zweiseitige Qualitäts-Tore (`lib/agent-quality-gate-logic.ts`) mit Pre-Execution-Prüfung von Eingabedaten, Werkzeugverfügbarkeit und Kontextauslastung sowie Post-Execution-Verifikation von Ergebnissen, Schema-Konformität und Fehlerfreiheit.
+- **Sprint 371 (Misserfolg-Analyse)**: Automatische Fehlerklassifizierung (`lib/agent-failure-analysis-logic.ts`) in strukturierte Kategorien (`rate_limit`, `timeout`, `token_limit`, `context_overflow`, `invalid_args`, `external_api`, `permission_denied`, `logic_error`, `unknown`), Ermittlung von Wiederholbarkeit und differenzierten Wiederherstellungsstrategien.
+- **Sprint 372 (Provider-Rotation v2)**: Dynamische Provider-Auswahl und -Rotation (`lib/provider-rotation-v2-logic.ts`) basierend auf Live-Metriken für Kosten, Latenz, Fehlerquote, Qualitäts-Scores und Feature-Support (Function Calling, Vision, JSON-Schema) mit automatischer Deaktivierung bei Ausfällen.
+- **Sprint 373 (Serie-I-Abschluss)**: Cross-Validierung aller 10 Sprints der Serie I (`lib/serie-i-validation-logic.ts`) mit automatisiertem Prüfbericht (100% grün, 10/10 Module verifiziert).
+- **Verifikation**: 18 neue deterministische Tests (insgesamt 2.292 Tests in 296 Testdateien 100% grün), `npx tsc --noEmit` 0 Fehler.
+
 ## 26.09.2026 — Sprints 364–368: Serie I (Agent-Intelligenz — Batch 17)
 
 - **Sprint 364 (Prompt-Versionierung + A/B-Vergleichsmetrik)**: Verwaltung von Prompt-Varianten (`lib/prompt-versioning-ab-logic.ts`), Erfassung von Ausführungsmetriken (Erfolgsrate, Qualitäts-Score, p95 Latenz, Token-Verbrauch) und statistischer A/B-Evaluierung mit ehrlichen Stichproben-Schwellenwerten (`evaluateABTest`) sowie deterministischem Traffic-Splitting per Hash-Seed.

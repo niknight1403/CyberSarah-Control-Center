@@ -1,6 +1,6 @@
 # Sprint-Tracker 284–383
 
-**Stand:** 26.09.2026 · 2.274 Tests grün · Produktiv-Backend deployed · APK v2.5.6
+**Stand:** 26.09.2026 · 2.292 Tests grün · Produktiv-Backend deployed · APK v2.5.6
 
 Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
@@ -24,7 +24,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 15 | 354–358 | ERLEDIGT | Serie H: Admin & Ops (2.046 Tests grün, 260 Testdateien) |
 | 16 | 359–363 | ERLEDIGT | Serie H Rest + Abschluss (2.071 Tests grün, 265 Testdateien) |
 | 17 | 364–368 | ERLEDIGT | Serie I: Agent-Intelligenz (2.274 Tests grün, 291 Testdateien) |
-| 18 | 369–373 | OFFEN | Serie I Rest + Abschluss |
+| 18 | 369–373 | ERLEDIGT | Serie I Rest + Abschluss (2.292 Tests grün, 296 Testdateien) |
 | 19 | 374–378 | IN ARBEIT | Serie J: Finale |
 | 20 | 379–383 | OFFEN | Serie J Rest + Abschluss-Validierung |
 
@@ -39,9 +39,11 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - [x] 354–358 — Dokumentiert in `docs/2026-09-25_SPRINTS_354-358_SERIE_H_ADMIN_OPS.md`
 - [x] 359–363 — Dokumentiert in `docs/2026-09-25_SPRINTS_359-363_SERIE_H_ABSCHLUSS.md`
 - [x] 364–368 — Dokumentiert in `docs/2026-09-26_SPRINTS_364-368_SERIE_I_AGENT_INTELLIGENZ.md`
+- [x] 369–373 — Dokumentiert in `docs/2026-09-26_SPRINTS_369-373_SERIE_I_ABSCHLUSS.md`
 
 ## Batch-Protokoll
 
+- **Batch 18 (Sprints 369–373):** ERLEDIGT am 26.09.2026. Fortschritts-Berichte für lange Aufgaben (Prozent, Restzeit, Stalled-Erkennung), Qualitäts-Tore vor/nach Ausführung (Pre/Post-Gates), Misserfolg-Analyse & Fehlerklassifikation, Provider-Rotation v2 (Qualitäts-/Kosten-Metriken, Feature-Matching), Serie-I-Abschluss & 10-Sprint Cross-Validierung (100% grün). Tests: 2.274 → 2.292 (+18), 296 Testdateien.
 - **Batch 17 (Sprints 364–368):** ERLEDIGT am 26.09.2026. Prompt-Versionierung & A/B-Tests, Selbst-Kritik-Schritt gegen Akzeptanzkriterien, Werkzeug-Auswahlstatistik & Nie-Nutzung-Bereinigung, Gedächtnis-Konsolidierung v2 (Kategorisierung + Konfliktlösung), Aufgaben-Zerlegung in prüfbare Teilschritte. Tests: 2.252 → 2.274 (+22), 291 Testdateien.
 - **Batch 17 (Sprint 374):** ERLEDIGT am 25.09.2026. Platzhalter-Sweep (0 nutzer-sichtbare Platzhalter in Produktionspfaden), Volle Regression der Suite, Test-Lücken geschlossen (Auth/Session, Billing/Quota, Publishing-Queue, Kampagnen-Brücke, tRPC-Router, Draft-Engine). Tests: 2.236 → 2.252 (+16), 286 Testdateien.
 - **Batch 1 (Sprints 284–288):** ERLEDIGT am 24.09.2026. Live-Preview-Zyklus Chat↔Preview, Multi-File Refactoring (Transaktion + Rollback), Code-Suche, Test-Runner, Iterations-Limits. Tests: 1.560 → 1.572 (+12), 188 Testdateien.
@@ -51,7 +53,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - **Batch 5 (Sprints 304–308):** ERLEDIGT am 24.09.2026 (Commit 269e115). BYO-Key, Stimmenauswahl, Render-Queue, Szenen-Editor, Bild-Fallback-Kette. v2.6.0. Tests: 1.770 (gleich), 208 Testdateien.
 - **Batch 6 (Sprints 309–313):** ERLEDIGT am 24.09.2026 (Commit c1c94d7). Medien-Cache-Aufräumlogik, SRT-Export, Batch-Export, Ergebnis-Verlauf. v2.7.0. Tests: 1.770 → 1.795 (+25), 212 Testdateien.
 - **Batch 7+8 (Sprints 314–323):** ERLEDIGT am 25.09.2026 (Commits bbba9b6, 922367f). Quota-Mode-Schalter mit Audit, Upgrade-Prompt-UI, Checkout-Rückweg, Abrechnung, Tier-Vergleich, Testmodus-Kennzeichnung, Kündigungs-Flow, MRR v2, Ops-Payment-Alerts, Serie-D-Abschluss. v2.8.0. Tests: 1.795 → 1.840 (+45), 218 Testdateien.
-- **Batch 9+10 (Sprints 324–333):** ERLEDIGT am 25.09.2026 (Commits e35a188, a44bd4d). Strukturierte Logs mit Korrelations-ID, Rate-Limits, RLS-Deckung, Restore-Beweis, Crash-Klassifizierung, Selbstheilung, Dependency-Audit, Geheimnis-Hygiene, Health-Deep-Check, Serie-E-Abschluss. v2.9.0. Tests: 1.840 → 1.900 (+60), 230 Testdateien.
+- **Batch 9+10 (Sprints 324–333):** ERLEDIGT am 25.09.2026 (Commits e35a188, a44bd4d). Strukturierte Logs with Korrelations-ID, Rate-Limits, RLS-Deckung, Restore-Beweis, Crash-Klassifizierung, Selbstheilung, Dependency-Audit, Geheimnis-Hygiene, Health-Deep-Check, Serie-E-Abschluss. v2.9.0. Tests: 1.840 → 1.900 (+60), 230 Testdateien.
 - **Batch 11+12 (Sprints 334–343):** ERLEDIGT am 25.09.2026 (Commits 2848acd, 0aecd3e). E-Mail v2 (Anhänge+Vorlagen), Kalender-Abstraktion, Webhook-Eingang mit Signatur, Export-Center, Import-Wizard, API-Keys mit Scopes, ehrliche API-Doku, Slack/Discord-Webhooks, Integrations-Diagnose, Serie-F-Abschluss. v3.0.0. Tests: 1.900 → 1.950 (+50), 242 Testdateien.
 - **Batch 13 (Sprints 344–348):** ERLEDIGT am 25.09.2026. Navigation-Pass (per-Tab-Stacks, Deep-Links), Offline-Zustände (Entprellung, Reconnect-Plan, Offline-Banner), Skeleton-Lade-Logik (Screen-Presets, Hybrid-Modus, Flackern-Schutz), Lokale Notifications (5 Kategorien, ohne FCM, ehrlich), APK-Größen-Metriken (Budget, Empfehlungen, Startzeit-Optimierung). Tests: 1.957 → 1.987 (+30), 250 Testdateien.
 - **Batch 14 (Sprints 349–353):** ERLEDIGT am 25.09.2026. Android Predictive Back Gesten & Animationen, Tastatur-Handling & Focus-Scrolling, Tablet-Layout & Dual-Pane, App-Icon/Splash-Lifecycle & Store-Screenshots Checklist, Serie-G-Abschluss. Tests: 1.987 → 2.021 (+34), 255 Testdateien.
