@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 26.09.2026 — Sprints 374–378: Serie J: Finale (Batch 19)
+
+- **Sprint 374 (Volle Regression + Test-Lücken)**: Platzhalter-Sweep Audit (`lib/sprint-374-regression-logic.ts`), Abdeckungsanalyse kritischer Kernpfade (Auth, Billing, Publishing, Kampagnen, tRPC, Drafts) und automatisierte Regressions-Gesundheitsprüfungen.
+- **Sprint 375 (Performance-Pass)**: Latenz-Messung (`lib/performance-pass-logic.ts`) für P50/P90/P95/P99, Hotpath-Erkennung mit Auswirkungsscores, SLA-Konformitätsprüfung (Target P95 < 200ms) und In-Memory LRU/TTL Cache.
+- **Sprint 376 (Doku-Pass)**: Doku-Strukturaudit (`lib/documentation-pass-logic.ts`), Prüfung relativer Markdown-Linkintegrität inklusive Pfadnormalisierung und Berechnung des Doku-Abdeckungsgrads für alle Sprint-Bereiche.
+- **Sprint 377 (CHANGELOG-Vollständigkeit seit 284)**: Parsing und Audit (`lib/changelog-completeness-logic.ts`) aller Sprint-Sektionen von 284 bis 378, Verifikation von Lückenlosigkeit und Append-Integritätsprüfungen gegen Löschen historischer Daten.
+- **Sprint 378 (Security-Final)**: Serie-E Sicherheits-Audit (`lib/security-final-audit-logic.ts`) für RLS-Policies aller Datenbanktabellen, Geheimnis-Hygiene in Umgebungsvariablen, Rate-Limiting-Deckung und gewichtete Security Compliance Reports.
+- **Verifikation**: 17 neue deterministische Tests (insgesamt 2.309 Tests in 301 Testdateien 100% grün), `npx tsc --noEmit` 0 Fehler.
+
 ## 26.09.2026 — Sprints 369–373: Serie I Rest + Abschluss (Agent-Intelligenz — Batch 18)
 
 - **Sprint 369 (Fortschritts-Berichte)**: Verfolgung mehrstufiger und langlaufender Agenten-Aufgaben (`lib/agent-progress-report-logic.ts`) mit Prozentfortschritt, Zeitschätzungen basierend auf historischen Schrittdurchschnitten und automatischer Inaktivitäts-Erkennung (`stalled`).
