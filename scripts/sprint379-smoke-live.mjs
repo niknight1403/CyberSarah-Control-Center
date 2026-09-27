@@ -93,9 +93,11 @@ async function main() {
   );
 
   // --- B) Authentifizierte Checks (Admin-Session, echte Credentials) ----
-  const login = unwrap((await trpcCall("account.login", { email, password })).payload);
+  const loginResp = await trpcCall("account.login", { email, password });
+  const login = unwrap(loginResp.payload);
   const token = login?.sessionToken;
-  record("B1 account.login -> role=admin + sessionToken", login?.user?.role === "admin" && typeof token === "string", `role=${login?.user?.role}`);
+  const loginError = login?.message ?? login?.data?.code ?? null;
+  record("B1 account.login -> role=admin + sessionToken", login?.user?.role === "admin" && typeof token === "string", `role=${login?.user?.role} http=${loginResp.status} err=${loginError}`);
 
   const me = unwrap((await trpcCall("account.me", null, token, true)).payload);
   record("B2 account.me mit Session -> admin", me?.role === "admin", `role=${me?.role}`);
