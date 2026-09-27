@@ -31,4 +31,6 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.AGENTEN_VILLA_GOOGLE_CLIENT_ID }}
           JWT_SECRET: ${{ secrets.AGENTEN_VILLA_JWT_SECRET }}
           OPENROUTER_API_KEY: ${{ secrets.AGENTEN_VILLA_OPENROUTER_API_KEY }}
+          DATABASE_URL_VALUE: ${{ secrets.AGENTEN_VILLA_DATABASE_URL }}
+          GOOGLE_CLIENT_SECRET_VALUE: ${{ secrets.AGENTEN_VILLA_GOOGLE_CLIENT_SECRET }}
         run: node scripts/render-villa-ops.mjs

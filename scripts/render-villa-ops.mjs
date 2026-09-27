@@ -71,6 +71,10 @@ async function setEnvOps() {
     GOOGLE_CLIENT_ID: (process.env.GOOGLE_CLIENT_ID ?? "").trim(),
     JWT_SECRET: (process.env.JWT_SECRET ?? "").trim(),
     OPENROUTER_API_KEY: (process.env.OPENROUTER_API_KEY ?? "").trim(),
+    // Noch offen (Owner-Werte) — sobald die Secrets AGENTEN_VILLA_DATABASE_URL /
+    // AGENTEN_VILLA_GOOGLE_CLIENT_SECRET hinterlegt sind, fließen sie mit rein.
+    DATABASE_URL: (process.env.DATABASE_URL_VALUE ?? "").trim(),
+    GOOGLE_CLIENT_SECRET: (process.env.GOOGLE_CLIENT_SECRET_VALUE ?? "").trim(),
   };
   const present = Object.fromEntries(Object.entries(values).filter(([, v]) => v));
   const keys = Object.keys(present);
