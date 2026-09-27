@@ -45,9 +45,13 @@ async function readOps() {
   const service = await findVillaServiceId();
   if (!service) { console.log("[villa-ops] Kein Villa-Service gefunden."); return; }
   console.log(`[villa-ops] SERVICE: ${service.id} | ${service.name} | ${service.type} | suspended=${service.suspended}`);
-  const { ok, data, status } = await render(`/services/${service.id}/env-vars`);
-  if (!ok) { console.error(`[villa-ops] Env-Vars nicht lesbar (HTTP ${status})`); return; }
-  for (const item of data || []) {
+  const { ok, data, status, text } = await render(`/services/${service.id}/env-vars`);
+  if (!ok) { console.error(`[villa-ops] Env-Vars nicht lesbar (HTTP ${status}): ${text.slice(0, 400)}`); return; }
+  if (!Array.isArray(data) || data.length === 0) {
+    console.log(`[villa-ops] Env-Var-Antwort ungueltig/leer. Roh (${status}): ${text.slice(0, 500)}`);
+    return;
+  }
+  for (const item of data) {
     const e = item.envVar ?? item;
     console.log(` - ${e.key} = ${mask(e.value)}`);
   }
