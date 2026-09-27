@@ -8,6 +8,9 @@
  */
 
 export type DrawerRoute =
+  | "/dashboard"
+  | "/business"
+  | "/account"
   | "/chat"
   | "/revenue-os"
   | "/micro-trading"
@@ -16,6 +19,7 @@ export type DrawerRoute =
   | "/ideas"
   | "/decisions"
   | "/superagent"
+  | "/designer"
   | "/plugins"
   | "/meetings"
   | "/cyber-terminal"
@@ -49,26 +53,19 @@ export type DrawerItem = {
 };
 
 /** Reihenfolge deckungsgleich mit dem Base44-Vorbild (Chat oben, Settings unten). */
+/** Operatives Menü: Revenue zuerst, Admin- und Utility-Routen bleiben direkt erreichbar. */
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
-  { route: "/chat", title: "Chat", icon: "message.fill" },
-  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", badge: "Neu" },
-  { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill", badge: "Paper" },
-  { route: "/loop-engineering", title: "Loop Engineering", icon: "wand.and.stars", badge: "Umsatz" },
+  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill" },
+  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill" },
+  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
+  { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill", badge: "Read-only" },
+  { route: "/loop-engineering", title: "Revenue-Loops", icon: "wand.and.stars" },
   { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", badge: "Neu" },
   { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", badge: "Neu" },
   { route: "/decisions", title: "Entscheidungs-Journal", icon: "tablecells.fill" },
+  { route: "/chat", title: "Chat", icon: "message.fill" },
   { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
-  { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },
-  { route: "/meetings", title: "Meetings", icon: "video.fill", badge: "Neu" },
-  // Sprint 199: ehemals sichtbare Tabs — jetzt hier, damit die Tab-Leiste schlank bleibt.
-  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right" },
-  { route: "/agent", title: "Entwicklung", icon: "sparkles" },
-  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill" },
-  { route: "/quality", title: "Qualität", icon: "chart.bar.fill" },
-  { route: "/", title: "Dateien", icon: "folder.fill" },
-  { route: "/memory", title: "Gedächtnis", icon: "brain.head.profile" },
-  { route: "/data", title: "Daten", icon: "tablecells.fill" },
-  { route: "/settings", title: "Agenteneinstellungen", icon: "gearshape.fill" },
+  { route: "/account", title: "Konto", icon: "gearshape.fill" },
 ] as const;
 
 /** Aktives Item anhand des Pfades auflösen — "/" nur bei exaktem Root-Treffer,

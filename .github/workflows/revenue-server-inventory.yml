@@ -1,0 +1,165 @@
+name: Revenue-OS Server Inventory (read-only)
+
+on:
+  push:
+    branches: [integration/revenue-os-live-data]
+    paths: ['.github/workflows/revenue-server-inventory.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+    steps:
+      - name: Inspect revenue installation without disclosing connection strings
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then echo 'SSH: NOT_CONFIGURED'; exit 1; fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/revenue_inventory_key
+          chmod 600 ~/.ssh/revenue_inventory_key
+          ssh -i ~/.ssh/revenue_inventory_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          for dir in /opt/cybersarah /opt/cybersarah-revenue-os /opt/cybersarah-control-center; do
+            case "$dir" in
+              /opt/cybersarah|/opt/cybersarah-revenue-os) label="revenue_install" ;;
+              *) label="control_center_install" ;;
+            esac
+            if [ -d "$dir" ]; then
+              echo "$label: PRESENT"
+              if [ -f "$dir/.env" ]; then
+                echo "$label.env: PRESENT"
+                if grep -q '^DATABASE_URL=' "$dir/.env"; then echo "$label.database_var: PRESENT"; else echo "$label.database_var: MISSING"; fi
+              else echo "$label.env: MISSING"; fi
+            else echo "$label: MISSING"; fi
+          done
+          if [ -d /opt/cybersarah-control-center/.git ]; then
+            if git -C /opt/cybersarah-control-center diff-index --quiet HEAD --; then echo 'root_worktree_clean: YES'; else echo 'root_worktree_clean: NO'; fi
+            case "$(git -C /opt/cybersarah-control-center branch --show-current)" in main) echo 'root_branch_main: YES' ;; *) echo 'root_branch_main: NO' ;; esac
+          fi
+          if command -v pm2 >/dev/null 2>&1; then
+            pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{const p=JSON.parse(s);for(const x of p){if(x.name==="cybersarah-backend")console.log("root_backend_pm2: "+(x.pm2_env?.status==="online"?"ONLINE":"OFFLINE"))}}catch{console.log("root_backend_pm2: UNKNOWN")}})' || true
+          fi
+          if [ -d /opt/cybersarah-control-center ]; then echo 'control_center_directory: PRESENT'; else echo 'control_center_directory: MISSING'; fi
+          if [ -f /opt/cybersarah-control-center/.env ]; then echo 'control_center_env: PRESENT'; else echo 'control_center_env: MISSING'; fi
+          for entry in /opt/cybersarah-control-center/dist/index.js /opt/cybersarah-control-center/web-dist/index.html /opt/cybersarah-control-center/node_modules /opt/cybersarah-control-center/package.json; do
+            name=$(basename "$entry")
+            if [ -e "$entry" ]; then echo "control_center_asset_${name}: PRESENT"; else echo "control_center_asset_${name}: MISSING"; fi
+          done
+          pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{const x=JSON.parse(s).find(p=>p.name==="cybersarah-backend");console.log("backend_actual_cwd: "+(x?.pm2_env?.pm_cwd==="/opt/cybersarah-control-center"?"EXPECTED":"OTHER"));console.log("backend_expected_script: "+(x?.pm2_env?.pm_exec_path==="/opt/cybersarah-control-center/dist/index.js"?"YES":"NO"))}catch{console.log("backend_actual_cwd: UNKNOWN")}})' || true
+
+          if command -v pm2 >/dev/null 2>&1; then
+            pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>{try{for(const x of JSON.parse(s).slice(0,15))console.log("pm2_service: "+String(x.name).replace(/[^a-zA-Z0-9_-]/g,"_")+"_"+(x.pm2_env?.status==="online"?"ONLINE":"OFFLINE"))}catch{console.log("pm2_service: UNKNOWN")}})' || true
+          fi
+          echo "server_node_major: $(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo UNKNOWN)"
+          if [ -d /opt/cybersarah/.git ]; then echo 'revenue_git: PRESENT'; else echo 'revenue_git: MISSING'; fi
+          if [ -d /opt/cybersarah/node_modules ]; then echo 'revenue_dependencies: PRESENT'; else echo 'revenue_dependencies: MISSING'; fi
+          if command -v pnpm >/dev/null 2>&1 || command -v corepack >/dev/null 2>&1; then echo 'pnpm_or_corepack: PRESENT'; else echo 'pnpm_or_corepack: MISSING'; fi
+          for port in 3000 3001 18741 4000 5000; do
+            if (echo > "/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1; then echo "localhost_port_$port: LISTENING"; else echo "localhost_port_$port: CLOSED"; fi
+          done
+          REMOTE
+          # Die Revenue-Engine lebt bereits auf demselben Host. Nur read-only
+          # Tabellen- und Health-Status pruefen; weder URL noch Daten ausgeben.
+          ssh -i ~/.ssh/revenue_inventory_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          for path in /opt/cybersarah/.env /opt/cybersarah/node_modules/pg /opt/cybersarah-control-center/node_modules/pg /opt/cybersarah/package.json; do
+            case "$path" in
+              *.env) label=env_readable; if [ -r "$path" ]; then echo "$label: YES"; else echo "$label: NO"; fi ;;
+              */pg) label=pg_driver; if [ -d "$path" ]; then echo "$label: PRESENT"; else echo "$label: MISSING"; fi ;;
+              *) label=revenue_package; if [ -f "$path" ]; then echo "$label: PRESENT"; else echo "$label: MISSING"; fi ;;
+            esac
+          done
+          if [ ! -r /opt/cybersarah/.env ]; then echo 'revenue_db_probe: UNAVAILABLE'; exit 0; fi
+          cd /opt/cybersarah
+          node <<'JS'
+          const fs = require('node:fs');
+          let Pool;
+          try { Pool = require('pg').Pool; } catch {
+            try { Pool = require('/opt/cybersarah-control-center/node_modules/pg').Pool; }
+            catch { console.log('revenue_db_probe: DRIVER_UNAVAILABLE'); process.exit(0); }
+          }
+          const lines = fs.readFileSync('.env', 'utf8').split(/\r?\n/);
+          const lookup = name => {
+            const line = lines.find(line => line.startsWith(name + '='));
+            if (!line) return '';
+            let value = line.slice(name.length + 1).trim();
+            if ((value[0] === '"' && value.at(-1) === '"') || (value[0] === "'" && value.at(-1) === "'")) value = value.slice(1, -1);
+            return value;
+          };
+          const dbUrl = lookup('DATABASE_URL');
+          const publicUrl = lookup('PUBLIC_APP_URL');
+          console.log('revenue_public_https:', publicUrl.startsWith('https://') ? 'YES' : 'NO');
+          if (!dbUrl) { console.log('revenue_db_probe: UNAVAILABLE'); process.exit(0); }
+          try {
+            const parsed = new URL(dbUrl);
+            console.log('revenue_db_target:', ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname) ? 'LOCAL' : 'REMOTE');
+            console.log('revenue_db_protocol:', ['postgres:', 'postgresql:'].includes(parsed.protocol) ? 'POSTGRES' : 'OTHER');
+          } catch { console.log('revenue_db_target: UNPARSEABLE'); }
+          const pool = new Pool({ connectionString: dbUrl, max: 1, connectionTimeoutMillis: 7000,
+            query_timeout: 5000, options: '-c default_transaction_read_only=on' });
+          (async () => {
+            const names = ['hara_proposals', 'hara_performance', 'subscription_plans', 'customer_subscriptions',
+              'subscription_invoices', 'cross_sell_rules', 'cross_sell_recommendations', 'expansion_chancen'];
+            const result = await pool.query("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = ANY($1::text[])", [names]);
+            console.log(`revenue_db_tables: ${result.rows.length}/${names.length}`);
+          })().catch(error => {
+            const code = String(error?.code ?? 'UNKNOWN');
+            const safe = ['ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', '28P01', '3D000', '28000', '42P01'].includes(code) ? code : 'OTHER';
+            console.log(`revenue_db_probe: ${safe}`);
+          }).finally(() => pool.end().catch(() => {}));
+          JS
+          if sudo -n -u postgres psql -Atqc 'SELECT 1' >/dev/null 2>&1; then echo 'local_pg_admin: YES'; else echo 'local_pg_admin: NO'; fi
+          cd /opt/cybersarah
+          node <<'JS'
+          const fs = require('node:fs');
+          const cp = require('node:child_process');
+          const envline = fs.readFileSync('.env','utf8').split(/\r?\n/).find(line=>line.startsWith('DATABASE_URL='));
+          if (!envline) { console.log('revenue_db_inventory: UNAVAILABLE'); process.exit(0); }
+          try {
+            let value = envline.slice('DATABASE_URL='.length).trim();
+            if ((value[0] === '"' && value.at(-1) === '"') || (value[0] === "'" && value.at(-1) === "'")) value = value.slice(1, -1);
+            const target = decodeURIComponent(new URL(value).pathname.slice(1));
+            const query = (args) => cp.execFileSync('sudo', ['-n','-u','postgres','psql','-Atq',...args],{encoding:'utf8',timeout:6000,stdio:['ignore','pipe','pipe']}).trim();
+            const databases = query(['-c',"SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate"]).split('\n').filter(Boolean);
+            console.log('revenue_db_exact_exists:',databases.includes(target)?'YES':'NO');
+            let full=0;
+            const tables = "'hara_proposals','hara_performance','subscription_plans','customer_subscriptions','subscription_invoices','cross_sell_rules','cross_sell_recommendations','expansion_chancen'";
+            for (const db of databases.slice(0,30)) {
+              try {
+                const count = Number(query(['-d',db,'-c',`SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename IN (${tables})`]));
+                if (db===target) console.log('revenue_db_target_tables:',count+'/8');
+                if (count===8) full++;
+              } catch { if (db===target) console.log('revenue_db_target_tables: UNAVAILABLE'); }
+            }
+            console.log('revenue_db_full_schema_instances:',full);
+            const roleCount = Number(query(['-c', "SELECT count(*) FROM pg_roles WHERE rolname = 'cybersarah_revenue_bridge'"]));
+            console.log('revenue_bridge_role_exists:',roleCount?'YES':'NO');
+          } catch { console.log('revenue_db_inventory: UNAVAILABLE'); }
+          JS
+          if command -v pm2 >/dev/null 2>&1; then
+            pm2 jlist 2>/dev/null | node -e 'let input="";process.stdin.on("data",chunk=>input+=chunk);process.stdin.on("end",()=>{try{const p=JSON.parse(input);console.log("pm2_revenue_process: "+(p.some(x=>String(x.pm2_env?.pm_cwd??"").startsWith("/opt/cybersarah/"))?"PRESENT":"MISSING"))}catch{console.log("pm2_revenue_process: UNKNOWN")}})' || true
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 http://127.0.0.1:3000/api/health || true)
+          case "$code" in 200|503) echo "revenue_api_health: HTTP_$code" ;; *) echo 'revenue_api_health: UNAVAILABLE' ;; esac
+          REMOTE
+          ssh -i ~/.ssh/revenue_inventory_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" node <<'JS'
+          fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(8000) })
+            .then(response => response.json())
+            .then(data => {
+              for (const component of data.komponenten || []) {
+                if (["PostgreSQL", "Stripe", "OpenAI"].includes(component.name)) {
+                  console.log(`revenue_health_${component.name}: ${component.status === "ONLINE" ? "ONLINE" : "OFFLINE"}`);
+                }
+              }
+            }).catch(() => console.log("revenue_health: UNAVAILABLE"));
+          JS
+          rm -f ~/.ssh/revenue_inventory_key

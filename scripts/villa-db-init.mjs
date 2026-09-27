@@ -12,6 +12,8 @@
  *   - Env: DATABASE_URL (Neon, CyberSarah), RENDER_API_KEY,
  *          RENDER_VILLA_SERVICE_ID, NEON_DB_NAME (default agenten_villa)
  */
+// `postgres` wird nur im Villa-Provisioning-Workflow per `npm install postgres --no-save` bereitgestellt.
+// eslint-disable-next-line import/no-unresolved
 import postgres from "postgres";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";

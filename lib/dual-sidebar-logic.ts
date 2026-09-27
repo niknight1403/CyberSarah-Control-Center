@@ -22,25 +22,16 @@ export type NavigationItem = {
 
 export const APPS_ITEMS: NavigationItem[] = [
   { route: "/dashboard", title: "Übersicht", icon: "house.fill" },
-  { route: "/", title: "Workspace", icon: "folder.fill" },
-  { route: "/cyber-dashboard", title: "Cyber Dashboard", icon: "bolt.fill" },
+  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill" },
   { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
-  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right" },
-  { route: "/data", title: "Daten-Hub", icon: "tablecells.fill" },
-  { route: "/meetings", title: "Meetings", icon: "gearshape.fill" },
-  // Sprint 201: Speicher-Manager — per Prompt App-Speicher sortieren und aufraeumen.
-  { route: "/storage-manager", title: "Speicher", icon: "internaldrive.fill" },
-  // Sprint 200: auf Wide-Viewports ist die Tab-Bar ausgeblendet — ohne
-  // diesen Eintrag waere der Konto-Screen dort unerreichbar.
+  { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill" },
+  { route: "/loop-engineering", title: "Revenue-Loops", icon: "wand.and.stars" },
   { route: "/account", title: "Konto", icon: "person.crop.circle" },
 ];
 
 export const SUPERAGENT_ITEMS: NavigationItem[] = [
   { route: "/superagent", title: "Command Center", icon: "wand.and.stars" },
-  { route: "/agent", title: "Development Agent", icon: "sparkles" },
   { route: "/chat", title: "Agent Chat", icon: "message.fill" },
-  { route: "/quality", title: "Quality & Runs", icon: "checkmark.circle.fill" },
-  { route: "/preview", title: "Live Preview", icon: "play.rectangle.fill" },
 ];
 
 /** Liefert die Navigationseintraege einer Zone (Kopie, nicht die Referenz). */

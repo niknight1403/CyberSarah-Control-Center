@@ -3,42 +3,26 @@ import { describe, expect, it } from "vitest";
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 
 describe("DRAWER_ITEMS", () => {
-  it("enthaelt genau die erwarteten Einträge in Reihenfolge", () => {
+  it("zeigt fokussierte Revenue-Navigation ohne Designer/Utility-Tabs", () => {
     expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
-      "Chat",
-      "Revenue OS",
-      "Micro Trading",
-      "Loop Engineering",
-      "Fokus & Rückblick",
-      "Ideen-Inbox",
-      "Entscheidungs-Journal",
-      "Workflows",
-            "Plugins",
-      "Meetings",
-      "Terminal",
-      "Entwicklung",
-      "Vorschau",
-      "Qualit\u00e4t",
-      "Dateien",
-      "Gedächtnis",
-      "Daten",
-      "Agenteneinstellungen",
+      "Übersicht", "Revenue OS", "Business & Analytics", "Micro Trading",
+      "Revenue-Loops", "Fokus & Rückblick", "Ideen-Inbox", "Entscheidungs-Journal",
+      "Chat", "Workflows", "Konto",
     ]);
+    expect(DRAWER_ITEMS.map(item => item.route)).not.toContain("/designer");
+    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/focus");
+    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/ideas");
+    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/decisions");
   });
 
-  it("badgt die neuen Revenue-Einträge und Systembereiche", () => {
-    const badged = DRAWER_ITEMS.filter((item) => item.badge);
-    expect(badged.map((item) => `${item.title}=${item.badge}`)).toEqual(["Revenue OS=Neu", "Micro Trading=Paper", "Loop Engineering=Umsatz", "Fokus & Rückblick=Neu", "Ideen-Inbox=Neu", "Meetings=Neu"]);
-  });
 });
 
 describe("resolveActiveDrawerItem", () => {
   it("findet exakte Treffer", () => {
-    expect(resolveActiveDrawerItem("/memory")?.title).toBe("Gedächtnis");
-    expect(resolveActiveDrawerItem("/settings")?.title).toBe("Agenteneinstellungen");
+    expect(resolveActiveDrawerItem("/account")?.title).toBe("Konto");
     expect(resolveActiveDrawerItem("/revenue-os")?.title).toBe("Revenue OS");
     expect(resolveActiveDrawerItem("/micro-trading")?.title).toBe("Micro Trading");
-    expect(resolveActiveDrawerItem("/loop-engineering")?.title).toBe("Loop Engineering");
+    expect(resolveActiveDrawerItem("/loop-engineering")?.title).toBe("Revenue-Loops");
   });
 
   it("findet Praefix-Treffer fuer verschachtelte Routen", () => {
@@ -46,9 +30,9 @@ describe("resolveActiveDrawerItem", () => {
   });
 
   it("behandelt den Root-Pfad nicht als Praefix fuer andere Routen", () => {
-    expect(resolveActiveDrawerItem("/plugins")?.title).toBe("Plugins");
-    expect(resolveActiveDrawerItem("")?.title).toBe("Dateien");
-    expect(resolveActiveDrawerItem("/")?.title).toBe("Dateien");
+    expect(resolveActiveDrawerItem("/plugins")).toBeNull();
+    expect(resolveActiveDrawerItem("")).toBeNull();
+    expect(resolveActiveDrawerItem("/")).toBeNull();
   });
 
   it("liefert null bei unbekannter Route", () => {

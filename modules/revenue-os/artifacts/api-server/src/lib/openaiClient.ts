@@ -37,7 +37,7 @@ if (ALLE_KEYS.length === 0) {
   logger.warn("⚠️ Kein OpenAI-API-Key gefunden — KI-Agenten laufen im Fallback-Modus");
 } else {
   logger.info(
-    { keysAnzahl: ALLE_KEYS.length, primärKey: ALLE_KEYS[0]?.substring(0, 12) + "..." },
+    { keysAnzahl: ALLE_KEYS.length },
     "✅ OpenAI API-Keys erkannt"
   );
 }

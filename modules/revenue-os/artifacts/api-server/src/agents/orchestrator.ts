@@ -2,6 +2,9 @@ import cron from "node-cron";
 import { woechentlicherNewsletterScan } from "./newsletterAgent";
 import { taeglicheWhatsAppAufgabe } from "./whatsappAgent";
 
+// Der Control-Center-Bridge-Modus startet keine produktiven Cron-Aktionen.
+if (process.env.REVENUE_OS_INTEGRATION_ONLY !== "1") {
+
   // ── Smart Coupon Agent: Init beim Start, KI-Coupons alle 12h, Optimierung alle 6h ──
   cron.schedule("0 */12 * * *", () => {
     globalQueue.fuegeHinzu("smart_coupon_ki", { aktion: "ki_coupons" }, { prioritaet: 2 });
@@ -192,6 +195,8 @@ import { taeglicheWhatsAppAufgabe } from "./whatsappAgent";
     globalQueue.fuegeHinzu("subscription_full_check", { aktion: "full_check" }, { prioritaet: 3 });
   });
   });
+}
+
 import { db } from "@workspace/db";
 import { agentsTable, agentLogsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
