@@ -56,6 +56,11 @@ async function readOps() {
     console.log(` - ${e.key} = ${mask(e.value)}`);
   }
   console.log("[villa-ops] Wenn DATABASE_URL fehlt: Login/Villen-Speicher inaktiv (Health meldet nicht_konfiguriert).");
+  const deps = await render(`/services/${service.id}/deploys?limit=3`);
+  for (const item of deps.data || []) {
+    const d = item.deploy ?? item;
+    console.log(`[deploy] ${d.id} | ${d.status} | commit=${(d.commit ?? {}).id ?? "?"} | erstellt=${d.createdAt}`);
+  }
 }
 
 async function setEnvOps() {
