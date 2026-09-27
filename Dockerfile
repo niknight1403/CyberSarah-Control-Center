@@ -19,6 +19,14 @@ RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime
 
+# Sprint 274: ffmpeg fuer die Medien-Pipeline (Video-Assembly, 1080p).
+# Ehrlich: ohne dieses Binary ist Video-Generierung in Produktion nicht
+# verfuegbar — der Faehigkeits-Check (probeFfmpeg) meldet das klar.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV NODE_ENV=production

@@ -12,11 +12,13 @@ function source(file: string): string {
 describe("CyberSarah Future Glass design integration", () => {
   it("uses the canonical reference palette and status semantics", () => {
     const tokens = fs.readFileSync(path.join(root, "lib", "design", "future-glass.ts"), "utf8");
-    expect(tokens).toContain('cyan: "#00E5FF"');
-    expect(tokens).toContain('purple: "#8B5CF6"');
+    // Sprint 355 — Aurora Flow ist die kanonische Referenzpalette.
+    expect(tokens).toContain('cyan: "#00F2FE"');
+    expect(tokens).toContain('purple: "#7C3AED"');
+    expect(tokens).toContain('purple: "#7C3AED"');
     expect(tokens).toContain('magenta: "#EC4899"');
-    expect(tokens).toContain('green: "#00FFA3"');
-    expect(tokens).toContain('blue: "#2EA7FF"');
+    expect(tokens).toContain('green: "#00E5B0"');
+    expect(tokens).toContain('blue: "#38BDF8"');
     expect(tokens).toContain('idle: { accent: "purple"');
     expect(tokens).toContain('success: { accent: "green"');
     expect(tokens).toContain('error: { accent: "red"');

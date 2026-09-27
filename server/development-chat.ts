@@ -18,6 +18,10 @@ import {
   countMessagesToday,
   evaluateChatQuota,
 } from "../lib/chat-quota-logic";
+import { buildQuotaUpgradePrompt } from "../lib/upgrade-prompt-logic";
+import { tierPriceId } from "../lib/subscription-tiers-logic";
+import { guardFileWrite } from "../lib/code-safety-logic";
+import { getMonetizationAccount } from "./monetization";
 import {
   isFeatureEnabled,
   parseFeatureFlagOverrides,
@@ -75,6 +79,13 @@ import {
 } from "./model-router";
 
 import { autonomousKeyRecovery, getRuntimeApiKey, isProviderDisabledRuntime } from "./provider-admin";
+// Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette unterbrechungsfrei).
+import {
+  forceRouteRotation,
+  getRouteRotationStatus,
+  setRouteRotationEnabled,
+} from "./route-rotation-agent";
+import { FREE_ROUTE_SOURCES } from "../lib/route-rotation-agent-logic";
 
 const providerSchema = z.enum([
   "auto",
@@ -388,6 +399,19 @@ export const developmentChatRouter = router({
   /** Sprint 71 — Lokale Endpoints (Ollama/LM Studio) aktiv anpingen. */
   probeLocalProviders: adminProcedure.mutation(async () => probeLocalProviders()),
 
+  /** Sprint 196 — Rotations-Agent: vollstaendiger Status-Snapshot (Admin). */
+  routeRotationStatus: adminProcedure.query(async () => getRouteRotationStatus()),
+
+  /** Sprint 196 — Rotations-Agent pausieren/fortsetzen (Admin-Vollzugriff). */
+  setRouteRotationEnabled: adminProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ input }) => ({ enabled: await setRouteRotationEnabled(input.enabled) })),
+
+  /** Sprint 196 — Primaerroute erzwingen oder Zwang aufheben ('auto'). */
+  forceRouteRotation: adminProcedure
+    .input(z.object({ to: z.enum([...FREE_ROUTE_SOURCES, "auto"]) }))
+    .mutation(async ({ input }) => forceRouteRotation({ to: input.to })),
+
   send: protectedProcedure
     .input(chatInputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -407,7 +431,15 @@ export const developmentChatRouter = router({
             new Date(),
           );
           if (!quota.allowed) {
-            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: quota.reason ?? "Tageslimit erreicht." });
+            // Sprint 262: Ehrlicher Upgrade-Prompt statt nacktem Fehler —
+            // Zahlen, Reset-Zeitpunkt, Checkout nur wenn ein Preis konfiguriert ist.
+            const plan = await getMonetizationAccount(ctx.user.openId).then((account) => account.plan).catch(() => "free" as const);
+            const gate = buildQuotaUpgradePrompt(
+              { usedToday, dailyLimit: quota.dailyLimit, resetsAt: quota.resetsAt, plan, quotaExempt: quota.quotaExempt },
+              (tier) => tierPriceId(tier, process.env) !== null,
+            );
+            const detail = gate.prompt?.detail ?? quota.reason ?? "Tageslimit erreicht.";
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: detail });
           }
         } catch (error) {
           if (error instanceof TRPCError) throw error;
@@ -635,6 +667,12 @@ async function executeAgentTool(
   args: Record<string, unknown>,
   githubToken?: string,
 ): Promise<string> {
+  // Sprint 270: Selbstheilende Schreib-Grenze — Validierung VOR dem
+  // Schreiben; Fehler gehen als behebbare Meldung an das Modell zurueck.
+  if (tool === "write_repo_file") {
+    const guard = guardFileWrite(String(args.path ?? ""), typeof args.content === "string" ? args.content : "");
+    if (!guard.ok) return `FEHLER: ${guard.reason} Korrekturhinweis: ${guard.fixHint}`;
+  }
   const built = buildWorkspaceToolRequest(tool, workspaceId, args);
   if (!built.ok) return `FEHLER: ${built.error}`;
   const { method, path, body } = built.request;

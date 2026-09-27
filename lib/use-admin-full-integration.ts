@@ -2,6 +2,7 @@ import { useAdminAutoRouter } from "@/lib/use-admin-auto-router";
 import { useAdminDesignThemeSync } from "@/lib/use-admin-design-theme-sync";
 import { useAdminGithubTokenSync } from "@/lib/use-admin-github-token-sync";
 import { useAdminRepositoryAutoConnect } from "@/lib/use-admin-repository-autoconnect";
+import { useAutonomousCampaignBridge } from "@/lib/use-autonomous-campaign-bridge";
 
 type AdminUser = { role?: string } | null | undefined;
 
@@ -26,4 +27,7 @@ export function useAdminFullIntegration(user: AdminUser) {
   useAdminGithubTokenSync(user);
   useAdminDesignThemeSync(user);
   useAdminRepositoryAutoConnect(user);
+  // Sprint 373: Ideen/Produkte fliessen nach dem Admin-Login voll autonom
+  // in das Influencer-Marketing (nacheinander, pro Zyklus begrenzt, HITL bleibt).
+  useAutonomousCampaignBridge(user);
 }

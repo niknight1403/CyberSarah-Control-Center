@@ -4,11 +4,7 @@
  * das Muster "Logic-Modul in lib/ + Tests in tests/" — Tool-Schema,
  * Request-Bau fuer den Workspace-Service und Ergebnis-Formatierung fuer
  * das Modell.
- *
- * Ziel (Owner-Feedback 14.09.2026): der In-App-Chat soll wie ein echter
- * Superagent selbststaendig Repository-Dateien lesen/schreiben und Git-
- * Operationen ausfuehren koennen, statt den Nutzer zum manuellen Einfuegen
- * von Code aufzufordern.
+ * Erweitert in Sprints 285-288 (Multi-File Refactor, Code-Suche, Test-Runner, Iterations-Limits).
  */
 
 export const AGENT_TOOL_NAMES = [
@@ -25,6 +21,9 @@ export const AGENT_TOOL_NAMES = [
   "create_github_issue",
   "close_github_issue",
   "save_learning",
+  "multi_file_refactor",
+  "search_code",
+  "run_tests",
 ] as const;
 
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
@@ -216,9 +215,70 @@ export const AGENT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "multi_file_refactor",
+      description: "Führt eine atomare Multi-File-Refactoring-Transaktion über mehrere Dateiänderungen (write/delete) gleichzeitig aus. Enthält automatischen Rollback bei Fehlern.",
+      parameters: {
+        type: "object",
+        properties: {
+          operations: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                path: { type: "string" },
+                action: { type: "string", enum: ["write", "delete"] },
+                content: { type: "string" },
+              },
+              required: ["path", "action"],
+            },
+            description: "Liste von Dateioperationen (write oder delete).",
+          },
+          commitMessage: { type: "string", description: "Optionale Commit-Message." },
+        },
+        required: ["operations"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_code",
+      description: "Durchsucht den Repository-Code mit Regex- oder Textmustern (grep-ähnlich) und liefert Treffer inklusive Syntax-Kontextzeilen.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Suchmuster oder Text." },
+          filePattern: { type: "string", description: "Optionaler Dateipfad-Filter (z. B. '*.ts' oder 'src/')." },
+          isRegex: { type: "boolean", description: "Standard false (Textsuche)." },
+          maxResults: { type: "number", description: "Maximale Trefferanzahl (1-100, Standard 20)." },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_tests",
+      description: "Führt die Vitest-Testsuite gezielt für eine einzelne Testdatei oder ein Filter-Muster aus und liefert eine Zusammenfassung der Ergebnisse.",
+      parameters: {
+        type: "object",
+        properties: {
+          testFile: { type: "string", description: "Relativer Pfad zur Testdatei (z. B. 'tests/dev-agent-tools-logic.test.ts')." },
+          pattern: { type: "string", description: "Optionaler Name/Filter für spezifische Tests (-t Filter)." },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
-export const MAX_AGENT_TOOL_ITERATIONS = 6;
+export const MAX_AGENT_TOOL_ITERATIONS = 8;
 export const MAX_FILE_LIST_ENTRIES = 250;
 export const MAX_FILE_CONTENT_CHARS = 9_000;
 export const MAX_TOOL_RESULT_CHARS = 4_000;
@@ -228,7 +288,7 @@ export function parseToolArguments(raw: string | undefined | null): Record<strin
   if (!raw || !raw.trim()) return {};
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
   } catch {
     return {};
   }
@@ -265,16 +325,12 @@ export const NO_WORKSPACE_CONNECTED_ERROR =
 export function buildWorkspaceToolRequest(
   tool: AgentToolName,
   workspaceId: string,
-  args: Record<string, unknown>,
+  args: Record<string, unknown>
 ): WorkspaceToolRequestResult {
-  // Sprint 147 — Selbstdiagnose-Haertung: Ohne verbundenes Repository ist
-  // JEDER Workspace-Aufruf zum Scheitern verurteilt (leere Workspace-ID im
-  // Pfad). Statt einen sinnlosen Netzwerk-Roundtrip zu riskieren, dessen
-  // Fehlertext das Modell zu einer erfundenen Ausrede verleiten kann, wird
-  // hier sofort ein klarer, deterministischer Fehler zurueckgegeben.
-  if (!workspaceId.trim()) {
+  if (!workspaceId || !workspaceId.trim()) {
     return { ok: false, error: NO_WORKSPACE_CONNECTED_ERROR };
   }
+
   const base = `/api/render/api/v1/workspaces/${encodeURIComponent(workspaceId)}`;
 
   switch (tool) {
@@ -282,76 +338,144 @@ export function buildWorkspaceToolRequest(
       return { ok: true, request: { method: "GET", path: `${base}/files` } };
 
     case "read_repo_file": {
-      const path = requireStringArg(args, "path", 500);
-      if (typeof path !== "string") return { ok: false, error: path.error };
-      return { ok: true, request: { method: "GET", path: `${base}/file?path=${encodeURIComponent(path)}` } };
+      const pathRes = requireStringArg(args, "path", 500);
+      if (typeof pathRes === "object") return { ok: false, error: pathRes.error };
+      return { ok: true, request: { method: "GET", path: `${base}/file?path=${encodeURIComponent(pathRes)}` } };
     }
 
     case "write_repo_file": {
-      const path = requireStringArg(args, "path", 500);
-      if (typeof path !== "string") return { ok: false, error: path.error };
-      const content = args.content;
-      if (typeof content !== "string") return { ok: false, error: "Das Argument 'content' fehlt oder ist kein Text." };
-      if (content.length > 1_000_000) return { ok: false, error: "Der Dateiinhalt ist zu gross (max. 1.000.000 Zeichen)." };
-      return { ok: true, request: { method: "PUT", path: `${base}/file`, body: { path, content } } };
+      const pathRes = requireStringArg(args, "path", 500);
+      if (typeof pathRes === "object") return { ok: false, error: pathRes.error };
+      const contentRes = requireStringArg(args, "content", 1_000_000);
+      if (typeof contentRes === "object") return { ok: false, error: contentRes.error };
+      return {
+        ok: true,
+        request: { method: "PUT", path: `${base}/file`, body: { path: pathRes, content: contentRes } },
+      };
     }
 
     case "git_status":
       return { ok: true, request: { method: "GET", path: `${base}/git/status` } };
 
     case "commit_changes": {
-      const message = requireStringArg(args, "message", 240);
-      if (typeof message !== "string") return { ok: false, error: message.error };
-      return { ok: true, request: { method: "POST", path: `${base}/git/commit`, body: { message } } };
+      const msgRes = requireStringArg(args, "message", 240);
+      if (typeof msgRes === "object") return { ok: false, error: msgRes.error };
+      return { ok: true, request: { method: "POST", path: `${base}/git/commit`, body: { message: msgRes } } };
     }
 
     case "push_changes":
       return { ok: true, request: { method: "POST", path: `${base}/git/push` } };
 
     case "open_pull_request": {
-      const title = requireStringArg(args, "title", 140);
-      if (typeof title !== "string") return { ok: false, error: title.error };
-      if (title.length < 3) return { ok: false, error: "Das Argument 'title' muss mindestens 3 Zeichen lang sein." };
-      const baseBranch = requireStringArg(args, "baseBranch", 120);
-      if (typeof baseBranch !== "string") return { ok: false, error: baseBranch.error };
-      const body = typeof args.body === "string" ? args.body.slice(0, 10_000) : "";
-      return { ok: true, request: { method: "POST", path: `${base}/git/pull-request`, body: { title, baseBranch, body } } };
+      const titleRes = requireStringArg(args, "title", 240);
+      if (typeof titleRes === "object") return { ok: false, error: titleRes.error };
+      if (titleRes.length < 3) return { ok: false, error: "Das Argument 'title' muss mindestens 3 Zeichen lang sein." };
+      const baseBranchRes = requireStringArg(args, "baseBranch", 120);
+      if (typeof baseBranchRes === "object") return { ok: false, error: baseBranchRes.error };
+      const body = typeof args.body === "string" ? args.body : "";
+      return {
+        ok: true,
+        request: {
+          method: "POST",
+          path: `${base}/git/pull-request`,
+          body: { title: titleRes, baseBranch: baseBranchRes, body },
+        },
+      };
     }
 
     case "list_branches":
       return { ok: true, request: { method: "GET", path: `${base}/git/branches` } };
 
     case "checkout_branch": {
-      const branch = requireStringArg(args, "branch", 120);
-      if (typeof branch !== "string") return { ok: false, error: branch.error };
-      return { ok: true, request: { method: "POST", path: `${base}/git/checkout`, body: { branch } } };
+      const branchRes = requireStringArg(args, "branch", 120);
+      if (typeof branchRes === "object") return { ok: false, error: branchRes.error };
+      return {
+        ok: true,
+        request: { method: "POST", path: `${base}/git/checkout`, body: { branch: branchRes } },
+      };
     }
 
     case "list_github_issues": {
-      const stateRaw = typeof args.state === "string" ? args.state.trim().toLowerCase() : "open";
-      const state = ["open", "closed", "all"].includes(stateRaw) ? stateRaw : "open";
-      const limit = typeof args.limit === "number" && Number.isFinite(args.limit) ? Math.min(Math.max(Math.trunc(args.limit), 1), 30) : 15;
-      return { ok: true, request: { method: "GET", path: `${base}/github/issues?state=${state}&limit=${limit}` } };
+      const rawState = typeof args.state === "string" ? args.state.toLowerCase() : "open";
+      const state = rawState === "closed" || rawState === "all" ? rawState : "open";
+      const rawLimit = typeof args.limit === "number" && Number.isFinite(args.limit) ? args.limit : 15;
+      const limit = Math.min(Math.max(1, Math.round(rawLimit)), 30);
+      return {
+        ok: true,
+        request: { method: "GET", path: `${base}/github/issues?state=${state}&limit=${limit}` },
+      };
     }
 
     case "create_github_issue": {
-      const title = requireStringArg(args, "title", 280);
-      if (typeof title !== "string") return { ok: false, error: title.error };
-      if (title.length < 3) return { ok: false, error: "Das Argument 'title' muss mindestens 3 Zeichen lang sein." };
-      const body = typeof args.body === "string" ? args.body.slice(0, 20_000) : "";
-      const labels = Array.isArray(args.labels)
-        ? args.labels.filter((label): label is string => typeof label === "string" && label.trim().length > 0).map((label) => label.trim().slice(0, 60)).slice(0, 6)
-        : [];
-      return { ok: true, request: { method: "POST", path: `${base}/github/issues`, body: { title, body, labels } } };
+      const titleRes = requireStringArg(args, "title", 280);
+      if (typeof titleRes === "object") return { ok: false, error: titleRes.error };
+      if (titleRes.length < 3) return { ok: false, error: "Das Argument 'title' muss mindestens 3 Zeichen lang sein." };
+      const body = typeof args.body === "string" ? args.body : "";
+      const rawLabels = Array.isArray(args.labels) ? args.labels : [];
+      const labels = rawLabels
+        .filter((l): l is string => typeof l === "string" && Boolean(l.trim()))
+        .map((l) => l.trim())
+        .slice(0, 6);
+      return {
+        ok: true,
+        request: { method: "POST", path: `${base}/github/issues`, body: { title: titleRes, body, labels } },
+      };
     }
 
     case "close_github_issue": {
-      const issueNumber = args.number;
-      if (typeof issueNumber !== "number" || !Number.isInteger(issueNumber) || issueNumber < 1) {
-        return { ok: false, error: "Das Argument 'number' fehlt oder ist keine gueltige Issue-Nummer." };
-      }
-      const comment = typeof args.comment === "string" ? args.comment.slice(0, 10_000) : "";
-      return { ok: true, request: { method: "POST", path: `${base}/github/issues/close`, body: { number: issueNumber, comment } } };
+      const num = typeof args.number === "number" && Number.isFinite(args.number) ? Math.round(args.number) : 0;
+      if (num <= 0) return { ok: false, error: "Das Argument 'number' fehlt oder ist keine gueltige Issue-Nummer." };
+      const comment = typeof args.comment === "string" ? args.comment : "";
+      return {
+        ok: true,
+        request: { method: "POST", path: `${base}/github/issues/close`, body: { number: num, comment } },
+      };
+    }
+
+    case "save_learning": {
+      const titleRes = requireStringArg(args, "title", 160);
+      if (typeof titleRes === "object") return { ok: false, error: titleRes.error };
+      const detailRes = requireStringArg(args, "detail", 2000);
+      if (typeof detailRes === "object") return { ok: false, error: detailRes.error };
+      const kind = typeof args.kind === "string" ? args.kind : "entscheidung";
+      return {
+        ok: true,
+        request: { method: "POST", path: `${base}/learnings`, body: { title: titleRes, detail: detailRes, kind } },
+      };
+    }
+
+    case "multi_file_refactor": {
+      const ops = Array.isArray(args.operations) ? args.operations : [];
+      if (ops.length === 0) return { ok: false, error: "Das Argument 'operations' muss mindestens eine Operation enthalten." };
+      return {
+        ok: true,
+        request: { method: "POST", path: `${base}/refactor/multi-file`, body: { operations: ops, commitMessage: args.commitMessage } },
+      };
+    }
+
+    case "search_code": {
+      const queryRes = requireStringArg(args, "query", 200);
+      if (typeof queryRes === "object") return { ok: false, error: queryRes.error };
+      const filePattern = typeof args.filePattern === "string" ? args.filePattern : "";
+      const isRegex = Boolean(args.isRegex);
+      const maxResults = typeof args.maxResults === "number" ? Math.min(Math.max(1, Math.round(args.maxResults)), 100) : 20;
+      return {
+        ok: true,
+        request: {
+          method: "POST",
+          path: `${base}/code/search`,
+          body: { query: queryRes, filePattern, isRegex, maxResults },
+        },
+      };
+    }
+
+    case "run_tests": {
+      const testFile = typeof args.testFile === "string" ? args.testFile.trim() : "";
+      const pattern = typeof args.pattern === "string" ? args.pattern.trim() : "";
+      return {
+        ok: true,
+        request: { method: "POST", path: `${base}/tests/run`, body: { testFile, pattern } },
+      };
     }
 
     default:
@@ -370,11 +494,11 @@ function truncate(text: string, maxChars: number): string {
  * gleiche Eingabe liefert immer dieselbe Ausgabe.
  */
 export function formatToolResultForModel(tool: AgentToolName, payload: unknown): string {
-  const record = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+  const record = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
 
   switch (tool) {
     case "list_repo_files": {
-      const files = Array.isArray(record.files) ? record.files as unknown[] : [];
+      const files = Array.isArray(record.files) ? (record.files as unknown[]) : [];
       const paths = files
         .map((entry) => (typeof entry === "string" ? entry : (entry as { path?: string })?.path))
         .filter((value): value is string => typeof value === "string");
@@ -421,7 +545,7 @@ export function formatToolResultForModel(tool: AgentToolName, payload: unknown):
     }
 
     case "list_github_issues": {
-      const issues = Array.isArray(record.issues) ? record.issues as Record<string, unknown>[] : [];
+      const issues = Array.isArray(record.issues) ? (record.issues as Record<string, unknown>[]) : [];
       if (!issues.length) return "Keine Issues gefunden.";
       const lines = issues.map((issue) => {
         const labels = Array.isArray(issue.labels) ? (issue.labels as unknown[]).filter((l): l is string => typeof l === "string").join(", ") : "";
@@ -441,6 +565,27 @@ export function formatToolResultForModel(tool: AgentToolName, payload: unknown):
         ? `Issue #${String(record.number ?? "")} geschlossen.`
         : `Issue #${String(record.number ?? "")} konnte nicht geschlossen werden (Zustand: ${String(record.state ?? "unbekannt")}).`;
 
+    case "multi_file_refactor":
+      return record.success
+        ? `Multi-File-Refactoring erfolgreich angewendet (${String(record.appliedOps ?? 0)} Datei(en)).`
+        : `Multi-File-Refactoring fehlgeschlagen: ${String(record.error ?? "Unbekannter Fehler")}`;
+
+    case "search_code": {
+      const matches = Array.isArray(record.matches) ? (record.matches as Record<string, unknown>[]) : [];
+      if (!matches.length) return "Keine Treffer im Code gefunden.";
+      const lines = matches.map((m) => `${String(m.path ?? "")}:${String(m.lineNumber ?? "")} - ${String(m.lineContent ?? "")}`);
+      return truncate(lines.join("\n"), MAX_TOOL_RESULT_CHARS);
+    }
+
+    case "run_tests": {
+      const passed = String(record.passed ?? 0);
+      const failed = String(record.failed ?? 0);
+      const isSuccess = Boolean(record.isSuccess);
+      return isSuccess
+        ? `Test-Run erfolgreich: ${passed} bestanden.`
+        : `Test-Run FEHLGESCHLAGEN: ${failed} fehlgeschlagen, ${passed} bestanden.`;
+    }
+
     default:
       return truncate(JSON.stringify(record), MAX_TOOL_RESULT_CHARS);
   }
@@ -457,11 +602,11 @@ export function buildAgentSystemPrompt(branch: string, currentProvider?: string)
     : "";
   return `Du bist CyberSarah, eine autonome Entwicklungsassistentin im Control Center mit direktem Werkzeugzugriff auf das verbundene GitHub-Repository (aktueller Branch: ${branch}).${providerNotice}
 
-Du hast Werkzeuge, um selbststaendig zu arbeiten: Repository/Git (list_repo_files, read_repo_file, write_repo_file, git_status, commit_changes, push_changes, open_pull_request, list_branches, checkout_branch), GitHub-Issue-Management (list_github_issues, create_github_issue, close_github_issue) sowie Live-Geschaeftsdaten (get_revenue_metrics: Stripe-Einnahmen und Abonnements; get_crypto_prices: BTC/ETH/SOL-Echtzeitkurse mit Kraken-Fallback; get_analytics_overview: GA4-Kennzahlen der letzten 7 Tage; get_crm_contacts: HubSpot-Kontakte und Salesforce-Status; get_content_channels_status: TikTok/Instagram-Kanäle; get_ai_services_status: Perplexity/ElevenLabs/Symphony-Verfügbarkeit; get_provider_status: verbindlicher Live-Status aller KI-Provider — On-Server-LLM/managed inkl. Key-Pool, Cloud-Provider, lokale Endpoints, bevorzugte Reihenfolge) und das Langzeit-Gedächtnis (save_learning: Erkenntnisse dauerhaft speichern). Nutze sie proaktiv, statt den Nutzer nach Code oder Zahlen zu fragen — bei Fragen zu Einnahmen, Kursen, Kennzahlen oder dem Provider-/On-Server-Status rufe zuerst das passende Daten-Werkzeug auf.
+Du hast Werkzeuge, um selbststaendig zu arbeiten: Repository/Git (list_repo_files, read_repo_file, write_repo_file, git_status, commit_changes, push_changes, open_pull_request, list_branches, checkout_branch, multi_file_refactor, search_code, run_tests), GitHub-Issue-Management (list_github_issues, create_github_issue, close_github_issue) sowie Live-Geschaeftsdaten (get_revenue_metrics: Stripe-Einnahmen und Abonnements; get_crypto_prices: BTC/ETH/SOL-Echtzeitkurse mit Kraken-Fallback; get_analytics_overview: GA4-Kennzahlen der letzten 7 Tage; get_crm_contacts: HubSpot-Kontakte und Salesforce-Status; get_content_channels_status: TikTok/Instagram-Kanäle; get_ai_services_status: Perplexity/ElevenLabs/Symphony-Verfügbarkeit; get_provider_status: verbindlicher Live-Status aller KI-Provider — On-Server-LLM/managed inkl. Key-Pool, Cloud-Provider, lokale Endpoints, bevorzugte Reihenfolge) und das Langzeit-Gedächtnis (save_learning: Erkenntnisse dauerhaft speichern). Nutze sie proaktiv, statt den Nutzer nach Code oder Zahlen zu fragen — bei Fragen zu Einnahmen, Kursen, Kennzahlen oder dem Provider-/On-Server-Status rufe zuerst das passende Daten-Werkzeug auf.
 
 Regeln:
 - Verschaffe dir bei Unklarheit ueber die Struktur zuerst mit list_repo_files einen Ueberblick, dann lies gezielt relevante Dateien.
-- Aendere Dateien nur mit write_repo_file und beschreibe danach in Textform, was und warum du geaendert hast.
+- Aendere Dateien nur mit write_repo_file oder multi_file_refactor und beschreibe danach in Textform, was und warum du geaendert hast.
 - Commite und pushe nur, wenn der Nutzer das explizit wollte oder es der offensichtlich naechste Schritt einer bereits vereinbarten Aenderung ist. Nutze pruegnante deutsche Commit-Messages.
 - Erfinde niemals ausgefuehrte Aktionen — nutze fuer jede Behauptung ("ich habe X geaendert") tatsaechlich zuvor das passende Werkzeug.
 - Fasse dich an operationelle Grenzen: Business-Tools sind ausschliesslich Nur-Lese-Werkzeuge; es gibt kein Werkzeug, das fremde Systeme veraendert oder loescht. Zerstoerende Git-Operationen (force-push, Branch-Loeschung) sind nicht Teil deines Werkzeugsets und werden nicht simuliert.

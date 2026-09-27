@@ -31,13 +31,13 @@ const DOCUMENT_EXTENSIONS = new Set(["txt", "json", "md", "pdf", "csv", "xml", "
 export function classifyStorageEntry(path: string): StorageCategory {
   const normalized = path.toLowerCase();
   const segments = normalized.split("/");
+  // Backups duerfen auch unter cache/ niemals als gefahrlos gelten.
+  if (segments.some((segment) => segment.includes("backup"))) return "backups";
   for (const segment of segments) {
-    if (segment.includes("cache") || segment.includes("caches")) return "cache";
+    if (segment.includes("cache")) return "cache";
     if (segment === "logs" || segment.startsWith("log-")) return "logs";
-    if (segment.includes("backup")) return "backups";
   }
   if (normalized.endsWith(".log") || normalized.includes("/logs/")) return "logs";
-  if (normalized.includes("backup")) return "backups";
   const extension = normalized.includes(".") ? normalized.split(".").pop() ?? "" : "";
   if (MEDIA_EXTENSIONS.has(extension)) return "media";
   if (DOCUMENT_EXTENSIONS.has(extension)) return "documents";
@@ -139,18 +139,17 @@ const MS_PER_DAY = 86_400_000;
 
 /** Sicherheits-Netz: Systemrelevante Pfade duerfen NIE im Plan landen. */
 export function isProtectedPath(path: string): boolean {
-  const normalized = path.toLowerCase();
-  return (
-    normalized.includes("sqlite/") ||
-    normalized.endsWith(".db") ||
-    normalized.endsWith(".sqlite") ||
-    normalized.includes("localdata") ||
-    normalized.includes("websql") ||
-    normalized.includes("indexeddb") ||
-    normalized.includes("__expo") ||
-    normalized === "" ||
-    normalized === "/" ||
-    normalized.includes("..")
+  // Nur relative, kanonische Pfade aus einem Scan sind zulaessig.
+  if (!path || path.startsWith("/") || path.includes("\\") || /[\x00-\x1f?#]/.test(path)) return true;
+  const segments = path.toLowerCase().split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) return true;
+  if (!["cache", "document", "webstorage"].includes(segments[0])) return true;
+  if (segments.length < 2 || (segments[0] === "webstorage" && segments.length !== 2)) return true;
+  return segments.some((segment) =>
+    segment === "sqlite" || segment === "indexeddb" || segment === "websql" ||
+    segment.startsWith("__expo") || segment.includes("localdata") ||
+    segment.endsWith(".db") || segment.endsWith(".sqlite") ||
+    segment === "app_session_token" || segment === "manus-runtime-user-info"
   );
 }
 
@@ -204,6 +203,30 @@ export function buildCleanupPlan(entries: StorageEntry[], options: CleanupOption
   return { items, reclaimableBytes: automaticBytes + confirmationBytes, automaticBytes, confirmationBytes };
 }
 
+/** Nur in der Vorschau angezeigte Eintraege duerfen per Sammelaktion geloescht werden. */
+export function visibleCleanupItems(plan: CleanupPlan, count: number): CleanupPlanItem[] {
+  return plan.items.slice(0, Math.max(0, Math.floor(count)));
+}
+
+/** Verhindert, dass Aufrufer Pfade ausserhalb des angezeigten Plans freigeben. */
+export function selectCleanupTargets(
+  entries: StorageEntry[], plan: CleanupPlan | null, safePaths: string[], confirmedPaths: string[],
+): StorageEntry[] {
+  if (!plan) return [];
+  const safe = new Set(safePaths);
+  const confirmed = new Set(confirmedPaths);
+  const allowed = new Set(plan.items.filter((item) =>
+    !isProtectedPath(item.path) && (item.requiresConfirmation ? confirmed.has(item.path) : safe.has(item.path) || confirmed.has(item.path)),
+  ).map((item) => item.path));
+  return entries.filter((entry) => allowed.has(entry.path));
+}
+
+/** Ein alter Plan ist nach Dateiaenderungen nicht mehr gueltig. */
+export function cleanupTargetsUnchanged(targets: StorageEntry[], current: StorageEntry[]): boolean {
+  const byPath = new Map(current.map((entry) => [entry.path, entry]));
+  return targets.every((entry) => byPath.get(entry.path)?.sizeBytes === entry.sizeBytes);
+}
+
 /* ==================== Optimierungs-Vorschlaege ==================== */
 
 export type StorageSuggestion = {
@@ -231,7 +254,7 @@ export function buildStorageSuggestions(entries: StorageEntry[], options: Sugges
       kind: "largest",
       title: `Größter Eintrag: ${entry.path}`,
       detail: `${formatBytesGerman(entry.sizeBytes)} — ${classifyStorageEntry(entry.path)}. Prüfe, ob die Datei noch gebraucht wird.`,
-      reclaimableBytes: entry.sizeBytes,
+      // Ein grosser Eintrag ist nicht automatisch loeschbar.
     });
   }
 
@@ -242,7 +265,7 @@ export function buildStorageSuggestions(entries: StorageEntry[], options: Sugges
       kind: "stale",
       title: `${stale.length} Einträge seit über ${staleDays} Tagen ungenutzt`,
       detail: `Zusammen ${formatBytesGerman(staleBytes)}. Der Aufräum-Befehl entfernt veraltete Logs automatisch; für alles Weitere gibt es einen Bestätigungs-Plan.`,
-      reclaimableBytes: staleBytes,
+      // Alter allein belegt weder Nutzlosigkeit noch Loeschbarkeit.
     });
   }
 
@@ -256,12 +279,10 @@ export function buildStorageSuggestions(entries: StorageEntry[], options: Sugges
   for (const [key, bucket] of duplicates) {
     if (bucket.length > 1) {
       const name = key.split("|")[0];
-      const reclaimable = totalSizeBytes(bucket.slice(1));
       suggestions.push({
         kind: "duplicate",
-        title: `Duplikat-Kandidat: ${name}`,
-        detail: `${bucket.length} identische Kopien (${formatBytesGerman(bucket[0].sizeBytes)} je Datei) — ca. ${formatBytesGerman(reclaimable)} durch Löschen der Mehrfachkopien gewinnbar.`,
-        reclaimableBytes: reclaimable,
+        title: `Möglicher Duplikat-Kandidat: ${name}`,
+        detail: `${bucket.length} Einträge mit gleichem Dateinamen und gleicher Größe (${formatBytesGerman(bucket[0].sizeBytes)}). Inhalte sind nicht verglichen; vor dem Löschen manuell prüfen.`,
       });
     }
   }
@@ -296,14 +317,14 @@ export type StoragePromptCommand = {
   includeBackups: boolean;
 };
 
-const ACTION_KEYWORDS: Array<{ action: StoragePromptAction; pattern: RegExp }> = [
+const ACTION_KEYWORDS: { action: StoragePromptAction; pattern: RegExp }[] = [
   { action: "clean", pattern: /aufräum|räum|lösch|freigeb|platz (?:machen|schaffen)|leere?r?|bereinig/i },
   { action: "sort", pattern: /sortier|ordn|struktur|auflist/i },
   { action: "suggest", pattern: /vorschl(?:ä|ae)g|vorschlag|optimier|empfehl|tipp|idee|wie kann ich|spare/i },
   { action: "analyze", pattern: /analy|übersicht|status|scan|zeig|wie viel|beleg|größe|verbrauch/i },
 ];
 
-const CATEGORY_KEYWORDS: Array<{ category: StorageCategory; pattern: RegExp }> = [
+const CATEGORY_KEYWORDS: { category: StorageCategory; pattern: RegExp }[] = [
   { category: "cache", pattern: /cache|zwischenspeicher/i },
   { category: "logs", pattern: /logs?|protokoll/i },
   { category: "backups", pattern: /backups?|sicherung/i },
@@ -320,6 +341,13 @@ export function parseStoragePrompt(prompt: string): StoragePromptCommand {
   const actions: StoragePromptAction[] = [];
   for (const { action, pattern } of ACTION_KEYWORDS) {
     if (pattern.test(trimmed) && !actions.includes(action)) actions.push(action);
+  }
+  // Ein verneinter Loeschwunsch darf niemals einen Aufraeum-Plan erzeugen.
+  if (/(?:nicht|nichts|nie|ohne(?:\s+zu)?)\s+(?:löschen|loeschen|aufräumen|aufraeumen|bereinigen)/i.test(trimmed) ||
+      /(?:keine|keinerlei)\s+.{0,45}?(?:löschen|loeschen|aufräumen|aufraeumen)/i.test(trimmed) ||
+      /nur\s+(?:analysieren|anzeigen|ansehen|scannen)/i.test(trimmed)) {
+    const cleanIndex = actions.indexOf("clean");
+    if (cleanIndex >= 0) actions.splice(cleanIndex, 1);
   }
   if (actions.length === 0) actions.push("analyze");
 

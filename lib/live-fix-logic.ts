@@ -233,3 +233,8 @@ export function describeLiveFix(outcome: LiveFixOutcome): string {
 }
 
 export type IncidentWithLiveFix = SelfHealingIncident & { liveFix?: string };
+
+/** Test-Hook: Quarantaene-Registry komplett leeren (deterministische Suite). */
+export function resetProviderQuarantineForTests(): void {
+  quarantinedUntil.clear();
+}

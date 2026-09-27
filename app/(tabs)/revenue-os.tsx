@@ -6,6 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { AiCore } from "@/components/glass/ai-core";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
+import { AutonomousDraftsCard } from "@/components/glass/autonomous-drafts";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { INFLUENCER_PERSONAS, type InfluencerPersonaId, type InfluencerPlatform } from "@/lib/influencer-persona-logic";
@@ -16,10 +17,11 @@ type Accent = "cyan" | "purple" | "magenta" | "blue" | "green" | "amber";
 
 const PERSONA_ACCENTS: Record<InfluencerPersonaId, Accent> = {
   nova: "cyan", mira: "purple", juno: "magenta", lina: "blue", kaya: "green", zara: "amber",
+  orion: "cyan", ava: "green", rio: "magenta", nala: "blue",
 };
 
 const SECTIONS: { key: Section; label: string; icon: string; accent: "cyan" | "purple" | "magenta" | "blue" | "green" }[] = [
-  { key: "influencer", label: "6 Personas", icon: "✦", accent: "cyan" },
+  { key: "influencer", label: "10 Personas", icon: "✦", accent: "cyan" },
   { key: "hara", label: "HARA", icon: "⚡", accent: "purple" },
   { key: "saas", label: "SaaS", icon: "▦", accent: "magenta" },
   { key: "loop", label: "Loop Revenue", icon: "↻", accent: "blue" },
@@ -50,7 +52,7 @@ function InfluencerSection() {
   const accent = PERSONA_ACCENTS[selected.id];
 
   return <>
-    <View style={styles.sectionHeading}><View style={styles.headingCopy}><Text style={styles.sectionTitle}>KI-Influencer-Persönlichkeiten</Text><Text style={styles.sectionDescription}>Persona wählen, Thema eingeben und direkt einen Content-Entwurf generieren.</Text></View><StatusChip label="6 verfügbar" accent="green" live /></View>
+    <View style={styles.sectionHeading}><View style={styles.headingCopy}><Text style={styles.sectionTitle}>KI-Influencer-Persönlichkeiten</Text><Text style={styles.sectionDescription}>Persona wählen, Thema eingeben und direkt einen Content-Entwurf generieren.</Text></View><StatusChip label={`${INFLUENCER_PERSONAS.length} verfügbar`} accent="green" live /></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.personaRow}>
       {INFLUENCER_PERSONAS.map((persona) => {
         const personaAccent = PERSONA_ACCENTS[persona.id];
@@ -146,7 +148,7 @@ export default function RevenueOsScreen() {
   const [section, setSection] = useState<Section>("influencer");
   const navDrawer = useNavDrawer();
   const active = useMemo(() => SECTIONS.find((item) => item.key === section) ?? SECTIONS[0], [section]);
-  return <GlassBackdrop accent={active.accent}><ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent"><View style={styles.topBar}><NavDrawerButton {...navDrawer.hamburgerProps} tint={glassPalette.cyan} /><View style={styles.titleBlock}><Text style={styles.eyebrow}>CYBERSARAH · REVENUE OS</Text><Text style={styles.title}>Revenue Hub</Text></View><StatusChip label="Live-Status je Modul" accent="cyan" /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow} accessibilityLabel="Revenue-OS-Bereiche">{SECTIONS.map((item) => <SectionButton key={item.key} item={item} active={item.key === section} onPress={() => setSection(item.key)} />)}</ScrollView><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><GlassCard accent={active.accent} glow={2} style={styles.heroCard}><Text style={styles.heroKicker}>INTEGRIERTES REVENUE-OS</Text><Text style={styles.heroTitle}>Alle Umsatzsysteme an einem Ort.</Text><Text style={styles.heroText}>Live-Daten pro Bereich statt Demo-Kennzahlen. Fehlende Verbindungen werden sichtbar angezeigt.</Text></GlassCard>{section === "influencer" ? <InfluencerSection /> : <OtherSection section={section} />}</ScrollView></ScreenContainer><NavDrawer {...navDrawer.drawerProps} /></GlassBackdrop>;
+  return <GlassBackdrop accent={active.accent}><ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent"><View style={styles.topBar}><NavDrawerButton {...navDrawer.hamburgerProps} tint={glassPalette.cyan} /><View style={styles.titleBlock}><Text style={styles.eyebrow}>CYBERSARAH · REVENUE OS</Text><Text style={styles.title}>Revenue Hub</Text></View><StatusChip label="Live-Status je Modul" accent="cyan" /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow} accessibilityLabel="Revenue-OS-Bereiche">{SECTIONS.map((item) => <SectionButton key={item.key} item={item} active={item.key === section} onPress={() => setSection(item.key)} />)}</ScrollView><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><GlassCard accent={active.accent} glow={2} style={styles.heroCard}><Text style={styles.heroKicker}>INTEGRIERTES REVENUE-OS</Text><Text style={styles.heroTitle}>Alle Umsatzsysteme an einem Ort.</Text><Text style={styles.heroText}>Live-Daten pro Bereich statt Demo-Kennzahlen. Fehlende Verbindungen werden sichtbar angezeigt.</Text></GlassCard>{section === "influencer" ? <InfluencerSection /> : <OtherSection section={section} />}<AutonomousDraftsCard kinds={["content", "revenue-loop"]} accent="purple" /></ScrollView></ScreenContainer><NavDrawer {...navDrawer.drawerProps} /></GlassBackdrop>;
 }
 
 const styles = StyleSheet.create({

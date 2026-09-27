@@ -1,5 +1,14 @@
 # Project TODO
 
+- [x] Sprint 371: tRPC-Vollintegration — agents-Router (getStatus/control/getLogs mit Telemetrie- und Ownership-Checks), system.getResourceUsage (admin-gated), revenue-Router (getMetrics mit Revenue-OS-Snapshot, ehrlich bei not-configured); 2.212 Tests gruen.
+- [x] Sprint 370: X-OAuth2-Auto-Refresh — platform_tokens-Tabelle (Migration 0012) persistiert rotierte Tokensaetze; resolveXToken frischt 10 min vor Ablauf automatisch nach (5-min-Cooldown bei Fehlern), 401-Publish-Retry rotiert einmal; Deploy-Sync um X_CLIENT_ID/X_CLIENT_SECRET/X_REFRESH_TOKEN erweitert; 2.206 Tests gruen.
+- [x] Sprint 369: Hugging Face als KI-Provider verdrahtet — validierter HF-Token (whoami 200) als GitHub-Secret AI_HUGGINGFACE_API_KEY, render-deploy.mjs/yml synchronisieren ihn optional zur Render-App; Router laesst HF ohne Key inaktiv.
+- [x] Sprint 368: Conversion-Loop — IG-Insights (reach/impressions) aggregieren je Persona und geben bis +15/-10 Punkte Bonus in der Fokus-Persona-Wahl; Sandbox liefert kein Signal; E2E: juno uebernimmt nach 2 Live-Posts (10k Reichweite) den Fokus von orion.
+- [x] Sprint 367: Instagram-Medien-Pipeline finalisiert (Issue #45) — Container-Polling, Auto-Karten (app-gehostet, PNG ohne Bild-Libs), Reels/Carousel, vorabige Asset-Validierung, Insights-Rueckkanal (Migration 0011); Publishing-Tokens fliessen via GitHub Secrets in den Render-Deploy; E2E 6/6 gruen.
+- [x] Sprint 366: Publishing-Logik fuer alle 5 Plattformen finalisiert — Instagram (Graph-API 2-Schritt) und TikTok (PULL_FROM_URL) live-faehig mit Asset-Pipeline (Migration 0010, enqueue/setAsset), ehrliche Modus-Aufloesung pro Job, E2E-Vollautomatik gegen Mock-APIs verifiziert (5/5 live).
+- [x] Sprint 365: Autonomes Social-Media-Publishing — Publishing-Tabelle (Migration 0009), Warteschlange mit Dedupe/Retry-Backoff, Autopilot im 60-Sekunden-Takt (live mit Credentials auf X/LinkedIn/Threads, ehrlich Sandbox sonst), tRPC-Router + Orchestrator-Tools, E2E gegen Sandbox-PG verifiziert.
+- [x] Sprint 364: Autonomie-Maximierung — 10 Influencer-Personas, Reichweiten-/Revenue-Engine, Projekt-Superagenten-Fabrik mit Bot-Villa (8 Live-Kern, Pool-Kapazitaet 5000, Spawn-on-Demand, HITL-Schienen fuer Geld/Sends).
+- [x] Sprint 163 (portiert auf V4.2): Repo-Chat-Service (Tarball-Indizierung, Budget-Deckel, Index-Cache) + repo.searchCode-Orchestrator-Tool, live verifiziert (1.161 Dateien / 19.676 Symbole).
 - [x] Define the portrait-first Custom AI Studio Mobile design and remote-workspace boundary.
 - [x] Replace the template with the dark Workspace, Agent, Preview, and Settings experience.
 - [x] Build a typed local workspace model with file selection, editing, logs, and agent proposals.

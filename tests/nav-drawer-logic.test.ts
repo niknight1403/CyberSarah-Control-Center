@@ -6,9 +6,13 @@ describe("DRAWER_ITEMS", () => {
   it("zeigt fokussierte Revenue-Navigation ohne Designer/Utility-Tabs", () => {
     expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
       "Übersicht", "Revenue OS", "Business & Analytics", "Micro Trading",
-      "Revenue-Loops", "Chat", "Workflows", "Konto",
+      "Revenue-Loops", "Fokus & Rückblick", "Ideen-Inbox", "Entscheidungs-Journal",
+      "Chat", "Workflows", "Konto",
     ]);
     expect(DRAWER_ITEMS.map(item => item.route)).not.toContain("/designer");
+    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/focus");
+    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/ideas");
+    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/decisions");
   });
 
 });

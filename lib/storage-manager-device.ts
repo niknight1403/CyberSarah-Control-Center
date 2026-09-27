@@ -16,7 +16,7 @@
  */
 
 import { Platform } from "react-native";
-import type { StorageEntry } from "@/lib/storage-manager-logic";
+import { isProtectedPath, type StorageEntry } from "@/lib/storage-manager-logic";
 
 export type StorageScan = {
   status: "ok" | "partial";
@@ -38,13 +38,20 @@ const MAX_SCAN_DEPTH = 6;
 const MAX_ENTRIES = 2_000;
 const MS_PER_DAY = 86_400_000;
 
+/** Only app-owned keys; auth/session material is deliberately excluded. */
+export function isAppStorageKey(key: string): boolean {
+  return /^(?:cybersarah[.-]|expo[.-])/i.test(key) && !isProtectedPath(`webstorage/${key}`) &&
+    !/(?:auth|token|secret|password|credential|session|api[_-]?key)/i.test(key);
+}
+
 function estimateWebStorageBytes(): StorageEntry[] {
   if (typeof globalThis.localStorage === "undefined") return [];
   const entries: StorageEntry[] = [];
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
-    if (!key) continue;
-    const value = localStorage.getItem(key) ?? "";
+    if (!key || !isAppStorageKey(key)) continue;
+    const value = localStorage.getItem(key);
+    if (value === null) continue;
     entries.push({ path: `webstorage/${key}`, sizeBytes: value.length * 2, modifiedAt: Date.now() });
   }
   return entries;
@@ -71,8 +78,12 @@ export function createExpoFileSystemAdapter(): FileSystemAdapter | null {
   }
 }
 
-async function scanDirectory(adapter: FileSystemAdapter, dirUri: string, prefix: string, depth: number, entries: StorageEntry[], notes: string[]): Promise<void> {
-  if (depth > MAX_SCAN_DEPTH || entries.length >= MAX_ENTRIES) return;
+async function scanDirectory(adapter: FileSystemAdapter, dirUri: string, prefix: string, depth: number, entries: StorageEntry[], notes: string[], visited: { count: number }): Promise<void> {
+  if (depth > MAX_SCAN_DEPTH) {
+    notes.push(`Scan-Tiefe bei ${prefix} begrenzt.`);
+    return;
+  }
+  if (visited.count >= MAX_ENTRIES) return;
   let names: string[];
   try {
     names = await adapter.readDirectoryAsync(dirUri);
@@ -81,14 +92,20 @@ async function scanDirectory(adapter: FileSystemAdapter, dirUri: string, prefix:
     return;
   }
   for (const name of names) {
-    if (entries.length >= MAX_ENTRIES) return;
-    const childUri = `${dirUri.replace(/\/+$/, "")}/${name}`;
+    if (visited.count >= MAX_ENTRIES) return;
+    visited.count += 1;
+    if (!name || name === "." || name === ".." || name.includes("/") || name.includes("\\")) {
+      notes.push(`Ungültiger Dateiname übersprungen in ${prefix}.`);
+      continue;
+    }
+    const childUri = `${dirUri.replace(/\/+$/, "")}/${encodeURIComponent(name)}`;
     const childPath = prefix ? `${prefix}/${name}` : name;
+    if (isProtectedPath(childPath)) continue;
     try {
       const info = await adapter.getInfoAsync(childUri);
       if (!info?.exists) continue;
       if (info.isDirectory) {
-        await scanDirectory(adapter, childUri, childPath, depth + 1, entries, notes);
+        await scanDirectory(adapter, childUri, childPath, depth + 1, entries, notes, visited);
         continue;
       }
       entries.push({
@@ -107,7 +124,12 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
   const notes: string[] = [];
   const entries: StorageEntry[] = [];
 
-  const webStorage = estimateWebStorageBytes();
+  let webStorage: StorageEntry[] = [];
+  try {
+    webStorage = estimateWebStorageBytes();
+  } catch {
+    notes.push("WebStorage konnte nicht gelesen werden.");
+  }
   entries.push(...webStorage);
   if (webStorage.length > 0) notes.push(`${webStorage.length} WebStorage-Einträge (geschätzte Größe) einbezogen.`);
 
@@ -116,24 +138,25 @@ export async function scanDeviceStorage(adapter: FileSystemAdapter | null): Prom
     return { status: "partial", entries, notes };
   }
 
+  const visited = { count: 0 };
   for (const [rootUri, label] of [
     [adapter.documentDirectory, "document"],
     [adapter.cacheDirectory, "cache"],
-  ] as Array<[string | null, string]>) {
+  ] as [string | null, string][]) {
     if (!rootUri) {
       notes.push(`${label}-Verzeichnis nicht verfügbar.`);
       continue;
     }
-    await scanDirectory(adapter, rootUri, label, 0, entries, notes);
+    await scanDirectory(adapter, rootUri, label, 0, entries, notes, visited);
   }
 
-  if (entries.length >= MAX_ENTRIES) notes.push(`Scan bei ${MAX_ENTRIES} Einträgen begrenzt.`);
-  return { status: entries.length > 0 ? "ok" : "partial", entries, notes };
+  if (visited.count >= MAX_ENTRIES) notes.push(`Scan bei ${MAX_ENTRIES} untersuchten Einträgen begrenzt.`);
+  return { status: notes.some((note) => /nicht verfügbar|Nicht lesbar|übersprungen|begrenzt|nicht gelesen/.test(note)) ? "partial" : "ok", entries, notes };
 }
 
 export type CleanupExecutionResult = {
   deleted: string[];
-  failed: Array<{ path: string; reason: string }>;
+  failed: { path: string; reason: string }[];
   reclaimedBytes: number;
 };
 
@@ -144,17 +167,25 @@ export type CleanupExecutionResult = {
  */
 export async function applyCleanupEntries(
   adapter: FileSystemAdapter | null,
-  entries: Array<{ path: string; sizeBytes: number }>,
+  entries: { path: string; sizeBytes: number }[],
 ): Promise<CleanupExecutionResult> {
   const deleted: string[] = [];
-  const failed: Array<{ path: string; reason: string }> = [];
+  const failed: { path: string; reason: string }[] = [];
   let reclaimedBytes = 0;
 
   for (const entry of entries) {
+    if (isProtectedPath(entry.path)) {
+      failed.push({ path: entry.path, reason: "Geschützter oder ungültiger Pfad" });
+      continue;
+    }
     if (entry.path.startsWith("webstorage/")) {
       const key = entry.path.slice("webstorage/".length);
       try {
-        if (typeof globalThis.localStorage !== "undefined") globalThis.localStorage.removeItem(key);
+        if (!isAppStorageKey(key) || typeof globalThis.localStorage === "undefined" || globalThis.localStorage.getItem(key) === null) {
+          failed.push({ path: entry.path, reason: "WebStorage-Eintrag nicht verfügbar oder nicht freigegeben" });
+          continue;
+        }
+        globalThis.localStorage.removeItem(key);
         deleted.push(entry.path);
         reclaimedBytes += entry.sizeBytes;
       } catch (error) {
@@ -162,7 +193,7 @@ export async function applyCleanupEntries(
       }
       continue;
     }
-    if (!adapter || !adapter.documentDirectory) {
+    if (!adapter) {
       failed.push({ path: entry.path, reason: "Dateisystem nicht verfügbar" });
       continue;
     }
@@ -171,8 +202,14 @@ export async function applyCleanupEntries(
       failed.push({ path: entry.path, reason: "Zielverzeichnis nicht verfügbar" });
       continue;
     }
-    const fileUri = `${root.replace(/\/+$/, "")}/${entry.path.replace(/^(?:document|cache)\//, "")}`;
+    const relative = entry.path.split("/").slice(1).map(encodeURIComponent).join("/");
+    const fileUri = `${root.replace(/\/+$/, "")}/${relative}`;
     try {
+      const info = await adapter.getInfoAsync(fileUri);
+      if (!info?.exists || info.isDirectory) {
+        failed.push({ path: entry.path, reason: "Datei nicht mehr vorhanden oder Verzeichnis" });
+        continue;
+      }
       await adapter.deleteAsync(fileUri);
       deleted.push(entry.path);
       reclaimedBytes += entry.sizeBytes;

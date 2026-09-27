@@ -15,6 +15,9 @@ export type DrawerRoute =
   | "/revenue-os"
   | "/micro-trading"
   | "/loop-engineering"
+  | "/focus"
+  | "/ideas"
+  | "/decisions"
   | "/superagent"
   | "/designer"
   | "/plugins"
@@ -44,6 +47,7 @@ export type DrawerItem = {
     | "chevron.left.forwardslash.chevron.right"
     | "sparkles"
     | "play.rectangle.fill"
+    | "hourglass"
     | "chart.bar.fill";
   badge?: string;
 };
@@ -56,6 +60,9 @@ export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
   { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill", badge: "Read-only" },
   { route: "/loop-engineering", title: "Revenue-Loops", icon: "wand.and.stars" },
+  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", badge: "Neu" },
+  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", badge: "Neu" },
+  { route: "/decisions", title: "Entscheidungs-Journal", icon: "tablecells.fill" },
   { route: "/chat", title: "Chat", icon: "message.fill" },
   { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
   { route: "/account", title: "Konto", icon: "gearshape.fill" },

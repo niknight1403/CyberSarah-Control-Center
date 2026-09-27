@@ -1,11 +1,16 @@
 import { ENV } from "./env";
 
 import {
+  isFreeManagedSource,
   MANAGED_LLM_NO_KEY_MESSAGE,
   resolveManagedLlmEndpoint,
   resolveManagedLlmEndpoints,
   type ManagedLlmEndpoint,
 } from "../../lib/managed-llm-fallback-logic";
+// Sprint 196 — Synchroner Spiegel des autonomen Route-Rotations-Agenten
+// (server/route-rotation-agent.ts). Bewusst NUR das winzige Zustandsmodul:
+// kein Import-Zyklus zum Agenten selbst.
+import { getRouteRotationPrimary } from "./route-rotation-state";
 import { isProviderQuarantined } from "../../lib/live-fix-logic";
 import { resolveManagedModel } from "../../lib/managed-model-logic";
 import {
@@ -612,6 +617,18 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     ordered = notQuarantined;
   }
 
+  // Sprint 196 — Autonomer Rotations-Agent: Die agentenseitig gewaehlte
+  // gesunde Gratis-Route (bzw. die vom Administrator erzwungene) fuehrt die
+  // Kette an. Nur die Reihenfolge aendert sich — der per-Aufruf-Failover
+  // bleibt als zweite Verteidigungslinie vollstaendig erhalten.
+  const rotationPrimary = getRouteRotationPrimary();
+  if (rotationPrimary) {
+    const primaryIndex = ordered.findIndex((endpoint) => endpoint.source === rotationPrimary);
+    if (primaryIndex > 0) {
+      ordered = [ordered[primaryIndex], ...ordered.slice(0, primaryIndex), ...ordered.slice(primaryIndex + 1)];
+    }
+  }
+
   const payload: Record<string, unknown> = {
     messages: messages.map(normalizeMessage),
   };
@@ -726,6 +743,35 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   throw lastError instanceof Error
     ? lastError
     : new Error("LLM invoke failed: alle Managed-Keys im Cooldown oder erschöpft");
+}
+
+/**
+ * Sprint 196 — Konfigurierte Gratis-Routen (URL + Key) fuer den autonomen
+ * Rotations-Agenten: Erreichbarkeits-Probes gegen /models. Enthaelt ausschliess-
+ * lich KOSTENFREIE Quellen der Managed-Kette (Custom > Groq > OpenRouter >
+ * Gemini) plus die lokalen Kandidaten (Ollama, LM Studio). Die API-Keys
+ * bleiben strikt serverintern: Der Agent braucht sie allein fuer den
+ * Bearer-Header der Erreichbarkeits-Probe (GET /models).
+ */
+export function listManagedFreeRoutes(): { source: ManagedLlmEndpoint["source"]; url: string; apiKey: string; headers?: Record<string, string> }[] {
+  let chain: ManagedLlmEndpoint[] = [];
+  try {
+    chain = resolveManagedLlmEndpoints(managedLlmEnv()).filter((endpoint) => isFreeManagedSource(endpoint.source));
+  } catch {
+    chain = [];
+  }
+  const cloudRoutes = chain.map((endpoint) => ({
+    source: endpoint.source,
+    url: endpoint.url.replace(/\/chat\/completions$/, ""),
+    apiKey: endpoint.apiKey,
+    ...(endpoint.headers ? { headers: endpoint.headers } : {}),
+  }));
+  const localRoutes = localLlmCandidates().map((candidate) => ({
+    source: candidate.source,
+    url: candidate.baseUrl,
+    apiKey: candidate.apiKey,
+  }));
+  return [...cloudRoutes, ...localRoutes];
 }
 
 export type ModelInfo = {

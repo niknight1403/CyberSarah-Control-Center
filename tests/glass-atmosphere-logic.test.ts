@@ -55,9 +55,13 @@ describe("glass-atmosphere-logic (Sprint 192: deterministische Grafik)", () => {
   });
 
   it("baut Aurora-Stops aus Hex-Farbe mit dezentem Alpha", () => {
-    const aurora = buildAurora("#00E5FF");
-    expect(aurora.colors[0]).toBe("rgba(0, 229, 255, 0.12)");
-    expect(aurora.colors[1]).toBe("rgba(0, 229, 255, 0)");
+    const aurora = buildAurora("#00F2FE");
+    // Sprint 355 — Aurora-Flow-Welle: Akzent, Violett, Cyan, Petrol, transparent.
+    expect(aurora.colors[0]).toBe("rgba(0, 242, 254, 0.14)");
+    expect(aurora.colors[1]).toBe("rgba(124, 58, 237, 0.09)");
+    expect(aurora.colors[2]).toBe("rgba(0, 242, 254, 0.06)");
+    expect(aurora.colors[3]).toBe("rgba(0, 229, 176, 0.04)");
+    expect(aurora.colors[4]).toBe("rgba(0, 229, 176, 0)");
     expect(aurora.driftMs).toBeGreaterThan(10_000); // langsam, unaufdraenglich
   });
 

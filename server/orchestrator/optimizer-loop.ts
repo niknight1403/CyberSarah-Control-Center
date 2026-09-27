@@ -29,7 +29,7 @@ import {
   shouldRunCycle,
   type OptimizerSnapshot,
 } from "../../lib/optimizer-logic";
-import { extractJsonObject } from "../../lib/designer-logic";
+import { extractJsonObject } from "../../lib/json-extract-logic";
 
 const CYCLES_KEY = "orchestrator.optimizerCycles";
 const MAX_CYCLE_ENTRIES = 30;

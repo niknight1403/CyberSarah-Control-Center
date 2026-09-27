@@ -13,8 +13,10 @@ import { analyzeContentMetrics } from "../lib/influencer-engine/analytics-feedba
 import { invokeLLM } from "./_core/llm";
 import { protectedProcedure, router } from "./_core/trpc";
 
-const personaIdSchema = z.enum(["nova", "mira", "juno", "lina", "kaya", "zara"]);
-const platformSchema = z.enum(["instagram", "tiktok", "linkedin", "x", "threads"]);
+const personaIdSchema = z.enum(
+  INFLUENCER_PERSONAS.map((persona) => persona.id) as [InfluencerPersonaId, ...InfluencerPersonaId[]]
+);
+const platformSchema = z.enum(["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"]);
 const shortPlatformSchema = z.enum(["instagram", "tiktok", "facebook"]);
 
 const trendSchema = z.object({

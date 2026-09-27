@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -251,3 +252,98 @@ export const superAgents = pgTable("superAgents", {
 
 export type SuperAgentRow = typeof superAgents.$inferSelect;
 export type InsertSuperAgentRow = typeof superAgents.$inferInsert;
+
+/**
+ * Sprint 346 — Autonome Draft-Engine: Freigabe-Queue (HITL).
+ * Die Engine (Cron/admin) erzeugt NUR "pending"-Zeilen; "approved"/
+ * "rejected" entscheidet ausschliesslich ein Mensch. Nichts wird ohne
+ * Freigabe veroeffentlicht oder ausgefuehrt.
+ */
+export const draftKind = pgEnum("draft_kind", ["content", "revenue-loop", "idea"]);
+export const draftStatus = pgEnum("draft_status", ["pending", "approved", "rejected"]);
+
+export const draftQueue = pgTable("draftQueue", {
+  id: serial("id").primaryKey(),
+  kind: draftKind("kind").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  payload: jsonb("payload").notNull(),
+  status: draftStatus("status").notNull().default("pending"),
+  createdBy: varchar("createdBy", { length: 64 }).notNull().default("draft-engine"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decidedBy: varchar("decidedBy", { length: 64 }),
+}, (table) => [
+  index("draftQueue_status_kind_idx").on(table.status, table.kind),
+]);
+
+export type DraftQueueRow = typeof draftQueue.$inferSelect;
+export type InsertDraftQueueRow = typeof draftQueue.$inferInsert;
+
+// Sprint 365 — Autonomes Social-Media-Publishing (Warteschlange je Nutzer).
+// Kampagnen-Slots der 10 Influencer-Personas landen als Jobs hier; der
+// Publishing-Autopilot verarbeitet faellige Eintraege autonom (live, wenn
+// Plattform-Credentials vorhanden, sonst ehrlich im Sandbox-Modus).
+// Tokens liegen NUR in Env-Variablen, niemals in der DB.
+export const publishingStatus = pgEnum("publishing_status", [
+  "geplant",
+  "sandbox_veroeffentlicht",
+  "veroeffentlicht",
+  "fehlgeschlagen",
+  "abgebrochen",
+]);
+
+export const publishingJobs = pgTable(
+  "publishingJobs",
+  {
+    id: serial("id").primaryKey(),
+    userOpenId: text("user_open_id").notNull(),
+    product: text("product").notNull(),
+    goal: text("goal").notNull(),
+    persona: text("persona").notNull(),
+    platform: text("platform").notNull(),
+    campaignDay: integer("campaign_day").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    status: publishingStatus("status").notNull().default("geplant"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    mode: text("mode"),
+    externalId: text("external_id"),
+    assetUrl: text("asset_url"),
+    assetUrls: jsonb("asset_urls").$type<string[]>().default([]).notNull(),
+    insights: jsonb("insights").$type<Record<string, number>>().default({}).notNull(),
+    insightsFetchedAt: timestamp("insights_fetched_at"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("publishing_jobs_queue_idx").on(table.userOpenId, table.status, table.scheduledFor),
+    uniqueIndex("publishing_jobs_dedupe_idx").on(table.userOpenId, table.dedupeKey),
+  ],
+);
+
+
+// Sprint 370 — Rotierte Plattform-Tokens (X-OAuth2-Auto-Refresh).
+// X rotiert bei JEDEM Refresh den Access- UND Refresh-Token; die Umgebung
+// liefert nur den Bootstrap-Satz. Der aktuell gueltige Tokensatz wird hier
+// persistiert, damit der Autopilot den Live-Modus dauerhaft haelt.
+export const platformTokens = pgTable(
+  "platform_tokens",
+  {
+    id: serial("id").primaryKey(),
+    platform: text("platform").notNull(),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("platform_tokens_platform_idx").on(table.platform)],
+);
+
+export type PlatformTokenRow = typeof platformTokens.$inferSelect;
+export type InsertPlatformTokenRow = typeof platformTokens.$inferInsert;
+
+export type PublishingJobRow = typeof publishingJobs.$inferSelect;
+export type InsertPublishingJobRow = typeof publishingJobs.$inferInsert;

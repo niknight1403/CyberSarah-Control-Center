@@ -15,6 +15,7 @@ import {
   touchSuperAgentLastActive,
   updateSuperAgentRecord,
 } from "./db";
+import { createProjectSuperagent } from "./project-superagent-factory";
 import {
   assertSuperAgentRemovable,
   defaultSeedSuperAgent,
@@ -37,6 +38,31 @@ function serialize<T extends { lastActiveAt: Date; createdAt: Date }>(row: T) {
 }
 
 export const superAgentsRouter = router({
+  /** Sprint 364 — dedizierter Projekt-Superagent inkl. Bot-Villa aus einem Aufruf. */
+  createFromProject: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().trim().min(2).max(80),
+        kind: z.enum(["web-app", "mobile-app", "saas", "content", "automation", "forschung"]),
+        goal: z.string().trim().min(3).max(400),
+        poolSize: z.number().int().min(0).max(5000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const creation = await createProjectSuperagent(ctx.user.openId, input);
+      return {
+        superagent: creation.superagent,
+        villa: {
+          projectKind: creation.blueprint.project.kind,
+          coreTeam: creation.blueprint.villa.coreTeam.length,
+          pool: creation.blueprint.villa.pool.length,
+          poolCapacity: creation.blueprint.villa.poolCapacity,
+          liveWorkerCap: creation.blueprint.villa.liveWorkerCap,
+        },
+        toolGrants: creation.blueprint.toolGrants,
+        autonomy: creation.blueprint.autonomy,
+      };
+    }),
   /** Superagenten des Nutzers — seedet einmalig den Standard-Agenten ("Elara"), wenn leer. */
   list: protectedProcedure.query(async ({ ctx }) => {
     let rows = await listSuperAgentsForUser(ctx.user.openId);

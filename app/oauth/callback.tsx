@@ -93,7 +93,7 @@ export default function OAuthCallback() {
 
         // Check for error
         const error =
-          params.error || (url ? new URL(url, "http://dummy").searchParams.get("error") : null);
+          params.error || (url ? new URL(url, "https://app.cybersarah-ki.com").searchParams.get("error") : null);
         if (error) {
           console.error("[OAuth] Error parameter found:", error);
           setStatus("error");

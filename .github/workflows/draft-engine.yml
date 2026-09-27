@@ -1,0 +1,34 @@
+# Sprint 346 — Autonome Draft-Engine: taeglicher Lauf um 09:25 MESZ.
+# Ruft den Cron-Endpoint des Render-Backends auf, der Content-, Revenue-
+# Loop- und Ideen-Entwuerfe NUR als "pending" in die Freigabe-Queue legt.
+# Veroeffentlichen passiert ausschliesslich nach menschlicher Freigabe.
+# METRICS_TOKEN ist bereits als Ops-Token auf Render und hier konfiguriert.
+name: draft-engine
+
+on:
+  schedule:
+    - cron: "25 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: draft-engine
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Draft-Engine-Lauf
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Engine-Endpoint aufrufen
+        env:
+          ENDPOINT: ${{ secrets.RENDER_PUBLIC_URL }}/api/cron/draft-engine
+          TOKEN: ${{ secrets.METRICS_TOKEN }}
+        run: |
+          set +e
+          body=$(curl -sS -X POST --max-time 120 -H "Authorization: Bearer $TOKEN" "$ENDPOINT")
+          echo "$body"
+          echo "$body" | grep -q '"ok":true' && exit 0 || exit 1

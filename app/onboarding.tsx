@@ -37,13 +37,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { DEFAULT_DESIGN_THEME, type DesignTheme } from "@/lib/design-theme-logic";
 import { DesignThemeDefinitions, resolveDesignPalette, resolveDesignRuntimePalette } from "@/lib/_core/design-theme-palettes";
-import {
-  getOnboardingStepState,
-  getOnboardingThemeChoices,
-  normalizeOnboardingDesignTheme,
-  ONBOARDING_SLIDES,
-  shouldCompleteOnboarding,
-} from "@/lib/onboarding-logic";
+import { getOnboardingStepState, ONBOARDING_SLIDES, shouldCompleteOnboarding } from "@/lib/onboarding-logic";
 import { normalizeThemePreference, themePreferenceLabel, type ThemePreference } from "@/lib/theme-preference-logic";
 import { useThemeContext } from "@/lib/theme-provider";
 import { withAlpha } from "@/lib/theme-color-utils";
@@ -144,26 +138,25 @@ export default function OnboardingScreen() {
   const { completeOnboarding } = useOnboarding();
 
   const [stepIndex, setStepIndex] = useState(0);
-  const [designChoice, setDesignChoice] = useState<DesignTheme | null>(null);
-  const [previewTheme, setPreviewTheme] = useState<DesignTheme>(DEFAULT_DESIGN_THEME);
   // Der neue Neon-Look startet bewusst dunkel; "System" bleibt später auswählbar.
   const [preferenceChoice, setPreferenceChoice] = useState<ThemePreference>("dark");
 
   const step = useMemo(() => getOnboardingStepState(stepIndex, ONBOARDING_SLIDES), [stepIndex]);
-  const themeChoices = useMemo(() => getOnboardingThemeChoices(), []);
+
   const visualColors = useMemo(
-    () => resolveDesignRuntimePalette(previewTheme, preferenceChoice === "light" ? "light" : "dark"),
-    [preferenceChoice, previewTheme],
+    // Sprint 355 — Aurora Flow ist fix; die Vorschau zeigt nur noch Hell/Dunkel.
+    () => resolveDesignRuntimePalette(DEFAULT_DESIGN_THEME, preferenceChoice === "light" ? "light" : "dark"),
+    [preferenceChoice],
   );
   const styles = useMemo(() => createStyles(visualColors), [visualColors]);
 
   const finish = useCallback(async () => {
-    if (!shouldCompleteOnboarding(step.isLast, designChoice !== null)) return;
-    setDesignTheme(normalizeOnboardingDesignTheme(designChoice, DEFAULT_DESIGN_THEME));
+    if (!shouldCompleteOnboarding(step.isLast, true)) return;
+    setDesignTheme(DEFAULT_DESIGN_THEME);
     setThemePreference(normalizeThemePreference(preferenceChoice));
     await completeOnboarding();
     router.replace("/(tabs)");
-  }, [completeOnboarding, designChoice, preferenceChoice, setDesignTheme, setThemePreference, step.isLast]);
+  }, [completeOnboarding, preferenceChoice, setDesignTheme, setThemePreference, step.isLast]);
 
   const isWide = width >= 640;
   const isWelcome = step.slide.id === "welcome";
@@ -211,37 +204,10 @@ export default function OnboardingScreen() {
         {/* Theme-Auswahl erst auf dem letzten Schritt */}
         {step.slide.id === "theme" ? (
           <Animated.View entering={FadeInUp.duration(320).delay(120)} style={[styles.glassCard, isWide && styles.glassCardWide]}>
-            <Text style={styles.sectionTitle}>Design wählen</Text>
+            <Text style={styles.sectionTitle}>Dein Design: Aurora Flow</Text>
 
-            <DesignPreview theme={previewTheme} colors={visualColors} />
-            <Text style={styles.previewHint}>Live-Vorschau — tippe eine Karte an, um Farben und Effekte direkt zu sehen.</Text>
-
-            <View style={styles.choiceGrid}>
-              {themeChoices.map((choice) => {
-                const selected = designChoice === choice.theme;
-                return (
-                  <Pressable
-                    key={choice.theme}
-                    onPress={() => {
-                      setDesignChoice(choice.theme);
-                      setPreviewTheme(choice.theme);
-                    }}
-                    onHoverIn={Platform.OS === "web" ? () => setPreviewTheme(choice.theme) : undefined}
-                    style={[styles.choiceCard, selected && styles.choiceCardSelected]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                  >
-                    <IconSymbol name={choice.icon} size={22} color={selected ? visualColors.tint : visualColors.icon} />
-                    <Text style={[styles.choiceLabel, selected && styles.choiceLabelSelected]} numberOfLines={1}>
-                      {choice.label}
-                    </Text>
-                    <Text style={styles.choiceDescription} numberOfLines={3}>
-                      {choice.description}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <DesignPreview theme={DEFAULT_DESIGN_THEME} colors={visualColors} />
+            <Text style={styles.previewHint}>Live-Vorschau von Aurora Flow — hell oder dunkel, wie du es gleich festlegst.</Text>
 
             <Text style={styles.sectionTitle}>Hell oder dunkel?</Text>
             <View style={styles.preferenceRow}>
@@ -274,7 +240,7 @@ export default function OnboardingScreen() {
           </Pressable>
         )}
         <Pressable
-          style={[styles.nextButton, step.isLast && designChoice === null && styles.nextButtonDisabled]}
+          style={styles.nextButton}
           onPress={() => {
             if (step.isLast) {
               void finish();
@@ -282,7 +248,7 @@ export default function OnboardingScreen() {
             }
             setStepIndex((current) => Math.min(ONBOARDING_SLIDES.length - 1, current + 1));
           }}
-          disabled={step.isLast && designChoice === null}
+
         >
           <Text style={styles.nextLabel}>{step.nextLabel}</Text>
         </Pressable>

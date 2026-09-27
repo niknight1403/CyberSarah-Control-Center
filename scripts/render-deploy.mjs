@@ -247,6 +247,62 @@ function makeAppEnvBuilder(databaseUrl) {
   if (workspaceServiceUrl) workspaceExtra.push(`WORKSPACE_SERVICE_URL=${workspaceServiceUrl}`);
   if (workspaceServiceToken) workspaceExtra.push(`WORKSPACE_SERVICE_TOKEN=${workspaceServiceToken}`);
 
+  // Sprint 367: Publishing-Tokens via GitHub Secrets — nur gesetzt, wenn das
+  // Secret existiert (Modus-Aufloesung laesst Plattformen ohne Token im
+  // ehrlichen Sandbox-Modus statt mit leerem Token zu scheitern).
+  // Sprint 369: Optionale KI-Provider-Keys (z. B. Hugging Face fuer den
+  // Model-Router) — nur gesetzt, wenn das GitHub-Secret existiert.
+  const aiProviderExtra = [];
+  for (const key of ["AI_HUGGINGFACE_API_KEY", "HF_TOKEN"]) {
+    const value = env(key, "").trim();
+    if (value) aiProviderExtra.push(`${key}=${value}`);
+  }
+
+  // Sprint 112 — Daten- und Integrations-Keys, die der Server liest
+  // (Dev-Agent-Tools, Content-Kanaele, E-Mail). Wie bei den Publishing-Tokens:
+  // nur gesetzt, wenn das GitHub-Secret existiert; fehlende Keys bleiben leer
+  // und der Server meldet ehrlich "nicht konfiguriert".
+  const integrationExtra = [];
+  for (const key of [
+    "STRIPE_SECRET_KEY_2",
+    "ADMIN_GITHUB_TOKEN",
+    "TIKTOK_CLIENT_KEY",
+    "TIKTOK_CLIENT_SECRET",
+    "TIKTOK_ACCESS_TOKEN",
+    "GA4_PROPERTY_ID",
+    "GA4_ACCESS_TOKEN",
+    "HUBSPOT_ACCESS_TOKEN",
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
+    "PERPLEXITY_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "TIKTOK_SYMPHONY_API_KEY",
+  ]) {
+    const value = env(key, "").trim();
+    if (value) integrationExtra.push(`${key}=${value}`);
+  }
+
+  const publishingExtra = [];
+  for (const key of [
+    "X_PUBLISH_TOKEN",
+    "X_CLIENT_ID",
+    "X_CLIENT_SECRET",
+    "X_REFRESH_TOKEN",
+    "LINKEDIN_PUBLISH_TOKEN",
+    "LINKEDIN_PUBLISH_USER_URN",
+    "THREADS_PUBLISH_TOKEN",
+    "THREADS_PUBLISH_USER_ID",
+    "INSTAGRAM_PUBLISH_TOKEN",
+    "INSTAGRAM_PUBLISH_USER_ID",
+    "TIKTOK_PUBLISH_TOKEN",
+    "BLUESKY_APP_PASSWORD",
+    "BLUESKY_IDENTIFIER",
+    "PUBLIC_APP_ORIGIN",
+  ]) {
+    const value = env(key, "").trim();
+    if (value) publishingExtra.push(`${key}=${value}`);
+  }
+
   return (baseUrl) =>
     buildServiceEnv({
       databaseUrl,
@@ -270,7 +326,7 @@ function makeAppEnvBuilder(databaseUrl) {
       stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
       stripeProductId: env("STRIPE_PRICE_ID"),
       trustProxy: env("TRUST_PROXY", "1"),
-      extra: workspaceExtra,
+      extra: [...workspaceExtra, ...aiProviderExtra, ...integrationExtra, ...publishingExtra],
     });
 }
 

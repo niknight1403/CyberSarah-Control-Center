@@ -5,6 +5,8 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
 import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
+import { startPublishingAutopilot, getPublishingJobCard } from "../publishing-service";
+import { buildPublishingCardPng, type IgRatioKey } from "../../lib/asset-card-logic";
 import {
   isWebFallbackCandidate,
   mapUrlPathToWebFile,
@@ -24,11 +26,15 @@ import {
   createLiveBillingPortalSession,
   createLiveCheckoutSession,
   processStripeWebhook,
+  StripeWebhookSignatureError,
 } from "../billing";
 import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
 import { checkDatabaseHealth } from "../db";
 import { restoreRouterState } from "../model-router";
+// Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
+import { restoreRouteRotationState } from "../route-rotation-agent";
+import { runDraftEngine } from "../draft-engine";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -39,6 +45,8 @@ import {
   installRuntimeLogger,
   subscribeRuntimeLogs,
 } from "../runtime-logger";
+import { agenticLoopTelemetryBus } from "../agentic-loop-telemetry";
+import { isValidLoopSessionId } from "../../lib/agentic-loop-telemetry-logic";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
   try {
@@ -76,8 +84,16 @@ async function startServer() {
           "[Stripe] Webhook-Verarbeitung fehlgeschlagen:",
           error instanceof Error ? error.message : "Unbekannter Fehler",
         );
-        res.status(400).json({
-          error: "Webhook konnte nicht verifiziert oder verarbeitet werden.",
+        // Signatur-Fehler: 400 (Stripe kann dieses Event nie liefern).
+        // Verarbeitungs-Fehler: 500 — Stripe wiederholt die Zustellung.
+        if (error instanceof StripeWebhookSignatureError) {
+          res.status(400).json({
+            error: "Webhook-Signatur ungültig.",
+          });
+          return;
+        }
+        res.status(500).json({
+          error: "Webhook-Verarbeitung vorübergehend fehlgeschlagen — Stripe wird erneut zustellen.",
         });
       }
     },
@@ -145,6 +161,30 @@ async function startServer() {
     }
   });
 
+  // Sprint 367: App-gehostete Auto-Karten fuer Instagram-Jobs (public, da die
+  // Graph-API die URL serverseitig abrufen muss). Deterministisch aus dem Job.
+  app.get("/api/publishing/assets/:jobId.png", async (req, res) => {
+    const jobId = Number(req.params.jobId);
+    if (!Number.isInteger(jobId) || jobId <= 0) {
+      res.status(400).json({ error: "Ungueltige Job-ID." });
+      return;
+    }
+    try {
+      const card = await getPublishingJobCard(jobId);
+      if (!card) {
+        res.status(404).json({ error: "Job nicht gefunden." });
+        return;
+      }
+      const png = buildPublishingCardPng({ ...card, ratio: (req.query.ratio as IgRatioKey) ?? "square" });
+      res.setHeader("content-type", "image/png");
+      res.setHeader("cache-control", "public, max-age=86400");
+      res.status(200).send(png);
+    } catch (error) {
+      console.error("[Publishing] Auto-Karte fehlgeschlagen:", error instanceof Error ? error.message : "unbekannt");
+      res.status(500).json({ error: "Karte konnte nicht generiert werden." });
+    }
+  });
+
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
@@ -158,6 +198,27 @@ async function startServer() {
   });
 
   app.get("/api/metrics", metricsHandler);
+
+  // Sprint 346 — Autonome Draft-Engine: taeglicher Cron-Endpoint. Nutzt
+  // bewusst METRICS_TOKEN als gemeinsames Ops-Token (bereits auf Render UND
+  // als GitHub-Secret konfiguriert) — kein neues Secret noetig. Erzeugt
+  // NUR pending-Entwuerfe; Freigabe bleibt dem Menschen vorbehalten.
+  app.post("/api/cron/draft-engine", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runDraftEngine();
+      console.info("[Draft-Engine] Lauf abgeschlossen:", JSON.stringify(result));
+      res.json({ ok: true, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Draft-Engine] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
 
   // Sprint 66 — Live-Runtime-Endpunkte fuer das Preview-Panel (auth-pflichtig).
   installRuntimeLogger();
@@ -210,6 +271,38 @@ async function startServer() {
       query: typeof req.query.query === "string" ? req.query.query : undefined,
     });
     res.json({ entries: filtered.slice(-limit).reverse(), total: filtered.length });
+  });
+
+  // Sprint 353 — Agentic-Loop-Telemetrie: SSE-Stream pro Session-ID.
+  // Reconnect-Sicherheit: Last-Event-ID wird nachgeliefert (atomares
+  // subscribeWithReplay), danach folgt der Live-Stream; Heartbeat haelt
+  // Proxies waerme, close raeumt Abonnenten und Timer ab.
+  app.get("/api/agentic-loops/:sessionId/stream", async (req, res) => {
+    const sessionId = String(req.params.sessionId ?? "");
+    if (!isValidLoopSessionId(sessionId)) {
+      res.status(400).json({ error: "Ungueltige Session-ID (4-64 Zeichen, [A-Za-z0-9_-])." });
+      return;
+    }
+    if (!(await requireRuntimeUser(req, res))) return;
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.write(": loop-telemetrie verbunden\n\n");
+    const sinceHeader = req.headers["last-event-id"];
+    const sinceEventId = Number.isFinite(Number(sinceHeader)) ? Number(sinceHeader) : 0;
+    const { unsubscribe } = agenticLoopTelemetryBus.subscribeWithReplay(sessionId, (event) => {
+      res.write(`id: ${event.id}\nevent: ${event.event}\ndata: ${JSON.stringify(event)}\n\n`);
+    }, sinceEventId);
+    const heartbeat = setInterval(() => {
+      res.write(`: ping ${Date.now()}\n\n`);
+    }, 15_000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
   });
 
   app.get("/api/runtime/logs/stream", async (req, res) => {
@@ -291,6 +384,9 @@ async function startServer() {
   const port = parseInt(process.env.PORT || "3000", 10);
   void restoreRouterState().catch(() => undefined);
   void initProviderAdmin().catch(() => undefined);
+  // Sprint 196 — Autonomer Route-Rotations-Agent: Zustand restaurieren,
+  // synchronen Spiegel fuer die Ketten-Sortierung setzen und Tick starten.
+  void restoreRouteRotationState().catch(() => undefined);
 
   // Sprint 169 — Port-Konflikt-Haertung (EADDRINUSE): Ohne diesen Handler
   // wirft der Listener eine unbehandelte Exception mit rohem Stack-Trace und
@@ -312,6 +408,7 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
     startOptimizerLoop();
+    startPublishingAutopilot();
   });
 }
 

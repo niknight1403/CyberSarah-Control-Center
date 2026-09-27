@@ -4,273 +4,73 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
-## [Unreleased — Sprint 201]
-
-### Added — Interner Speicher-Manager (Prompt-gesteuert, Test-Modul)
-- **Neuer Screen `app/storage-manager.tsx` (Sidebar: „Speicher")**: per Prompt den App-eigenen Speicher analysieren, sortieren, aufräumen und Optimierungs-Vorschläge erhalten — als Test-Modul zur Voll-Funktionsprüfung.
-- **Reine Logik in `lib/storage-manager-logic.ts`** (deterministisch, 11 Tests): Pfad-Klassifikation in Kategorien (Cache, Logs, Backups, Dokumente, Medien, Other), Aggregation, deutsche Byte-Formatierung, vier Sortierungen, Aufäum-Plan mit Sicherheitsregeln (Cache/veraltete Logs gefahrlos, Backups/Dokumente/Medien nur mit Bestätigung, Systempfade wie SQLite/IndexedDB grundsätzlich geschützt), Optimierungs-Vorschläge (größte/stälteste/doppelte Einträge, Kategorie-Dominanz) und deutsches Prompt-Parsing (Aktionen, Kategorien, „älter als N Tage", Sortierung, Umlaut-sicher).
-- **Ehrliche Geräte-Anbindung in `lib/storage-manager-device.ts`**: Scan der Expo-Verzeichnisse + WebStorage-Einträge mit injizierbarem FS-Adapter (Tiefe/Anzahl begrenzt, nicht lesbare Bereiche werden als Hinweis gemeldet statt still leer zu bleiben); Löschen ausschließlich vom Plan freigegebener Pfade.
-- **Orchestrierung in `hooks/use-storage-manager.ts`**: Scan, Prompt-Auswertung, Plan; Löschung nie ohne Nutzer-Bestätigung (Confirm-Dialog mit Freigabe-Vorschau). Sidebar-Icon `internaldrive.fill` ergänzt.
-
-## [Unreleased — Sprint 200]
-
-### Fixed — Dual-Sidebar ehrlich und vollstaendig (Wide-Viewport)
-- **Fake-Status entfernt:** Der Dual-Sidebar-Footer zeigte pauschal gruen „SYSTEM ONLINE"/„ORCHESTRATOR READY" — unabhaengig vom echten Serverzustand. Neu: echter Health-Poll gegen den oeffentlichen `/api/health`-Endpunkt (Timeout 4 s, alle 60 s, AbortController, kein Auth) mit ehrlichen Zustaenden: online (gruen) / offline (rot) / pruefend (muted). „ORCHESTRATOR ERREICHBAR" behauptet bewusst nur Erreichbarkeit, keine Orchestrator-Readiness oder DB-Verfuegbarkeit.
-- **Konto-Screen auf Wide-Viewports wieder erreichbar:** Die Tab-Bar ist ab 768 px ausgeblendet, `/account` fehlte aber in beiden Sidebar-Zonen — der Konto-Screen war auf dem Desktop unmoeglich zu erreichen. Neu: Eintrag „Konto" in der Apps-Zone.
-- **Logik extrahiert und getestet:** Routing-Match (inkl. index-/Praefix-Faelle), Zonen-Eintraege und Footer-Ableitung liegen als reine Funktionen in `lib/dual-sidebar-logic.ts`; deterministische Tests in `tests/dual-sidebar-logic.test.ts` pinnen auch die Konto-Erreichbarkeits-Regression.
-
-## [Unreleased — Sprint 194]
-
-### Fixed
-- **Sprint 194 — Chat-Nachrichten laufen nicht mehr aus dem Bildschirm (Owner-Feedback 21.09.2026):** Lange, nicht umbrechbare Inhalte (URLs, Pfade, Stacktrace-Zeilen) sprengten die Flex-Zeile der Chat-Bubbles und verschwanden rechts aus dem Bildschirmrand — React-Native-Web erzwingt ohne `minWidth: 0` min-width:auto auf Flex-Kindern. Neu: die komplette Kette row/rowUser/bubble/codeBox im MessageBubble haelt `minWidth: 0`, Code-/Inhaltstexte brechen via `wordBreak: "break-word"` mitten im Token statt die Zeile zu sprengen. Regressionsschutz: tests/chat-overflow-connector.test.ts.
-
-### Changed
-- **Sprint 194 — GitHub-Repository-Picker im Chat vollautonom:** chat.tsx und agent.tsx gaben `onListRepositories` nur bei lokal hinterlegtem Token weiter — der Ein-Klick-Picker blieb fuer einen Administrator stumm, obwohl das Admin-Auto-Provisioning (Sprint 87, adminRouter.githubToken) server-seitig laengst existierte. Neu: `listGithubRepositories` faellt ohne lokales Secure-Store-Token automatisch auf das server-seitige Admin-Token zurueck (ADMIN_GITHUB_TOKEN/GITHUB_TOKEN); beide Screens uebergeben den Picker immer, die Karte faelllt nur noch bei wirklich fehlendem Token auf die manuelle Eingabe zurueck. Der GitHub-Sub-Tab bleibt fuer Status/Diagnose, ist fuer die Verbindung aber nicht mehr noetig.
-
-- App-Lockfile 2.3.0 → 2.5.0 nachgezogen (war hinter package.json zurueckgefallen).
-
-## [Unreleased — Sprint 189]
-
-### Changed
-- **Sprint 189 (Chat-Qualität) — Übersichtlichere Antworten in beiden Chatbereichen:** Der Leitende Superagent nutzt jetzt ein festes Antwortformat (### Ergebnis mit Kernantwort zuerst, ### Was ich getan habe als max. 5 Stichpunkte, ### Naechste Schritte max. 3) mit Praegnanz-Regeln (keine Floskeln, keine Rohdaten, ehrliche Zahlen). Der Superagent-Tab rendert finale Antworten ab sofort mit Markdown-Lite (Ueberschriften, Listen, Code) statt Fliesstext. Der Repo-Chat erhaelt die Kernantwort-zuerst-Regel plus klare Themen-Ueberschriften und Stichpunkt-Limits. Live verifiziert: beide Chatbereiche end-to-end gegen einen lokalen Server mit echter Postgres-DB, Admin-Login und Mock-LLM getestet (Orchestrator-Run inkl. Task-Ledger, Repo-Chat inkl. Historie-Persistenz).
-
-## [Unreleased — Sprint 190]
-
-### Fixed
-- **Sprint 190 — Deterministischer Secret-Vault-Test (28P01 auf Produktiv-VPS):** Der Vault-Test mokierte den KV-Speicher via `vi.mock("../server/db")` — unter `isolate: false` (Sprint 187) haengt die Modul-Mock-Aufloesung jedoch von Worker-Belegung und Dateireihenfolge ab. Auf einem Produktiv-VPS mit echter DATABASE_URL lief der Test dadurch stellenweise gegen die echte Postgres (Fehler 28P01, falsches Passwort fuer User cybersarah). Neu: injizierbarer KV-Adapter `setVaultKvForTests` in server/secret-vault.ts (nur unter NODE_ENV=test aktiv), der Test bindet seinen In-Memory-KV direkt daran. Verifiziert: Suite gruen mit falschem DB-Passwort, ohne DATABASE_URL und unter gezielt vergiftetem Modul-Cache (Einzel-Worker). Keine Produktionsverhaltens-Aenderung — der Hook greift nur im Test-Modus.
-
-## [Unreleased — Sprint 191]
-
-### Changed
-- **Sprint 191 — Deterministische Test-Hooks statt vi.mock ( komplette Fehlerklasse behoben):** Unter `isolate: false` (Sprint 187) haengt die vi.mock-Aufloesung von Worker-Belegung und Dateireihenfolge ab — auf produktiven VPS mit echter DATABASE_URL konnten KV-gemockte Tests real gegen Postgres laufen (28P01). Neu: zentraler Test-Hook `setModelRouterKvForTests` in server/db.ts und `setInvokeLlmForTests` in server/_core/llm.ts (Guard: NODE_ENV=test ODER VITEST-Marker; ausserhalb von Tests abgelehnt). Alle vier betroffenen Tests (secret-vault, wix-vault, orchestrator-failover, development-chat-server) binden ihre In-Memory-Fakes jetzt direkt und loesen den Hook in afterAll wieder (isolate:false-Hygiene). Der Sprint-190-Adapter in server/secret-vault.ts wurde vom zentralen Hook abgeloest und entfernt. Verifiziert: Suite gruen mit falschem DB-Passwort, ohne DATABASE_URL, unter gezielt vergiftetem Modul-Cache im Einzel-Worker (145 Dateien / 1196 Tests) und mit geleaktem NODE_ENV=production. Keine Produktionsverhaltens-Aenderung — die Hooks greifen nur im Test-Modus.
-
-## [Unreleased — Sprint 192]
-
-### Added — Future-Glass Max: komplettes Grafik-Upgrade
-- **GlassBackdrop v2:** dritte Lichtwolke (Blue, Daten), driftender Aurora-Schleier (26 s Pendel, Native Driver), haarfeines Cyber-Grid-Maschennetz und bis zu 5 driftende Lichtpartikel mit Fade — alles ausschaltbar per `atmosphere={false}` fuer dichte Screens. Basis: neue deterministische Logik `lib/design/glass-atmosphere-logic.ts` (seeded LCG statt Math.random im Render-Pfad, geklammerte Grid-Dichte 60-160 px, dezente Alpha-Obergrenzen) mit 8 neuen Tests.
-- **GlassCard:** diagonaler Akzent-Gradient-Wash bei Glow >= 1 — Karten bekommen Licht von oben links statt flacher Flaeche.
-- **GlowButton:** vertikaler Lichtschein auf primaeren CTAs ("beleuchtet"-Effekt).
-- **MetricTile:** Glow 1 + diagonaler Akzent-Wash — Kennzahlen-Kacheln wirken gerahmt vom Licht.
-- **AI-CORE:** gegenlaeufiger, duennerer Innenring (zweite Rotationsebene) — mehr Tiefe in jedem Zustand.
-- Alle Effekte laufen ausschliesslich ueber Tokens aus future-glass.ts (keine hardcodierten Farben ausserhalb lib/design/), nur Opacity/Transform-Animationen, web+mobile-kompatibel.
-
-### Changed
-- App-Version 2.3.0 → **2.4.0**.
-
-## [Unreleased — Sprint 193]
-
-### Changed — Komplettes UI-Update: 100% Token-Konformitaet
-- **Token-Sweep ueber alle Screens:** 192 hardcodierte Farbwerte in 31 Dateien (app/ + components/) durch Tokens aus future-glass.ts ersetzt — Akzente einheitlich auf glassPalette (Amber/Cyan/Green/Red/Purple), neutrale Flaechen auf glassDepth/glassSurface, Alphavarianten ueber accentAlpha(). Damit gilt die Design-Regel jetzt verbatim: Farbwerte ausschliesslich in lib/design/.
-- **Neue glassOverlay-Tokens** (Sprint 193) in future-glass.ts: whiteSheen/whiteStrong/whiteBright, gridLine, scrim, dark, track, shadow — absorbieren die bisherigen rgba()-Ausnahmen in Komponenten.
-- Sichtbarkeits-Feinschliff nach dem Sweep: unsichtbare Borders (Chat-TabBar, Dev-Trace, Paywall-Sheet, Error-Boundary) auf glassSurface.border gehoben, unlesbarer Paywall-Fineprint auf textMuted, Warn-Karten-Border auf borderStrong.
-- Dokumentierte Ausnahmen bleiben: app/+html.tsx (Web-Boot-Shell, synchron vor React-Load — Werte spiegeln bewusst design-theme-palettes.ts, Dual-Maintenance-Kommentar) und app/dev/theme-lab.tsx (Dev-Palette-Playground, zeigt Farbwerte als Daten).
-- Keine Logik-Aenderung: reine Praesentationsschicht; Agent-Farbwerte (Daten aus super-agents-logic) unberuehrt.
-
-## [Unreleased — Sprint 188]
-
-### Changed
-- **Sprint 188 (Design) — Dashboard-Styling auf Glass-Primitives vereinheitlicht:** Der letzte Ad-hoc-Link im Dashboard („Geschäftsdaten öffnen") nutzt jetzt `GlowButton` (secondary, Akzent blau/Daten) aus den verbindlichen Glass-Primitives statt eigener Pressable-Karten-Styles — inkl. Press-Scale-Feedback, Glow-Rand und Accessibility-Label. Keine Ad-hoc-Flächen mehr im Dashboard-Screen; weiterhin ausschließlich Tokens aus `lib/design/future-glass.ts`.
-
-## [Unreleased — Sprint 187]
-
-### Added
-- **Sprint 187 — Wix-API-Anbindung (read-only):** Admin-gated Karte „Wix-API" mit ehrlichem Konfigurationsstatus, verschlüsselter API-Key-Ablage (AES-256-GCM im KV, Env-Fallback), Site-ID-Setzung zur Laufzeit (KV, ohne Redeploy), Konto-Site-Suche (Tap-to-select) sowie Site-Properties (v4) und eCommerce-Orders-Views. Read-only-Client (`server/wix.ts`, 15-s-Timeout) mit klassifizierten Fehlerzustaenden aus der Live-Verifikation (META_SITE_NOT_FOUND, READ_ORDER_FORBIDDEN, HTML-403, Controller-404). 22 neue Tests (1195 gesamt). Siehe `docs/SPRINT_187_WIX_API.md`.
-- **Sprint 187 (Performance) — KDF-Root-Cause-Fix:** NODE_ENV wurde in dieser Umgebung mit 'production' gesetzt; Vitest ueberschreibt ein besetztes NODE_ENV nicht, sodass die KDF-Guards (NODE_ENV=test) ins Leere liefen und PBKDF2 volle 310.000 Iterationen zog (~60 s je Backup-Datei). vitest.config.ts erzwingt jetzt NODE_ENV='test', support-backup erhaelt das Sprint-112-Override-Muster (Envelope-Iterationszahl), Worker-Reuse (isolate: false) und testTimeout: 180.000. Suite: 61 s → 4 s.
-- **Sprint 187 (CI-Fix) — ENV dynamisch:** server/_core/env.ts friert die Env-Werte nicht mehr beim Modul-Import ein (dynamische Getter). Mit isolate: false bewertete sonst ein frueher Import ohne JWT_SECRET ENV.cookieSecret fuer alle Testdateien des Workers leer (CI: 'DataError: Zero-length key'). Produktion unberuehrt.
-
-## [4.2.0] — 2026-09-19
-
-**Tag:** v4.2.0 · **Commit:** d198c88 · **Verifikation:** tsc fehlerfrei, 1173 Tests gruen (142 Dateien), Expo-Web-Export erfolgreich, ESLint 0 Errors / 0 Warnings (Start des Lint-Sprints: 86 Warnings), GitHub CI + Gitleaks success · **Kosten der Neuerungen:** 0,00 EUR
-
-### Added
-- **Sprint 166 — Custom-Spiel-Codegenerator (Stufe 2):** Freier LLM-Spielgenerator fuer eigene Spielideen (Single-File-HTML5, Sandbox-Haerte: kein eval/Netzwerk/CDN, Offline-Template-Fallback) mit vollautonomer Fix-Schleife ueber `developCustom`-Route und Admin-UI; weiterhin harte 0-EUR-Garantie. Erweiterte Live-Fix-Watchdog-Aktionen: `invalidate_runtime_caches` (Latenz/5xx) und `restart_subsystem` (Watchdog ab 3 Wiederholungen in 10 Min) mit ehrlicher `applied=false`-Kennzeichnung und Occurrence-Tracker.
-- **Sprint 167 — Secret-Vault:** Nutzer-scoped AES-256-GCM-Vault (KV-persistiert, gleiche Infrastruktur wie Provider-Keys). Erkannte API-Keys (Groq/OpenAI/Anthropic/Google/GitHub/OpenRouter/Slack/AWS/Bearer/Hex) werden im Repo-Chat und Superagenten-Chat autonom verschluesselt gespeichert, der Klartext aus dem Verlauf maskiert und ein ehrlicher Hinweis angehaengt; Klartext erscheint nie in Listen oder Logs. Neuer Secrets-Tab im Repo-Chat, VAULT-Modul im Superagenten-Chat; 13 neue Tests (1173 gesamt).
-- **Sprint 168 — CyberSarah Future Glass:** Komplettes Design-System-Fundament (`lib/design/future-glass.ts` mit Token-System, Lichtquellen-Palette, AI-Core-Statusmaschine) und Glass-Komponenten-Bibliothek (`components/glass/`: AiCore, GlassCard, GlowButton, StatusChip, GlassBackdrop, GlassHeader, MetricTile, ControlModuleCard, HoloActivityCard mit animiertem SVG-Line-Chart, SuperagentHeroCard). Dashboard komplett auf das neue System umgebaut (ausschliesslich echte Backend-Daten), schwebende CyberGlass-Bottom-Navigation, Chat-Bubbles als Glass-Layers.
-
-### Fixed
-- **Sprint 169 — Runtime-Haertung:** EADDRINUSE-Handler am Listener (klare Meldung statt rohem Crash, kontrollierter Exit 1, live verifiziert), globale unhandledRejection/uncaughtException-Handler (speisen Runtime-Logger + Self-Healing-Ledger), PG-Pool-Haertung (keepAlive, 30s Idle-Timeout, Idle-Fehler-Handler gegen Neon-Idle-Kills). CI-Lint-Gate repariert (19 Errors via offiziellen `useAnimatedValue`-Hook).
-- **Sprint 171 — Latenter Render-Loop geschlossen:** `coerceLedgerTask` erzeugte pro Render neue Objekte; ein Effekt mit neuer Set-Referenz lief bei jedem Render erneut.
-
-### Changed
-- **Sprint 170–172 — Lint-Sprint (86 → 0 Warnings):** Import-Hygiene, ungenutzte Variablen, axios-Named-Imports, tote Prefetches (Sprint 170). React-Compiler-Batch 1: alle 16 `set-state-in-effect`-Meldungen behoben — Spiegel-Staende durch Render-Ableitung ersetzt, offizielles Adjust-Pattern (React-Docs) fuer Provider-Wechsel/History-Reset/Hydratation, dokumentierte Ausnahmen fuer Fetch-on-Mount und Live-Polling (Sprint 171). React-Compiler-Batch 2: neue Tick-Uhr `hooks/use-now.ts` (useSyncExternalStore, Date.now lebt im Modul-Scope) ersetzt `Date.now()` in allen Render-Pfaden; Reanimated-Shared-Value-Writes ueber dokumentierte `"use no memo"`-Interop; nicht erhaltbare manuelle Memoisierung im Theme-Lab entfernt. ESLint final 0 Errors / 0 Warnings.
-
-### Compatibility
-- Keine Breaking Changes; keine Migration noetig. Betrieb weiterhin ohne Cloud-Keys moeglich (lokale Offline-Stufen Ollama / LM Studio).
-
----
-
-## [4.1.1] — 2026-09-19
-
-**Tag:** v4.1.1 · **Commit:** 376a980 · **Verifikation:** tsc fehlerfrei, 1149 Tests gruen (139 Dateien) · **Kosten der Neuerungen:** 0,00 EUR
-
-### Added
-- **Echte keylose Web-Suche:** DuckDuckGo-HTML-Scraping (`lib/keyless-search.ts`, `server/keyless-search.ts`) als dauerhaft kostenlose Alternative zu bezahlten Search-APIs — Redirect-Dekodierung (uddg), Snippet-Extraktion, Dedup, 8s-Timeout, ehrliches Fehlverhalten (keine erfundenen Treffer). Neuer admin-geschuetzter tRPC-Endpunkt `keylessSearch.search`. Live verifiziert: 8 Treffer fuer 'kostenlose llm api', 0 API-Keys.
-- **Admin-UI 'Autonome Entwicklung':** Neue Karte im Admin-Dashboard (`components/studio/autonomous-dev-card.tsx`, eingebunden in `app/admin.tsx`) — Template-Auswahl aller 8 Vorlagen (Pong, Snake, Breakout, Flappy, To-Do, Notizen, Taschenrechner, Timer), Wunsch-Feld, Ein-Klick-Entwicklung mit 0-EUR-Nachweis und Uebersicht der letzten Laeufe inklusive Kosten.
-- **Tests:** 5 neue Logik-Tests fuer die Such-Parsing-Basis (Redirect-Dekodierung, Dedup, Validierung, Encoding).
-
-### Fixed
-- **Live-Fix-Quarantaene wirkt jetzt in der Chat-Runtime:** `invokeLLM()` (`server/_core/llm.ts`) filtert vom Self-Healing-Live-Fix quarantaenierte Provider (60s nach 429/Quota-Fehler) aktiv aus der Kette und rotiert sofort auf den naechsten Endpoint; sind alle Provider in Quarantaene, wird Best-Effort weitergearbeitet — der Service bleibt nie stumm.
-
-### Documentation
-- CHANGELOG um die Sprint-Abschnitte 163 (ToolLimitResolverAgent & Tool-Rotator), 164 (vollautonome 0-EUR-Entwicklung + Live-Fix-Agent) und 165 (Review-Fixes) ergaenzt.
-
-### Compatibility
-- Keine Breaking Changes; keine Migration noetig. Betrieb weiterhin ohne Cloud-Keys moeglich (lokale Offline-Stufen Ollama / LM Studio).
-
----
-
-## [4.1.0] — 2026-09-19
-
-**Tag:** v4.1.0 · **Verifikation:** tsc fehlerfrei, 1144 Tests gruen · **Kosten der Neuerungen:** 0,00 EUR
-
-### Added
-- **Zero-Cost-Dev-Stack-Registry:** alle kostenlosen LLMs (Groq, OpenRouter :free, Gemini 2.5, Cerebras, SambaNova, GitHub Models plus lokale Ollama-/LM-Studio-Endpunkte), kostenlosen Entwicklungswerkzeuge und Anbindungs-Alternativen (GitHub-API Free, Neon Free, DuckDuckGo, lokale Ablage) mit ehrlichem `isZeroCost`-Nachweis; bezahlte Endpoints werden NIE gewaehlt.
-- **Autonome Entwicklungs-Pipeline:** 8 Standalone-HTML5-Templates mit Plan -> freie LLM-Personalisierung (Cloud -> Ollama -> Template-Defaults) -> `node --check`-Verifikation mit autonomer Fix-Schleife -> Lieferung ins Workspace; vollstaendig autonom auch ohne jeden API-Key (Offline-Modus). Live-Lauf: Snake, 4,4 KB, Verifikation bestanden.
-- **Live-Fix-Agent:** Incidents werden sofort live behoben (Backup-Waechter-Reset bei DB-Stoerung, Log-Puffer-Purge bei OOM, 60s-Provider-Quarantaene bei 429/Quota); angewandte Fixes werden am Incident dokumentiert.
-- **tRPC:** Router `autonomousDev` (catalog / stack / develop / runs / preview); 17 neue Logik-Tests.
-
-### Compatibility
-- Keine Breaking Changes; keine Migration noetig.
-
----
-
-## Sprint 165 (2026-09-19) — Offene Punkte aus dem V4.1-Review behoben
-
-### Keyless Web-Search (Alternative zu bezahlten Search-APIs)
-- `lib/keyless-search.ts` + `server/keyless-search.ts`: echte, keylose Web-Suche via DuckDuckGo-HTML-Scraping (uddg-Redirect-Dekodierung, Snippet-Extraktion, Dedup, Ergebnisbegrenzung, 8s-Timeout, ehrliches Fehlverhalten) — 0 EUR, 0 API-Keys.
-- tRPC: `keylessSearch.search` (admin-geschuetzt). Live verifiziert: 8 Treffer fuer 'kostenlose llm api'.
-- 5 neue Logik-Tests; Router registriert.
-
-### Live-Fix-Quarantaene in der Chat-Runtime
-- `server/_core/llm.ts`: `invokeLLM()` filtert quarantaenierte Provider (60s nach 429/Quota) aus der Kaskade — die Kette rotiert sofort auf den naechsten Endpoint; sind alle in Quarantaene, wird Best-Effort weitergearbeitet (nie stumm).
-
-### Admin-UI
-- `components/studio/autonomous-dev-card.tsx` + Einbindung in app/admin.tsx: Template-Auswahl (8 Vorlagen), Wunsch-Feld, Ein-Klick-Entwicklung (0 EUR), letzte Laeufe mit Kosten-Nachweis.
-
-## Sprint 164 (2026-09-19) — Vollautonome 0-EUR-Entwicklung + Live-Fix-Agent
-
-- Zero-Cost-Dev-Stack-Registry (`lib/free-dev-stack.ts`): alle kostenlosen LLMs (Groq/OpenRouter :free/Gemini/Cerebras/SambaNova/GitHub Models + lokale Ollama/LM-Studio-Endpunkte), Werkzeuge (tsc, vitest, node --check) und Anbindungs-Alternativen (GitHub-API Free, Neon Free, DuckDuckGo, lokale Ablage) mit ehrlichem isZeroCost-Nachweis; bezahlte Endpoints werden NIE gewaehlt.
-- Autonome Entwicklungs-Pipeline (`lib/autonomous-dev-logic.ts` + `server/autonomous-dev.ts`): 8 Standalone-HTML5-Templates (Pong, Snake, Breakout, Flappy, To-Do, Notizen, Taschenrechner, Timer) — Plan -> freie LLM-Personalisierung (Cloud -> Ollama -> Template-Defaults) -> node --check-Verifikation mit autonomer Fix-Schleife -> Lieferung ins Workspace; auch OHNE jeden API-Key vollstaendig autonom (Offline-Modus), harte 0-EUR-Garantie. Live-Lauf: Snake 4,4 KB, Verifikation bestanden.
-- Live-Fix-Agent (`lib/live-fix-logic.ts`, verdrahtet in server/self-healing.ts): Incidents werden sofort live behoben — Backup-Waechter-Reset bei DB-Stoerung, Log-Puffer-Purge bei OOM, 60s-Provider-Quarantaene bei 429/Quota; angewandte Fixes werden am Incident dokumentiert.
-- tRPC: `autonomousDev`-Router (catalog/stack/develop/runs/preview). 17 neue Tests. Release v4.1.0 veroeffentlicht.
-
-## Sprint 163 (2026-09-19) — ToolLimitResolverAgent & Tool-Rotator
-
-- `artifacts/api-server`: Dynamic Tool & Key Rotator Engine mit kostenloser Multi-Tier-Kaskade (Tier 1: Groq/Gemini 2.5/Cerebras/SambaNova/GitHub Models, Tier 2: OpenRouter :free/HF Serverless/Cloudflare Workers AI, Tier 3: lokales Ollama — garantiert unbegrenzt).
-- ToolLimitResolverAgent (BaseAgent): faengt 429/403/503, Quota- und Token-Limits autonom ab, rotiert in Millisekunden, re-executet gescheiterte Tasks ohne Datenverlust; Dedicated VIP Admin Bypass (Admin-Keys nie vom Cooldown-Loop beruehrt), 60s-Cooldown-Queue mit Selbstheilung (STATUS: HEALTHY).
-- Zentrale Task-Execution-Pipeline + Express/tRPC-Middleware-Adapter; Resilienz- & HITL-Test-Suite (32 Checks, Exit-Codes, GREEN-Banner).
-
-
-## Sprint 162 (2026-09-19) — Vektor-Gedaechtnis produktiv: Tabelle, Store-Adapter, Prompt-Injektion
-
-### Memory
-- Neue Drizzle-Tabelle `agentMemoryVectors` (Migration 0007: userOpenId, source, refId, text, vector jsonb, metadata, Index auf (userOpenId, createdAt)) — laeuft ohne Erweiterung, pgvector-ready dokumentiert; Migration zieht die in Sprint 160 fehlende `users.designTheme`-Spalte nach.
-- `server/vector-memory-store.ts`: VectorMemoryStore-Vertrag produktiv gebunden — save/query (Kosinus-Ranking anwendungsseitig, 200 Kandidaten), `queryUserBestPractices()`, `persistLearningVector()`; ehrlicher No-DB-Pfad.
-- `server/development-chat.ts`: Agenten fragen vor neuen Aktionen historische Best-Practices aus dem Vektor-Gedaechtnis ab (Kontext-Injektion neben den keyword-gerankten Learnings); save_learning und Auto-Learnings werden parallel als Vektor-Erinnerung persistiert (Best-Effort, nie blockierend).
-- `lib/vector-memory-logic.ts`: `formatBestPracticesForContext()` — deduplizierte, gekapte, nummerierte Snippets (max. 3) fuer den System-Prompt.
-
-### Verifikation
-- 1127 Tests gruen (4 neu), tsc sauber, 0 Lint-Errors, verify:system GREEN mit 10 Kernmodulen. Bericht: `docs/SPRINT_162_VEKTOR_GEDAECHTNIS.md`. Offen: Migration 0007 auf Neon anwenden (Owner), repo.searchCode-Tool (Sprint 163).
-
-
-## Sprint 161 (2026-09-19) — V4.0-Integration: HITL, Vector Memory, Repo Chat, Multi-PSP & System-Verify
-
-### Sicherheit
-- `lib/hitl-guard-logic.ts`: Human-in-the-Loop-Guardrail nach Master-Prompt V4.0 — Transaktionen > 50 EUR, destruktive SQL-Befehle (DELETE nur ohne ID-Constraint), kritische System-/SSH-/Flash-Kommandos und Massen-E-Mails > 500 Empfaenger erfordern Operator-Bestaetigung; HARA-Auto-Approve bei ROI > 90, Kosten 0,00 EUR, RiskLevel LOW.
-- HITL produktiv verdrahtet: `executeTool()` (server/orchestrator/tool-registry.ts) bewertet jeden Tool-Aufruf zusaetzlich zur Allowlist und blockt bei OPERATOR_CONFIRM_REQUIRED ohne `confirm: true`.
-
-### V4.0-Kernkomponenten (Logik + Tests)
-- `lib/vector-memory-logic.ts`: pgvector-faehiges Vektor-Gedaechtnis (Kosinus-Aehnlichkeit, deterministische 256-dim-Offline-Einbettung, injizierbarer Speicher-Vertrag, Best-Practice-Abfrage).
-- `lib/repo-chat-logic.ts`: Repo-Chat-Index mit zeilengenauem Symbol-Scanner (function/class/interface/type/const) und Pfad:Zeile-Antworten, Ausschluesse fuer node_modules/.git/dist.
-- `lib/payment-fallback-logic.ts`: Multi-PSP-Kaskade Stripe -> LemonSqueezy -> Paddle mit Webhook-Timeout-Failover und ehrlichen Nicht-Konfiguriert-Zustaenden.
-
-### Verifikation
-- `scripts/system-verify.ts` + `npm run verify:system`: ein Befehl fuer tsc + volle Suite + Modul-Präsenz, exaktes GREEN-Banner bei Gesamtbetriebsbereitschaft, Exit 1 bei Rot.
-- 1123 Tests gruen (56 neu: 19 HITL, 11 Vector Memory, 14 Repo Chat, 12 Payment-Fallback). Bericht: `docs/SPRINT_161_V4_INTEGRATION_HITL.md`.
-
-
-## Sprint 157 (2026-09-19) — Mega-Sprint: Performance & Professional Polish (v2.3.0)
-
-### Performance
-- FlatList-Windowing auf allen Kern-Screens (Chat, Superagent, Agent, Workspace, Quality, Preview, Memory): `initialNumToRender=12`, `maxToRenderPerBatch=8`, `windowSize=9` — schnellere Erst-Erkennung, weniger Render-Arbeit pro Frame, flüssigeres Scrollen in langen Chats und Task-Verlaeufen.
-- Fehlende `@types/compression` ergaenzt (TypeCheck-Blocker aus Sprint 156-Nachzug).
-
-### Release
-- App-Version 2.2.0 -> 2.3.0 (minor): komplettes Update inkl. Neon-Pulse-Dashboard, einheitlicher Cyber-Neon-Themes, autonomem Provider-/Key-Manager, verstaendlicher Provider-Key-Eskalation, Rate-Limiter-IP-Fix und Superagent-Chat-Composer aus Sprint 138-156.
-
-## Sprint 151 (2026-09-18, Commit c7f02e1) — Bugfix: Superagent-Eskalation bei Tool-Aufrufen
-
-### Problem
-- Der Optimizer-/Superagent-Tab eskalierte JEDE Aufgabe mit Tool-Aufrufen nach 3 Iterationen ("Cannot read properties of undefined (reading 'type')"), unabhaengig vom LLM-Anbieter — sichtbar als wiederholte Fehler- und Eskalationsmeldungen in der UI.
-
-### Ursache
-- Eine Assistant-Antwort mit reinen Tool-Aufrufen traegt oft kein Text-Content (content=null bzw. Feld fehlt). Sobald diese Nachricht in der naechsten Runde erneut normalisiert wurde (server/_core/llm.ts::normalizeMessage), stuerzte ensureArray(null).map(normalizeContentPart) ab.
-
-### Fix
-- `ensureArray()` behandelt null/undefined/leeren String jetzt sicher (leeres Array statt Abstuerzen); fehlender Content wird als null uebergeben, wie OpenAI-kompatible APIs es erwarten.
-- Neuer Regressionstest in tests/orchestrator-superagent-provider-failover.test.ts: schlaegt ohne Fix nachweislich fehl, gruen mit Fix.
-
-### Verifikation
-- 1001 Tests gruen, TypeCheck sauber, Gitleaks bestanden, Render-Deploy erfolgreich; /api/health ok.
-
-## Sprint 152 (2026-09-18) — Bugfix: Rate-Limit traf faelschlich alle Nutzer gemeinsam
-
-### Problem
-- Nutzer erhielten im Superagent-/Optimizer-Tab die Fehlermeldung "Unable to transform response from server" beim Senden neuer Aufgaben.
-
-### Ursache
-- render.yaml setzt TRUST_PROXY="1", der Server pruefte aber exakt `=== "true"`. Dadurch blieb Express' "trust proxy" in Produktion IMMER deaktiviert. Ohne trust proxy zeigte req.ip fuer JEDEN Nutzer auf dieselbe interne Render-Proxy-Adresse — der IP-basierte Rate-Limiter (server/_core/security.ts) fasste dadurch de facto ALLE Nutzer in einen gemeinsamen Zaehler-Bucket zusammen. Wurde dieser durch intensive Anfragen (z. B. Monitoring) ausgeschoepft, bekamen auch andere Nutzer eine 429-Antwort, die nicht ins tRPC-Envelope passt und im Client als "Unable to transform response from server" auftaucht.
-
-### Fix
-- Neue, testbare Helper-Funktion `isTruthyEnvFlag()` (lib/trust-proxy-logic.ts) akzeptiert gaengige Wahrheitswert-Schreibweisen ("1", "true", "yes", "on"); server/_core/index.ts nutzt sie jetzt statt des strikten String-Vergleichs.
-- Neuer Regressionstest (tests/trust-proxy-logic.test.ts) deckt genau den render.yaml-Fall ("1") ab.
-
-### Verifikation
-- 1004 Tests gruen, TypeCheck sauber.
-
-## Sprint 153 (2026-09-18) — Superagent: verstaendliche Eskalation bei ungueltigen LLM-API-Keys
-
-### Problem
-- Der Superagent eskalierte mit kryptischen Roh-Fehlern ("LLM invoke failed: 400 Bad Request – [Please pass a valid API key]"), obwohl die eigentliche Ursache reine Konfiguration war: Alle hinterlegten Provider-Keys (Gemini, OpenAI inkl. Backups) sind ungueltig bzw. erschöpft, Groq/OpenRouter sind nicht konfiguriert.
-
-### Fix
-- Neue reine Diagnose-Logik `lib/llm-failure-diagnostics.ts`: Scheitern ALLE Endpunkt-Versuche einer invokeLLM-Runde an Auth-/Guthaben-Fehlern (401/402/403 oder typische Anbieter-Meldungen wie "Please pass a valid API key", "Incorrect API key", "insufficient_quota"), wirft der LLM-Router jetzt eine klare Handlungsanweisung statt des letzten Roh-Fehlers ("Kein Code-Problem: bitte gueltigen API-Key hinterlegen, z. B. AI_GEMINI_API_KEY oder AI_GROQ_API_KEY").
-- Die Eskalations-Zusammenfassung des Superagenten zeigt damit verifizierbar die Konfigurationsursache statt Code-Rauschen (end-to-end lokal getestet).
-- 6 neue Unit-Tests decken die Klassifikation und die Anwendungsfaelle ab.
-
-### Verifikation
-- 1010 Tests gruen (131 Dateien), TypeCheck sauber, End-to-End-Smoke-Test gegen lokale API: Eskalation enthaelt die verstaendliche Anleitung.
-
-### Hinweis fuer den Betrieb (kein Code-Fehler)
-- Es ist aktuell KEIN gueltiger LLM-Key hinterlegt (Gemini/OpenAI inkl. Backup-Keys geprueft: alle ungueltig). Bis ein gueltiger Key (bevorzugt kostenloser: Gemini-Free-Tier oder Groq) als Umgebungsvariable hinterlegt ist, kann keine LLM-Aufgabe erfolgreich abgeschlossen werden.
-
-## [Unreleased] — Sprint 133: AI-Grafik-Designer-Agent + Autonomer Engineering-Optimizer-Loop
-
-### Neu
-- **Designer-Agent** (`app/designer.tsx`, `server/design/`): KI-entwirft App-Icons, Logos, Splash-Screens, Banner, Illustrationen (validiertes SVG) und Design-Tokens (JSON) im Cyber-Design-System. Admin-gated, Galerie mit Loeschen, Drawer-Eintrag "Designer".
-- **Engineering-Optimizer-Loop** (`server/orchestrator/optimizer-loop.ts`): kontinuierliche System-Analyse (DB-Health, Runtime-Logs, Uptime, Zyklus-Historie) alle `OPTIMIZER_LOOP_INTERVAL_MIN` Minuten; LLM priorisiert Findings und startet automatisch einen Orchestrator-Task mit dem wichtigsten Optimierungsziel. Status/Trigger im Superagent-Tab ("JETZT ANALYSIEREN & OPTIMIEREN"), Zyklen-Historie in der DB.
-- tRPC: `design.generate/gallery/asset/delete`, `orchestrator.optimizerStatus/optimizerCycles/optimizerTrigger`.
-- Tests: `tests/designer-logic.test.ts`, `tests/optimizer-logic.test.ts` (Prompt-Bau, Validierung, Cadence, Zielauswahl).
-
-# Changelog — CyberSarah Control Center
-
-## Sprint 127 (2026-09-16, Commits f36f69d + 8b98436)
-
-### Administrator-Autopilot im Chat-Tab (Antwort auf: "nach dem Login einfach loslegen")
-- `useAdminGithubTokenSync`, `useAdminAutoRouter` und zwei neue Hooks jetzt direkt im Chat-Tab aktiv:
-  - `useAdminDesignThemeSync` — setzt Cyber-Neon-Design automatisch nach Admin-Login
-  - `useAdminRepositoryAutoConnect` — verbindet das CyberSarah-revenue-os-Repository (main) automatisch, sobald das GitHub-Token synchronisiert ist; kein manueller Connect-Klick mehr nötig
-- Die gleichen Autopilot-Hooks zusätzlich in Agent-Tab und Settings ergänzt (Theme + Repo-Autoconnect fehlten dort)
-
-### Superagent-Entwicklungsfenster
-- `runAgentToolLoop` zeichnet jeden Werkzeugaufruf auf (Tool, Argumente, Ergebnis-Summary) und liefert ihn als `devTrace` mit der Chat-Antwort zurück
-- Neue UI-Komponente `DevTracePanel` (components/chat/dev-trace-panel.tsx): standardmäßig eingeklappt, per Tap aufklappbar — macht autonome Datei-Edits und Diagnosen in der Agenten-Antwort sichtbar
-- `devTrace` wird in der Chat-Historie persistiert (Serialisierung + Parsing incl. Längen- und Typvalidierung)
-
-### Cyber-Neon-Design als Standard
-- `DEFAULT_DESIGN_THEME` von "living" auf "neon" (Cyber Neon) umgestellt
-- Onboarding-Theme-Auswahl: "neon" steht jetzt an erster Stelle
-- Tests an den neuen Standard angepasst (design-theme-logic, onboarding-logic) — alle 815 Tests grün
-
-### Infrastruktur
-- Typcheck und `npm run build` sauber; Render-Deploy über den kanonischen GitHub-Workflow (render-deploy.yml) verifiziert: Commit 8b98436 auf Render live
+## 26.09.2026 — Sprints 374–378: Serie J: Finale (Batch 19)
+
+- **Sprint 374 (Volle Regression + Test-Lücken)**: Platzhalter-Sweep Audit (`lib/sprint-374-regression-logic.ts`), Abdeckungsanalyse kritischer Kernpfade (Auth, Billing, Publishing, Kampagnen, tRPC, Drafts) und automatisierte Regressions-Gesundheitsprüfungen.
+- **Sprint 375 (Performance-Pass)**: Latenz-Messung (`lib/performance-pass-logic.ts`) für P50/P90/P95/P99, Hotpath-Erkennung mit Auswirkungsscores, SLA-Konformitätsprüfung (Target P95 < 200ms) und In-Memory LRU/TTL Cache.
+- **Sprint 376 (Doku-Pass)**: Doku-Strukturaudit (`lib/documentation-pass-logic.ts`), Prüfung relativer Markdown-Linkintegrität inklusive Pfadnormalisierung und Berechnung des Doku-Abdeckungsgrads für alle Sprint-Bereiche.
+- **Sprint 377 (CHANGELOG-Vollständigkeit seit 284)**: Parsing und Audit (`lib/changelog-completeness-logic.ts`) aller Sprint-Sektionen von 284 bis 378, Verifikation von Lückenlosigkeit und Append-Integritätsprüfungen gegen Löschen historischer Daten.
+- **Sprint 378 (Security-Final)**: Serie-E Sicherheits-Audit (`lib/security-final-audit-logic.ts`) für RLS-Policies aller Datenbanktabellen, Geheimnis-Hygiene in Umgebungsvariablen, Rate-Limiting-Deckung und gewichtete Security Compliance Reports.
+- **Verifikation**: 17 neue deterministische Tests (insgesamt 2.309 Tests in 301 Testdateien 100% grün), `npx tsc --noEmit` 0 Fehler.
+
+## 26.09.2026 — Sprints 369–373: Serie I Rest + Abschluss (Agent-Intelligenz — Batch 18)
+
+- **Sprint 369 (Fortschritts-Berichte)**: Verfolgung mehrstufiger und langlaufender Agenten-Aufgaben (`lib/agent-progress-report-logic.ts`) mit Prozentfortschritt, Zeitschätzungen basierend auf historischen Schrittdurchschnitten und automatischer Inaktivitäts-Erkennung (`stalled`).
+- **Sprint 370 (Qualitäts-Tore)**: Zweiseitige Qualitäts-Tore (`lib/agent-quality-gate-logic.ts`) mit Pre-Execution-Prüfung von Eingabedaten, Werkzeugverfügbarkeit und Kontextauslastung sowie Post-Execution-Verifikation von Ergebnissen, Schema-Konformität und Fehlerfreiheit.
+- **Sprint 371 (Misserfolg-Analyse)**: Automatische Fehlerklassifizierung (`lib/agent-failure-analysis-logic.ts`) in strukturierte Kategorien (`rate_limit`, `timeout`, `token_limit`, `context_overflow`, `invalid_args`, `external_api`, `permission_denied`, `logic_error`, `unknown`), Ermittlung von Wiederholbarkeit und differenzierten Wiederherstellungsstrategien.
+- **Sprint 372 (Provider-Rotation v2)**: Dynamische Provider-Auswahl und -Rotation (`lib/provider-rotation-v2-logic.ts`) basierend auf Live-Metriken für Kosten, Latenz, Fehlerquote, Qualitäts-Scores und Feature-Support (Function Calling, Vision, JSON-Schema) mit automatischer Deaktivierung bei Ausfällen.
+- **Sprint 373 (Serie-I-Abschluss)**: Cross-Validierung aller 10 Sprints der Serie I (`lib/serie-i-validation-logic.ts`) mit automatisiertem Prüfbericht (100% grün, 10/10 Module verifiziert).
+- **Verifikation**: 18 neue deterministische Tests (insgesamt 2.292 Tests in 296 Testdateien 100% grün), `npx tsc --noEmit` 0 Fehler.
+
+## 26.09.2026 — Sprints 364–368: Serie I (Agent-Intelligenz — Batch 17)
+
+- **Sprint 364 (Prompt-Versionierung + A/B-Vergleichsmetrik)**: Verwaltung von Prompt-Varianten (`lib/prompt-versioning-ab-logic.ts`), Erfassung von Ausführungsmetriken (Erfolgsrate, Qualitäts-Score, p95 Latenz, Token-Verbrauch) und statistischer A/B-Evaluierung mit ehrlichen Stichproben-Schwellenwerten (`evaluateABTest`) sowie deterministischem Traffic-Splitting per Hash-Seed.
+- **Sprint 365 (Selbst-Kritik-Schritt)**: Deterministische Selbstkritik-Logik (`lib/agent-self-critique-logic.ts`) zur Überprüfung von Agenten-Lösungen gegen vorgegebene Akzeptanzkriterien vor Task-Abschluss. Generiert strukturierte Kriterien-Auswertungen, Qualitäts-Scores und konkrete Nachbesserungs-Instruktionen bei Verfehlungen.
+- **Sprint 366 (Werkzeug-Auswahlstatistik)**: Messung der Werkzeug-Nutzung (`lib/tool-usage-stats-logic.ts`) mit Aufrufzählung, Erfolgsraten, Latenzen und Inaktivitätszeiträumen. Erzeugt ehrliche Bereinigungspläne (`generatePruningPlan`) zur Deaktivierung ungenutzter Nicht-Kern-Werkzeuge ("Nie-Nutzung"), während geschützte Kern-Werkzeuge (z. B. `bash`, `read_file`) garantiert unberührt bleiben.
+- **Sprint 367 (Gedächtnis-Konsolidierung v2)**: Erweiterte Gedächtnis-Konsolidierung (`lib/agent-memory-consolidation-v2-logic.ts`) mit automatischer Kategorisierung (`UserPreference`, `ProjectRules`, `SystemArchitecture`, `EphemeralTaskState`), Duplikat-Bereinigung und konfliktfreier Zusammenführung zugunsten nutzerbestätigter/neuerer Fakten sowie automatischem Verfall alter flüchtiger Zustände.
+- **Sprint 368 (Aufgaben-Zerlegung)**: Zerlegungs-Engine (`lib/task-decomposition-logic.ts`) für komplexe Hauptziele in prüfbare Teilschritte mit expliziten Abhängigkeiten, Akzeptanzkriterien und topologischer Ausführungsreihenfolge. Bietet Fortschrittsverfolgung und automatische Blockade-Propagierung bei Fehlern sowie ehrliche Rückfragen bei vagen Zielformulierungen.
+- **Verifikation**: 22 neue deterministische Tests (insgesamt 2.274 Tests in 291 Testdateien 100% grün), `npx tsc --noEmit` 0 Fehler.
+
+## 25.09.2026 — Sprint 374: Volle Regression + Test-Lücken schließen (Serie J)
+
+- **Platzhalter-Sweep (Owner-Gebot)**: Systematischer Audit über `app/`, `components/`, `lib/`, `server/` auf TODOs/FIXMEs, Dummies, Mocks und Platzhalter. Allen Fundstellen echt gelöst oder als ehrlichen Systemzustand ausgezeichnet (z.B. tRPC Router Clean-up in `server/routers.ts`, sicherer Callback-Origin in `app/oauth/callback.tsx`, saubere System-Startup-Logs im Admin Log Viewer `lib/admin-log-viewer-logic.ts`, ehrliche Template-Limit-Beschreibungen in `lib/template-gallery-logic.ts`). Null nutzer- oder produktionssichtbare Platzhalter verbleiben.
+- **Volle Regression**: Vitest-Suite über alle 286 Testdateien ohne Flakes oder Zeitabhängigkeiten deterministisch ausgeführt.
+- **Kritische Pfade & Test-Lücken (`tests/sprint-374-regression-and-gaps.test.ts`)**: 16 neue deterministische Tests für die 6 kritischen Kernpfade der App:
+  1. Auth / Session: Gate-Phase-Determinismus (`resolveAuthGate`) & `SecureSessionStore`-Persistenz/Löschung
+  2. Billing / Quota: Fair-Use Tageslimit (`evaluateChatQuota`) & Tier-Entitlements / Admin `QUOTA_EXEMPT`
+  3. Publishing Queue: Status-Invarianten (`PUBLISHING_STATUSES`)
+  4. Kampagnen-Brücke: Autonome Ideen-zu-Brief-Planung (`planCampaignBridges`) & Budget-Stopps
+  5. tRPC Router: Prozeduren-Vollständigkeit (`appRouter` sub-routers)
+  6. Draft Engine: Kapazitätsgrenzen (`DRAFT_MAX_PENDING_PER_KIND`) & Payload-Validierung (`validateDraftPayload`)
+- **Verifikation**: 16 neue deterministische Tests (insgesamt 2.252 Tests in 286 Dateien), `tsc --noEmit` grün, `npm run build` grün.
+
+## 25.09.2026 — Sprint 373: Login-Gate beim App-Start + autonome Ideen→Influencer-Kampagnen-Bruecke
+
+- **Login-Bereich als App-Einstieg**: Neuer Screen app/login.tsx (Login + Registrierung, reale account-Router-Mutations, Session-Token via _core/auth); Auth-Gate (lib/auth-gate-logic.ts, rein + getestet) in (tabs)/_layout.tsx — Login hat Vorrang vor dem einmaligen Onboarding, kein Login-Flackern fuer Angemeldete (Phase "loading" bis die Session-Abfrage entschieden ist)
+- **Autonome Kampagnen-Bruecke (kostenlos, nacheinander)**: lib/campaign-bridge-logic.ts leitet aus offenen Inbox-Ideen Kampagnenziel (Keyword-Inferenz), Thema und via Reichweiten-Engine (Sprint 364) Fokus-Persona + Plattform ab — pro Zyklus max. 2 Briefs, sequenziell, Budget gegen die content-Freigabe-Queue
+- **Server (server/campaign-bridge.ts + Router)**: queueFromIdeas (admin-only, Zod-validiert, max. 3 Briefs) erzeugt pro Brief echten Persona-Content im Free-Tier-LLM-Pool der Draft-Engine und legt ihn als pending-Entwurf in der Freigabe-Queue ab — LLM-Fehler/ungueltiges JSON werden ehrlich uebersprungen, nie ein Fake-Entwurf; parseLlmJson/insertPendingDraft der Draft-Engine wiederverwendet (nur exportiert)
+- **Ledger (lib/campaign-bridge-ledger.ts)**: verbrueckte Ideen-IDs persistent + idempotent — kein Doppel-Brief auch nach App-Neustart; korrupte Daten werden verworfen und gemeldet, nie still repariert
+- **Admin-Autonomie nach Login**: useAutonomousCampaignBridge laeuft still auf jedem Screen (via useAdminFullIntegration, 2-Minuten-Zyklen) — Ideen fliessen vollautonom ins Influencer-Marketing; HITL bleibt: veroeffentlicht wird erst nach menschlicher Freigabe (Sprint-346-Regel), die Idee selbst bleibt unangetastet in der Inbox (Sprint-242-Regel)
+- **Verifikation**: 24 neue deterministische Tests (Gate-Phasen, Ziel-Inferenz, Thema-Bau, Zyklus-Limits, Budget, Ledger-Roundtrip/-Korruption), Gesamt gruen, tsc --noEmit gruen; Live-Verifikation gegen app.cybersarah-ki.com nach Deploy
+
+## 25.09.2026 — Sprint 371: tRPC-Vollintegration — agents-, system- und revenue-Router
+
+- **Bestandsaufnahme**: tRPC-Kern (server/_core/trpc.ts mit superjson, Rate-Limit-Guard, protected/adminProcedure), Express-Mount (/api/trpc), Frontend-Client (lib/trpc.ts mit httpBatchLink + Session-Header) und alle Abhängigkeiten (@trpc/server/client/react-query ^11.18.0, @tanstack/react-query, zod) waren bereits vorhanden — der Sprint schließt die im Arbeitsplan fehlenden Router
+- **agents-Router (neu)**: getStatus (Agenten des Nutzers inkl. Live-Telemetrie: gepufferte Loop-Events, Live-Abonnenten, Status-Zusammenfassung), control (Zod-validiert: activate/pause/archive auf den super_agent_status-Enum, strikt nutzer-gescoped — fremde IDs sind NOT_FOUND, Aktivierung toucht lastActiveAt), getLogs (Replay des Session-Telemetrie-Bus ab sinceEventId, Limit-Clamp 1..240, Ownership-Check gegen die Agenten-Liste)
+- **system.getResourceUsage (neu)**: admin-gateder ehrlicher Prozess-Snapshot — Memory (rss/heap), CPU-Zeit, Uptime, Load-Averages, Node-Version; keine Netzaufrufe, keine Fake-Werte
+- **revenue-Router (neu)**: getMetrics kombiniert Kontometrie des Control Centers (Plan/Verbrauch/Credits, Sprint-144-Admin-Elite-Garantie bleibt wirksam) mit dem read-only Revenue-OS-Snapshot — nur fuer Admins; ohne REVENUE_OS_DATABASE_URL ehrlicher not-configured-Zustand
+- **Verifikation**: 6 neue Logik-Tests (Aktions-Mapping, Status-Aggregation, Telemetrie-Sicht, ISO-Serialisierung, Limit-Clamp), Gesamt 2.212 Tests gruen (282 Dateien), tsc --noEmit gruen
+
+## 25.09.2026 — Sprint 370: X-OAuth2-Auto-Refresh — Live-Modus haelt dauerhaft
+
+- **Token-Rotations-Persistenz (Migration 0012)**: Neue Tabelle platform_tokens speichert den aktuell gueltigen X-Tokensatz — X rotiert bei JEDEM Refresh den Access- UND Refresh-Token, deshalb ist Env nur der Bootstrap (X_PUBLISH_TOKEN/X_REFRESH_TOKEN) und die DB die Quelle der Wahrheit
+- **Automatischer Refresh (Sprint 370)**: resolveXToken frischt den Access-Token 10 Minuten vor Ablauf selbst nach (grant_type=refresh_token, Basic-Auth aus X_CLIENT_ID/X_CLIENT_SECRET) — der Autopilot bleibt ohne manuelles Eingreifen live; fehlgeschlagene Refreshes haben einen 5-Minuten-Cooldown gegen Endpoint-Hammering
+- **401-Retry im Publish-Pfad**: Ein X-Post mit abgelaufenem Token rotiert einmal frisch und sendet einmal neu — ein zweiter 401 ist ein ehrlicher Fehler, kein Blind-Retry
+- **Ehrliche Fallback-Kette**: Frischer DB-Satz > Refresh > Bestands-/Env-Bootstrap-Token > Sandbox-Modus mit Grund; force-Retry akzeptiert nur ein frisches Ergebnis (kein blindes Wiederholen toter Token)
+- **Deploy-Sync erweitert**: render-deploy.mjs/yml uebertragen jetzt auch X_CLIENT_ID, X_CLIENT_SECRET und X_REFRESH_TOKEN an die Render-App
+- **E2E verifiziert**: 14 neue Tests (Puffer-, Cooldown-, Fallback- und Endpunkt-Fehlerfaelle gegen Mock-Token-Endpoint), 2.206 Tests gruen (281 Dateien), Typecheck gruen
+
+## 25.09.2026 — Sprint 369: Hugging Face als KI-Provider im Deploy verdrahtet
+
+- **Model-Router-Anbindung**: Der bestehende Model-Router (Zero-Cost + BYO) liest Hugging Face via AI_HUGGINGFACE_API_KEY/HF_TOKEN — der validierte HF-Token des Owners liegt jetzt als GitHub-Secret AI_HUGGINGFACE_API_KEY (whoami verifiziert, Account Niknight1981)
+- **Deploy-Sync erweitert**: render-deploy.mjs uebertraegt jetzt optionale KI-Provider-Keys (AI_HUGGINGFACE_API_KEY, HF_TOKEN) nur bei existierendem Secret an die Render-App; render-deploy.yml reicht das GitHub-Secret an den Deploy durch

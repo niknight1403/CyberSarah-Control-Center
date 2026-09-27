@@ -22,6 +22,7 @@ import {
 
 import { ENV } from "./_core/env";
 import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
+import { resolvePgSslConfig } from "../lib/db-ssl-logic";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
   .trim()
@@ -50,6 +51,10 @@ export async function getDb() {
     try {
       const pool = new Pool({
         connectionString: process.env.DATABASE_URL,
+        // Sprint 112 — explizite SSL-Ableitung statt pg's impliziter
+        // sslmode-Aufloesung (vermeidet die "aliases for verify-full"
+        // SECURITY WARNING bei identischer Sicherheitsstufe).
+        ssl: resolvePgSslConfig(process.env.DATABASE_URL),
         max: 10,
         idleTimeoutMillis: 30_000,
         connectionTimeoutMillis: 10_000,

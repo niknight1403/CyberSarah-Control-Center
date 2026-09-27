@@ -22,6 +22,6 @@ export function useAdminDesignThemeSync(user: AdminUser) {
     if (attemptedRef.current) return;
     if (user?.role !== "admin") return;
     attemptedRef.current = true;
-    if (designTheme !== "pulse") setDesignTheme("pulse");
+    if (designTheme !== "aurora") setDesignTheme("aurora");
   }, [user, designTheme, setDesignTheme]);
 }

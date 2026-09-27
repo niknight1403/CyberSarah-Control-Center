@@ -5,6 +5,10 @@ export const INFLUENCER_PERSONAS = [
   { id: "lina", name: "Lina", niche: "Lifestyle & Produktivität", tonality: "motivierend", catchphrases: ["Ein System pro Tag.", "Produktivität darf leicht sein."] },
   { id: "kaya", name: "Kaya", niche: "Finance Education", tonality: "nüchtern", catchphrases: ["Risiko zuerst.", "Keine Rendite ohne Unsicherheit."] },
   { id: "zara", name: "Zara", niche: "Creator Economy", tonality: "mutig", catchphrases: ["Aufmerksamkeit ist ein System.", "Mach den nächsten Test."] },
+  { id: "orion", name: "Orion", niche: "Tech & Gadgets", tonality: "neugierig", catchphrases: ["Details machen den Unterschied.", "Erst verstehen, dann empfehlen."] },
+  { id: "ava", name: "Ava", niche: "Gesundheit & Fitness", tonality: "energetisch", catchphrases: ["Fortschritt liebt Wiederholung.", "Ein Plan, der mitmacht."] },
+  { id: "rio", name: "Rio", niche: "Food & Genuss", tonality: "warmherzig", catchphrases: ["Genuss braucht kein Tempo.", "Gute Zutaten sprechen für sich."] },
+  { id: "nala", name: "Nala", niche: "Reisen & Nomadenleben", tonality: "einladend", catchphrases: ["Fernweh ist ein Kompass.", "Überall lässt sich arbeiten."] },
 ] as const;
 
 export type InfluencerPersonaId = (typeof INFLUENCER_PERSONAS)[number]["id"];

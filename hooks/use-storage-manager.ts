@@ -2,10 +2,11 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import {
   buildPromptResult,
-  buildCleanupPlan,
   formatBytesGerman,
+  cleanupTargetsUnchanged,
   parseStoragePrompt,
   sortStorageEntries,
+  selectCleanupTargets,
   totalSizeBytes,
   type CleanupPlan,
   type PromptResult,
@@ -51,9 +52,17 @@ export function useStorageManager() {
 
   const scanNow = useCallback(async (): Promise<StorageScan> => {
     setState((prev) => ({ ...prev, scanning: true }));
-    const scan = await scanDeviceStorage(adapterRef.current);
-    setState((prev) => ({ ...prev, scanning: false, scan }));
-    return scan;
+    try {
+      const scan = await scanDeviceStorage(adapterRef.current);
+      setState((prev) => ({ ...prev, scanning: false, scan, plan: null, lastResult: null }));
+      return scan;
+    } catch (error) {
+      const scan: StorageScan = { status: "partial", entries: [], notes: [
+        `Scan fehlgeschlagen: ${error instanceof Error ? error.message : "unbekannter Fehler"}`,
+      ] };
+      setState((prev) => ({ ...prev, scanning: false, scan, plan: null, lastResult: null }));
+      return scan;
+    }
   }, []);
 
   const runPrompt = useCallback(
@@ -81,20 +90,29 @@ export function useStorageManager() {
   const applyPlan = useCallback(
     async (safePaths: string[], confirmedPaths: string[]): Promise<void> => {
       const scan = state.scan;
-      if (!scan) return;
-      const targetPaths = new Set([...safePaths, ...confirmedPaths]);
-      const targets = scan.entries.filter((entry) => targetPaths.has(entry.path)).map((entry) => ({ path: entry.path, sizeBytes: entry.sizeBytes }));
+      if (!scan || !state.plan || state.applying) return;
+      const targets = selectCleanupTargets(scan.entries, state.plan, safePaths, confirmedPaths);
       if (targets.length === 0) return;
       setState((prev) => ({ ...prev, applying: true, applyMessage: null }));
-      const execution = await applyCleanupEntries(adapterRef.current, targets);
-      const fresh = await scanNow();
-      const message =
-        execution.failed.length === 0
+      try {
+        const before = await scanDeviceStorage(adapterRef.current);
+        if (!cleanupTargetsUnchanged(targets, before.entries)) {
+          setState((prev) => ({ ...prev, applying: false, scan: before, plan: null, lastResult: null,
+            applyMessage: "Speicher seit dem Plan geändert. Bitte erneut analysieren und bestätigen." }));
+          return;
+        }
+        const execution = await applyCleanupEntries(adapterRef.current, targets);
+        const fresh = await scanDeviceStorage(adapterRef.current);
+        const message = execution.failed.length === 0
           ? `${execution.deleted.length} Einträge gelöscht, ${formatBytesGerman(execution.reclaimedBytes)} freigegeben.`
           : `${execution.deleted.length} gelöscht (${formatBytesGerman(execution.reclaimedBytes)} freigegeben), ${execution.failed.length} fehlgeschlagen: ${execution.failed[0]?.reason ?? "unbekannt"}.`;
-      setState((prev) => ({ ...prev, applying: false, applyMessage: message, plan: null, scan: fresh }));
+        setState((prev) => ({ ...prev, applying: false, applyMessage: message, plan: null, lastResult: null, scan: fresh }));
+      } catch (error) {
+        setState((prev) => ({ ...prev, applying: false, plan: null,
+          applyMessage: `Aufräumen abgebrochen: ${error instanceof Error ? error.message : "unbekannter Fehler"}` }));
+      }
     },
-    [state.scan, scanNow],
+    [state.scan, state.plan, state.applying],
   );
 
   const sortedEntries = useMemo<StorageEntry[]>(() => {
