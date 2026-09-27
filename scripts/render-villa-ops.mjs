@@ -56,6 +56,23 @@ async function readOps() {
     console.log(` - ${e.key} = ${mask(e.value)}`);
   }
   console.log("[villa-ops] Wenn DATABASE_URL fehlt: Login/Villen-Speicher inaktiv (Health meldet nicht_konfiguriert).");
+  // Environment Groups pruefen: Der Container bezieht Env evtl. aus einer Gruppe,
+  // waehrend /services/{id}/env-vars nur service-lokale Werte spiegelt.
+  const groups = await render(`/env-groups?ownerId=${(service.ownerId ?? "").split("/")[1] ?? ""}`);
+  const groupList = groups.data ?? [];
+  console.log(`[villa-ops] Env-Groups: ${groupList.length}`);
+  for (const g of groupList) {
+    const grp = g.envGroup ?? g;
+    console.log(` - Gruppe: ${grp.id} | ${grp.name} | envVars=${(grp.envVars ?? []).length}`);
+    for (const e of grp.envVars ?? []) console.log(`   * ${e.key}`);
+  }
+  // Service-Detail ohne Werte: enthaelt er eine envGroup-Referenz?
+  const detail = await render(`/services/${service.id}`);
+  const keys = Object.keys(detail.data ?? {});
+  console.log(`[villa-ops] Service-Felder: ${keys.join(", ")}`);
+  for (const k of ["envGroups", "envGroup", "environmentGroup", "environmentId", "environmentGroups"]) {
+    if (detail.data?.[k]) console.log(` - ${k}: ${JSON.stringify(detail.data[k]).slice(0, 200)}`);
+  }
   // Einzel-Key-Abfrage: die Listen-Endpoint liefert hier unzulaessig [].
   for (const key of ["DATABASE_URL", "AGENT_ADMIN_EMAIL", "GOOGLE_CLIENT_ID", "JWT_SECRET", "OPENROUTER_API_KEY", "GOOGLE_CLIENT_SECRET"]) {
     const r = await render(`/services/${service.id}/env-vars/${key}`);
