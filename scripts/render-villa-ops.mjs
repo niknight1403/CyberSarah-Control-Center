@@ -61,6 +61,7 @@ async function readOps() {
 async function setEnvOps() {
   if (!SERVICE_ID) { console.error("[villa-ops] SERVICE_ID fehlt fuer set-env"); process.exit(1); }
   const values = {
+    NODE_ENV: "production", // kein Secret — produktiver Modus ist der Deploy-Standard
     AGENT_ADMIN_EMAIL: (process.env.AGENT_ADMIN_EMAIL ?? "").trim(),
     GOOGLE_CLIENT_ID: (process.env.GOOGLE_CLIENT_ID ?? "").trim(),
     JWT_SECRET: (process.env.JWT_SECRET ?? "").trim(),
@@ -71,7 +72,7 @@ async function setEnvOps() {
   if (keys.length === 0) { console.error("[villa-ops] Keine Werte vorhanden — nichts zu setzen."); process.exit(1); }
   console.log(`[villa-ops] Setze auf Service ${SERVICE_ID}: ${keys.join(", ")}`);
   const { status, ok, text } = await render(`/services/${SERVICE_ID}/env-vars`, {
-    method: "PUT",
+    method: "PATCH", // Upsert: vorhandene Keys bleiben unberuehrt (PUT wuerde alles ersetzen)
     body: JSON.stringify(keys.map((key) => ({ key, value: present[key] }))),
   });
   console.log(`[villa-ops] PUT env-vars -> HTTP ${status}${ok ? "" : `: ${text.slice(0, 300)}`}`);
