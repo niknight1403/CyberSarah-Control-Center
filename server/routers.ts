@@ -13,7 +13,6 @@ import { memoryRouter } from "./memory-router";
 import { meteringRouter } from "./metering-router";
 import { mcpRouter } from "./mcp-router";
 import { orchestratorRouter } from "./orchestrator-router";
-import { designRouter } from "./design/design-router";
 import { monetizationRouter } from "./monetization-router";
 import { crashReportingRouter, selfHealingRouter } from "./self-healing-router";
 import { projectsRouter } from "./projects-router";
@@ -23,13 +22,35 @@ import { autonomousDevRouter } from "./autonomous-dev-router";
 import { keylessSearchRouter } from "./keyless-search";
 import { secretsRouter } from "./secrets-router";
 import { wixRouter } from "./wix-router";
+import { integrationsRouter } from "./integrations-router";
+import { imageGenerationRouter } from "./image-generation-router";
+import { mediaPipelineRouter } from "./media-pipeline-router";
+import { assetPacksRouter } from "./asset-packs-router";
+import { emailRouter } from "./email-router";
+import { analyticsRouter } from "./analytics-router";
+import { externalActionsRouter } from "./external-actions-router";
 import { influencerRouter } from "./influencer-router";
-import { publicProcedure, router } from "./_core/trpc";
+import { publishingRouter } from "./publishing-router";
+import { agentsRouter } from "./agents-router";
+import { revenueRouter } from "./revenue-router";
+import { draftEngineRouter } from "./draft-engine-router";
+import { campaignBridgeRouter } from "./campaign-bridge-router";
+import { pillarsRouter } from "./pillars-router";
 import { haraRouter, saasRouter, crossSellRouter, expansionRouter, subscriptionManagementRouter, revenueTradingRouter } from "./revenue-command-router";
+import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  agents: agentsRouter,
+  revenue: revenueRouter,
+  integrations: integrationsRouter,
+  imageGeneration: imageGenerationRouter,
+  mediaPipeline: mediaPipelineRouter,
+  assetPacks: assetPacksRouter,
+  email: emailRouter,
+  analytics: analyticsRouter,
+  externalActions: externalActionsRouter,
   ops: opsRouter,
   features: featuresRouter,
   appStatus: appStatusRouter,
@@ -39,7 +60,6 @@ export const appRouter = router({
   metering: meteringRouter,
   mcp: mcpRouter,
   orchestrator: orchestratorRouter,
-  design: designRouter,
   monetization: monetizationRouter,
   selfHealing: selfHealingRouter,
   crashReporting: crashReportingRouter,
@@ -54,6 +74,10 @@ export const appRouter = router({
   secrets: secretsRouter,
   wix: wixRouter,
   influencer: influencerRouter,
+  publishing: publishingRouter,
+  draftEngine: draftEngineRouter,
+  campaignBridge: campaignBridgeRouter,
+  pillars: pillarsRouter,
   hara: haraRouter,
   saas: saasRouter,
   crossSell: crossSellRouter,
