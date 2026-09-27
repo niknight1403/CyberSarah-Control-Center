@@ -1,6 +1,6 @@
 # Sprint-Tracker 284–383
 
-**Stand:** 26.09.2026 · 2.309 Tests grün · Produktiv-Backend deployed · APK v2.5.6
+**Stand:** 27.09.2026 · CI auf main e5a456b grün · Render-App live auf älterem Commit cad99ed · letzter Release v2.6.0-apk vom 24.09.2026 · Batch 20 noch offen
 
 Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
@@ -26,7 +26,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 17 | 364–368 | ERLEDIGT | Serie I: Agent-Intelligenz (2.274 Tests grün, 291 Testdateien) |
 | 18 | 369–373 | ERLEDIGT | Serie I Rest + Abschluss (2.292 Tests grün, 296 Testdateien) |
 | 19 | 374–378 | ERLEDIGT | Serie J: Finale (2.309 Tests grün, 301 Testdateien) |
-| 20 | 379–383 | OFFEN | Serie J Rest + Abschluss-Validierung |
+| 20 | 379–383 | IN ARBEIT / RELEASE BLOCKIERT | CI grün, Live-Deploy nicht auf main, APK v2.6.0 vor Integration, Readiness fehlgeschlagen |
 
 ## Sprint-Einzelverfolgung
 
@@ -41,6 +41,11 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - [x] 364–368 — Dokumentiert in `docs/2026-09-26_SPRINTS_364-368_SERIE_I_AGENT_INTELLIGENZ.md`
 - [x] 369–373 — Dokumentiert in `docs/2026-09-26_SPRINTS_369-373_SERIE_I_ABSCHLUSS.md`
 - [x] 374–378 — Dokumentiert in `docs/2026-09-26_SPRINTS_374-378_SERIE_J_FINALE.md`
+- [ ] 379 — Live-Smoke-Skripte vorhanden; neuer main-Deploy und authentifizierter Smoke noch nicht nachgewiesen.
+- [ ] 380 — Zwei APKs und AAB zuletzt am 24.09.2026 (v2.6.0-apk); neuer Build aus integriertem main und Gerätetest fehlen.
+- [ ] 381 — v2.6.0-apk ist älter als PR #44/#47; Integrations-Release mit passenden Assets fehlt.
+- [x] 382 — Ehrliche Bilanz in `docs/2026-09-27_SPRINTS_379-383_RELEASE_EVIDENCE.md`.
+- [ ] 383 — Abschluss erst nach CI, Live-Deploy, Revenue-Readiness, Smoke, beiden APKs und Gerätetest.
 
 ## Batch-Protokoll
 
