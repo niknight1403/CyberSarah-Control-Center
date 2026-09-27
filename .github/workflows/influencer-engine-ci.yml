@@ -1,0 +1,31 @@
+name: Influencer Engine Integration Gate
+on:
+  push:
+    branches: [integration/revenue-os-live-data]
+    paths:
+      - 'lib/influencer-engine/**'
+      - 'server/influencer-router.ts'
+      - 'tests/influencer-content-engine.test.ts'
+      - '.github/workflows/influencer-engine-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: TypeScript
+        run: npm run check
+      - name: Influencer engine tests
+        run: npx vitest run tests/influencer-content-engine.test.ts
+      - name: Full tests
+        run: npm test
+      - name: Server build
+        run: npm run build
