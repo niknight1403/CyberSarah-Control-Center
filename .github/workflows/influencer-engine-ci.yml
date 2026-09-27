@@ -5,6 +5,7 @@ on:
     paths:
       - 'lib/influencer-engine/**'
       - 'server/influencer-router.ts'
+      - 'server/routers.ts'
       - 'tests/influencer-content-engine.test.ts'
       - '.github/workflows/influencer-engine-ci.yml'
   workflow_dispatch:
