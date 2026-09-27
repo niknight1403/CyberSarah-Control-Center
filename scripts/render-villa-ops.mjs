@@ -56,6 +56,13 @@ async function readOps() {
     console.log(` - ${e.key} = ${mask(e.value)}`);
   }
   console.log("[villa-ops] Wenn DATABASE_URL fehlt: Login/Villen-Speicher inaktiv (Health meldet nicht_konfiguriert).");
+  // Einzel-Key-Abfrage: die Listen-Endpoint liefert hier unzulaessig [].
+  for (const key of ["DATABASE_URL", "AGENT_ADMIN_EMAIL", "GOOGLE_CLIENT_ID", "JWT_SECRET", "OPENROUTER_API_KEY", "GOOGLE_CLIENT_SECRET"]) {
+    const r = await render(`/services/${service.id}/env-vars/${key}`);
+    const e = r.ok ? ((r.data?.[0] ?? r.data) ?? null) : null;
+    const v = e?.value;
+    console.log(` - ${key}: ${r.ok ? (v ? mask(v) : "gesetzt, Wert nicht lesbar") : `nicht gesetzt (HTTP ${r.status})`}`);
+  }
   const deps = await render(`/services/${service.id}/deploys?limit=3`);
   for (const item of deps.data || []) {
     const d = item.deploy ?? item;
