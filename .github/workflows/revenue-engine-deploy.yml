@@ -89,7 +89,12 @@ jobs:
             DOTENV_CONFIG_PATH="$target/.revenue.integration.env" REVENUE_OS_INTEGRATION_ONLY=1 pm2 start "$target/artifacts/api-server/dist/integration-server.mjs" --name cybersarah-revenue-bridge --cwd "$target" >/dev/null
           fi
           sleep 5
-          test "$(curl -s -o /dev/null -w '%{http_code}' --max-time 7 http://127.0.0.1:18741/api/healthz)" = '200'
+          health_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 7 http://127.0.0.1:18741/api/healthz || true)"
+          if [ "$health_code" != "200" ]; then
+            echo "Revenue bridge health failed: HTTP $health_code"
+            pm2 logs cybersarah-revenue-bridge --lines 35 --nostream 2>&1               | sed -E 's#(postgres(ql)?://)[^[:space:]@]+@#\1***@#g; s#(sk_(live|test)_[A-Za-z0-9_-]+)#***#g'               | tail -n 70
+            exit 1
+          fi
           pm2 save >/dev/null
           echo 'Revenue integration bridge: private loopback and DB health verified.'
           REMOTE
