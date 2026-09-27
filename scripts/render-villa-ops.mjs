@@ -4,6 +4,8 @@
  *
  * OP=read        : Services listen + Env-Vars des Villa-Services anzeigen
  * OP=set-env     : AGENTEN_VILLA_*-Werte als Env-Vars setzen + Deploy triggern
+ * OP=deploy      : Nur einen Deploy triggern (kein Env-Write) — fuer saubere
+ *                  Env-Snapshot-Tests und als Anschub nach Env-Aenderungen
  *                  (SERVICE_ID via Umgebungsvariable)
  */
 const API = "https://api.render.com/v1";
@@ -39,6 +41,13 @@ async function findVillaServiceId() {
     if ((s.name ?? "").toLowerCase().includes("villa")) return s;
   }
   return null;
+}
+
+async function deployOps() {
+  if (!SERVICE_ID) { console.error("[villa-ops] SERVICE_ID fehlt fuer deploy"); process.exit(1); }
+  const dep = await render(`/services/${SERVICE_ID}/deploys`, { method: "POST", body: JSON.stringify({}) });
+  const bodyText = await dep.text();
+  console.log(`[villa-ops] Deploy -> HTTP ${dep.status}: ${bodyText.slice(0, 120)}`);
 }
 
 async function readOps() {
@@ -119,7 +128,8 @@ async function setEnvOps() {
 
 (async () => {
   try {
-    if (OP === "read") await readOps();
+    if (OP === "deploy") await deployOps();
+  else if (OP === "read") await readOps();
     else if (OP === "set-env") await setEnvOps();
     else { console.error(`[villa-ops] Unbekannte Operation: ${OP}`); process.exit(1); }
   } catch (error) {
