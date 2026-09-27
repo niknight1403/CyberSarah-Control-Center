@@ -36,7 +36,7 @@ jobs:
           pnpm --filter @workspace/api-server run typecheck
           pnpm --filter @workspace/api-server run build:integration
           test -s artifacts/api-server/dist/integration-server.mjs
-      - name: Deploy private loopback service and test authenticated read-only access
+      - name: Deploy private loopback service with scoped DB access and authenticated API
         shell: bash
         run: |
           set -euo pipefail
