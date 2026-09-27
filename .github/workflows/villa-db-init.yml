@@ -44,4 +44,9 @@ jobs:
           RENDER_VILLA_SERVICE_ID: srv-das5th97lnhs73foc9vg
           NEON_DB_NAME: ${{ github.event.inputs.neon_db_name }}
           VILLA_DIR: ./villa
+          AGENT_ADMIN_EMAIL: ${{ secrets.AGENTEN_VILLA_AGENT_ADMIN_EMAIL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.AGENTEN_VILLA_GOOGLE_CLIENT_ID }}
+          JWT_SECRET: ${{ secrets.AGENTEN_VILLA_JWT_SECRET }}
+          OPENROUTER_API_KEY: ${{ secrets.AGENTEN_VILLA_OPENROUTER_API_KEY }}
+          GOOGLE_CLIENT_SECRET_VALUE: ${{ secrets.AGENTEN_VILLA_GOOGLE_CLIENT_SECRET }}
         run: node scripts/villa-db-init.mjs

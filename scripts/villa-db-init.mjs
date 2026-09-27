@@ -85,18 +85,33 @@ async function main() {
     await villa.end();
   }
 
-  // 4) DATABASE_URL direkt auf Render setzen und Deploy triggern
-  log("Setze DATABASE_URL auf dem Render-Service ...");
+  // 4) Volles Env-Set auf Render setzen (PUT ersetzt das Set komplett — deshalb
+  //    hier ALLE Werte, damit nichts verloren geht) und Deploy triggern.
+  //    AGENT_ADMIN_EMAIL/GOOGLE_CLIENT_ID/JWT_SECRET/OPENROUTER_API_KEY kommen
+  //    aus den AGENTEN_VILLA_*-Secrets des Workflows.
+  const extra = {
+    NODE_ENV: "production",
+    AGENT_ADMIN_EMAIL: (process.env.AGENT_ADMIN_EMAIL ?? "").trim(),
+    GOOGLE_CLIENT_ID: (process.env.GOOGLE_CLIENT_ID ?? "").trim(),
+    JWT_SECRET: (process.env.JWT_SECRET ?? "").trim(),
+    OPENROUTER_API_KEY: (process.env.OPENROUTER_API_KEY ?? "").trim(),
+    GOOGLE_CLIENT_SECRET: (process.env.GOOGLE_CLIENT_SECRET_VALUE ?? "").trim(),
+  };
+  const fullSet = Object.entries({ ...extra, DATABASE_URL: villaUrl })
+    .filter(([, v]) => v)
+    .map(([key, value]) => ({ key, value }));
+  log(`Setze vollstaendiges Env-Set auf Render (${fullSet.map((e) => e.key).join(", ")}) ...`);
   const res = await fetch(`https://api.render.com/v1/services/${SERVICE_ID}/env-vars`, {
-    method: "POST",
+    method: "PUT",
     headers: { Authorization: `Bearer ${RENDER_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify([{ key: "DATABASE_URL", value: villaUrl }]),
+    body: JSON.stringify(fullSet),
   });
   if (!res.ok) {
-    console.error(`[villa-db] Render env-var Fehler: HTTP ${res.status}`);
+    const text = (await res.text()).slice(0, 300);
+    console.error(`[villa-db] Render env-var Fehler: HTTP ${res.status}: ${text}`);
     process.exit(1);
   }
-  log("DATABASE_URL auf Render gesetzt");
+  log("Env-Set auf Render gesetzt");
 
   const dep = await fetch(`https://api.render.com/v1/services/${SERVICE_ID}/deploys`, {
     method: "POST",
