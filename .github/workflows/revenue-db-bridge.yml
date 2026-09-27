@@ -61,8 +61,8 @@ jobs:
               process.stdout.write(url);
             } catch {
               if (roleCreated) {
-              try { psql(dbname, `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${role}; REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${role}; REVOKE USAGE ON SCHEMA public FROM ${role};`); } catch {}
-              try { psql('postgres', `REVOKE CONNECT ON DATABASE "${dbname}" FROM ${role}; DROP ROLE IF EXISTS ${role};`); } catch {}
+                try { psql(dbname, `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${role}; REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${role}; REVOKE USAGE ON SCHEMA public FROM ${role};`); } catch {}
+                try { psql('postgres', `REVOKE CONNECT ON DATABASE "${dbname}" FROM ${role}; DROP ROLE IF EXISTS ${role};`); } catch {}
               }
               process.stderr.write('Bridge provisioning failed; cleanup attempted only for a role owned by this run\n'); process.exitCode=1;
             }
