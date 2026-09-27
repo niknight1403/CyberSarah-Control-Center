@@ -4,6 +4,12 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 27.09.2026 — Sprint 382: Evidenzbasierte Abschlussbilanz (Batch 20 noch offen)
+
+- PR #44 und #47 integriert; GitHub CI und Gitleaks auf main `e5a456b` erfolgreich.
+- Release-Gates 379–381 und 383 **nicht** als grün erklärt: Render-Live-Deploy älter als Integration; ältere v2.6.0-APKs ohne aktuellen Build-/Gerätenachweis; Revenue-Readiness mit Stripe TEST und OpenAI UNAVAILABLE; separater Revenue-Render-Deploy zuletzt fehlgeschlagen.
+- Verbindliche Prüfkriterien und Quellen: `docs/2026-09-27_SPRINTS_379-383_RELEASE_EVIDENCE.md`. Kein erfundener Produktions- oder Android-Test.
+
 ## 26.09.2026 — Sprints 374–378: Serie J: Finale (Batch 19)
 
 - **Sprint 374 (Volle Regression + Test-Lücken)**: Platzhalter-Sweep Audit (`lib/sprint-374-regression-logic.ts`), Abdeckungsanalyse kritischer Kernpfade (Auth, Billing, Publishing, Kampagnen, tRPC, Drafts) und automatisierte Regressions-Gesundheitsprüfungen.
