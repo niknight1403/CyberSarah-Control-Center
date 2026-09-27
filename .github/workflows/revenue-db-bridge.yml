@@ -41,14 +41,14 @@ jobs:
           const role = 'cybersarah_revenue_bridge';
           const psql = (db, sql) => cp.execFileSync('sudo',['-n','-u','postgres','psql','-X','-v','ON_ERROR_STOP=1','-Atq','-d',db], { input: sql, encoding:'utf8', stdio:['pipe','pipe','pipe'], timeout:10000 }).trim();
           const roleExists = psql('postgres', `SELECT count(*) FROM pg_roles WHERE rolname = '${role}';`);
-          if (roleExists !== '0') throw new Error('Bridge role already exists: abort to avoid rotation');
+          if (roleExists !== '0') throw new Error('Bridge role already exists: rotate it before reprovisioning to enforce current least-privilege grants');
           const tables = psql(dbname, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename IN ('hara_proposals','hara_performance','subscription_plans','customer_subscriptions','subscription_invoices','cross_sell_rules','cross_sell_recommendations','expansion_chancen');");
           if (tables !== '8') throw new Error('Revenue schema is incomplete: abort');
           const password = crypto.randomBytes(36).toString('hex');
           (async () => {
             try {
               psql('postgres', `CREATE ROLE ${role} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD '${password}'; GRANT CONNECT ON DATABASE "${dbname}" TO ${role};`);
-              psql(dbname, `GRANT USAGE ON SCHEMA public TO ${role}; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO ${role}; GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${role};`);
+              psql(dbname, `GRANT USAGE ON SCHEMA public TO ${role}; GRANT SELECT ON TABLE hara_proposals,hara_performance,subscription_plans,customer_subscriptions,subscription_invoices,cross_sell_rules,cross_sell_recommendations,expansion_chancen TO ${role};`);
               const url = `postgresql://${role}:${password}@127.0.0.1:${parsed.port || '5432'}/${encodeURIComponent(dbname)}`;
               const pool = new Pool({connectionString:url, max:1, connectionTimeoutMillis:5000});
               try { const result=await pool.query("SELECT to_regclass('public.hara_proposals') AS found"); if(!result.rows[0]?.found) throw new Error('Revenue table not readable'); }
