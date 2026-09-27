@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -90,14 +90,18 @@ const formatEur = (value: number) => new Intl.NumberFormat("de-DE", { style: "cu
 const metric = (label: string, value: string | number): [string, string] => [label, String(value)];
 
 function HaraSection() {
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => { timers.current.forEach(clearTimeout); timers.current = []; }, []);
   const q = trpc.hara.overview.useQuery(undefined, { retry: false });
   const scan = trpc.hara.scan.useMutation({
     onSuccess: (result) => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
       void q.refetch();
       if (result.background) {
-        for (const delayMs of [2500, 7000, 15000]) {
-          setTimeout(() => void q.refetch(), delayMs);
-        }
+        timers.current = [2500, 7000, 15000].map(delayMs =>
+          setTimeout(() => void q.refetch(), delayMs)
+        );
       }
     },
   });
