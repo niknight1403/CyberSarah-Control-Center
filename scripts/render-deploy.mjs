@@ -264,6 +264,7 @@ function makeAppEnvBuilder(databaseUrl) {
   // und der Server meldet ehrlich "nicht konfiguriert".
   const integrationExtra = [];
   for (const key of [
+    "STRIPE_SECRET_KEY_2",
     "ADMIN_GITHUB_TOKEN",
     "TIKTOK_CLIENT_KEY",
     "TIKTOK_CLIENT_SECRET",
