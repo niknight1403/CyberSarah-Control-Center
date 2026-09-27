@@ -47,7 +47,7 @@ export async function subscriptionsOverview() {
   const [plans, counts, invoices] = await Promise.all([
     revenueRows<{ id: number; name: string; preis: string; waehrung: string; intervall: string; trial_tage: number; aktiv: boolean }>(
       "SELECT id, name, preis, waehrung, intervall, trial_tage, aktiv FROM subscription_plans ORDER BY reihenfolge, id LIMIT 100"),
-    revenueRows<{ status: string; count: number; trial_count: number }>("SELECT status, COUNT(*)::int AS count, COUNT(*) FILTER (WHERE trial_ende > NOW())::int AS trial_count FROM customer_subscriptions GROUP BY status LIMIT 20"),
+    revenueRows<{ status: string; count: number; trial_count: number }>("SELECT status, COUNT(*)::int AS count, COUNT(*) FILTER (WHERE trial_ende > NOW() AND status IN ('aktiv', 'trial', 'trialing'))::int AS trial_count FROM customer_subscriptions GROUP BY status LIMIT 20"),
     revenueRows<{ paid_eur_7d: string; paid_eur_30d: string; paid_count: number; failed_count: number }>(
       "SELECT COALESCE(SUM(betrag) FILTER (WHERE status = 'bezahlt' AND bezahlt_am >= NOW() - INTERVAL '7 days' AND waehrung = 'EUR'), 0)::text AS paid_eur_7d, COALESCE(SUM(betrag) FILTER (WHERE status = 'bezahlt' AND bezahlt_am >= NOW() - INTERVAL '30 days' AND waehrung = 'EUR'), 0)::text AS paid_eur_30d, COUNT(*) FILTER (WHERE status = 'bezahlt' AND created_at >= NOW() - INTERVAL '30 days')::int AS paid_count, COUNT(*) FILTER (WHERE status = 'fehlgeschlagen' AND created_at >= NOW() - INTERVAL '30 days')::int AS failed_count FROM subscription_invoices"),
   ]);
