@@ -1,0 +1,35 @@
+# Sprint 112: GitLab-Spiegel — bei jedem Push auf main wird der
+# komplette Ref-Bestand (Branches + Tags) nach GitLab gespiegelt.
+# Inaktiv, bis die Secrets GITLAB_TOKEN und GITLAB_PROJECT_PATH
+# existieren (das if prueft das Token, fehlende Secrets ueberspringen den Job).
+name: GitLab Mirror
+
+on:
+  push:
+    branches: [ main ]
+    tags: ['*']
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.GITLAB_TOKEN != '' }}
+    steps:
+      - name: Repository vollstaendig auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Nach GitLab spiegeln
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_PROJECT_PATH: ${{ secrets.GITLAB_PROJECT_PATH }}
+        run: |
+          if [ -z "$GITLAB_PROJECT_PATH" ]; then
+            echo "GITLAB_PROJECT_PATH fehlt (z. B. 'niknight1403/CyberSarah-Control-Center')."
+            exit 1
+          fi
+          git remote add gitlab "https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_PROJECT_PATH}.git"
+          git push gitlab --mirror
+          echo "Spiegel-Push nach GitLab abgeschlossen: ${GITLAB_PROJECT_PATH}"
