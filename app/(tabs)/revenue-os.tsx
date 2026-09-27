@@ -91,7 +91,16 @@ const metric = (label: string, value: string | number): [string, string] => [lab
 
 function HaraSection() {
   const q = trpc.hara.overview.useQuery(undefined, { retry: false });
-  const scan = trpc.hara.scan.useMutation({ onSuccess: () => void q.refetch() });
+  const scan = trpc.hara.scan.useMutation({
+    onSuccess: (result) => {
+      void q.refetch();
+      if (result.background) {
+        for (const delayMs of [2500, 7000, 15000]) {
+          setTimeout(() => void q.refetch(), delayMs);
+        }
+      }
+    },
+  });
   return <FeatureCard accent="purple" title="HARA" subtitle="Hyper-Autonomer Revenue Agent" body="Vorschläge und Kampagnenstatus direkt aus der Revenue-Datenbank. Ein Scan wird nur auf Anforderung angestoßen." cta="HARA-Scan starten" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Daten geladen"} loading={q.isLoading || scan.isPending} error={q.error?.message ?? scan.error?.message} metrics={[metric("Chancen", q.data?.counts.proposals ?? "—"), metric("In Umsetzung", q.data?.counts.active ?? "—"), metric("Abgeschlossen", q.data?.counts.completed ?? "—")]} details={[
     ...(q.data?.proposals.slice(0, 5).map(p => `${p.titel}: ${p.status} (${p.kanal})`) ?? []),
     ...(scan.data?.accepted ? ["Scan angenommen. Ergebnis wird nach Abschluss sichtbar, kein garantierter Erfolg."] : []),
