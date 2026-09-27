@@ -70,7 +70,7 @@ async function main() {
   record("A5 billing.status ohne Login -> 401", billing401.status === 401, `http=${billing401.status}`);
 
   const ops401 = await trpcCall("ops.overview", null, null, true);
-  record("A6 ops.overview (Deep-Health) ohne Login -> 401", ops401.status === 401, `http=${ops401.status}`);
+  record("A6 ops.overview (Deep-Health) ohne Login -> 401/403 (admin-gated)", ops401.status === 401 || ops401.status === 403, `http=${ops401.status}`);
 
   const mainRouter = await trpcCall("ops.workspaceServiceUrl", null, null, true);
   const mainRouterData = unwrap(mainRouter.payload);
@@ -101,13 +101,13 @@ async function main() {
   record("B2 account.me mit Session -> admin", me?.role === "admin", `role=${me?.role}`);
 
   const deep = unwrap((await trpcCall("ops.overview", null, token, true)).payload);
-  const components = Array.isArray(deep?.components) ? deep.components : [];
-  const dbOk = components.some((c) => c.kind === "database" && c.state === "ok");
-  const neonState = components.find((c) => c.kind === "neonPostgres")?.state ?? "unbekannt";
+  const checks = Array.isArray(deep?.checks) ? deep.checks : [];
+  const dbOk = checks.some((c) => c.kind === "database" && c.state === "ok");
+  const neonState = checks.find((c) => c.kind === "neonPostgres")?.state ?? "unbekannt";
   record(
     "B3 ops.overview Deep-Health: Datenbank ok, Neon-Status gemeldet",
-    components.length > 0 && (dbOk || neonState !== "unbekannt"),
-    `components=${components.length} dbOk=${dbOk} neon=${neonState}`
+    checks.length > 0 && (dbOk || neonState !== "unbekannt"),
+    `checks=${checks.length} dbOk=${dbOk} neon=${neonState}`
   );
 
   const billing = unwrap((await trpcCall("billing.status", null, token, true)).payload);
