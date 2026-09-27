@@ -38,7 +38,7 @@ jobs:
           if (!['localhost','127.0.0.1','::1'].includes(parsed.hostname) || !['postgres:','postgresql:'].includes(parsed.protocol)) throw new Error('Expected local PostgreSQL source');
           const dbname = decodeURIComponent(parsed.pathname.slice(1));
           if (!/^[a-zA-Z0-9_-]+$/.test(dbname)) throw new Error('Unexpected database identifier');
-          const role = 'cybersarah_revenue_bridge';
+          const role = 'cybersarah_revenue_bridge_ro_v2';
           const psql = (db, sql) => cp.execFileSync('sudo',['-n','-u','postgres','psql','-X','-v','ON_ERROR_STOP=1','-Atq','-d',db], { input: sql, encoding:'utf8', stdio:['pipe','pipe','pipe'], timeout:10000 }).trim();
           const roleExists = psql('postgres', `SELECT count(*) FROM pg_roles WHERE rolname = '${role}';`);
           if (roleExists !== '0') throw new Error('Bridge role already exists: rotate it before reprovisioning to enforce current least-privilege grants');
