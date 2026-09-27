@@ -100,6 +100,7 @@ describe("Influencer Engine Sprints 1-10", () => {
       affiliateOffers: [{ name: "Test", category: "wellness", commissionPercent: 5, evidenceFit: 90, audienceFit: 90 }],
     });
     expect(plan.affiliate[0].disclosure).toContain("Werbung/Affiliate");
+    expect(plan.script.cta).toContain(plan.affiliate[0].disclosure);
     expect(plan.compliance.issues.map(issue => issue.code)).not.toContain("missing_disclosure");
     expect(plan.publishing[0].requiresReview).toBe(true);
   });

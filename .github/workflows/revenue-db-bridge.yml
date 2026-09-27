@@ -42,8 +42,8 @@ jobs:
           const psql = (db, sql) => cp.execFileSync('sudo',['-n','-u','postgres','psql','-X','-v','ON_ERROR_STOP=1','-Atq','-d',db], { input: sql, encoding:'utf8', stdio:['pipe','pipe','pipe'], timeout:10000 }).trim();
           const roleExists = psql('postgres', `SELECT count(*) FROM pg_roles WHERE rolname = '${role}';`);
           if (roleExists !== '0') throw new Error('Bridge role already exists: rotate it before reprovisioning to enforce current least-privilege grants');
-          const tables = psql(dbname, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename IN ('hara_proposals','hara_performance','subscription_plans','customer_subscriptions','subscription_invoices','cross_sell_rules','cross_sell_recommendations','expansion_chancen');");
-          if (tables !== '8') throw new Error('Revenue schema is incomplete: abort');
+          const tables = psql(dbname, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename IN ('hara_proposals','hara_performance','subscription_plans','customer_subscriptions','subscription_invoices','cross_sell_rules','cross_sell_recommendations','expansion_chancen','agents','campaigns','content','agent_logs');");
+          if (tables !== '12') throw new Error('Revenue schema is incomplete: abort');
           const password = crypto.randomBytes(36).toString('hex');
           (async () => {
             try {
@@ -54,7 +54,11 @@ jobs:
               try { const result=await pool.query("SELECT to_regclass('public.hara_proposals') AS found"); if(!result.rows[0]?.found) throw new Error('Revenue table not readable'); }
               finally { await pool.end(); }
               process.stdout.write(url);
-            } catch { process.stderr.write('Bridge provisioning or read-only validation failed\n'); process.exitCode=1; }
+            } catch {
+              try { psql(dbname, `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${role}; REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${role}; REVOKE USAGE ON SCHEMA public FROM ${role};`); } catch {}
+              try { psql('postgres', `REVOKE CONNECT ON DATABASE "${dbname}" FROM ${role}; DROP ROLE IF EXISTS ${role};`); } catch {}
+              process.stderr.write('Bridge provisioning failed; cleanup attempted\n'); process.exitCode=1;
+            }
           })();
           JS
           )
