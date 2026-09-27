@@ -1,0 +1,45 @@
+name: Villa DB Init (Neon + Render)
+
+on:
+  workflow_dispatch:
+    inputs:
+      neon_db_name:
+        description: "Name der Neon-Datenbank (default: agenten_villa)"
+        required: false
+        default: agenten_villa
+
+permissions:
+  contents: read
+
+jobs:
+  villa-db-init:
+    name: "Villa DB anlegen, migrieren, auf Render setzen"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Agenten-Villa nach ./villa auschecken
+        uses: actions/checkout@v4
+        with:
+          repository: niknight1403/Agenten-Villa
+          path: villa
+          token: ${{ secrets.AGENTEN_VILLA_GITHUB_TOKEN }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: villa/pnpm-lock.yaml
+      - name: Villa-Dependencies installieren
+        run: pnpm install --frozen-lockfile
+        working-directory: villa
+      - name: postgres-Paket fuer das Init-Skript
+        run: npm install postgres@3 --no-save
+      - name: DB anlegen, migrieren, Render setzen
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_VILLA_SERVICE_ID: srv-das5th97lnhs73foc9vg
+          NEON_DB_NAME: ${{ github.event.inputs.neon_db_name }}
+          VILLA_DIR: ./villa
+        run: node scripts/villa-db-init.mjs
