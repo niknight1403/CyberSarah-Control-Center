@@ -14,9 +14,9 @@ describe("Influencer Engine Sprints 1-10", () => {
     const high = scoreTrend({ topic: "Schlafroutine", velocity: 90, engagement: 80, saturation: 20, euRelevance: 90 });
     expect(high.opportunity).toBe("high");
     expect(rankTrends([
-      { topic: "A", velocity: 100, engagement: 100, saturation: 0, euRelevance: 100 },
-      { topic: "B", velocity: 10, engagement: 10, saturation: 100, euRelevance: 10 },
-    ])[0].topic).toBe("A");
+      { topic: "Alpha", velocity: 100, engagement: 100, saturation: 0, euRelevance: 100 },
+      { topic: "Beta", velocity: 10, engagement: 10, saturation: 100, euRelevance: 10 },
+    ])[0].topic).toBe("Alpha");
   });
 
   it("baut 15-30s Short-Blueprint mit Hook und CTA", () => {
