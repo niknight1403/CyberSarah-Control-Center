@@ -46,7 +46,7 @@ async function findVillaServiceId() {
 async function deployOps() {
   if (!SERVICE_ID) { console.error("[villa-ops] SERVICE_ID fehlt fuer deploy"); process.exit(1); }
   const dep = await render(`/services/${SERVICE_ID}/deploys`, { method: "POST", body: JSON.stringify({}) });
-  const bodyText = await dep.text();
+  const bodyText = dep.text ?? "";
   console.log(`[villa-ops] Deploy -> HTTP ${dep.status}: ${bodyText.slice(0, 120)}`);
 }
 
