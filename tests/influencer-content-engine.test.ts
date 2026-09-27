@@ -90,6 +90,18 @@ describe("Influencer Engine Sprints 1-10", () => {
     expect(plan.readyForManualReview).toBe(true);
   });
 
+  it("liefert eine explizite Affiliate-Kennzeichnung statt den Entwurf unnoetig zu blockieren", () => {
+    const plan = buildCampaignPlan({
+      topic: "Schlafhygiene", audience: "Erwachsene",
+      persona: { referenceId: "x", age: 45, presentation: "ruhig", signatureLook: "neutral" },
+      platforms: ["instagram"],
+      affiliateOffers: [{ name: "Test", category: "wellness", commissionPercent: 5, evidenceFit: 90, audienceFit: 90 }],
+    });
+    expect(plan.affiliate[0].disclosure).toContain("Werbung/Affiliate");
+    expect(plan.compliance.issues.map(issue => issue.code)).not.toContain("missing_disclosure");
+    expect(plan.publishing[0].requiresReview).toBe(true);
+  });
+
   it("blockiert Kampagnen mit problematischen Health-Claims", () => {
     const plan = buildCampaignPlan({
       topic: "Heilung garantiert",
