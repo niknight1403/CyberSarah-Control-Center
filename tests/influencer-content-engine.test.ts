@@ -44,6 +44,8 @@ describe("Influencer Engine Sprints 1-10", () => {
     expect(review.issues.map(i => i.code)).toContain("guarantee");
     expect(review.issues.map(i => i.code)).toContain("missing_disclosure");
     expect(addHealthDisclaimer("Test")).toContain("keine individuelle medizinische Beratung");
+    expect(reviewHealthCopy("100 % wirksam").issues.map(i => i.code)).toContain("guarantee");
+    expect(reviewHealthCopy("wirkt zu 100%").issues.map(i => i.code)).toContain("guarantee");
   });
 
   it("priorisiert Angebots-Fit vor Provision", () => {
