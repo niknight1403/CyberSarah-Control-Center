@@ -83,6 +83,11 @@ jobs:
           target=/opt/cybersarah-revenue-bridge
           mv "$target/integration-server.mjs" "$target/artifacts/api-server/dist/integration-server.mjs"
           chmod 600 "$target/.revenue.integration.env"
+          # PM2 behaelt sonst alte Prozessvariablen; die geschuetzte Datei wird
+          # deshalb vor --update-env explizit geladen. Werte werden nicht geloggt.
+          set -a
+          . "$target/.revenue.integration.env"
+          set +a
           if pm2 describe cybersarah-revenue-bridge >/dev/null 2>&1; then
             DOTENV_CONFIG_PATH="$target/.revenue.integration.env" REVENUE_OS_INTEGRATION_ONLY=1 pm2 restart cybersarah-revenue-bridge --update-env >/dev/null
           else
