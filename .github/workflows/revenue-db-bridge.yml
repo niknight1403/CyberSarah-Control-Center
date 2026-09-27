@@ -5,6 +5,9 @@ on:
     paths: ['.github/workflows/revenue-db-bridge.yml']
 permissions:
   contents: read
+concurrency:
+  group: revenue-db-bridge-provisioning
+  cancel-in-progress: false
 jobs:
   bridge:
     runs-on: ubuntu-latest
@@ -46,8 +49,10 @@ jobs:
           if (tables !== '12') throw new Error('Revenue schema is incomplete: abort');
           const password = crypto.randomBytes(36).toString('hex');
           (async () => {
+            let roleCreated = false;
             try {
               psql('postgres', `CREATE ROLE ${role} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD '${password}'; GRANT CONNECT ON DATABASE "${dbname}" TO ${role};`);
+              roleCreated = true;
               psql(dbname, `GRANT USAGE ON SCHEMA public TO ${role}; GRANT SELECT ON TABLE hara_proposals,hara_performance,subscription_plans,customer_subscriptions,subscription_invoices,cross_sell_rules,cross_sell_recommendations,expansion_chancen,agents,campaigns,content TO ${role}; GRANT INSERT,UPDATE,DELETE ON TABLE hara_proposals,hara_performance,expansion_chancen,agent_logs TO ${role}; GRANT UPDATE ON TABLE agents TO ${role}; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO ${role};`);
               const url = `postgresql://${role}:${password}@127.0.0.1:${parsed.port || '5432'}/${encodeURIComponent(dbname)}`;
               const pool = new Pool({connectionString:url, max:1, connectionTimeoutMillis:5000});
@@ -55,9 +60,11 @@ jobs:
               finally { await pool.end(); }
               process.stdout.write(url);
             } catch {
+              if (roleCreated) {
               try { psql(dbname, `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${role}; REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${role}; REVOKE USAGE ON SCHEMA public FROM ${role};`); } catch {}
               try { psql('postgres', `REVOKE CONNECT ON DATABASE "${dbname}" FROM ${role}; DROP ROLE IF EXISTS ${role};`); } catch {}
-              process.stderr.write('Bridge provisioning failed; cleanup attempted\n'); process.exitCode=1;
+              }
+              process.stderr.write('Bridge provisioning failed; cleanup attempted only for a role owned by this run\n'); process.exitCode=1;
             }
           })();
           JS
