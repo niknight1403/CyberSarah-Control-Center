@@ -5,7 +5,7 @@ export type ComplianceIssue = {
 
 const RULES: Array<{ code: ComplianceIssue["code"]; pattern: RegExp; message: string }> = [
   { code: "cure_claim", pattern: /\b(heilt|heilung|cures?|therapiert)\b/i, message: "Heilungsbehauptung entfernen oder evidenzbasiert und zulässig neu formulieren." },
-  { code: "guarantee", pattern: /\b(garantiert|100\s*%|wirkt immer|sicher wirksam)\b/i, message: "Garantierte Wirkung ist unzulässig bzw. irreführend." },
+  { code: "guarantee", pattern: /(\b(garantiert|wirkt immer|sicher wirksam)\b|\b100\s*%)/i, message: "Garantierte Wirkung ist unzulässig bzw. irreführend." },
   { code: "diagnosis", pattern: /\b(du hast|sie haben)\s+(diabetes|krebs|depression|adhs|bluthochdruck)\b/i, message: "Keine Diagnose aus Kurzcontent ableiten." },
   { code: "fear", pattern: /\b(gefährlich wenn du nicht|bevor es zu spät ist|vergiftet dich)\b/i, message: "Angstbasierte Gesundheitsmanipulation vermeiden." },
 ];
