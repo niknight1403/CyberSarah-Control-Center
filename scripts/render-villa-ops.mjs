@@ -71,12 +71,15 @@ async function setEnvOps() {
   const keys = Object.keys(present);
   if (keys.length === 0) { console.error("[villa-ops] Keine Werte vorhanden — nichts zu setzen."); process.exit(1); }
   console.log(`[villa-ops] Setze auf Service ${SERVICE_ID}: ${keys.join(", ")}`);
-  const { status, ok, text } = await render(`/services/${SERVICE_ID}/env-vars`, {
-    method: "PATCH", // Upsert: vorhandene Keys bleiben unberuehrt (PUT wuerde alles ersetzen)
-    body: JSON.stringify(keys.map((key) => ({ key, value: present[key] }))),
-  });
-  console.log(`[villa-ops] PUT env-vars -> HTTP ${status}${ok ? "" : `: ${text.slice(0, 300)}`}`);
-  if (!ok) process.exit(1);
+  const body = JSON.stringify(keys.map((key) => ({ key, value: present[key] })));
+  let result = await render(`/services/${SERVICE_ID}/env-vars`, { method: "POST", body });
+  if (!result.ok && result.status === 405) {
+    // Render akzeptiert je nach API-Version kein batch-POST — PUT ersetzt das
+    // komplette Set; sicher, weil die Villa hier nur per Workflow verwaltet wird.
+    result = await render(`/services/${SERVICE_ID}/env-vars`, { method: "PUT", body });
+  }
+  console.log(`[villa-ops] env-vars setzen -> HTTP ${result.status}${result.ok ? "" : `: ${result.text.slice(0, 300)}`}`);
+  if (!result.ok) process.exit(1);
   const dep = await render(`/services/${SERVICE_ID}/deploys`, { method: "POST", body: JSON.stringify({}) });
   console.log(`[villa-ops] Deploy-Trigger -> HTTP ${dep.status}${dep.ok ? " (laeuft)" : `: ${String(dep.text).slice(0, 300)}`}`);
 }
