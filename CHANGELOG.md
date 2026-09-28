@@ -4,6 +4,12 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 28.09.2026 — Sprint 381: Release v4.2.1 (Serie J — Batch 20)
+
+- **Sprint 381 (Release)**: Ehrliche Versionsnummer per `lib/release-version-logic.ts` ermittelt (hoechster bestehender Release-Tag v4.2.0 -> v4.2.1, Plan-Angabe v2.6.0 war ueberholt). Tag `v4.2.1` auf Commit a6c25a6 gesetzt, Release veroeffentlicht: https://github.com/niknight1403/CyberSarah-Control-Center/releases/tag/v4.2.1 mit Notes aus CHANGELOG + echten Commits (Serie I + Serie J, 348 Commits seit v4.2.0, 2.329 Tests in 301 Dateien).
+- **Assets**: Die drei APK/AAB-Artefakte aus Sprint 380 (v2.6.1-apk) als Release-Assets angehaengt: admin.apk 7,9 MB, dev.apk 9,3 MB, release.aab 7,7 MB.
+- **Release-Workflow**: 'CyberSarah Control Center Release' durch Tag-Push ausgeloest und gruen abgewartet.
+
 ## 28.09.2026 — Sprint 379: Staging-Smoke + Revenue-Maschinerie live verifiziert
 
 **Was real umgesetzt wurde:**
