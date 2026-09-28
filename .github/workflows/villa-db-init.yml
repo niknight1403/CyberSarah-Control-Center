@@ -24,7 +24,7 @@ jobs:
           repository: niknight1403/Agenten-Villa
           path: villa
           token: ${{ secrets.AGENTEN_VILLA_GITHUB_TOKEN }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.4.1 # CCC-Root nutzt npm; hier explizit die Villa-pnpm-Version
       - uses: actions/setup-node@v4
