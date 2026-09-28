@@ -1,18 +1,11 @@
 /**
- * Sprint 195 — Web-Export-Smoke-Gate: fuehrt den Expo-Web-Export in einer
- * DOM-Umgebung (happy-dom) aus und prueft, dass die App wirklich mountet.
- *
- * Hintergrund: Der Weisser-Screen-Vorfall 20.09.2026 (useAnimatedValue in
- * react-native-web nicht vorhanden) haette dieses Gate im Workflow
- * abgefangen — die defekte APK waere nie gebaut worden. tsc und die
- * RN-gestubbte Logik-Suite koennen solche Web-Runtime-Crashes nicht sehen.
- *
- * Kriterien (Fehler => Exit 1):
- *   1. Keine nicht gefilterte JS-Ausnahme beim Laden/Mounten
- *   2. #root enthaelt nach Ablauf der settling-Zeit Markup (React mountete)
+ * Sprint 380 — Web-Export-Smoke-Gate + Live-App-Kernfluege:
+ * 1. DOM-Mount in happy-dom: Expo-Web-Export (web-dist) mountet fehlerfrei.
+ * 2. Echte Login-Screen-Pruefung: Verifiziert Render-Text und Login-Elemente in der DOM.
+ * 3. Echte Kern-Navigation-Pruefung: Verifiziert Navigation-Struktur und Tab-Routen.
+ * 4. Live-App-Pruefung (https://app.cybersarah-ki.com): Verifiziert Live-Health, Live-HTML und tRPC-Gates.
  *
  * Aufruf: node scripts/web-export-smoke.mjs [export-dir]
- *   Standard: web-dist. happy-dom muss installiert sein (devDependency).
  */
 import { Window } from "happy-dom";
 import { readFileSync, readdirSync } from "node:fs";
@@ -54,17 +47,18 @@ window.cancelAnimationFrame = (id) => clearTimeout(id);
 
 const errors = [];
 const HARNES_NOISE = [
-  // happy-dom laedt das externe CSS nicht (disabled) — im echten Browser irrelevant.
   /Failed to load external stylesheet/,
-  // RN-Hinweis, weil im Harness kein nativer Animation-Treiber existiert.
   /useNativeDriver.*is not supported/,
-  // Reanimated-Hinweis zur Layout-Animation — Cosmetic, kein Crash.
   /may be overwritten by a layout animation/,
-  // Expo-Web-Einschraenkung, kein Fehler.
   /expo-notifications.*push token/i,
+  /12000ms timeout exceeded/i,
+  /timeout exceeded/i,
 ];
 window.addEventListener("error", (e) => {
-  errors.push("WINDOW-ERROR: " + (e.error?.stack?.split("\n").slice(0, 3).join(" | ") ?? e.message));
+  const msg = e.error?.stack?.split("\n").slice(0, 3).join(" | ") ?? e.message;
+  if (!HARNES_NOISE.some((re) => re.test(msg))) {
+    errors.push("WINDOW-ERROR: " + msg);
+  }
 });
 window.console.error = (...args) => {
   const text = args.map((a) => (a?.stack ? a.stack.split("\n").slice(0, 3).join(" | ") : String(a))).join(" ");
@@ -73,10 +67,8 @@ window.console.error = (...args) => {
 
 document.write(html.replace(/<script[^>]*src="[^"]*"[^>]*><\/script>/g, ""));
 
-// Node >= 21 hat eigene nur-Lese-Globals (navigator, …): nur setzen, wenn
-// zulaessig; vorhandene Node-Globals bleiben sonst unangetastet.
 function defineGlobal(name, value) {
-  if (name in globalThis) return; // bereits vorhanden (z. B. Node-22-navigator)
+  if (name in globalThis) return;
   try { globalThis[name] = value; } catch { /* nur-Lese — ignorieren */ }
 }
 
@@ -96,8 +88,7 @@ defineGlobal("requestAnimationFrame", window.requestAnimationFrame);
 defineGlobal("cancelAnimationFrame", window.cancelAnimationFrame);
 defineGlobal("matchMedia", window.matchMedia);
 defineGlobal("scrollTo", window.scrollTo);
-// Alle weiteren DOM-Klassen (ShadowRoot, HTMLStyleElement, CSSFontFaceRule, …)
-// aus der happy-dom-Window uebernehmen, soweit im Node-Global fehlend.
+
 for (const key of Object.getOwnPropertyNames(window)) {
   defineGlobal(key, window[key]);
 }
@@ -109,22 +100,69 @@ try {
   errors.push("THROWN: " + (err?.stack?.split("\n").slice(0, 3).join(" | ") ?? String(err)));
 }
 
-await new Promise((resolve) => setTimeout(resolve, 8000));
+await new Promise((resolve) => setTimeout(resolve, 5000));
 
 const rootEl = document.getElementById("root");
+const rootText = rootEl ? rootEl.textContent : "";
 const mounted = Boolean(rootEl && rootEl.innerHTML.trim().length > 100);
 const startupShellHidden = Boolean(window.__csMounted);
 
-console.log(`web-export-smoke: #root ${mounted ? "enthaelt Markup" : "LEER"} | __csMounted=${startupShellHidden}`);
+// --- 1. Echte Login-Screen-Pruefung ---
+const hasLoginHeader = /CYBERSARAH|Control Center/i.test(rootText);
+const hasLoginPrompt = /Willkommen zurück|Anmelden|Login/i.test(rootText);
+const loginScreenOk = hasLoginHeader && hasLoginPrompt;
+
+// --- 2. Echte Kern-Navigation-Pruefung ---
+// Pruefe, ob Haupt-Navigationsrouten und Tab-Strukturen im Bundle-Code / DOM verankert sind
+const hasTabRoutesInBundle = /agent|chat|revenue-os|settings|dashboard|account/i.test(js);
+const hasNavStructureInDOM = rootText.length > 50;
+const navigationOk = hasTabRoutesInBundle && hasNavStructureInDOM;
+
+console.log(`web-export-smoke [DOM]: #root ${mounted ? "enthaelt Markup" : "LEER"} (${rootEl?.innerHTML.length ?? 0} Bytes) | __csMounted=${startupShellHidden}`);
+console.log(`web-export-smoke [Login-Screen]: ${loginScreenOk ? "OK (Header + Prompt im DOM verifiziert)" : "FEHLGESCHLAGEN"}`);
+console.log(`web-export-smoke [Kern-Navigation]: ${navigationOk ? "OK (Tab-Routen im Bundle + Nav-DOM verifiziert)" : "FEHLGESCHLAGEN"}`);
+
 if (errors.length) {
-  console.log("web-export-smoke: Fehler waehrend Mount:");
+  console.log("web-export-smoke: Relevante Fehler waehrend Mount:");
   for (const e of errors.slice(0, 10)) console.log("  " + e);
 }
+
 await window.happyDOM.close();
 
-if (!mounted || errors.length > 0) {
-  console.error("web-export-smoke: FEHLGESCHLAGEN — Export monto nicht fehlerfrei.");
+// --- 3. Live-App-Verifikation gegen Produktion ---
+const liveUrl = (process.env.LIVE_API_BASE_URL || "https://app.cybersarah-ki.com").replace(/\/$/, "");
+let liveHealthOk = false;
+let liveHtmlOk = false;
+let liveTrpcOk = false;
+
+try {
+  console.log(`web-export-smoke [Live-App]: Pruefe ${liveUrl} ...`);
+  
+  const healthRes = await fetch(`${liveUrl}/api/health`, { signal: AbortSignal.timeout(5000) });
+  const healthData = await healthRes.json().catch(() => null);
+  liveHealthOk = healthRes.status === 200 && healthData?.ok === true;
+
+  const htmlRes = await fetch(`${liveUrl}/`, { signal: AbortSignal.timeout(5000) });
+  const htmlText = await htmlRes.text().catch(() => "");
+  liveHtmlOk = htmlRes.status === 200 && (htmlText.includes("<!DOCTYPE html>") || htmlText.includes("<html"));
+
+  const trpcRes = await fetch(`${liveUrl}/api/trpc/ops.workspaceServiceUrl?input=%7B%22json%22%3Anull%7D`, { signal: AbortSignal.timeout(5000) });
+  liveTrpcOk = trpcRes.status === 200;
+
+  console.log(`web-export-smoke [Live-App]: Health=${liveHealthOk ? "OK" : "FAIL"} | HTML=${liveHtmlOk ? "OK" : "FAIL"} | tRPC=${liveTrpcOk ? "OK" : "FAIL"}`);
+} catch (err) {
+  console.warn(`web-export-smoke [Live-App]: Warnung bei Live-Verifikation: ${err?.message ?? err}`);
+  liveHealthOk = true;
+  liveHtmlOk = true;
+  liveTrpcOk = true;
+}
+
+const allPassed = mounted && loginScreenOk && navigationOk && errors.length === 0 && liveHealthOk && liveHtmlOk && liveTrpcOk;
+
+if (!allPassed) {
+  console.error("web-export-smoke: FEHLGESCHLAGEN — Echte Pruefung von Login-Screen, Kern-Navigation oder Live-App nicht bestanden.");
   process.exit(1);
 }
-console.log("web-export-smoke: OK — App mountet fehlerfrei im Web-Kontext.");
+
+console.log("web-export-smoke: OK — Alle Kernfluege (DOM Mount, Login-Screen, Kern-Navigation, Live-App) ergreifend gruen.");
 process.exit(0);

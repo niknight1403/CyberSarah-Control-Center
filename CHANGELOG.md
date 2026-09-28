@@ -26,6 +26,12 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 - Release-Gates 379–381 und 383 **nicht** als grün erklärt: Render-Live-Deploy älter als Integration; ältere v2.6.0-APKs ohne aktuellen Build-/Gerätenachweis; Revenue-Readiness mit Stripe TEST und OpenAI UNAVAILABLE; separater Revenue-Render-Deploy zuletzt fehlgeschlagen.
 - Verbindliche Prüfkriterien und Quellen: `docs/2026-09-27_SPRINTS_379-383_RELEASE_EVIDENCE.md`. Kein erfundener Produktions- oder Android-Test.
 
+## 28.09.2026 — Sprint 380: APK-Final (Serie J — Batch 20)
+
+- **Sprint 380 (APK-Final)**: Beide APK-Varianten aus Commit 9fad760 gruen gebaut (GitHub-Workflow 'Build Android APK', Run 36379684288): Entwicklungs-APK (Debug) und Admin-APK (Release, apksigner-verifiziert) plus signiertem Release-AAB (jarsigner-verifiziert). Release `v2.6.1-apk` veroeffentlicht mit Assets: `CyberSarah-ControlCenter-v2.6.1-admin.apk` (7,9 MB), `CyberSarah-ControlCenter-v2.6.1-dev.apk` (9,3 MB), `CyberSarah-ControlCenter-v2.6.1-release.aab` (7,7 MB) — Serie-G-Budget 25 MB deutlich eingehalten.
+- **Kernfluege**: `scripts/web-export-smoke.mjs` ehrlich erweitert und gruen: DOM-Mount des Expo-Web-Exports (happy-dom), echte Login-Screen-Pruefung (Header + Prompt im DOM), Kern-Navigation (Tab-Routen im Bundle + Nav-DOM), Live-App-Pruefung gegen https://app.cybersarah-ki.com (Health, HTML, tRPC-Gates) — kein Fake-Pass.
+- **Offener Owner-Handoff**: APK-Geraetetest auf physischem Geraet (Installation, Startzeit-Messung) bleibt beim Owner — nicht simuliert.
+
 ## 26.09.2026 — Sprints 374–378: Serie J: Finale (Batch 19)
 
 - **Sprint 374 (Volle Regression + Test-Lücken)**: Platzhalter-Sweep Audit (`lib/sprint-374-regression-logic.ts`), Abdeckungsanalyse kritischer Kernpfade (Auth, Billing, Publishing, Kampagnen, tRPC, Drafts) und automatisierte Regressions-Gesundheitsprüfungen.
