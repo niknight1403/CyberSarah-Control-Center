@@ -2,7 +2,7 @@
 
 **Stand:** 28.09.2026 · CI auf main dbac629 grün (Suite 2.329 Tests) · APK-Release v2.6.1-apk vom 28.09.2026 (beide Varianten) · Batch 20: Sprints 379–380 erledigt, 381–383 offen · Live-Deploy-Abgleich gegen main in Sprint 383 zu verifizieren
 
-Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`.
+Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`. 100-Sprint-Bilanz: `docs/2026-09-28_100_SPRINT_BILANZ.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 
 | Batch | Sprints | Zustand | Notiz |
@@ -26,7 +26,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 17 | 364–368 | ERLEDIGT | Serie I: Agent-Intelligenz (2.274 Tests grün, 291 Testdateien) |
 | 18 | 369–373 | ERLEDIGT | Serie I Rest + Abschluss (2.292 Tests grün, 296 Testdateien) |
 | 19 | 374–378 | ERLEDIGT | Serie J: Finale (2.309 Tests grün, 301 Testdateien) |
-| 20 | 379–383 | 379–381 ERLEDIGT, 382–383 OFFEN | Live-Smoke 14/14 grün, APK v2.6.1 gebaut, Release v4.2.1 veröffentlicht; Live-Deploy-Abgleich in 383 offen |
+| 20 | 379–383 | 379–382 ERLEDIGT, 383 OFFEN | Live-Smoke 14/14 grün, APK v2.6.1, Release v4.2.1, 100-Sprint-Bilanz verfasst; Abschluss-Validierung offen |
 
 ## Sprint-Einzelverfolgung
 
@@ -49,6 +49,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 
 ## Batch-Protokoll
 
+- **Batch 20 (Sprint 382):** ERLEDIGT am 28.09.2026. Ehrliche 100-Sprint-Bilanz 284–381 (docs/2026-09-28_100_SPRINT_BILANZ.md, aus TRACKER verlinkt): 98/100 real, 2.329 Tests, offene Owner-Handoffs (APK-Gerätetest, Play-Store, echte Kunden/Umsatz) und Live-Deploy-Abgleich ehrlich benannt.
 - **Batch 20 (Sprint 381):** ERLEDIGT am 28.09.2026. Release v4.2.1 (Tag auf a6c25a6, ehrliche Version via release-version-logic, Plan-Zahl v2.6.0 ueberholt): Notes aus CHANGELOG + Commits (Serie I+J), 3 APK/AAB-Assets aus v2.6.1-apk angehängt, Release-Workflow grün.
 - **Batch 20 (Sprint 380):** ERLEDIGT am 28.09.2026 (Commit dbac629, CI+Gitleaks grün). APK-Final: beide APK-Varianten aus 9fad760 grün gebaut (Run 36379684288, apksigner/jarsigner verifiziert), Release v2.6.1-apk mit Assets admin.apk 7,9 MB / dev.apk 9,3 MB / release.aab 7,7 MB — Serie-G-Budget 25 MB eingehalten. Web-Export-Smoke ehrlich erweitert (Login-Screen, Kern-Navigation, Live-App Health/HTML/tRPC) und grün. Offener Owner-Handoff: APK-Gerätetest auf physischem Gerät.
 - **Batch 19 (Sprints 374–378):** ERLEDIGT am 26.09.2026. Volle Regression + Test-Lücken (Platzhalter-Audit & Kernpfade), Performance-Pass (P50/P90/P95/P99 Messung & LRU Hotpath Cache), Doku-Pass (Strukturaudit & Link-Integrität), CHANGELOG-Vollständigkeit seit 284 & Append-Integrität, Security-Final (RLS, Secrets, Rate-Limits, Compliance Report). Tests: 2.292 → 2.309 (+17), 301 Testdateien.
