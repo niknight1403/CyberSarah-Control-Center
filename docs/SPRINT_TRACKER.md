@@ -1,6 +1,6 @@
 # Sprint-Tracker 284–383
 
-**Stand:** 27.09.2026 · CI auf main e5a456b grün · Render-App live auf älterem Commit cad99ed · letzter Release v2.6.0-apk vom 24.09.2026 · Batch 20 noch offen
+**Stand:** 28.09.2026 · CI auf main dbac629 grün (Suite 2.329 Tests) · APK-Release v2.6.1-apk vom 28.09.2026 (beide Varianten) · Batch 20: Sprints 379–380 erledigt, 381–383 offen · Live-Deploy-Abgleich gegen main in Sprint 383 zu verifizieren
 
 Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
@@ -26,7 +26,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 17 | 364–368 | ERLEDIGT | Serie I: Agent-Intelligenz (2.274 Tests grün, 291 Testdateien) |
 | 18 | 369–373 | ERLEDIGT | Serie I Rest + Abschluss (2.292 Tests grün, 296 Testdateien) |
 | 19 | 374–378 | ERLEDIGT | Serie J: Finale (2.309 Tests grün, 301 Testdateien) |
-| 20 | 379–383 | IN ARBEIT / RELEASE BLOCKIERT | CI grün, Live-Deploy nicht auf main, APK v2.6.0 vor Integration, Readiness fehlgeschlagen |
+| 20 | 379–383 | 379–380 ERLEDIGT, 381–383 OFFEN | Live-Smoke 14/14 grün, APK v2.6.1 gebaut+veröffentlicht; Release-Tag + Live-Deploy-Abgleich offen (381/383) |
 
 ## Sprint-Einzelverfolgung
 
@@ -49,6 +49,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 
 ## Batch-Protokoll
 
+- **Batch 20 (Sprint 380):** ERLEDIGT am 28.09.2026 (Commit dbac629, CI+Gitleaks grün). APK-Final: beide APK-Varianten aus 9fad760 grün gebaut (Run 36379684288, apksigner/jarsigner verifiziert), Release v2.6.1-apk mit Assets admin.apk 7,9 MB / dev.apk 9,3 MB / release.aab 7,7 MB — Serie-G-Budget 25 MB eingehalten. Web-Export-Smoke ehrlich erweitert (Login-Screen, Kern-Navigation, Live-App Health/HTML/tRPC) und grün. Offener Owner-Handoff: APK-Gerätetest auf physischem Gerät.
 - **Batch 19 (Sprints 374–378):** ERLEDIGT am 26.09.2026. Volle Regression + Test-Lücken (Platzhalter-Audit & Kernpfade), Performance-Pass (P50/P90/P95/P99 Messung & LRU Hotpath Cache), Doku-Pass (Strukturaudit & Link-Integrität), CHANGELOG-Vollständigkeit seit 284 & Append-Integrität, Security-Final (RLS, Secrets, Rate-Limits, Compliance Report). Tests: 2.292 → 2.309 (+17), 301 Testdateien.
 - **Batch 18 (Sprints 369–373):** ERLEDIGT am 26.09.2026. Fortschritts-Berichte für lange Aufgaben (Prozent, Restzeit, Stalled-Erkennung), Qualitäts-Tore vor/nach Ausführung (Pre/Post-Gates), Misserfolg-Analyse & Fehlerklassifikation, Provider-Rotation v2 (Qualitäts-/Kosten-Metriken, Feature-Matching), Serie-I-Abschluss & 10-Sprint Cross-Validierung (100% grün). Tests: 2.274 → 2.292 (+18), 296 Testdateien.
 - **Batch 17 (Sprints 364–368):** ERLEDIGT am 26.09.2026. Prompt-Versionierung & A/B-Tests, Selbst-Kritik-Schritt gegen Akzeptanzkriterien, Werkzeug-Auswahlstatistik & Nie-Nutzung-Bereinigung, Gedächtnis-Konsolidierung v2 (Kategorisierung + Konfliktlösung), Aufgaben-Zerlegung in prüfbare Teilschritte. Tests: 2.252 → 2.274 (+22), 291 Testdateien.
