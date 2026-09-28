@@ -41,7 +41,7 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - [x] 364–368 — Dokumentiert in `docs/2026-09-26_SPRINTS_364-368_SERIE_I_AGENT_INTELLIGENZ.md`
 - [x] 369–373 — Dokumentiert in `docs/2026-09-26_SPRINTS_369-373_SERIE_I_ABSCHLUSS.md`
 - [x] 374–378 — Dokumentiert in `docs/2026-09-26_SPRINTS_374-378_SERIE_J_FINALE.md`
-- [ ] 379 — Live-Smoke-Skripte vorhanden; neuer main-Deploy und authentifizierter Smoke noch nicht nachgewiesen.
+- [x] 379 — Live-Smoke 14/14 gruen gegen Produktion (Health, 401-Gates, Webhook-Enforcement, Deep-Health, Billing-Status, Checkout-Gate, Draft-Queue). E2E 373 4/4.
 - [ ] 380 — Zwei APKs und AAB zuletzt am 24.09.2026 (v2.6.0-apk); neuer Build aus integriertem main und Gerätetest fehlen.
 - [ ] 381 — v2.6.0-apk ist älter als PR #44/#47; Integrations-Release mit passenden Assets fehlt.
 - [x] 382 — Ehrliche Bilanz in `docs/2026-09-27_SPRINTS_379-383_RELEASE_EVIDENCE.md`.

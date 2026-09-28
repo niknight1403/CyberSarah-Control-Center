@@ -4,6 +4,22 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 28.09.2026 — Sprint 379: Staging-Smoke + Revenue-Maschinerie live verifiziert
+
+**Was real umgesetzt wurde:**
+- Produktion-Rollout auf b6cc965 (PR #44 Revenue OS + AI Influencer Engine integriert).
+- Live-Smoke 14/14 gruen gegen https://app.cybersarah-ki.com:
+  - Unauth: Health ok, 401-Gates auf account.me/billing/campaignBridge/draftEngine, 403 auf ops.overview (admin-gated), tRPC-Router erreichbar, Stripe-Webhook weist unsignierte Events ab (400).
+  - Auth (Admin): Login→Session→Deep-Health (10 Komponenten, DB+Neon ok), Billing-Status (subscription/customerConfigured/adminGranted/tier/entitlements), Checkout-Gate (Admin erhaelt FORBIDDEN), Draft-Queue lesbar.
+- Sprint 373 E2E-Live: 4/4 PASS (Login, Session, Kampagnen-Bruecke, Draft-Queue).
+- Admin-Seeding zur Synchronisierung des produktiven Passworts (war seit 22.09. nicht mehr gelaufen).
+- Tests: 2.309 → 2.329 (+20), 304 Testdateien. tsc+build gruen. CI+Gitleaks+Deploy gruen auf b6cc965.
+
+**Ehrliche Grenzen:**
+- Keine echten Zahlungen ausgeloesst (Admin-Checkout-Gate gibt FORBIDDEN). Revenue-Maschinerie bis zur Checkout-Session-Erstellung verifiziert, nicht bis zum echten Zahlungsabschluss.
+- Draft-Queue: content=0 Eintraege (Test-Entwurf aus Sprint 373 wurde verarbeitet oder ist in anderer Gruppe).
+
+
 ## 27.09.2026 — Sprint 382: Evidenzbasierte Abschlussbilanz (Batch 20 noch offen)
 
 - PR #44 und #47 integriert; GitHub CI und Gitleaks auf main `e5a456b` erfolgreich.
