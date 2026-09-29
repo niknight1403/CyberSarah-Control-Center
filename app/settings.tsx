@@ -272,6 +272,25 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.sectionSpacer}>
+          <Text style={styles.sectionLabel}>FÄHIGKEITEN</Text>
+          <Text style={styles.sectionTitle}>Skills</Text>
+          <Text style={styles.fieldHint}>Agent-Vorschläge, Code-Diff-Prüfung und CI-Qualitätsprüfung — die Prüfläufe des Superagenten bei jedem Auftrag.</Text>
+          <TouchableOpacity
+            accessibilityLabel="Skills verwalten"
+            accessibilityRole="button"
+            activeOpacity={0.75}
+            onPress={() => router.push("/settings/skills" as never)}
+            style={[styles.providerRow, styles.skillsEntryRow]}
+          >
+            <IconSymbol name="sparkles" size={18} color={glassPalette.cyan} />
+            <View style={styles.providerText}>
+              <Text style={styles.providerLabel}>Skills verwalten</Text>
+              <Text style={styles.providerDetail}>Auswahl, Beschreibungen und Sammelaktionen — wirken sofort im Optimizer-Chat.</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={glassSurface.textMuted} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.sectionSpacer}>
           <Text style={styles.sectionLabel}>DARSTELLUNG</Text>
           <Text style={styles.sectionTitle}>Erscheinungsbild</Text>
           <Text style={styles.fieldHint}>Design: Aurora Flow — Palette, Aurora-Verlauf und Glas-Effekte sind fest eingestellt und wirken auf die gesamte App.</Text>
@@ -565,6 +584,7 @@ const styles = StyleSheet.create({
   clearActionText: { color: glassPalette.red, fontSize: 12, fontWeight: "800" },
   providerRow: { alignItems: "center", backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 11, marginBottom: 8, padding: 12 },
   providerRowSelected: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border },
+  skillsEntryRow: { marginBottom: 0 },
   radio: { alignItems: "center", borderColor: glassSurface.textSecondary, borderRadius: 10, borderWidth: 1.5, height: 20, justifyContent: "center", width: 20 },
   radioSelected: { borderColor: glassPalette.cyan },
   radioDot: { backgroundColor: glassPalette.cyan, borderRadius: 5, height: 10, width: 10 },

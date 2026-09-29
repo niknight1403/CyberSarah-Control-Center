@@ -84,6 +84,7 @@ import {
   type SkillId,
   type SkillPreferences,
 } from "@/lib/skill-preferences-logic";
+import { enabledSkillLabels } from "@/lib/skill-catalog";
 import {
   Alert,
   ActivityIndicator,
@@ -472,13 +473,7 @@ export default function AgentScreen() {
     setIsThinking(true);
     try {
       const projectContext = await readProjectContext(attachments);
-      const enabledSkills = [
-        skillPreferences.agent ? "Agent-Vorschläge" : "",
-        skillPreferences.diff ? "Code-Diff-Prüfung" : "",
-        skillPreferences.quality ? "CI-Qualitätsprüfung" : "",
-      ]
-        .filter(Boolean)
-        .join(", ");
+      const enabledSkills = enabledSkillLabels(skillPreferences);
       const projectContextText = formatProjectContext(projectContext.files);
       const contextNotice = projectContext.skipped.length
         ? `\n\nNicht übernommen: ${projectContext.skipped.join(", ")}`
@@ -1301,6 +1296,17 @@ export default function AgentScreen() {
                           />
                         </TouchableOpacity>
                       </View>
+                      <TouchableOpacity
+                        accessibilityLabel="Skills in den Einstellungen verwalten"
+                        accessibilityRole="button"
+                        activeOpacity={0.75}
+                        onPress={() => router.push("/settings/skills" as never)}
+                        style={styles.toolsManageLink}
+                      >
+                        <Text style={styles.toolsManageLinkText}>
+                          Skills in den Einstellungen verwalten ›
+                        </Text>
+                      </TouchableOpacity>
                       <View style={styles.toolStatusRow}>
                         <View style={styles.toolNameBlock}>
                           <Text style={styles.toolName}>Workspace-Service</Text>
@@ -2321,6 +2327,15 @@ function createStyles() {
     fontWeight: "900",
     letterSpacing: 1,
     marginBottom: 8,
+  },
+  toolsManageLink: {
+    marginBottom: 10,
+  },
+  toolsManageLinkText: {
+    color: glassPalette.cyan,
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "right",
   },
   toolStatusRow: {
     alignItems: "center",

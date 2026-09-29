@@ -4,6 +4,10 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 29.09.2026 — Sprint 384: Skills-Einstellungs-Seite (/settings/skills)
+
+- **Sprint 384 (Skills-Einstellungen)**: Eigene Route `app/settings/skills.tsx` zur zentralen Verwaltung der drei Superagent-Skills (Agent-Vorschläge, Code-Diff-Prüfung, CI-Qualitätsprüfung): Status-Karte mit aktivem Zähler, Einzel-Toggles mit Beschreibung und Aktiv-Status, Sammelaktionen „Alle aktivieren“/„Alle deaktivieren“ sowie Erklaerkarte zum Verhalten deaktivierter Skills. Persistenz ueber den gemeinsamen Schluessel `cybersarah.skill-preferences.v1` — dieselbe Auswahl wie die Schnell-Toggles im Optimizer-Chat, Aenderungen wirken sofort ueberall. Neue Einzelquelle `lib/skill-catalog.ts` (Label, Beschreibung, Icon, Akzent) ersetzt die hartkodierte Label-Liste im Agent-Tab (`enabledSkillLabels`); `tests/skill-catalog.test.ts` (5 deterministische Tests). Einstiegspunkte: neue FÄHIGKEITEN-Sektion auf dem Einstellungs-Screen und „Skills in den Einstellungen verwalten“-Link im Tools-Menü des Optimizer-Chats. Nav-Drawer zeigt /settings/skills korrekt als aktiv (Prefix-Resolution auf /settings). Die ausfuehrbare Agent-Skill-Registry (lib/agent-skill-registry-logic.ts) bleibt davon unberuehrt — sie verwaltet Backend-Skill-Definitionen, nicht die Chat-Praeferenzen.
+
 ## 28.09.2026 — Sprint 382: 100-Sprint-Bilanz (ehrlicher Bericht)
 
 - **Sprint 382 (100-Sprint-Bilanz)**: Ehrliche Bilanz der Sprints 284–381 in `docs/2026-09-28_100_SPRINT_BILANZ.md`: 98/100 Sprints real umgesetzt (je CI+Gitleaks grün), Tests 1.560 → 2.329 (301 Dateien), Releases v2.6.1-apk + v4.2.1, 348 Commits seit v4.2.0. Nicht erreicht / nicht agenten-machbar ehrlich benannt: kein echter Umsatz bisher (Maschinerie live verifiziert, Zahlungen brauchen echte Kunden — nicht simuliert), APK-Gerätetest und Play-Store-Einreichung als Owner-Handoffs, Live-Deploy-Abgleich in Sprint 383 offen.
