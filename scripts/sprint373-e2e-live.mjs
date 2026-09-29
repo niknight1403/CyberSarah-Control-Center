@@ -3,6 +3,8 @@
  * produktive API (keine Simulation, keine Mocks — echte Requests).
  *
  * Kette:
+ *   0. Vorbereitung: alte Test-Entwuerfe "Kampagne: Sprint-373-Live-Test"
+ *      ablehnen (draftEngine.decide), damit das Budget frei ist (selbstreinigend).
  *   1. account.login (Admin-Credentials aus GitHub-Secrets) -> role=admin?
  *   2. account.me -> Session wird erkannt?
  *   3. campaignBridge.queueFromIdeas mit EINEM Test-Brief ->
@@ -11,6 +13,8 @@
  *
  * Der Test-Entwurf bleibt als sichtbares Artefakt pending — der Owner kann
  * ihn freigeben oder ablehnen; veroeffentlicht wird hier nichts.
+ * Vor jedem neuen Lauf werden bisherige Test-Entwuerfe abgelehnt, damit das
+ * Budget-Limit (DRAFT_MAX_PENDING_PER_KIND) den Test nicht blockiert.
  *
  * Gecallt von .github/workflows/diagnose-admin.yml (input: sprint373-e2e-live).
  */
@@ -21,6 +25,8 @@ const password = process.env.ADMIN_PASSWORD ?? "";
 if (!API_BASE || !email || !password) {
   throw new Error("LIVE_API_BASE_URL, ADMIN_EMAIL und ADMIN_PASSWORD muessen gesetzt sein.");
 }
+
+const TEST_DRAFT_TITLE = "Kampagne: Sprint-373-Live-Test";
 
 const results = [];
 
@@ -43,6 +49,25 @@ function unwrap(payload) {
   return first?.result?.data?.json ?? first?.result?.data ?? first?.result ?? first?.error ?? first;
 }
 
+async function cleanupOldTestDrafts(token) {
+  const queue = unwrap(await trpcCall("draftEngine.queue", null, token, true));
+  const pending = queue?.pending ?? [];
+  let cleaned = 0;
+  for (const group of pending) {
+    if (group.kind === "content") {
+      for (const item of group.items ?? []) {
+        if (item.title === TEST_DRAFT_TITLE && item.status === "pending") {
+          const r = unwrap(await trpcCall("draftEngine.decide", { id: item.id, action: "reject" }, token));
+          if (r?.ok) cleaned++;
+          else console.log(`  WARNUNG: Cleanup id=${item.id} fehlgeschlagen: ${JSON.stringify(r).slice(0, 100)}`);
+        }
+      }
+    }
+  }
+  if (cleaned > 0) console.log(`  Cleanup: ${cleaned} alte(n) Test-Entwurf/Entwuerfe abgelehnt.`);
+  return cleaned;
+}
+
 async function main() {
   // 1. Login mit produktivem Admin-Konto (echt, kein Stub).
   const login = unwrap(await trpcCall("account.login", { email, password }));
@@ -56,6 +81,9 @@ async function main() {
   const me = unwrap(await trpcCall("account.me", null, token, true));
   results.push({ step: "account.me -> Session erkannt", ok: me?.role === "admin", detail: `role=${me?.role}` });
 
+  // Vorbereitung: alte Test-Entwuerfe ablehnen, damit Budget frei ist.
+  await cleanupOldTestDrafts(token);
+
   // 3. Kampagnen-Bruecke: EIN Test-Brief durch die echte Pipeline.
   const brief = {
     ideaId: `live-test-${Date.now()}`,
@@ -64,7 +92,7 @@ async function main() {
     platform: "x",
     goal: "aufmerksamkeit",
     topic: "Ehrlicher Live-Test der Sprint-373-Kampagnenbruecke: autonome Integration von Ideen ins Influencer-Marketing",
-    draftTitle: "Kampagne: Sprint-373-Live-Test",
+    draftTitle: TEST_DRAFT_TITLE,
   };
   const bridge = unwrap(await trpcCall("campaignBridge.queueFromIdeas", { briefs: [brief] }, token));
   const queued = bridge?.result?.queued ?? 0;
@@ -78,7 +106,7 @@ async function main() {
   // 4. Freigabe-Queue: Entwurf sichtbar und pending (HITL bleibt gewahrt)?
   const queue = unwrap(await trpcCall("draftEngine.queue", null, token, true));
   const pendingContent = (queue?.pending ?? []).find((group) => group.kind === "content");
-  const match = (pendingContent?.items ?? []).some((item) => item.title === "Kampagne: Sprint-373-Live-Test" && item.status === "pending");
+  const match = (pendingContent?.items ?? []).some((item) => item.title === TEST_DRAFT_TITLE && item.status === "pending");
   results.push({
     step: "draftEngine.queue -> Test-Entwurf pending sichtbar",
     ok: match,
