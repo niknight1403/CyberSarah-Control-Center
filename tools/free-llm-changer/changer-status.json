@@ -1,17 +1,17 @@
 {
-  "stand": "2026-09-30T15:32:16",
+  "stand": "2026-09-30T15:34:32",
   "aktiv": "groq",
   "aktiv_name": "Groq Free Tier",
   "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "meta-llama/llama-prompt-guard-2-86m",
+  "modell": "qwen/qwen3.8-27b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 -)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 models/gemini-2.5-flash)"
     },
     {
       "id": "gemini-backup",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 -)"
+      "status": "KEY UNGUELTIG (KEYUNGUELTIG -) — Secret erneuern"
     },
     {
       "id": "groq",
