@@ -1,9 +1,9 @@
 {
-  "stand": "2026-09-30T15:46:41",
-  "aktiv": null,
-  "aktiv_name": null,
-  "endpunkt": null,
-  "modell": null,
+  "stand": "2026-09-30T15:49:00",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "openai/gpt-oss-120b",
   "anbieter": [
     {
       "id": "gemini",
@@ -15,7 +15,7 @@
     },
     {
       "id": "groq",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (400 canopylabs/orpheus-arabic-saudi)"
+      "status": "VERFUEGBAR"
     },
     {
       "id": "openrouter",
