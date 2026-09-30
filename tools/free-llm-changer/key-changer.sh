@@ -14,7 +14,7 @@ STATUS_FILE="$KIT_DIR/changer-status.json"
 ONLY_PROBE="${CHANGER_ONLY_PROBE:-false}"
 
 # Waehlt aus einer Live-Modellliste das bevorzugte (Registry) oder erste Modell.
-pick_model() { # $1=models-json $2=prefs (pipe-getrennt)
+pick_model() { # $1=models-json $2=prefs (pipe-getrennt) $3=max_kandidaten
   python3 -c "
 import json, sys
 try:
@@ -27,12 +27,12 @@ import re
 chat_ids = [i for i in ids if not re.search(
     r'guard|embed|whisper|tts|rerank|moderat|safety|tokeniz|vision', i, re.I)]
 prefs = [p for p in sys.argv[2].split('|') if p]
-for p in prefs:
-    if p in chat_ids:
-        print(p); break
-else:
-    if chat_ids:
-        print(chat_ids[0])
+try:
+    limit = int(sys.argv[3])
+except Exception:
+    limit = 1
+ordered = [p for p in prefs if p in chat_ids] + [i for i in chat_ids if i not in prefs]
+print('\n'.join(ordered[:limit]))
 " "$1" "$2"
 }
 
@@ -50,20 +50,27 @@ probe_chat() { # $1=base_url $2=key $3=prefs -> "OK <modell>" | "<status> <model
     fi
     return
   fi
-  chosen="$(pick_model "$models_json" "$prefs")"
-  if [[ -z "$chosen" ]]; then
+  candidates="$(pick_model "$models_json" "$prefs" 5)"
+  if [[ -z "$candidates" ]]; then
     echo "404 -"
     return
   fi
-  status=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' \
-    "${base%/}/chat/completions" \
-    -H "Authorization: Bearer ${key}" -H "Content-Type: application/json" \
-    -d "{\"model\":\"${chosen}\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" 2>/dev/null || true)
-  if [[ "${status:-000}" == "200" ]]; then
-    echo "OK $chosen"
-  else
-    echo "${status:-000} $chosen"
-  fi
+  # Bis zu 5 Kandidaten durchprobieren: nicht jedes Projekt serve jedes Modell
+  # (OpenHands-Doku: projektbezogene 404s sind bei Gemini real).
+  status="000"; chosen=""
+  while IFS= read -r cand; do
+    [[ -z "$cand" ]] && continue
+    chosen="$cand"
+    status=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' \
+      "${base%/}/chat/completions" \
+      -H "Authorization: Bearer ${key}" -H "Content-Type: application/json" \
+      -d "{\"model\":\"${cand}\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" 2>/dev/null || true)
+    if [[ "${status:-000}" == "200" ]]; then
+      echo "OK $cand"
+      return
+    fi
+  done <<< "$candidates"
+  echo "${status:-000} $chosen"
 }
 
 probe_ollama() {
