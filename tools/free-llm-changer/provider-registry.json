@@ -1,0 +1,97 @@
+{
+  "stand": "2026-09-30",
+  "hinweis": "Alle Anbieter haben kostenlose Kontingente, die sich aendern koennen. Der Changer rotiert automatisch weiter, sobald ein Limit greift.",
+  "anbieter": [
+    {
+      "id": "gemini",
+      "name": "Google Gemini Free Tier (Hauptkey)",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta-openai/",
+      "env_key": "GEMINI_API_KEY",
+      "kostenlose_modelle": [
+        "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro"
+      ],
+      "limit_hinweis": "Free Tier: Anfragen pro Minute/Tag je Modell, komplette Nutzung gratis",
+      "key_beantragen": "https://aistudio.google.com/apikey"
+    },
+    {
+      "id": "gemini-backup",
+      "name": "Google Gemini Free Tier (Backup-Key)",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta-openai/",
+      "env_key": "GEMINI_BACKUP_KEY",
+      "kostenlose_modelle": [
+        "gemini-2.0-flash",
+        "gemini-2.5-flash"
+      ],
+      "limit_hinweis": "Zweiter Gratis-Key als Reserve, wenn der Hauptkey sein Tageslimit erreicht",
+      "key_beantragen": "https://aistudio.google.com/apikey"
+    },
+    {
+      "id": "groq",
+      "name": "Groq Free Tier",
+      "base_url": "https://api.groq.com/openai/v1",
+      "env_key": "GROQ_API_KEY",
+      "kostenlose_modelle": [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "deepseek-r1-distill-llama-70b"
+      ],
+      "limit_hinweis": "Gratis, mit Tages- und RPM-Limiten; sehr schnell",
+      "key_beantragen": "https://console.groq.com/keys"
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter (Kostenlos-Modelle)",
+      "base_url": "https://openrouter.ai/api/v1",
+      "env_key": "OPENROUTER_API_KEY",
+      "kostenlose_modelle": [
+        "deepseek/deepseek-chat-v3.1:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemini-2.0-flash-exp:free",
+        "qwen/qwen3-coder:free"
+      ],
+      "limit_hinweis": "Modelle mit ':free' kosten nichts, RPM/Tag begrenzt",
+      "key_beantragen": "https://openrouter.ai/keys",
+      "note_secret": "OPENROUTER_API_KEY fehlt noch als Secret (optional: AGENTEN_VILLA_OPENROUTER_API_KEY duplizieren)"
+    },
+    {
+      "id": "cerebras",
+      "name": "Cerebras Free Tier",
+      "base_url": "https://api.cerebras.ai/v1",
+      "env_key": "CEREBRAS_API_KEY",
+      "kostenlose_modelle": [
+        "llama-3.3-70b",
+        "llama3.1-8b"
+      ],
+      "limit_hinweis": "Gratis-Tier mit Tageslimit, extrem schnell",
+      "key_beantragen": "https://cloud.cerebras.ai"
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral La Plateforme Free Tier",
+      "base_url": "https://api.mistral.ai/v1",
+      "env_key": "MISTRAL_API_KEY",
+      "kostenlose_modelle": [
+        "mistral-small-latest",
+        "open-mistral-nemo"
+      ],
+      "limit_hinweis": "Experiment-Tier gratis mit Tageslimit",
+      "key_beantragen": "https://console.mistral.ai/api-keys"
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama lokal (unbegrenzt, ohne Key)",
+      "base_url": "http://127.0.0.1:11434/v1",
+      "env_key": null,
+      "kostenlose_modelle": [
+        "qwen3-coder",
+        "llama3.3",
+        "deepseek-coder-v2"
+      ],
+      "limit_hinweis": "Komplett gratis und unbegrenzt: laeuft auf deinem Rechner, kein API-Key noetig. Diese Route ist der Never-Fail-Fallback.",
+      "key_beantragen": "https://ollama.com/download"
+    }
+  ],
+  "betrieb": "GitHub-Actions-Workflow (.github/workflows/free-llm-changer.yml) prueft alle 30 Min die Secrets und rotiert autonom."
+}
