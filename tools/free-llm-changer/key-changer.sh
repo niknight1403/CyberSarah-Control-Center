@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# OpenHands/Agent Canvas — Free-Tier Key-Changer
-# Prueft alle konfigurierten kostenlosen Anbieter, schaltet den ersten
-# verfuegbaren als aktive Anbindung und rotiert bei einem Limit (429/Quota)
-# automatisch auf den naechsten weiter. Ollama ist der Never-Fail-Fallback.
+# Free-Tier Key-Changer — autonome Rotation ueber alle kostenlosen LLM-Anbieter.
+#
+# Sprint 202c: Dynamische Modell-Discovery. Der Changer fragt je Anbieter live
+# GET /models ab und waehlt das erste verfuegbare Modell (bevorzugt aus der
+# Registry). Modell-Rueckzuege des Anbieters koennen den Changer daher nicht
+# mehr lahmlegen; nur echte Erreichbarkeits-/Limit-Zustaende zaehlen.
 
 set -euo pipefail
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,26 +13,56 @@ OUT_ENV="$KIT_DIR/aktive-anbindung.env"
 STATUS_FILE="$KIT_DIR/changer-status.json"
 ONLY_PROBE="${CHANGER_ONLY_PROBE:-false}"
 
-probe_chat() { # $1=base_url $2=key $3=model -> "ok" | HTTP-Status
-  local status
+# Waehlt aus einer Live-Modellliste das bevorzugte (Registry) oder erste Modell.
+pick_model() { # $1=models-json $2=prefs (pipe-getrennt)
+  python3 -c "
+import json, sys
+try:
+    ids = [m.get('id','') for m in json.loads(sys.argv[1]).get('data', [])]
+except Exception:
+    ids = []
+ids = [i for i in ids if i]
+prefs = [p for p in sys.argv[2].split('|') if p]
+for p in prefs:
+    if p in ids:
+        print(p); break
+else:
+    if ids:
+        print(ids[0])
+" "$1" "$2"
+}
+
+probe_chat() { # $1=base_url $2=key $3=prefs -> "OK <modell>" | "<status> <modell>"
+  local base="$1" key="$2" prefs="$3"
+  local models_json status chosen
+  models_json=$(curl -sS -m 15 "${base%/}/models" -H "Authorization: Bearer ${key}" 2>/dev/null || true)
+  chosen="$(pick_model "$models_json" "$prefs")"
+  if [[ -z "$chosen" ]]; then
+    echo "404 -"
+    return
+  fi
   status=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' \
-    "${1%/}/chat/completions" \
-    -H "Authorization: Bearer ${2}" -H "Content-Type: application/json" \
-    -d "{\"model\":\"${3}\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" 2>/dev/null || true)
-  [[ "$status" == "200" ]] && echo "ok" || echo "${status:-000}"
+    "${base%/}/chat/completions" \
+    -H "Authorization: Bearer ${key}" -H "Content-Type: application/json" \
+    -d "{\"model\":\"${chosen}\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" 2>/dev/null || true)
+  if [[ "${status:-000}" == "200" ]]; then
+    echo "OK $chosen"
+  else
+    echo "${status:-000} $chosen"
+  fi
 }
 
 probe_ollama() {
   local status
   status=$(curl -sS -m 5 -o /dev/null -w '%{http_code}' "${1%/}/models" 2>/dev/null || true)
-  [[ "$status" == "200" ]] && echo "ok" || echo "${status:-000}"
+  [[ "${status:-000}" == "200" ]] && echo "OK lokal" || echo "${status:-000} -"
 }
 
-echo "== Free-Tier Key-Changer: pruefe alle Anbieter =="
+echo "== Free-Tier Key-Changer: pruefe alle Anbieter (dynamische Modell-Discovery) =="
 results=()
 winner_id="" ; winner_name="" ; winner_base="" ; winner_model="" ; winner_key=""
 
-while IFS=$'\t' read -r id name base_url env_key first_model; do
+while IFS=$'\t' read -r id name base_url env_key first_model prefs; do
   [[ -z "$id" ]] && continue
   verdict="FEHLT"
   key=""
@@ -38,28 +70,31 @@ while IFS=$'\t' read -r id name base_url env_key first_model; do
   if [[ "$id" == "ollama" ]]; then
     verdict="$(probe_ollama "$base_url")"
   elif [[ -n "$key" ]]; then
-    verdict="$(probe_chat "$base_url" "$key" "$first_model")"
+    verdict="$(probe_chat "$base_url" "$key" "$prefs")"
   fi
+  verdict_model="${verdict#* }"
   case "$verdict" in
-    ok) verdict="VERFUEGBAR"
-        if [[ -z "$winner_id" ]]; then
-          winner_id="$id"; winner_name="$name"; winner_base="$base_url"
-          winner_model="$first_model"; winner_key="$key"
-        fi ;;
-    429|402) verdict="LIMIT ERREICHT ($verdict) — Changer rotiert weiter" ;;
+    OK*) verdict="VERFUEGBAR"
+         if [[ -z "$winner_id" ]]; then
+           winner_id="$id"; winner_name="$name"; winner_base="$base_url"
+           winner_model="$verdict_model"; winner_key="$key"
+         fi ;;
+    429*|402*) verdict="LIMIT ERREICHT ($verdict) — Changer rotiert weiter" ;;
+    401*|403*) verdict="KEY UNGUELTIG ($verdict)" ;;
     *) verdict="NICHT KONFIGURIERT/ERREICHBAR ($verdict)" ;;
   esac
-  printf '  [%-10s] %-38s -> %s\n' "$id" "$name" "$verdict"
+  printf '  [%-13s] %-38s -> %s\n' "$id" "$name" "$verdict"
   results+=("$id|$verdict")
 done < <(python3 -c "
 import json
 for a in json.load(open('$REGISTRY'))['anbieter']:
     print('\t'.join([a['id'], a['name'], a['base_url'], a['env_key'] or '-',
-                      (a['kostenlose_modelle'] or [''])[0]]))
+                      (a['kostenlose_modelle'] or [''])[0],
+                      '|'.join(a['kostenlose_modelle'] or [])]))
 ")
 
 # Never-Fail-Fallback: Ollama lokal, immer gratis, unbegrenzt, ohne Key.
-if [[ -z "$winner_id" ]] && [[ "$(probe_ollama http://127.0.0.1:11434/v1)" == "ok" ]]; then
+if [[ -z "$winner_id" ]] && [[ "$(probe_ollama http://127.0.0.1:11434/v1)" == "OK"* ]]; then
   winner_id="ollama"; winner_name="Ollama lokal (unbegrenzt, gratis)"
   winner_base="http://127.0.0.1:11434/v1"; winner_model="qwen3-coder"; winner_key=""
 fi
@@ -98,5 +133,5 @@ ENVEOF
 echo ""
 echo "== Aktiv geschaltet: $winner_name =="
 echo "   Endpunkt: $winner_base"
-echo "   Modell:   $winner_model"
+echo "   Modell:   $winner_model (dynamisch ermittelt)"
 echo "   ENV-Datei: $OUT_ENV"
