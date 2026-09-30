@@ -1,9 +1,9 @@
 {
-  "stand": "2026-09-30T15:36:44",
+  "stand": "2026-09-30T15:38:56",
   "aktiv": "groq",
   "aktiv_name": "Groq Free Tier",
   "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-20b",
+  "modell": "qwen/qwen3.8-27b",
   "anbieter": [
     {
       "id": "gemini",
