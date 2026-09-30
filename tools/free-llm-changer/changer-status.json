@@ -1,25 +1,25 @@
 {
-  "stand": "2026-09-30T15:51:08",
-  "aktiv": null,
-  "aktiv_name": null,
-  "endpunkt": null,
-  "modell": null,
+  "stand": "2026-09-30T15:53:17",
+  "aktiv": "gemini",
+  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
+  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
+  "modell": "gemma-4-26b-a4b-it",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
+      "status": "VERFUEGBAR"
     },
     {
       "id": "gemini-backup",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
-    },
-    {
-      "id": "groq",
       "status": "KEY UNGUELTIG (KEYUNGUELTIG -) — Secret erneuern"
     },
     {
+      "id": "groq",
+      "status": "VERFUEGBAR"
+    },
+    {
       "id": "openrouter",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 -)"
+      "status": "LIMIT ERREICHT (429 dots-studio/dots-3-note-preview:free) — Changer rotiert weiter"
     },
     {
       "id": "cerebras",
