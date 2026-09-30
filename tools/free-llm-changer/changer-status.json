@@ -1,21 +1,21 @@
 {
-  "stand": "2026-09-30T15:49:00",
-  "aktiv": "groq",
-  "aktiv_name": "Groq Free Tier",
-  "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-120b",
+  "stand": "2026-09-30T15:51:08",
+  "aktiv": null,
+  "aktiv_name": null,
+  "endpunkt": null,
+  "modell": null,
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 gemini-2.5-pro)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
     },
     {
       "id": "gemini-backup",
-      "status": "KEY UNGUELTIG (KEYUNGUELTIG -) — Secret erneuern"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
     },
     {
       "id": "groq",
-      "status": "VERFUEGBAR"
+      "status": "KEY UNGUELTIG (KEYUNGUELTIG -) — Secret erneuern"
     },
     {
       "id": "openrouter",

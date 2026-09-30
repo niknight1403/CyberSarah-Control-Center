@@ -14,30 +14,10 @@ STATUS_FILE="$KIT_DIR/changer-status.json"
 ONLY_PROBE="${CHANGER_ONLY_PROBE:-false}"
 
 # Waehlt aus einer Live-Modellliste das bevorzugte (Registry) oder erste Modell.
-pick_model() { # $1=models-json $2=prefs (pipe-getrennt) $3=max_kandidaten
-  python3 -c "
-import json, sys
-try:
-    ids = [m.get('id','') for m in json.loads(sys.argv[1]).get('data', [])]
-except Exception:
-    ids = []
-# Geminis OpenAI-Schicht listet IDs mit "models/"-Praefix — normalisieren.
-ids = [i.removeprefix('models/') for i in ids if i]
-import re
-junk = r'guard|embed|whisper|tts|rerank|moderat|safety|tokeniz|vision|orpheus|playai|aura|sora|flux|image'
-good = r'llama|qwen|gpt-oss|gemma|deepseek|kimi|glm|ministral|mistral|phi|falcon|starling'
-chat_ids = [i for i in ids if not re.search(junk, i, re.I)]
-# Bekannte Chat-Familien nach vorne sortieren (Anbieter listen oft Spezial-
-# modelle zuerst: ohne Ranking wuerde der Changer TTS/Embed-Derivate pingen).
-chat_ids = sorted(chat_ids, key=lambda i: 0 if re.search(good, i, re.I) else 1)
-prefs = [p for p in sys.argv[2].split('|') if p]
-try:
-    limit = int(sys.argv[3])
-except Exception:
-    limit = 1
-ordered = [p for p in prefs if p in chat_ids] + [i for i in chat_ids if i not in prefs]
-print('\n'.join(ordered[:limit]))
-" "$1" "$2"
+pick_model() { # $1=models-json $2=prefs $3=max_kandidaten — JSON via stdin
+  # WICHTIG: grosse Modelllisten (OpenRouter ~750 KB) ueberschreiten Linux'
+  # MAX_ARG_STRLEN von 128 KB pro Argument — daher stdin, nie argv.
+  printf '%s' "$1" | python3 "$KIT_DIR/pick_model.py" - "$2" "${3:-5}"
 }
 
 probe_chat() { # $1=base_url $2=key $3=prefs -> "OK <modell>" | "<status> <modell>"
