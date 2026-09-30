@@ -1,37 +1,44 @@
 {
-  "stand": "2026-09-30T15:53:17",
-  "aktiv": "gemini",
-  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
-  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemma-4-26b-a4b-it",
+  "stand": "2026-09-30T16:03:47",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "openai/gpt-oss-120b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "VERFUEGBAR"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "modell": "500 gemma-4-31b-it"
     },
     {
       "id": "gemini-backup",
-      "status": "KEY UNGUELTIG (KEYUNGUELTIG -) — Secret erneuern"
+      "status": "KEY UNGUELTIG",
+      "modell": "KEYUNGUELTIG -) — Secret erneuern"
     },
     {
       "id": "groq",
-      "status": "VERFUEGBAR"
+      "status": "VERFUEGBAR",
+      "modell": "openai/gpt-oss-120b"
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT (429 dots-studio/dots-3-note-preview:free) — Changer rotiert weiter"
+      "status": "LIMIT ERREICHT",
+      "modell": "429 dots-studio/dots-3-note-preview:free) — Changer rotiert weiter"
     },
     {
       "id": "cerebras",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "modell": "FEHLT"
     },
     {
       "id": "mistral",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "modell": "FEHLT"
     },
     {
       "id": "ollama",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (000 -)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "modell": "000 -"
     }
   ]
 }
