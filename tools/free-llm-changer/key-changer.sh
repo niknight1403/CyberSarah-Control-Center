@@ -22,20 +22,33 @@ try:
 except Exception:
     ids = []
 ids = [i for i in ids if i]
+import re
+chat_ids = [i for i in ids if not re.search(
+    r'guard|embed|whisper|tts|rerank|moderat|safety|tokeniz|vision', i, re.I)]
 prefs = [p for p in sys.argv[2].split('|') if p]
 for p in prefs:
-    if p in ids:
+    if p in chat_ids:
         print(p); break
 else:
-    if ids:
-        print(ids[0])
+    if chat_ids:
+        print(chat_ids[0])
 " "$1" "$2"
 }
 
 probe_chat() { # $1=base_url $2=key $3=prefs -> "OK <modell>" | "<status> <modell>"
   local base="$1" key="$2" prefs="$3"
-  local models_json status chosen
+  local models_json status chosen mstatus
   models_json=$(curl -sS -m 15 "${base%/}/models" -H "Authorization: Bearer ${key}" 2>/dev/null || true)
+  mstatus=$(printf '%s' "$models_json" | head -c 200 | grep -q '"error"' && echo "err" || echo "ok")
+  if [[ "$mstatus" == "err" ]]; then
+    # Anbieter meldet Fehler auf /models: haeufig 401/403 (Key ungueltig) oder leer.
+    if printf '%s' "$models_json" | grep -qi 'invalid\|unauthorized\|api key'; then
+      echo "KEYUNGUELTIG -"
+    else
+      echo "404 -"
+    fi
+    return
+  fi
   chosen="$(pick_model "$models_json" "$prefs")"
   if [[ -z "$chosen" ]]; then
     echo "404 -"
@@ -80,6 +93,7 @@ while IFS=$'\t' read -r id name base_url env_key first_model prefs; do
            winner_model="$verdict_model"; winner_key="$key"
          fi ;;
     429*|402*) verdict="LIMIT ERREICHT ($verdict) — Changer rotiert weiter" ;;
+    KEYUNGUELTIG*) verdict="KEY UNGUELTIG ($verdict) — Secret erneuern" ;;
     401*|403*) verdict="KEY UNGUELTIG ($verdict)" ;;
     *) verdict="NICHT KONFIGURIERT/ERREICHBAR ($verdict)" ;;
   esac

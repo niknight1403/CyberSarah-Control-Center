@@ -5,12 +5,12 @@
     {
       "id": "gemini",
       "name": "Google Gemini Free Tier (Hauptkey)",
-      "base_url": "https://generativelanguage.googleapis.com/v1beta-openai/",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
       "env_key": "GEMINI_API_KEY",
       "kostenlose_modelle": [
-        "gemini-2.0-flash",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro"
+        "gemini-2.5-pro",
+        "gemini-flash-latest",
+        "gemini-2.5-flash"
       ],
       "limit_hinweis": "Free Tier: Anfragen pro Minute/Tag je Modell, komplette Nutzung gratis",
       "key_beantragen": "https://aistudio.google.com/apikey"
@@ -18,10 +18,11 @@
     {
       "id": "gemini-backup",
       "name": "Google Gemini Free Tier (Backup-Key)",
-      "base_url": "https://generativelanguage.googleapis.com/v1beta-openai/",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
       "env_key": "GEMINI_BACKUP_KEY",
       "kostenlose_modelle": [
-        "gemini-2.0-flash",
+        "gemini-2.5-pro",
+        "gemini-flash-latest",
         "gemini-2.5-flash"
       ],
       "limit_hinweis": "Zweiter Gratis-Key als Reserve, wenn der Hauptkey sein Tageslimit erreicht",
