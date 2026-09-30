@@ -24,8 +24,12 @@ except Exception:
 # Geminis OpenAI-Schicht listet IDs mit "models/"-Praefix — normalisieren.
 ids = [i.removeprefix('models/') for i in ids if i]
 import re
-chat_ids = [i for i in ids if not re.search(
-    r'guard|embed|whisper|tts|rerank|moderat|safety|tokeniz|vision', i, re.I)]
+junk = r'guard|embed|whisper|tts|rerank|moderat|safety|tokeniz|vision|orpheus|playai|aura|sora|flux|image'
+good = r'llama|qwen|gpt-oss|gemma|deepseek|kimi|glm|ministral|mistral|phi|falcon|starling'
+chat_ids = [i for i in ids if not re.search(junk, i, re.I)]
+# Bekannte Chat-Familien nach vorne sortieren (Anbieter listen oft Spezial-
+# modelle zuerst: ohne Ranking wuerde der Changer TTS/Embed-Derivate pingen).
+chat_ids = sorted(chat_ids, key=lambda i: 0 if re.search(good, i, re.I) else 1)
 prefs = [p for p in sys.argv[2].split('|') if p]
 try:
     limit = int(sys.argv[3])
