@@ -1,9 +1,9 @@
 {
-  "stand": "2026-09-30T15:38:56",
-  "aktiv": "groq",
-  "aktiv_name": "Groq Free Tier",
-  "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "qwen/qwen3.8-27b",
+  "stand": "2026-09-30T15:46:41",
+  "aktiv": null,
+  "aktiv_name": null,
+  "endpunkt": null,
+  "modell": null,
   "anbieter": [
     {
       "id": "gemini",
@@ -15,7 +15,7 @@
     },
     {
       "id": "groq",
-      "status": "VERFUEGBAR"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (400 canopylabs/orpheus-arabic-saudi)"
     },
     {
       "id": "openrouter",
