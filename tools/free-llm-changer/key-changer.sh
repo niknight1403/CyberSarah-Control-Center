@@ -78,8 +78,10 @@ while IFS=$'\t' read -r id name base_url env_key first_model prefs; do
     verdict="$(probe_chat "$base_url" "$key" "$prefs")"
   fi
   verdict_model="${verdict#* }"
+  provider_model=""
+  if [[ "$verdict_model" != "-" ]]; then provider_model="$verdict_model"; fi
   case "$verdict" in
-    OK*) verdict="VERFUEGBAR"
+    OK*) verdict="VERFUEGBAR ($verdict_model)"
          if [[ -z "$winner_id" ]]; then
            winner_id="$id"; winner_name="$name"; winner_base="$base_url"
            winner_model="$verdict_model"; winner_key="$key"
@@ -108,11 +110,17 @@ fi
 python3 - "$STATUS_FILE" "$winner_id" "$winner_name" "$winner_base" "$winner_model" "${results[@]}" <<'PY'
 import datetime, json, sys
 path, winner_id, wname, wbase, wmodel, *res = sys.argv[1:]
+anbieter = []
+for r in res:
+    rid, rstatus = r.split("|", 1)
+    status, _, rmodel = rstatus.partition(" (")
+    rmodel = rmodel.rstrip(")") if rmodel else None
+    anbieter.append({"id": rid, "status": status or rstatus,
+                     "modell": rmodel or None})
 json.dump({"stand": datetime.datetime.now().isoformat(timespec="seconds"),
            "aktiv": winner_id or None, "aktiv_name": wname or None,
            "endpunkt": wbase or None, "modell": wmodel or None,
-           "anbieter": [dict(zip(("id", "status"), r.split("|", 1)))
-                        for r in res if "|" in r]},
+           "anbieter": anbieter},
           open(path, "w"), indent=2, ensure_ascii=False)
 PY
 
