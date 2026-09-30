@@ -26,6 +26,60 @@ export type ManagedModelSource =
   | "local-ollama"
   | "local-lmstudio";
 
+/**
+ * Sprint 385 — Modellfrische der Gratis-Kette.
+ *
+ * Anbieter ziehen Modelle regelmaessig zurueck (OpenRouter deaktivierte
+ * llama-3.3-70b-instruct:free; Groq rotiert gpt-oss-Tiere). Auto-aufgeloeste
+ * Modelle werden deshalb als geordnete Kandidatenliste geliefert: invokeLLM
+ * probiert bei 404/400 (Modell-Ruhestand) den naechsten Kandidaten desselben
+ * Endpoints, bevor die Provider-Kette weiterschaltet.
+ *
+ * Beide Listen am 30.09.2026 gegen die Live-Modelllisten verifiziert
+ * (tools/free-llm-changer/changer-status.json).
+ */
+export const OPENROUTER_FREE_MODEL_CANDIDATES = [
+  "qwen/qwen3.8-27b:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "inclusionai/ling-3.0-flash-sante:free",
+  "liquid/lfm-2.5-2.6b:free",
+  "nvidia/nemotron-3.5-lightning:free",
+] as const;
+
+export const GROQ_MODEL_CANDIDATES = [
+  "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b",
+  "qwen/qwen3.8-27b",
+] as const;
+
+/** Geordnete Kandidaten je Source; ENV-Override fuehrt als einziger Kandidat. */
+export function resolveManagedModelCandidates(
+  source: ManagedModelSource,
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  const override =
+    source === "openrouter"
+      ? env.AI_OPENROUTER_MODEL?.trim()
+      : source === "groq"
+        ? env.AI_GROQ_MODEL?.trim()
+        : source === "gemini"
+          ? env.AI_GEMINI_MODEL?.trim()
+          : undefined;
+  if (override) return [override];
+  switch (source) {
+    case "openrouter":
+      return [...OPENROUTER_FREE_MODEL_CANDIDATES];
+    case "groq":
+      return [...GROQ_MODEL_CANDIDATES];
+    case "gemini":
+      // Google-Alias: routet serverseitig immer auf ein aktuelles Flash-Modell.
+      return ["gemini-flash-latest"];
+    default:
+      return [resolveManagedModel(undefined, source, env)];
+  }
+}
+
 export function resolveManagedModel(
   requestedModel: string | undefined,
   source: ManagedModelSource,
@@ -58,8 +112,10 @@ export function resolveManagedModel(
   }
 
   if (source === "openrouter") {
-    // OpenRouter Free-Tier-Modell (kostenlos, ENV ueberschreibbar).
-    return env.AI_OPENROUTER_MODEL?.trim() || "meta-llama/llama-3.3-70b-instruct:free";
+    // Sprint 385 — Modellfrische: altes Default (llama-3.3-70b-instruct:free)
+    // wurde von OpenRouter zurueckgezogen; erster Kandidat der am
+    // 30.09.2026 live verifizierten Gratis-Liste.
+    return env.AI_OPENROUTER_MODEL?.trim() || OPENROUTER_FREE_MODEL_CANDIDATES[0];
   }
 
   const candidates = [

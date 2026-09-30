@@ -166,7 +166,7 @@ describe(
     expect(calls[0].url).toContain("api.groq.com");
     expect(calls[0].body.model).toBe("openai/gpt-oss-20b");
     expect(calls[1].url).toContain("openrouter.ai");
-    expect(calls[1].body.model).toBe("meta-llama/llama-3.3-70b-instruct:free");
+    expect(calls[1].body.model).toBe("qwen/qwen3.8-27b:free"); // Sprint 385: live verifizierter Free-Tier-Kandidat
     expect(calls.every((call) => !call.url.includes("api.openai.com"))).toBe(true);
   });
 

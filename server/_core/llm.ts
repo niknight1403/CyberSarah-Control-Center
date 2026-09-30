@@ -12,7 +12,7 @@ import {
 // kein Import-Zyklus zum Agenten selbst.
 import { getRouteRotationPrimary } from "./route-rotation-state";
 import { isProviderQuarantined } from "../../lib/live-fix-logic";
-import { resolveManagedModel } from "../../lib/managed-model-logic";
+import { resolveManagedModel, resolveManagedModelCandidates } from "../../lib/managed-model-logic";
 import {
   createKeyPoolEntry,
   recordKeyObservation,
@@ -670,10 +670,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   for (const endpoint of ordered) {
     // Sprint 85: model ist Pflicht und muss zum jeweiligen Endpoint passen
     // (Gemini-Endpoint → Gemini-Modell, Forge/OpenAI → OpenAI-Modell).
-    const attemptPayload = {
-      ...payload,
-      model: model ?? resolveManagedModel(undefined, endpoint.source),
-    };
+    // Sprint 385: Auto-aufgeloeste Modelle kommen als geordnete Kandidaten;
+    // bei 404/400 (Modell-Ruhestand) wird der naechste Kandidat desselben
+    // Endpoints probiert, bevor die Provider-Kette weiterschaltet.
+    const candidateModels = model ? [model] : resolveManagedModelCandidates(endpoint.source);
+    for (let modelIdx = 0; modelIdx < candidateModels.length; modelIdx += 1) {
+      const attemptPayload = {
+        ...payload,
+        model: candidateModels[modelIdx],
+      };
+      const isLastModelCandidate = modelIdx === candidateModels.length - 1;
     const startedAt = Date.now();
     try {
       const response = await fetchWithBackoff(endpoint.url, {
@@ -700,6 +706,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         } else {
           recordPoolObservation(endpoint.source, { latencyMs });
         }
+        // Sprint 385 — Modell-Ruhestand: 404/400 mit auto-aufgeloestem
+        // Modell → naechsten Modell-Kandidaten probieren (gleicher Endpoint,
+        // gleicher Key, kein Provider-Failover noetig).
+        if ((response.status === 404 || response.status === 400) && !isLastModelCandidate) {
+          continue;
+        }
         // Sprint 115: Failover auf den naechsten Kandidaten protokollieren.
         recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
         // Sprint 196: Telegram-Warnung bei Limit-/Auth-Failover (dedupliziert, never-throw).
@@ -711,18 +723,19 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
             `HTTP ${response.status} bei ${endpoint.source}. Rotiert automatisch auf die naechste Route.`,
           );
         }
-        continue;
+        break;
       }
       recordPoolObservation(endpoint.source, { latencyMs });
       recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
       runQuotaWarningCheck();
       return (await response.json()) as InvokeResult;
-    } catch (error) {
-      lastError = error;
-      attempts.push({ source: endpoint.source, httpStatus: null, message: error instanceof Error ? error.message : String(error) });
-      recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
-      recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
-      continue;
+      } catch (error) {
+        lastError = error;
+        attempts.push({ source: endpoint.source, httpStatus: null, message: error instanceof Error ? error.message : String(error) });
+        recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
+        recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
+        break;
+      }
     }
   }
 

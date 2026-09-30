@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveManagedModel } from "../lib/managed-model-logic";
+import {
+  GROQ_MODEL_CANDIDATES,
+  OPENROUTER_FREE_MODEL_CANDIDATES,
+  resolveManagedModel,
+  resolveManagedModelCandidates,
+} from "../lib/managed-model-logic";
 
 describe("resolveManagedModel (Sprint 85)", () => {
   it("bevorzugt das explizit angeforderte Modell unabhaengig vom Endpoint", () => {
@@ -35,11 +40,25 @@ describe("resolveManagedModel (Sprint 85)", () => {
     expect(resolveManagedModel(undefined, "groq", { AI_GROQ_MODEL: "openai/gpt-oss-120b" })).toBe("openai/gpt-oss-120b");
   });
 
-  it("Sprint 108: nutzt fuer OpenRouter-Endpoints ein Free-Tier-Modell", () => {
-    expect(resolveManagedModel(undefined, "openrouter", {})).toBe("meta-llama/llama-3.3-70b-instruct:free");
+  it("Sprint 108/385: nutzt fuer OpenRouter-Endpoints ein live verifiziertes Free-Tier-Modell", () => {
+    // Sprint 385: das alte Default (llama-3.3-70b-instruct:free) wurde von
+    // OpenRouter zurueckgezogen; erster Kandidat ist die neue Nummer eins.
+    expect(resolveManagedModel(undefined, "openrouter", {})).toBe(OPENROUTER_FREE_MODEL_CANDIDATES[0]);
+    expect(OPENROUTER_FREE_MODEL_CANDIDATES).not.toContain("meta-llama/llama-3.3-70b-instruct:free");
     expect(
       resolveManagedModel(undefined, "openrouter", { AI_OPENROUTER_MODEL: "google/gemma-3-27b-it:free" }),
     ).toBe("google/gemma-3-27b-it:free");
+  });
+
+  it("Sprint 385: liefert geordnete Modell-Kandidaten je Source (ENV-Override fuehrt solo)", () => {
+    expect(resolveManagedModelCandidates("openrouter", {})).toEqual([...OPENROUTER_FREE_MODEL_CANDIDATES]);
+    expect(resolveManagedModelCandidates("openrouter", { AI_OPENROUTER_MODEL: "x:free" })).toEqual(["x:free"]);
+    expect(resolveManagedModelCandidates("groq", {})).toEqual([...GROQ_MODEL_CANDIDATES]);
+    expect(resolveManagedModelCandidates("groq", { AI_GROQ_MODEL: "groq-custom" })).toEqual(["groq-custom"]);
+    expect(resolveManagedModelCandidates("gemini", {})).toEqual(["gemini-flash-latest"]);
+    expect(resolveManagedModelCandidates("gemini", { AI_GEMINI_MODEL: "gemini-2.5-pro" })).toEqual(["gemini-2.5-pro"]);
+    expect(resolveManagedModelCandidates("openai", { AI_MANAGED_MODEL: "managed-a" })).toEqual(["managed-a"]);
+    expect(resolveManagedModelCandidates("openai", {})).toEqual(["gpt-4o-mini"]);
   });
 
   it("liefert gpt-4o-mini, wenn weder Anforderung noch ENV ein Modell liefern", () => {
