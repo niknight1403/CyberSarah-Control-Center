@@ -1,25 +1,25 @@
 {
-  "stand": "2026-09-30T15:29:51",
-  "aktiv": null,
-  "aktiv_name": null,
-  "endpunkt": null,
-  "modell": null,
+  "stand": "2026-09-30T15:32:16",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "meta-llama/llama-prompt-guard-2-86m",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 -)"
     },
     {
       "id": "gemini-backup",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 -)"
     },
     {
       "id": "groq",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+      "status": "VERFUEGBAR"
     },
     {
       "id": "openrouter",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 -)"
     },
     {
       "id": "cerebras",
@@ -31,7 +31,7 @@
     },
     {
       "id": "ollama",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (000)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (000 -)"
     }
   ]
 }
