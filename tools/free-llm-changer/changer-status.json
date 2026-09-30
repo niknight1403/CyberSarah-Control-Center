@@ -1,0 +1,37 @@
+{
+  "stand": "2026-09-30T15:29:51",
+  "aktiv": null,
+  "aktiv_name": null,
+  "endpunkt": null,
+  "modell": null,
+  "anbieter": [
+    {
+      "id": "gemini",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+    },
+    {
+      "id": "gemini-backup",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+    },
+    {
+      "id": "groq",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+    },
+    {
+      "id": "openrouter",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404)"
+    },
+    {
+      "id": "cerebras",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
+    },
+    {
+      "id": "mistral",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (FEHLT)"
+    },
+    {
+      "id": "ollama",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (000)"
+    }
+  ]
+}
