@@ -21,7 +21,8 @@ try:
     ids = [m.get('id','') for m in json.loads(sys.argv[1]).get('data', [])]
 except Exception:
     ids = []
-ids = [i for i in ids if i]
+# Geminis OpenAI-Schicht listet IDs mit "models/"-Praefix — normalisieren.
+ids = [i.removeprefix('models/') for i in ids if i]
 import re
 chat_ids = [i for i in ids if not re.search(
     r'guard|embed|whisper|tts|rerank|moderat|safety|tokeniz|vision', i, re.I)]
