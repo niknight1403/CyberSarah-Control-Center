@@ -1,13 +1,13 @@
 {
-  "stand": "2026-09-30T15:34:32",
+  "stand": "2026-09-30T15:36:44",
   "aktiv": "groq",
   "aktiv_name": "Groq Free Tier",
   "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "qwen/qwen3.8-27b",
+  "modell": "openai/gpt-oss-20b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 models/gemini-2.5-flash)"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR (404 gemini-2.5-pro)"
     },
     {
       "id": "gemini-backup",
