@@ -4,6 +4,31 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 30.09.2026 — Sprint 383: Abschluss-Validierung alles grün (Serie J — Batch 20)
+
+**Validierungsergebnisse (alle belegt):**
+
+| Komponente | Status | Beleg |
+|---|---|---|
+| Suite | grün | 2.331 passed, 3 skipped (2.334) in 305 Dateien (CI aad9cfc) |
+| tsc --noEmit | grün | CI aad9cfc, tsc-Schritt erfolgreich |
+| npm run build | grün | CI aad9cfc, AUDIT_MESSAGE bestätigt |
+| CI | grün | CyberSarah Control Center CI: completed/success (aad9cfc) |
+| Gitleaks | grün | Gitleaks Secret Scan: completed/success (aad9cfc) |
+| Render-Deploy | grün | CyberSarah Deploy & Sync Secrets: completed/success (aad9cfc) |
+| Live-Health | grün | {ok:true} HTTP 200 (app.cybersarah-ki.com) |
+| E2E 373 live | grün | Diagnose Admin-Rollen 4/4 PASS (Login, Session, Kampagnen-Brücke, Draft-Queue) |
+| Uptime-Wächter | grün | completed/success (aad9cfc) |
+| APK-Builds | grün | v2.6.1-apk (Sprint 380): admin.apk 7,9 MB, dev.apk 9,3 MB, release.aab 7,7 MB, signiert |
+| Release | grün | v4.2.1 veröffentlicht mit APK-Assets (Sprint 381) |
+
+**Revenue-Fazit (ehrlich):** Bisher kein echter Umsatz. Die Revenue-Maschinerie ist live verifiziert (Pricing → Upgrade → Checkout-Gate → Stripe-Webhook-Enforcement → Entitlements), aber es wurden keine echten Zahlungen ausgelöst und keine echten Kunden akquiriert. Echter Umsatz entsteht erst mit echten Nutzern — nicht simuliert.
+
+**Offene Owner-Handoffs:**
+- APK-Gerätetest auf physischem Gerät (admin.apk / dev.apk aus Release v4.2.1).
+- Play-Store-Einreichung gemäß docs/PLAY_STORE_SUBMISSION_GUIDE.md.
+- Echte Kunden und erster echter Umsatz (Funnel: Ideen → Kampagnen-Brücke → Freigabe → Publishing ist live; HITL-Freigabe beim Owner).
+
 ## 29.09.2026 — Sprint 384: Skills-Einstellungs-Seite (/settings/skills)
 
 - **Sprint 384 (Skills-Einstellungen)**: Eigene Route `app/settings/skills.tsx` zur zentralen Verwaltung der drei Superagent-Skills (Agent-Vorschläge, Code-Diff-Prüfung, CI-Qualitätsprüfung): Status-Karte mit aktivem Zähler, Einzel-Toggles mit Beschreibung und Aktiv-Status, Sammelaktionen „Alle aktivieren“/„Alle deaktivieren“ sowie Erklaerkarte zum Verhalten deaktivierter Skills. Persistenz ueber den gemeinsamen Schluessel `cybersarah.skill-preferences.v1` — dieselbe Auswahl wie die Schnell-Toggles im Optimizer-Chat, Aenderungen wirken sofort ueberall. Neue Einzelquelle `lib/skill-catalog.ts` (Label, Beschreibung, Icon, Akzent) ersetzt die hartkodierte Label-Liste im Agent-Tab (`enabledSkillLabels`); `tests/skill-catalog.test.ts` (5 deterministische Tests). Einstiegspunkte: neue FÄHIGKEITEN-Sektion auf dem Einstellungs-Screen und „Skills in den Einstellungen verwalten“-Link im Tools-Menü des Optimizer-Chats. Nav-Drawer zeigt /settings/skills korrekt als aktiv (Prefix-Resolution auf /settings). Die ausfuehrbare Agent-Skill-Registry (lib/agent-skill-registry-logic.ts) bleibt davon unberuehrt — sie verwaltet Backend-Skill-Definitionen, nicht die Chat-Praeferenzen.
