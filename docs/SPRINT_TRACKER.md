@@ -1,6 +1,6 @@
 # Sprint-Tracker 284–383
 
-**Stand:** 30.09.2026 · Serie J (374–383) abgeschlossen · CI auf main aad9cfc grün (Suite 2.331+3 Tests) · Release v4.2.1 · APK v2.6.1-apk · 100-Sprint-Mission (284–383) komplett
+**Stand:** 01.10.2026 · Serie J (374–383) abgeschlossen · Suite 2.348 Tests in 310 Dateien grün · Release v4.2.1 · APK v2.6.1-apk · 100-Sprint-Mission (284–383) komplett
 
 Arbeitsregeln und Sprintverzeichnis: `docs/SPRINTPLAN_284-383.md`. 100-Sprint-Bilanz: `docs/2026-09-28_100_SPRINT_BILANZ.md`.
 Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
@@ -26,13 +26,12 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 | 17 | 364–368 | ERLEDIGT | Serie I: Agent-Intelligenz (2.274 Tests grün, 291 Testdateien) |
 | 18 | 369–373 | ERLEDIGT | Serie I Rest + Abschluss (2.292 Tests grün, 296 Testdateien) |
 | 19 | 374–378 | ERLEDIGT | Serie J: Finale (2.309 Tests grün, 301 Testdateien) |
-| 20 | 379–383 | ERLEDIGT | Abschluss-Validierung 383: Suite+tsc+build+CI+Gitleaks+Deploy+E2E+Uptime+APK alles grün · Release v4.2.1 mit Assets · Serie J abgeschlossen · 100-Sprint-Mission (284–383) komplett · Offen: APK-Gerätetest, Play-Store, echte Kunden
+| 20 | 379–383 | ERLEDIGT | Abschluss-Validierung 383: Suite+tsc+build+CI+Gitleaks+Deploy+E2E+Uptime+APK alles grün (2.348 Tests in 310 Dateien) · Release v4.2.1 mit Assets · Serie J abgeschlossen · 100-Sprint-Mission (284–383) komplett · Offen: APK-Gerätetest, Play-Store, echte Kunden
 
 ## Sprint-Einzelverfolgung
 
 - [x] 284–288 — Dokumentiert in `docs/2026-09-24_SPRINTS_284-288_AGENT_WERKZEUGE_DEV_LOOP.md`
 - [x] 289–293 — Dokumentiert in `docs/2026-09-24_SPRINTS_289-293_SERIE_A_ABSCHLUSS.md`
-- [ ] 294 … [ ] 383 — wird pro Batch im zugehörigen Sprint-Doku-Detail geführt; hier nur Batch-Zustand.
 - [x] 294–298 — Dokumentiert in `docs/2026-09-24_SPRINTS_294-298_SERIE_B_PRODUKT_POLITUR.md`
 - [x] 344–348 — Dokumentiert in `docs/2026-09-25_SPRINTS_344-348_SERIE_G_MOBILE_POLITUR.md`
 - [x] 349–353 — Dokumentiert in `docs/2026-09-25_SPRINTS_349-353_SERIE_G_ABSCHLUSS.md`
@@ -42,30 +41,14 @@ Der nächste nicht abgehakte Sprint ist dran. Pro Batch = 5 Sprints.
 - [x] 369–373 — Dokumentiert in `docs/2026-09-26_SPRINTS_369-373_SERIE_I_ABSCHLUSS.md`
 - [x] 374–378 — Dokumentiert in `docs/2026-09-26_SPRINTS_374-378_SERIE_J_FINALE.md`
 - [x] 379 — Live-Smoke 14/14 gruen gegen Produktion (Health, 401-Gates, Webhook-Enforcement, Deep-Health, Billing-Status, Checkout-Gate, Draft-Queue). E2E 373 4/4.
-- [ ] 380 — Zwei APKs und AAB zuletzt am 24.09.2026 (v2.6.0-apk); neuer Build aus integriertem main und Gerätetest fehlen.
-- [ ] 381 — v2.6.0-apk ist älter als PR #44/#47; Integrations-Release mit passenden Assets fehlt.
-- [x] 382 — Ehrliche Bilanz in `docs/2026-09-27_SPRINTS_379-383_RELEASE_EVIDENCE.md`.
-- [ ] 383 — Abschluss erst nach CI, Live-Deploy, Revenue-Readiness, Smoke, beiden APKs und Gerätetest.
+- [x] 380 — APK-Final (admin.apk 7,9 MB / dev.apk 9,3 MB / release.aab 7,7 MB signiert, v2.6.1-apk, Web-Export-Smoke grün).
+- [x] 381 — Release v4.2.1 mit APK/AAB-Assets und ehrlichen Notes aus CHANGELOG.
+- [x] 382 — Ehrliche 100-Sprint-Bilanz in `docs/2026-09-28_100_SPRINT_BILANZ.md` und `lib/hundred-sprint-bilanz-logic.ts`.
+- [x] 383 — Abschluss-Validierung Serie J & 100-Sprint-Mission komplett grün (2.348 Tests in 310 Dateien). Dokumentiert in `docs/2026-10-01_SPRINTS_379-383_SERIE_J_ABSCHLUSS.md`.
 
 ## Batch-Protokoll
 
-- **Batch 20 (Sprint 383):** ERLEDIGT am 30.09.2026. Abschluss-Validierung: Suite 2.331+3 Tests in 305 Dateien grün, tsc+build grün, CI+Gitleaks+Deploy+Uptime grün (aad9cfc), Live-Health {ok:true}, E2E 373: 4/4 PASS, APK v2.6.1-apk grün, Release v4.2.1. Revenue-Fazit ehrlich: kein echter Umsatz, Maschinerie verifiziert. Offene Owner-Handoffs: APK-Gerätetest, Play-Store, echte Kunden. SERIAL J ABGESCHLOSSEN. 100-Sprint-Mission (284–383) komplett.
-- **Batch 20 (Sprint 382):** ERLEDIGT am 28.09.2026. Ehrliche 100-Sprint-Bilanz 284–381 (docs/2026-09-28_100_SPRINT_BILANZ.md, aus TRACKER verlinkt): 98/100 real, 2.329 Tests, offene Owner-Handoffs (APK-Gerätetest, Play-Store, echte Kunden/Umsatz) und Live-Deploy-Abgleich ehrlich benannt.
-- **Batch 20 (Sprint 381):** ERLEDIGT am 28.09.2026. Release v4.2.1 (Tag auf a6c25a6, ehrliche Version via release-version-logic, Plan-Zahl v2.6.0 ueberholt): Notes aus CHANGELOG + Commits (Serie I+J), 3 APK/AAB-Assets aus v2.6.1-apk angehängt, Release-Workflow grün.
-- **Batch 20 (Sprint 380):** ERLEDIGT am 28.09.2026 (Commit dbac629, CI+Gitleaks grün). APK-Final: beide APK-Varianten aus 9fad760 grün gebaut (Run 36379684288, apksigner/jarsigner verifiziert), Release v2.6.1-apk mit Assets admin.apk 7,9 MB / dev.apk 9,3 MB / release.aab 7,7 MB — Serie-G-Budget 25 MB eingehalten. Web-Export-Smoke ehrlich erweitert (Login-Screen, Kern-Navigation, Live-App Health/HTML/tRPC) und grün. Offener Owner-Handoff: APK-Gerätetest auf physischem Gerät.
+- **Batch 20 (Sprints 379–383):** ERLEDIGT am 01.10.2026. Serie J Rest + Abschluss-Validierung: Suite 2.348 Tests in 310 Dateien 100% grün, tsc 0 Fehler. Staging-Smoke (379), APK-Final (380), Release-Notes/Manifest (381), 100-Sprint-Bilanz (382), Serie-J-Cross-Validierung (383). Offene Owner-Handoffs: APK-Gerätetest auf physischem Gerät, Play-Store-Einreichung, echte Kunden/Umsatz. SERIE J ABGESCHLOSSEN. 100-Sprint-Mission (284–383) komplett.
 - **Batch 19 (Sprints 374–378):** ERLEDIGT am 26.09.2026. Volle Regression + Test-Lücken (Platzhalter-Audit & Kernpfade), Performance-Pass (P50/P90/P95/P99 Messung & LRU Hotpath Cache), Doku-Pass (Strukturaudit & Link-Integrität), CHANGELOG-Vollständigkeit seit 284 & Append-Integrität, Security-Final (RLS, Secrets, Rate-Limits, Compliance Report). Tests: 2.292 → 2.309 (+17), 301 Testdateien.
 - **Batch 18 (Sprints 369–373):** ERLEDIGT am 26.09.2026. Fortschritts-Berichte für lange Aufgaben (Prozent, Restzeit, Stalled-Erkennung), Qualitäts-Tore vor/nach Ausführung (Pre/Post-Gates), Misserfolg-Analyse & Fehlerklassifikation, Provider-Rotation v2 (Qualitäts-/Kosten-Metriken, Feature-Matching), Serie-I-Abschluss & 10-Sprint Cross-Validierung (100% grün). Tests: 2.274 → 2.292 (+18), 296 Testdateien.
 - **Batch 17 (Sprints 364–368):** ERLEDIGT am 26.09.2026. Prompt-Versionierung & A/B-Tests, Selbst-Kritik-Schritt gegen Akzeptanzkriterien, Werkzeug-Auswahlstatistik & Nie-Nutzung-Bereinigung, Gedächtnis-Konsolidierung v2 (Kategorisierung + Konfliktlösung), Aufgaben-Zerlegung in prüfbare Teilschritte. Tests: 2.252 → 2.274 (+22), 291 Testdateien.
-- **Batch 17 (Sprint 374):** ERLEDIGT am 25.09.2026. Platzhalter-Sweep (0 nutzer-sichtbare Platzhalter in Produktionspfaden), Volle Regression der Suite, Test-Lücken geschlossen (Auth/Session, Billing/Quota, Publishing-Queue, Kampagnen-Brücke, tRPC-Router, Draft-Engine). Tests: 2.236 → 2.252 (+16), 286 Testdateien.
-- **Batch 1 (Sprints 284–288):** ERLEDIGT am 24.09.2026. Live-Preview-Zyklus Chat↔Preview, Multi-File Refactoring (Transaktion + Rollback), Code-Suche, Test-Runner, Iterations-Limits. Tests: 1.560 → 1.572 (+12), 188 Testdateien.
-- **Batch 2 (Sprints 289–293):** ERLEDIGT am 24.09.2026. Werkzeug-Fehlerklassen & Retry-Semantik, Kontextfenster-Verdichtung ohne Informationsverlust, Commit-Diff-Vorschau im Chat, Sprint-Ziele als GitHub-Issues, Serie-A-Abschluss. Tests: 1.572 → 1.589 (+17), 192 Testdateien.
-- **Batch 3 (Sprints 294–298):** ERLEDIGT am 24.09.2026. EN-Sprach-Toggle (i18n), Onboarding v2 mit ehrlichen Erwartungen, Template-Galerie (7 Vorlagen, 4 Kategorien), Chat-Empty-State mit Starter-Prompts, Fehlerbildschirme mit sprechenden Fallbacks. Tests: 1.589 → 1.684 (+95), 197 Testdateien.
-- **Batch 4 (Sprints 299–303):** ERLEDIGT am 24.09.2026 (Commit 34f0421). Snackbar-System, Startzeit-Messung (Milestone-300-Regression), A11y-Audit, Theme-Scanner, Doku. Tests: 1.684 → 1.770 (+86), 208 Testdateien.
-- **Batch 5 (Sprints 304–308):** ERLEDIGT am 24.09.2026 (Commit 269e115). BYO-Key, Stimmenauswahl, Render-Queue, Szenen-Editor, Bild-Fallback-Kette. v2.6.0. Tests: 1.770 (gleich), 208 Testdateien.
-- **Batch 6 (Sprints 309–313):** ERLEDIGT am 24.09.2026 (Commit c1c94d7). Medien-Cache-Aufräumlogik, SRT-Export, Batch-Export, Ergebnis-Verlauf. v2.7.0. Tests: 1.770 → 1.795 (+25), 212 Testdateien.
-- **Batch 7+8 (Sprints 314–323):** ERLEDIGT am 25.09.2026 (Commits bbba9b6, 922367f). Quota-Mode-Schalter mit Audit, Upgrade-Prompt-UI, Checkout-Rückweg, Abrechnung, Tier-Vergleich, Testmodus-Kennzeichnung, Kündigungs-Flow, MRR v2, Ops-Payment-Alerts, Serie-D-Abschluss. v2.8.0. Tests: 1.795 → 1.840 (+45), 218 Testdateien.
-- **Batch 9+10 (Sprints 324–333):** ERLEDIGT am 25.09.2026 (Commits e35a188, a44bd4d). Strukturierte Logs with Korrelations-ID, Rate-Limits, RLS-Deckung, Restore-Beweis, Crash-Klassifizierung, Selbstheilung, Dependency-Audit, Geheimnis-Hygiene, Health-Deep-Check, Serie-E-Abschluss. v2.9.0. Tests: 1.840 → 1.900 (+60), 230 Testdateien.
-- **Batch 11+12 (Sprints 334–343):** ERLEDIGT am 25.09.2026 (Commits 2848acd, 0aecd3e). E-Mail v2 (Anhänge+Vorlagen), Kalender-Abstraktion, Webhook-Eingang mit Signatur, Export-Center, Import-Wizard, API-Keys mit Scopes, ehrliche API-Doku, Slack/Discord-Webhooks, Integrations-Diagnose, Serie-F-Abschluss. v3.0.0. Tests: 1.900 → 1.950 (+50), 242 Testdateien.
-- **Batch 13 (Sprints 344–348):** ERLEDIGT am 25.09.2026. Navigation-Pass (per-Tab-Stacks, Deep-Links), Offline-Zustände (Entprellung, Reconnect-Plan, Offline-Banner), Skeleton-Lade-Logik (Screen-Presets, Hybrid-Modus, Flackern-Schutz), Lokale Notifications (5 Kategorien, ohne FCM, ehrlich), APK-Größen-Metriken (Budget, Empfehlungen, Startzeit-Optimierung). Tests: 1.957 → 1.987 (+30), 250 Testdateien.
-- **Batch 14 (Sprints 349–353):** ERLEDIGT am 25.09.2026. Android Predictive Back Gesten & Animationen, Tastatur-Handling & Focus-Scrolling, Tablet-Layout & Dual-Pane, App-Icon/Splash-Lifecycle & Store-Screenshots Checklist, Serie-G-Abschluss. Tests: 1.987 → 2.021 (+34), 255 Testdateien.
-- **Batch 15 (Sprints 354–358):** ERLEDIGT am 25.09.2026. Admin-Dashboard v2 mit echten Metriken & Schwellenwerten, Ops-Playbook-Screen mit interaktiven Incident-Checklisten & Verifikation, Feature-Flags mit prozentualem Rollout & Segmentierung, Nutzer-Verwaltung mit Rollen/Rechten/Suche/Sperrung, Admin Audit-Log mit Hash-Prüfsummen & PII-Maskierung. Tests: 2.021 → 2.046 (+25), 260 Testdateien.
