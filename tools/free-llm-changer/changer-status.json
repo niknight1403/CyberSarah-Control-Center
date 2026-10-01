@@ -1,14 +1,14 @@
 {
-  "stand": "2026-10-01T13:43:05",
+  "stand": "2026-10-01T19:15:12",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemini-flash-latest",
+  "modell": "gemma-4-26b-a4b-it",
   "anbieter": [
     {
       "id": "gemini",
       "status": "VERFUEGBAR",
-      "modell": "gemini-flash-latest"
+      "modell": "gemma-4-26b-a4b-it"
     },
     {
       "id": "gemini-backup",
