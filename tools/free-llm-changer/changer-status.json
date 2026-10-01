@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-30T20:30:50",
+  "stand": "2026-10-01T00:20:08",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -22,8 +22,8 @@
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT",
-      "modell": "429 dots-studio/dots-3-note-preview:free) — Changer rotiert weiter"
+      "status": "VERFUEGBAR",
+      "modell": "inclusionai/ling-3.0-flash-sante:free"
     },
     {
       "id": "cerebras",
