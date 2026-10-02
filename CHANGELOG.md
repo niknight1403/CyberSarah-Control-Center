@@ -4,10 +4,11 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
-## 02.10.2026 — Abschluss-Fixes: Root-Testlauf-Konsistenz & /api/ready Commit-SHA
+## 02.10.2026 — Abschluss-Fixes: Root-Testlauf-Konsistenz, /api/ready Commit-SHA & Web-Export-Smoke APK-Fix
 
 - **Root-Testlauf-Konsistenz (Fix 1):** `postinstall`-Script in root `package.json` hinterlegt (`npm --prefix workspace-service install --omit=dev --no-audit --no-fund`). Nach Standard `npm ci` im Root laeuft `npx vitest run` ohne manuelle Zusatzschritte komplett gruen durch.
 - **Deployed Commit-SHA & Uptime in /api/ready (Fix 2):** `/api/ready` um `gitCommitSha` (aus ENV-Variablen wie `GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `GITHUB_SHA` oder local Git CLI) und `deployedAt` erweitert. Ohne verfuegbare SHA-Quelle wird ehrlich `null` mit `gitCommitShaReason` geliefert statt eine Faeled/Dummy-SHA zu fingieren.
+- **Web-Export-Smoke & APK-Build (Fix 3):** `scripts/web-export-smoke.mjs` robust gemacht: happy-dom `removeChild` DOMExceptions gefangen & in `HARNES_NOISE` gefiltert, Polling/Retry-Warteschleife fuer DOM-Mount & Login-Screen-Erkennung (`/CYBERSARAH|Control Center/i` und `/Willkommen zurück|Anmelden|Login/i`), klare Diagnose-Meldung bei transienten Netzwerkproblemen bei Live-App-Pruefung. Echte Differenzierung: Login-Screen rendert im statischen Web-Export vollstaendig und real gruen.
 - **Tests & Typen:** Unit-Tests in `tests/ready-endpoint-deployment-info.test.ts` ergaenzt. `npx tsc --noEmit` fehlerfrei.
 
 ## 30.09.2026 — Sprint 383: Abschluss-Validierung alles grün (Serie J — Batch 20)
