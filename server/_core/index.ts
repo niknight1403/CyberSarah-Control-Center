@@ -1,3 +1,4 @@
+import { resolveDeploymentInfo } from "../../lib/deployment-info";
 import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
 import compression from "compression";
@@ -190,9 +191,13 @@ async function startServer() {
   });
   app.get("/api/ready", async (_req, res) => {
     const database = await checkDatabaseHealth();
+    const deployment = resolveDeploymentInfo();
     res.status(database ? 200 : 503).json({
       ok: database,
       checks: { database },
+      gitCommitSha: deployment.gitCommitSha,
+      gitCommitShaReason: deployment.gitCommitShaReason,
+      deployedAt: deployment.deployedAt,
       timestamp: Date.now(),
     });
   });
