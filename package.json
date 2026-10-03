@@ -24,7 +24,7 @@
     "audit": "tsx scripts/integration-audit.ts",
     "web:smoke": "node scripts/web-export-smoke.mjs",
     "web:shell": "node scripts/inject-startup-shell.mjs",
-    "postinstall": "npm --prefix workspace-service install --omit=dev --no-audit --no-fund"
+    "postinstall": "node scripts/postinstall-workspace-deps.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

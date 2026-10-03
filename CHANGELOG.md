@@ -4,6 +4,16 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 03.10.2026 — Render-Build-Fix: Existenz-toleranter postinstall-Hook für Docker-Layer-Builds
+
+- **Existenz-toleranter postinstall-Hook:** `scripts/postinstall-workspace-deps.mjs` erstellt und `package.json` (`postinstall`) auf das Skript umgestellt.
+- **Problem & Diagnose:** Der Docker-Build des Produktiv-Backends (Render) schlug fehl (`npm error ENOENT /app/workspace-service/package.json`), weil im initialen Docker-Layer (`COPY package.json package-lock.json ./`) das Verzeichnis `workspace-service/` noch nicht existiert.
+- **Lösung:** Das Skript prüft vor der Ausführung von `npm --prefix workspace-service install --omit=dev --no-audit --no-fund`, ob `workspace-service/package.json` existiert. Fehlt die Datei (z. B. im Docker-Layer-Build), wird sauber no-op ausgeführt (Exitcode 0). Existiert die Datei (z. B. nach normalem `npm ci` im Repository-Root), werden die Workspace-Abhängigkeiten wie bisher automatisch mitinstalliert.
+- **Verifizierung:**
+  1. Frisch im Root (`rm -rf node_modules && npm ci && npx vitest run`): 311 Testdateien / 2354 Tests 100% grün, `npx tsc --noEmit` 0 Fehler.
+  2. Docker-Layer-Simulation: In isoliertem Ordner mit nur `package.json` + `package-lock.json` verläuft `npm ci` fehlerfrei mit Exitcode 0 (postinstall skipped).
+  3. Dockerfile bleibt unverändert.
+
 ## 02.10.2026 — Abschluss-Fixes: Root-Testlauf-Konsistenz, /api/ready Commit-SHA & Web-Export-Smoke APK-Fix
 
 - **Root-Testlauf-Konsistenz (Fix 1):** `postinstall`-Script in root `package.json` hinterlegt (`npm --prefix workspace-service install --omit=dev --no-audit --no-fund`). Nach Standard `npm ci` im Root laeuft `npx vitest run` ohne manuelle Zusatzschritte komplett gruen durch.
