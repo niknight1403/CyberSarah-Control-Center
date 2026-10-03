@@ -7,6 +7,14 @@ on:
         description: "Service-Name (leer = alle)"
         required: false
         default: ""
+      start:
+        description: "Log-Zeitfenster Start (ISO8601, leer = letzte 6h)"
+        required: false
+        default: ""
+      end:
+        description: "Log-Zeitfenster Ende (ISO8601, leer = jetzt)"
+        required: false
+        default: ""
 
 jobs:
   diagnose:
@@ -62,6 +70,8 @@ jobs:
       - name: Render-Logs + healthCheckPath des App-Services (Render-API)
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          LOG_START: ${{ inputs.start }}
+          LOG_END: ${{ inputs.end }}
         run: |
           python3 - <<'PY'
           import json, os, urllib.request, urllib.parse
@@ -99,8 +109,10 @@ jobs:
           except Exception as e:
               print("ownerId-Lookup-Fehler:", e)
           print("ownerId:", owner_id)
-          start = "2026-09-16T06:38:00Z"
-          end = "2026-09-16T06:50:00Z"
+          import datetime as _dt
+          end = os.environ.get("LOG_END", "").strip() or _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          start = os.environ.get("LOG_START", "").strip() or (_dt.datetime.fromisoformat(end.replace("Z", "+00:00")) - _dt.timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+          print("Log-Fenster:", start, "->", end)
           attempts2 = [
               f"/logs?limit=100&ownerId={owner_id}&resource={app_sid}&startTime={start}&endTime={end}&direction=backward",
               f"/logs?limit=100&ownerId={owner_id}&resource={app_sid}&startTime={start}&endTime={end}",
