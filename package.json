@@ -24,7 +24,7 @@
     "audit": "tsx scripts/integration-audit.ts",
     "web:smoke": "node scripts/web-export-smoke.mjs",
     "web:shell": "node scripts/inject-startup-shell.mjs",
-    "postinstall": "node scripts/postinstall-workspace-deps.mjs"
+    "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('workspace-service/package.json')){require('child_process').execSync('npm --prefix workspace-service install --omit=dev --no-audit --no-fund',{stdio:'inherit'})}else{console.log('[postinstall] workspace-service nicht vorhanden - skip (Docker-Layer)')}\""
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

@@ -4,6 +4,16 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 03.10.2026 — Postinstall-Inline-Hotfix: Vollständig inline postinstall-Hook für Docker-Layer-Builds
+
+- **Vollständig inline postinstall-Hook:** `package.json` (`postinstall`) verwendet nun ein inline `node -e` Konstrukt: `"node -e "const fs=require('fs');if(fs.existsSync('workspace-service/package.json')){require('child_process').execSync('npm --prefix workspace-service install --omit=dev --no-audit --no-fund',{stdio:'inherit'})}else{console.log('[postinstall] workspace-service nicht vorhanden - skip (Docker-Layer)')}""`
+- **Problem & Root Cause:** Der Docker-Build im Render-Deploy kopiert im initialen Layer NUR `package.json` und `package-lock.json` (`COPY package.json package-lock.json ./`) vor `RUN npm ci`. Das Ausführen einer externe Skript-Datei wie `scripts/postinstall-workspace-deps.mjs` scheiterte mit `MODULE_NOT_FOUND`, da das `scripts/` Verzeichnis in dieser Docker-Layer noch nicht vorhanden war.
+- **Lösung:** Der `postinstall`-Hook in `package.json` ist nun vollkommen inline und referenziert KEINE Datei außerhalb von `package.json`. Er prüft inline via Node `fs.existsSync`, ob `workspace-service/package.json` existiert, und führt nur dann die Installation in `workspace-service` aus. Fehlt der Ordner (Docker-Layer), wird der Schritt sauber übersprungen.
+- **Verifizierung:**
+  1. Root-Install (`rm -rf node_modules workspace-service/node_modules && npm ci && npx vitest run`): 311 Testdateien / 2354 Tests 100% grün, `npx tsc --noEmit` 0 Fehler. `workspace-service/node_modules` wird automatisch mitinstalliert.
+  2. Docker-Layer-Simulation (NUR `package.json` + `package-lock.json` in neuem Ordner): `npm ci` erreicht Exitcode 0 (Inline-Hook no-oppt mit Meldung).
+  3. Dockerfile unverändert.
+
 ## 03.10.2026 — Render-Build-Fix: Existenz-toleranter postinstall-Hook für Docker-Layer-Builds
 
 - **Existenz-toleranter postinstall-Hook:** `scripts/postinstall-workspace-deps.mjs` erstellt und `package.json` (`postinstall`) auf das Skript umgestellt.
