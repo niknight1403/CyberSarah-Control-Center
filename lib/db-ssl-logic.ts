@@ -38,3 +38,24 @@ export function resolvePgSslConfig(connectionString: string): PgSslConfig {
   if (mode === "disable") return false;
   return { rejectUnauthorized: true };
 }
+
+/**
+ * Ersetzt Alias-SSL-Modes ('prefer', 'require', 'verify-ca') durch
+ * 'verify-full' in einer PostgreSQL-Connection-String.
+ */
+export function normalizeAliasSslModes(connectionString: string): string {
+  // Parse URL; if fails, return original.
+  try {
+    const url = new URL(connectionString);
+    const mode = url.searchParams.get("sslmode");
+    if (!mode) return connectionString;
+    if (mode === "prefer" || mode === "require" || mode === "verify-ca") {
+      url.searchParams.set("sslmode", "verify-full");
+      return url.toString();
+    }
+    return connectionString;
+  } catch {
+    // If not a URL, return original.
+    return connectionString;
+  }
+}
