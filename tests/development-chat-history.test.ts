@@ -36,3 +36,38 @@ describe("development chat history", () => {
     expect(chunks.join("")).toBe(source);
   });
 });
+
+describe("development chat history field validation", () => {
+  it("bounds persisted fields, restores interrupted proposal states, and retains applied state", () => {
+    const serialized = serializeDevelopmentChatHistory([
+      { id: "i".repeat(120), role: "agent", content: "c".repeat(950), state: "applying", proposalPreview: { affectedFiles: Array.from({ length: 6 }, (_, i) => `file-${i}`), changes: Array.from({ length: 6 }, (_, i) => ({ path: `path-${i}`.repeat(100), explanation: "e".repeat(700) })) } },
+      { id: "done", role: "agent", content: "finished", state: "applied", devTrace: Array.from({ length: 14 }, (_, i) => ({ tool: `tool-${i}`.repeat(20), args: "a".repeat(300), resultSummary: "r".repeat(400) })) },
+    ]);
+    const parsed = JSON.parse(serialized);
+    expect(parsed.messages[0].id).toHaveLength(100);
+    expect(parsed.messages[0].content).toHaveLength(900);
+    expect(parsed.messages[0].state).toBe("ready");
+    expect(parsed.messages[0].proposalPreview.affectedFiles).toHaveLength(4);
+    expect(parsed.messages[0].proposalPreview.changes[0].path).toHaveLength(500);
+    expect(parsed.messages[0].proposalPreview.changes[0].explanation).toHaveLength(600);
+    expect(parsed.messages[1].devTrace).toHaveLength(12);
+    expect(parsed.messages[1].devTrace[0].tool).toHaveLength(80);
+    expect(parsed.messages[1].devTrace[0].args).toHaveLength(240);
+    expect(parsed.messages[1].devTrace[0].resultSummary).toHaveLength(320);
+    expect(parseDevelopmentChatHistory(serialized).at(-1)).toMatchObject({ state: "applied" });
+  });
+
+  it("filters invalid messages, proposal entries, and trace entries on restore", () => {
+    const raw = JSON.stringify({ version: 1, messages: [
+      null,
+      { id: 1, role: "agent", content: "invalid id" },
+      { id: "bad-role", role: "system", content: "invalid role" },
+      { id: "ok", role: "user", content: "safe", state: "reverting", proposalPreview: { affectedFiles: ["valid", 4], changes: [{ path: "x", explanation: "y" }, { path: "broken" }, null] }, devTrace: [{ tool: "tool", args: "args", resultSummary: "result" }, { tool: "bad" }] },
+    ] });
+    expect(parseDevelopmentChatHistory(raw)).toEqual([{
+      id: "ok", role: "user", content: "safe", state: "restored",
+      proposalPreview: { affectedFiles: ["valid"], changes: [{ path: "x", explanation: "y" }] },
+      devTrace: [{ tool: "tool", args: "args", resultSummary: "result" }],
+    }]);
+  });
+});
