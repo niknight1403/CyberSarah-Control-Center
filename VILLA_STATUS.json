@@ -1,15 +1,14 @@
 {
-  "ts": "2026-10-06T02:16:55.668Z",
+  "ts": "2026-10-06T02:26:58.927Z",
   "villa": {
     "id": 3,
     "name": "CyberSarah Villa",
-    "status": "RUNNING"
+    "status": "PAUSED"
   },
   "tasks": {
-    "FAILED": 10,
-    "PENDING": 2
+    "FAILED": 12
   },
-  "running": true,
+  "running": false,
   "patches": {
     "appliedThisCycle": [],
     "failedThisCycle": [],
