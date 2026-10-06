@@ -1,27 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { setModelRouterKvForTests } from "../server/db";
 
-const { values, getModelRouterSetting, setModelRouterSetting } = vi.hoisted(() => {
-  const values = new Map<string, unknown>();
-  return {
-    values,
-    getModelRouterSetting: vi.fn(async <T>(key: string): Promise<T> => {
-      if (!values.has(key)) throw new Error("not found");
-      return values.get(key) as T;
-    }),
-    setModelRouterSetting: vi.fn(async (key: string, value: unknown) => {
-      values.set(key, value);
-    }),
-  };
-});
-
-vi.mock("../server/db", () => ({ getModelRouterSetting, setModelRouterSetting }));
+const values = new Map<string, unknown>();
+setModelRouterKvForTests(values);
 
 import { addStep, appendStepLog, createTask, finishTask, getTask, listTasks, recordCorrectionIteration, updateStep } from "../server/orchestrator/state-store";
 
 describe("orchestrator state store", () => {
   beforeEach(() => {
     values.clear();
-    vi.clearAllMocks();
   });
 
   it("creates tasks and indexes them newest-first without duplicate entries", async () => {
