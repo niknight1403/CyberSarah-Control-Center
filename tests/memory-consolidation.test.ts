@@ -7,15 +7,13 @@ const { listAll, applyWrites, insertRecord, getMetrics } = vi.hoisted(() => ({
   getMetrics: vi.fn(),
 }));
 
-vi.mock("../server/retrieval-metrics", () => ({ getRetrievalMetrics: getMetrics }));
-
 import { setMemoryConsolidationDbForTests, runMemoryConsolidation } from "../server/memory-consolidation";
 
 setMemoryConsolidationDbForTests({
   listAllAgentLearningsForConsolidation: listAll,
   applyConsolidationPlanWrites: applyWrites,
   insertMemoryConsolidationRecord: insertRecord,
-});
+}, getMetrics);
 
 describe("runMemoryConsolidation", () => {
   beforeEach(() => {

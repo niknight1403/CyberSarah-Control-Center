@@ -21,12 +21,14 @@ type MemoryConsolidationDb = Pick<typeof db,
   "applyConsolidationPlanWrites" | "insertMemoryConsolidationRecord" | "listAllAgentLearningsForConsolidation"
 >;
 let memoryConsolidationDb: MemoryConsolidationDb = db;
+let memoryConsolidationGetRetrievalMetrics = getRetrievalMetrics;
 
-export function setMemoryConsolidationDbForTests(override: MemoryConsolidationDb | null): void {
+export function setMemoryConsolidationDbForTests(override: MemoryConsolidationDb | null, retrievalMetrics: typeof getRetrievalMetrics | null = null): void {
   if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
     throw new Error("Memory-Consolidation-Test-Hook ist nur im Test-Modus verfuegbar.");
   }
   memoryConsolidationDb = override ?? db;
+  memoryConsolidationGetRetrievalMetrics = retrievalMetrics ?? getRetrievalMetrics;
 }
 
 export type MemoryConsolidationResult = {
@@ -64,7 +66,7 @@ export async function runMemoryConsolidation(
 
   const plan = buildConsolidationPlan(learnings, { now: Date.now() });
   const summary = formatConsolidationSummary(plan, trigger);
-  const retrieval = getRetrievalMetrics();
+  const retrieval = memoryConsolidationGetRetrievalMetrics();
 
   if (!options.dryRun) {
     await memoryConsolidationDb.applyConsolidationPlanWrites(plan);
