@@ -104,3 +104,40 @@ describe("dev-agent-tools-logic (Sprint 88 & Sprints 285-288)", () => {
     }
   });
 });
+
+describe("dev-agent-tools-logic request validation boundaries", () => {
+  it("rejects a missing workspace and validates branch/PR inputs", () => {
+    expect(buildWorkspaceToolRequest("git_status", "  ", {}).ok).toBe(false);
+    expect(buildWorkspaceToolRequest("checkout_branch", "ws1", { branch: "  " }).ok).toBe(false);
+    expect(buildWorkspaceToolRequest("checkout_branch", "ws1", { branch: "x".repeat(121) }).ok).toBe(false);
+    expect(buildWorkspaceToolRequest("open_pull_request", "ws1", { title: "ab", baseBranch: "main" }).ok).toBe(false);
+    expect(buildWorkspaceToolRequest("open_pull_request", "ws1", { title: "Fix issue", baseBranch: "main" })).toMatchObject({
+      ok: true,
+      request: { body: { title: "Fix issue", baseBranch: "main", body: "" } },
+    });
+  });
+
+  it("normalizes issue filters and bounds numeric limits", () => {
+    expect(buildWorkspaceToolRequest("list_github_issues", "ws1", { state: "CLOSED", limit: 500 })).toMatchObject({
+      ok: true, request: { path: expect.stringContaining("state=closed&limit=30") },
+    });
+    expect(buildWorkspaceToolRequest("list_github_issues", "ws1", { state: "invalid", limit: 0 })).toMatchObject({
+      ok: true, request: { path: expect.stringContaining("state=open&limit=1") },
+    });
+    expect(buildWorkspaceToolRequest("close_github_issue", "ws1", { number: 0 }).ok).toBe(false);
+    expect(buildWorkspaceToolRequest("close_github_issue", "ws1", { number: 4.6, comment: "done" })).toMatchObject({
+      ok: true, request: { body: { number: 5, comment: "done" } },
+    });
+  });
+
+  it("cleans issue labels and rejects empty refactors and learning fields", () => {
+    expect(buildWorkspaceToolRequest("create_github_issue", "ws1", {
+      title: "A useful issue", labels: [" bug ", "", 3, "one", "two", "three", "four", "five", "six"],
+    })).toMatchObject({ ok: true, request: { body: { labels: ["bug", "one", "two", "three", "four", "five"] } } });
+    expect(buildWorkspaceToolRequest("multi_file_refactor", "ws1", { operations: [] }).ok).toBe(false);
+    expect(buildWorkspaceToolRequest("save_learning", "ws1", { title: "", detail: "x" }).ok).toBe(false);
+    expect(buildWorkspaceToolRequest("save_learning", "ws1", { title: "Note", detail: "Remember this" })).toMatchObject({
+      ok: true, request: { body: { kind: "entscheidung" } },
+    });
+  });
+});
