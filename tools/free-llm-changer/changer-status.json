@@ -1,5 +1,5 @@
 {
-  "stand": "2026-10-08T09:22:22",
+  "stand": "2026-10-08T16:46:06",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -18,7 +18,7 @@
     {
       "id": "groq",
       "status": "VERFUEGBAR",
-      "modell": "qwen/qwen3.8-27b"
+      "modell": "openai/gpt-oss-20b"
     },
     {
       "id": "openrouter",
