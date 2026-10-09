@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractSslMode, resolvePgSslConfig } from "../lib/db-ssl-logic";
+import { extractSslMode, normalizeAliasSslModes, resolvePgSslConfig } from "../lib/db-ssl-logic";
 
 describe("db-ssl-logic", () => {
   it("liest sslmode aus einer Neon-Connection-URL", () => {
@@ -26,5 +26,23 @@ describe("db-ssl-logic", () => {
 
   it("erzwingt kein TLS ohne sslmode-Parameter (lokale Entwicklung)", () => {
     expect(resolvePgSslConfig("postgresql://u:p@localhost:5432/cybersarah")).toBe(false);
+  });
+
+  it("normalisiert unsichere Alias-Modi zu verify-full", () => {
+    for (const mode of ["prefer", "require", "verify-ca"]) {
+      const normalized = new URL(normalizeAliasSslModes(`postgresql://u:p@host/db?sslmode=${mode}`));
+      expect(normalized.searchParams.get("sslmode")).toBe("verify-full");
+    }
+  });
+
+  it("lässt verify-full, disable, fehlende Modi und ungültige URLs unverändert", () => {
+    for (const url of [
+      "postgresql://u:p@host/db?sslmode=verify-full",
+      "postgresql://u:p@host/db?sslmode=disable",
+      "postgresql://u:p@host/db",
+      "not-a-url?sslmode=require",
+    ]) {
+      expect(normalizeAliasSslModes(url)).toBe(url);
+    }
   });
 });
