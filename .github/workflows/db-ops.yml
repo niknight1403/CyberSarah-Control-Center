@@ -18,7 +18,17 @@ on:
           - publishing-diagnose
           - x-diagnose
           - x-post-live-test
+          - user-status
+          - user-set-password
         default: chat-clear-preview
+        email:
+          description: "E-Mail fuer user-status/user-set-password"
+          required: false
+          default: ""
+        hash:
+          description: "scrypt-Hash (scrypt$salt$derived) fuer user-set-password — niemals Klartext"
+          required: false
+          default: ""
 
 permissions:
   contents: read
@@ -47,6 +57,31 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install pg --no-audit --no-fund >/dev/null 2>&1
           node chat-clear.mjs
+
+      - name: Benutzer-Diagnose (user-status)
+        if: github.event.inputs.operation == 'user-status'
+        working-directory: scripts/db-ops
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OP: user-status
+          EMAIL: ${{ github.event.inputs.email }}
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install pg --no-audit --no-fund >/dev/null 2>&1
+          node user-status.mjs
+
+      - name: Passwort-Hash setzen (user-set-password)
+        if: github.event.inputs.operation == 'user-set-password'
+        working-directory: scripts/db-ops
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OP: user-set-password
+          EMAIL: ${{ github.event.inputs.email }}
+          HASH: ${{ github.event.inputs.hash }}
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install pg --no-audit --no-fund >/dev/null 2>&1
+          node user-set-password.mjs
 
       - name: Publishing Live-Test Operation (Sprint 370)
         if: startsWith(github.event.inputs.operation, 'publishing-') || startsWith(github.event.inputs.operation, 'x-')
