@@ -1,14 +1,14 @@
 {
-  "stand": "2026-10-10T06:11:29",
-  "aktiv": "gemini",
-  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
-  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemini-flash-latest",
+  "stand": "2026-10-10T12:51:34",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "qwen/qwen3.8-27b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "VERFUEGBAR",
-      "modell": "gemini-flash-latest"
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "modell": "500 gemma-4-31b-it"
     },
     {
       "id": "gemini-backup",
