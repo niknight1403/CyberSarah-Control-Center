@@ -29,7 +29,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { r
 try {
   await client.connect();
   const result = await client.query(
-    "UPDATE users SET password_hash = $1 WHERE lower(email) = $2 RETURNING id, email, role",
+    "UPDATE users SET passwordHash = $1 WHERE lower(email) = $2 RETURNING id, email, role",
     [hash, email]
   );
   if (result.rows.length === 0) {

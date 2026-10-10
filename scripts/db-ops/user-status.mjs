@@ -21,7 +21,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { r
 try {
   await client.connect();
   const result = await client.query(
-    "SELECT id, open_id, email, name, login_method, role, last_signed_in FROM users WHERE lower(email) = $1",
+    'SELECT id, "openId" AS open_id, email, name, "loginMethod", role, "lastSignedIn" FROM users WHERE lower(email) = $1',
     [email]
   );
   if (result.rows.length === 0) {
@@ -30,7 +30,7 @@ try {
     for (const row of result.rows) {
       console.log(
         `USER-STATUS: id=${row.id} | email=${row.email} | name=${row.name ?? "-"} | ` +
-          `login_method=${row.login_method ?? "-"} | role=${row.role} | last_signed_in=${row.last_signed_in}`
+          `login_method=${row.loginMethod ?? "-"} | role=${row.role} | last_signed_in=${row.lastSignedIn}`
       );
     }
   }
