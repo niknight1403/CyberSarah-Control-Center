@@ -1,14 +1,14 @@
 {
-  "stand": "2026-10-10T00:12:33",
-  "aktiv": "groq",
-  "aktiv_name": "Groq Free Tier",
-  "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-120b",
+  "stand": "2026-10-10T06:11:29",
+  "aktiv": "gemini",
+  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
+  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
+  "modell": "gemini-flash-latest",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR",
-      "modell": "000 gemma-4-31b-it"
+      "status": "VERFUEGBAR",
+      "modell": "gemini-flash-latest"
     },
     {
       "id": "gemini-backup",
@@ -18,12 +18,12 @@
     {
       "id": "groq",
       "status": "VERFUEGBAR",
-      "modell": "openai/gpt-oss-120b"
+      "modell": "qwen/qwen3.8-27b"
     },
     {
       "id": "openrouter",
-      "status": "VERFUEGBAR",
-      "modell": "apodex/apodex-1.1-mini:free"
+      "status": "LIMIT ERREICHT",
+      "modell": "429 liquid/lfm-2.5-2.6b:free) — Changer rotiert weiter"
     },
     {
       "id": "cerebras",
