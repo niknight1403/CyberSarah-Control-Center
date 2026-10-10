@@ -1,0 +1,53 @@
+name: VillaForge-Ops
+
+# VillaForge-Hub (hub.cybersarah-ki.com) auf der Produktions-VM verwalten:
+# SQLite-DB finden, Villen auflisten oder gezielt loeschen (mit Namens-Bestaetigung).
+#   mode=list                               -> Host-Erkennung + Villa-Inventar (read-only)
+#   mode=delete, villa_id, confirm_name     -> Villa samt Tasks/Agents/Chats loeschen
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "list | delete"
+        default: "list"
+      villa_id:
+        description: "Villa-ID (nur delete)"
+        default: ""
+      confirm_name:
+        description: "Exakter Villaname als Bestaetigung (nur delete)"
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: villaforge-ops
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: SSH-Zugang einrichten
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+      - name: VillaForge verwalten
+        env:
+          MODE: ${{ inputs.mode }}
+          VILLA_ID: ${{ inputs.villa_id }}
+          CONFIRM_NAME: ${{ inputs.confirm_name }}
+          SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+        run: |
+          case "$MODE" in
+            list)
+              $SSH_CMD 'echo "Y29uc3QgeyBleGVjU3luYyB9ID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCB7IERhdGFiYXNlU3luYyB9ID0gcmVxdWlyZSgnbm9kZTpzcWxpdGUnKTsKY29uc3QgcnVuID0gKGMpID0+IHsgdHJ5IHsgcmV0dXJuIFN0cmluZyhleGVjU3luYyhjLCB7IHNoZWxsOiAnL2Jpbi9iYXNoJyB9KSk7IH0gY2F0Y2ggKGUpIHsgcmV0dXJuICdGRUhMRVI6ICcgKyBTdHJpbmcoZS5tZXNzYWdlKS5zcGxpdCgnXG4nKVswXTsgfSB9Owpjb25zb2xlLmxvZygnPT0gaG9zdCA9PScpOwpjb25zb2xlLmxvZyhydW4oJ2hvc3RuYW1lJykudHJpbSgpKTsKY29uc29sZS5sb2cocnVuKCdob3N0bmFtZSAtSSAyPi9kZXYvbnVsbCcpLnRyaW0oKSk7CmNvbnNvbGUubG9nKCc9PSBwbTItUHJvemVzc2UgPT0nKTsKdHJ5IHsKICBjb25zdCBwcm9jcyA9IEpTT04ucGFyc2UocnVuKCdwbTIgamxpc3QgMj4vZGV2L251bGwnKSk7CiAgY29uc29sZS5sb2cocHJvY3MubWFwKHAgPT4gcC5uYW1lICsgKHAucG0yX2VudiAmJiBwLnBtMl9lbnYucG1fY3dkID8gJyBbJyArIHAucG0yX2Vudi5wbV9jd2QgKyAnXScgOiAnJykpLmpvaW4oJ1xuJykpOwp9IGNhdGNoIChlKSB7IGNvbnNvbGUubG9nKCdwbTI6IG5pY2h0IGxlc2JhcicpOyB9CmNvbnNvbGUubG9nKCc9PSBzZXJ2ZXItUHJvemVzc2UgPT0nKTsKY29uc29sZS5sb2cocnVuKCdwcyBhdXggfCBncmVwIC1pRSAic2VydmVyWy5dbWpzfHZpbGxhZm9yZ2UiIHwgZ3JlcCAtdiBncmVwIHwgaGVhZCAtOCcpKTsKY29uc29sZS5sb2coJz09IGZvcmdlL3ZpbGxhLXZlcnplaWNobmlzc2UgPT0nKTsKY29uc29sZS5sb2cocnVuKCdscyAtZCAvb3B0LyogL29wdC8qLyogL2hvbWUvKi8qIC9yb290LyogL3Nydi8qIDI+L2Rldi9udWxsIHwgZ3JlcCAtaUUgImZvcmdlfHZpbGxhIiB8IGhlYWQnKSk7CmNvbnNvbGUubG9nKCc9PSBkYi1kYXRlaWVuID09Jyk7CmNvbnN0IGZpbGVzID0gcnVuKCdmaW5kIC9vcHQgL2hvbWUgL3Jvb3QgL3NydiAvdmFyL3d3dyAtbWF4ZGVwdGggNyAtbmFtZSAiKi5kYiIgMj4vZGV2L251bGwgfCBoZWFkIC00MCcpLnNwbGl0KCdcbicpLmZpbHRlcihCb29sZWFuKTsKY29uc29sZS5sb2coSlNPTi5zdHJpbmdpZnkoZmlsZXMpKTsKZm9yIChjb25zdCBmIG9mIFsuLi5uZXcgU2V0KGZpbGVzKV0pIHsKICB0cnkgewogICAgY29uc3QgZGIgPSBuZXcgRGF0YWJhc2VTeW5jKGYpOwogICAgY29uc3QgaGFzID0gZGIucHJlcGFyZSgiU0VMRUNUIG5hbWUgRlJPTSBzcWxpdGVfbWFzdGVyIFdIRVJFIHR5cGU9J3RhYmxlJyBBTkQgbmFtZT0ndmlsbGFzJyIpLmdldCgpOwogICAgaWYgKGhhcykgewogICAgICBjb25zb2xlLmxvZygnPT0gVklMTEEtREI6ICcgKyBmKTsKICAgICAgY29uc29sZS5sb2coSlNPTi5zdHJpbmdpZnkoZGIucHJlcGFyZSgnU0VMRUNUIGlkLCBuYW1lLCBzdGF0dXMsIGNyZWF0ZWRfYXQsIHVwZGF0ZWRfYXQgRlJPTSB2aWxsYXMgT1JERVIgQlkgaWQnKS5hbGwoKSwgbnVsbCwgMSkpOwogICAgfSBlbHNlIHsgY29uc29sZS5sb2coJyhvaG5lIHZpbGxhcy1UYWJlbGxlKTogJyArIGYpOyB9CiAgICBkYi5jbG9zZSgpOwogIH0gY2F0Y2ggKGUpIHsgY29uc29sZS5sb2coJ0ZFSExFUiAnICsgZiArICc6ICcgKyBTdHJpbmcoZS5tZXNzYWdlKS5zcGxpdCgnXG4nKVswXSk7IH0KfQo=" | base64 -d | node -'
+              ;;
+            delete)
+              if ! echo "$VILLA_ID" | grep -qE '^[0-9]+$'; then echo "FEHLER: villa_id muss numerisch sein"; exit 1; fi
+              NAME_B64=$(printf '%s' "$CONFIRM_NAME" | base64 -w0)
+              $SSH_CMD "VILLA_ID=$VILLA_ID CONFIRM_NAME_B64=$NAME_B64 bash -c 'echo \"Y29uc3QgeyBleGVjU3luYyB9ID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCB7IERhdGFiYXNlU3luYyB9ID0gcmVxdWlyZSgnbm9kZTpzcWxpdGUnKTsKY29uc3QgcnVuID0gKGMpID0+IHsgdHJ5IHsgcmV0dXJuIFN0cmluZyhleGVjU3luYyhjLCB7IHNoZWxsOiAnL2Jpbi9iYXNoJyB9KSk7IH0gY2F0Y2ggKGUpIHsgcmV0dXJuICdGRUhMRVI6ICcgKyBTdHJpbmcoZS5tZXNzYWdlKS5zcGxpdCgnXG4nKVswXSk7IH0gfTsKY29uc3QgZmlsZXMgPSBbLi4ubmV3IFNldChydW4oJ2ZpbmQgL29wdCAvaG9tZSAvcm9vdCAvc3J2IC92YXIvd3d3IC1tYXhkZXB0aCA3IC1uYW1lICJ2aWxsYWZvcmdlLmRiIiAyPi9kZXYvbnVsbCcpLnNwbGl0KCdcbicpLmZpbHRlcihCb29sZWFuKSldOwppZiAoIWZpbGVzLmxlbmd0aCkgeyBjb25zb2xlLmxvZygnRkVITEVSOiBrZWluZSB2aWxsYWZvcmdlLmRiIGdlZnVuZGVuJyk7IHByb2Nlc3MuZXhpdCgxKTsgfQppZiAoZmlsZXMubGVuZ3RoID4gMSkgeyBjb25zb2xlLmxvZygnRkVITEVSOiBtZWhyZXJlIERCcywga2VpbmUgZWluZGV1dGlnZSBadW9yZG51bmc6ICcgKyBKU09OLnN0cmluZ2lmeShmaWxlcykpOyBwcm9jZXNzLmV4aXQoMSk7IH0KY29uc3QgZGIgPSBuZXcgRGF0YWJhc2VTeW5jKGZpbGVzWzBdKTsKY29uc3QgdmlsbGFJZCA9IE51bWJlcihwcm9jZXNzLmVudi5WSUxMQV9JRCB8fCAwKTsKY29uc3QgY29uZmlybU5hbWUgPSBCdWZmZXIuZnJvbShTdHJpbmcocHJvY2Vzcy5lbnYuQ09ORklSTV9OQU1FX0I2NCB8fCAnJyksICdiYXNlNjQnKS50b1N0cmluZygndXRmOCcpLnRyaW0oKTsKaWYgKCF2aWxsYUlkIHx8ICFjb25maXJtTmFtZSkgeyBjb25zb2xlLmxvZygnRkVITEVSOiB2aWxsYV9pZCB1bmQgY29uZmlybV9uYW1lIG5vZXRpZycpOyBwcm9jZXNzLmV4aXQoMSk7IH0KY29uc3Qgcm93ID0gZGIucHJlcGFyZSgnU0VMRUNUIGlkLCBuYW1lLCBzdGF0dXMgRlJPTSB2aWxsYXMgV0hFUkUgaWQgPSA/JykuZ2V0KHZpbGxhSWQpOwppZiAoIXJvdykgeyBjb25zb2xlLmxvZygnRkVITEVSOiBWaWxsYSAnICsgdmlsbGFJZCArICcgZXhpc3RpZXJ0IG5pY2h0Jyk7IHByb2Nlc3MuZXhpdCgxKTsgfQppZiAocm93Lm5hbWUgIT09IGNvbmZpcm1OYW1lKSB7IGNvbnNvbGUubG9nKCdGRUhMRVI6IE5hbWUtTWlzbWF0Y2g6IFZpbGxhICcgKyB2aWxsYUlkICsgJyBoZWlzc3QgIicgKyByb3cubmFtZSArICciLCBCZXN0YWV0aWd1bmcgd2FyICInICsgY29uZmlybU5hbWUgKyAnIiAtIG5pY2h0cyBnZWxvZXNjaHQuJyk7IHByb2Nlc3MuZXhpdCgxKTsgfQppZiAocm93LnN0YXR1cyA9PT0gJ1JVTk5JTkcnKSB7IGNvbnNvbGUubG9nKCdGRUhMRVI6IFZpbGxhIGxhZXVmdCBnZXJhZGUgLSBlcnN0IHN0b3BwZW4sIGRhbm4gbG9lc2NoZW4uJyk7IHByb2Nlc3MuZXhpdCgxKTsgfQpjb25zb2xlLmxvZygnTG9lc2NoZSBWaWxsYSAnICsgdmlsbGFJZCArICcgKCcgKyByb3cubmFtZSArICcpIGF1cyAnICsgZmlsZXNbMF0pOwpkYi5leGVjKCdCRUdJTicpOwp0cnkgewogIGZvciAoY29uc3QgdCBvZiBbJ3Rhc2tzJywgJ2FnZW50cycsICdtZXNzYWdlcycsICdtZW1vcmllcycsICdhdWRpdCcsICdzb3VyY2VzJywgJ3JlcG9ydHMnLCAndmlsbGFfdG9vbHMnXSkgewogICAgdHJ5IHsgZGIucHJlcGFyZSgnREVMRVRFIEZST00gJyArIHQgKyAnIFdIRVJFIHZpbGxhX2lkID0gPycpLnJ1bih2aWxsYUlkKTsgfSBjYXRjaCAoZSkgeyBpZiAoIVN0cmluZyhlLm1lc3NhZ2UpLmluY2x1ZGVzKCdubyBzdWNoIHRhYmxlJykpIHRocm93IGU7IH0KICB9CiAgZGIucHJlcGFyZSgnREVMRVRFIEZST00gdmlsbGFzIFdIRVJFIGlkID0gPycpLnJ1bih2aWxsYUlkKTsKICBkYi5leGVjKCdDT01NSVQnKTsKfSBjYXRjaCAoZSkgeyBkYi5leGVjKCdST0xMQkFDSycpOyBjb25zb2xlLmxvZygnRkVITEVSIGJlaW0gTG9lc2NoZW46ICcgKyBTdHJpbmcoZS5tZXNzYWdlKS5zcGxpdCgnXG4nKVswXSk7IHByb2Nlc3MuZXhpdCgxKTsgfQpjb25zb2xlLmxvZygnR2Vsb2VzY2h0OicsIHZpbGxhSWQsIHJvdy5uYW1lKTsKY29uc29sZS5sb2coJ1ZlcmJsZWliZW5kZSBWaWxsZW46JywgSlNPTi5zdHJpbmdpZnkoZGIucHJlcGFyZSgnU0VMRUNUIGlkLCBuYW1lLCBzdGF0dXMgRlJPTSB2aWxsYXMgT1JERVIgQlkgaWQnKS5hbGwoKSwgbnVsbCwgMSkpOwpkYi5jbG9zZSgpOwo=\" | base64 -d | node -'"
+              ;;
+            *) echo "Unbekannter Modus: $MODE"; exit 1;;
+          esac
