@@ -36,6 +36,13 @@ services:
         sync: false # Managed-LLM-Fallback (Sprint 53)
       # Sprint 108 (Zero-Cost-Router): Kostenlose LLM-Provider — Keys via
       # GitHub-Secrets im Render-Deploy-Workflow (nur gesetzt, wenn vorhanden).
+      # Ollama-First: eigene Oracle-VM-Route (gratis, ohne Token-Limit).
+      - key: AI_OLLAMA_BASE_URL
+        sync: false # https://ollama.cybersarah-ki.com/v1
+      - key: AI_OLLAMA_API_KEY
+        sync: false # Bearer-Token der Oracle-VM-Route
+      - key: AI_OLLAMA_MODEL
+        sync: false # z. B. qwen3.6:27b
       - key: AI_GROQ_API_KEY
         sync: false # Groq (ultraschnelle guenstige Inferenz, openai/gpt-oss-20b)
       - key: AI_OPENROUTER_API_KEY

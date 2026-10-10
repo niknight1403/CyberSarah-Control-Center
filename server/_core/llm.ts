@@ -317,7 +317,7 @@ const localLlmCandidates = (): LocalLlmCandidate[] => {
     {
       source: "local-ollama",
       baseUrl: base(process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL, "http://127.0.0.1:11434/v1"),
-      apiKey: "ollama",
+      apiKey: trim(process.env.AI_OLLAMA_API_KEY ?? process.env.OLLAMA_API_KEY) ?? "ollama",
     },
     {
       source: "local-lmstudio",
@@ -328,11 +328,14 @@ const localLlmCandidates = (): LocalLlmCandidate[] => {
 };
 
 /** Erreichbarkeits-Probe gegen den OpenAI-kompatiblen /models-Endpoint. */
-async function probeLocalLlmEndpoint(baseUrl: string): Promise<boolean> {
+async function probeLocalLlmEndpoint(baseUrl: string, apiKey?: string): Promise<boolean> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1_500);
-    const response = await fetch(`${baseUrl}/models`, { signal: controller.signal });
+    const timer = setTimeout(() => controller.abort(), 4_000);
+    const response = await fetch(`${baseUrl}/models`, {
+      signal: controller.signal,
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+    });
     clearTimeout(timer);
     return response.ok;
   } catch {
@@ -343,7 +346,7 @@ async function probeLocalLlmEndpoint(baseUrl: string): Promise<boolean> {
 /** Ersten erreichbaren lokalen Endpoint liefern (oder null). */
 async function resolveLocalManagedEndpoint(): Promise<ManagedLlmEndpoint | null> {
   for (const candidate of localLlmCandidates()) {
-    if (await probeLocalLlmEndpoint(candidate.baseUrl)) {
+    if (await probeLocalLlmEndpoint(candidate.baseUrl, candidate.apiKey)) {
       return { url: `${candidate.baseUrl}/chat/completions`, apiKey: candidate.apiKey, source: candidate.source };
     }
   }

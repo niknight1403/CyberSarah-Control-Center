@@ -253,7 +253,8 @@ function makeAppEnvBuilder(databaseUrl) {
   // Sprint 369: Optionale KI-Provider-Keys (z. B. Hugging Face fuer den
   // Model-Router) — nur gesetzt, wenn das GitHub-Secret existiert.
   const aiProviderExtra = [];
-  for (const key of ["AI_HUGGINGFACE_API_KEY", "HF_TOKEN"]) {
+  // Ollama-First: eigene Oracle-VM-Route (OpenAI-kompatibel, Bearer-Token).
+  for (const key of ["AI_HUGGINGFACE_API_KEY", "HF_TOKEN", "AI_OLLAMA_BASE_URL", "AI_OLLAMA_API_KEY", "AI_OLLAMA_MODEL"]) {
     const value = env(key, "").trim();
     if (value) aiProviderExtra.push(`${key}=${value}`);
   }
