@@ -1,0 +1,73 @@
+name: CCC-Villa-Ops
+
+# Villen (= Superagenten inkl. Bot-Villa) und Projekte der CCC-Produktions-DB
+# verwalten. DATABASE_URL kommt aus den Repo-Secrets, nie im Klartext.
+#   mode=list                       -> read-only Inventar
+#   mode=delete-agent, item_id, confirm_name -> Superagent loeschen
+#   mode=delete-project, item_id, confirm_name -> Projekt loeschen
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "list | delete-agent | delete-project"
+        default: "list"
+      item_id:
+        description: "ID (nur delete-*)"
+        default: ""
+      confirm_name:
+        description: "Exakter Name als Bestaetigung (nur delete-*)"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Abhaengigkeiten
+        run: npm install pg --no-audit --no-fund
+      - name: "Villen verwalten"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MODE: ${{ inputs.mode }}
+          ITEM_ID: ${{ inputs.item_id }}
+          CONFIRM_NAME: ${{ inputs.confirm_name }}
+        run: |
+          node - <<'JS'
+          const { Client } = require('pg');
+          const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+          const mode = process.env.MODE;
+          const itemId = Number(process.env.ITEM_ID || 0);
+          const confirmName = (process.env.CONFIRM_NAME || '').trim();
+          (async () => {
+            await c.connect();
+            if (mode === 'delete-agent' || mode === 'delete-project') {
+              if (!itemId || !confirmName) throw new Error('delete braucht item_id und confirm_name');
+              const table = mode === 'delete-agent' ? 'superAgents' : 'projects';
+              const res = await c.query(`SELECT id, name FROM "${table}" WHERE id = $1`, [itemId]);
+              if (!res.rows.length) throw new Error(`${table} ${itemId} existiert nicht`);
+              if (res.rows[0].name !== confirmName)
+                throw new Error(`Name-Mismatch: "${res.rows[0].name}" != "${confirmName}" — nichts geloescht.`);
+              if (mode === 'delete-agent') {
+                const sess = await c.query('SELECT "sessionId", "userOpenId" FROM "superAgents" WHERE id = $1', [itemId]);
+                if (sess.rows.length && !sess.rows[0].sessionId.startsWith('default')) {
+                  await c.query('DELETE FROM "chatMessages" WHERE "sessionId" = $1', [sess.rows[0].sessionId]);
+                }
+              }
+              await c.query(`DELETE FROM "${table}" WHERE id = $1`, [itemId]);
+              console.log('Geloescht:', table, itemId, confirmName);
+            } else {
+              const agents = await c.query('SELECT id, name, status, "isDefault", "sessionId", "lastActiveAt", "createdAt" FROM "superAgents" ORDER BY id');
+              console.log('Superagenten (Villen):', JSON.stringify(agents.rows, null, 1));
+              const projects = await c.query('SELECT id, name, status, "lastActivityAt", "createdAt", "repositoryUrl" FROM "projects" ORDER BY id');
+              console.log('Projekte:', JSON.stringify(projects.rows, null, 1));
+            }
+            await c.end();
+          })().catch(e => { console.error('OPS-Fehler:', e.message); process.exit(1); });
+          JS
