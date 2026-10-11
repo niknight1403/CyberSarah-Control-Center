@@ -1,5 +1,5 @@
 {
-  "ts": "2026-10-11T04:44:46.483Z",
+  "ts": "2026-10-11T05:08:46.548Z",
   "villa": {
     "id": 1,
     "name": "CyberSarah Villa",
@@ -7,7 +7,8 @@
   },
   "tasks": {
     "DONE": 14,
-    "RUNNING": 4,
+    "FAILED": 3,
+    "RUNNING": 1,
     "PENDING": 3
   },
   "running": true,
