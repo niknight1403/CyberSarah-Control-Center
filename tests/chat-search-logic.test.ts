@@ -41,7 +41,7 @@ describe("chat-search-logic", () => {
   it("bewertet staerkere Treffer hoeher und sortiert danach", () => {
     const messages: SearchableMessage[] = [
       { ...base, content: "Render kurz. Neon.", createdAt: "2026-09-01T10:00:00.000Z" },
-      { ...base, content: "Render und Neon zusammen einrichten.", createdAt: "2026-09-09T10:00:00.000Z" },
+      { ...base, content: "Render und Neon zusammen einrichten, Neon pruefen.", createdAt: "2026-09-09T10:00:00.000Z" },
     ];
     const result = searchChatMessages(messages, "render neon");
     expect(result.hits[0].snippet).toContain("Render und Neon");
