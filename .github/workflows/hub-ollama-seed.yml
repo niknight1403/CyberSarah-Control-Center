@@ -1,0 +1,36 @@
+name: Hub Ollama Seed
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: OLLAMA_API_KEY an Hub-Seeds-Store
+        env:
+          AI_OLLAMA_API_KEY: ${{ secrets.AI_OLLAMA_API_KEY }}
+          VF_HUB_EMAIL: ${{ secrets.VF_HUB_EMAIL }}
+          VF_HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
+        run: |
+          set -e
+          TOK=$(curl -s -m 20 -X POST -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+            https://hub.cybersarah-ki.com/api/auth/login | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          [ -n "$TOK" ] || { echo LOGIN-FEHLGESCHLAGEN; exit 1; }
+          echo LOGIN-OK
+          curl -s -m 20 -X POST -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+            -d "{\"name\":\"OLLAMA_API_KEY\",\"value\":\"$AI_OLLAMA_API_KEY\"}" \
+            https://hub.cybersarah-ki.com/api/secrets
+          echo "SECRET-OLLAMA-GESETZT"
+      - name: Ollama-Verfuegbarkeit und Modelle
+        env:
+          AI_OLLAMA_API_KEY: ${{ secrets.AI_OLLAMA_API_KEY }}
+        run: |
+          set -e
+          echo "== /api/tags =="
+          curl -s -m 20 -H "Authorization: Bearer $AI_OLLAMA_API_KEY" https://ollama.cybersarah-ki.com/api/tags | python3 -c 'import json,sys; [print(m["name"]) for m in json.load(sys.stdin).get("models",[])]'
+          echo "== Chat-Smoke-Test =="
+          curl -s -m 60 -X POST -H "Authorization: Bearer $AI_OLLAMA_API_KEY" -H 'Content-Type: application/json' \
+            -d '{"model":"gemma4:12b","messages":[{"role":"user","content":"Antworte nur mit OK"}],"max_tokens":10}' \
+            -w '\nHTTP: %{http_code}\n' https://ollama.cybersarah-ki.com/v1/chat/completions | head -c 400
