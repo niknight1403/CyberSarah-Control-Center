@@ -25,7 +25,10 @@ describe("vitest rn-import-regression", () => {
   it("liefert statische RN-Exporte und nicht-thenbare Stubs", async () => {
     const { Platform, Pressable, useColorScheme } = await import("react-native");
     expect(typeof Platform.select).toBe("function");
-    expect(Platform.OS === "ios").toBe(false); // Proxy, kein "ios"
+    // Andere Tests ändern den gemeinsamen Stub bei isolate:false auf ios/android.
+    // Für diesen Regressionstest den dokumentierten Default explizit herstellen.
+    Platform.OS = "web";
+    expect(Platform.OS).toBe("web");
     expect(typeof Pressable).toBe("function");
     expect(useColorScheme()).toBe("light");
 
