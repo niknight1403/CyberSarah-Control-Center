@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { asyncStorageValues, Platform, secureStorageValues, setUseTestStorageValues } from "./stubs/react-native-stub.mjs";
 
@@ -8,7 +8,15 @@ import { getDevelopmentChatHistoryKey } from "../lib/development-chat-history-lo
 const manifest = (workspace?: string) => `custom-ai-studio.development-chat.manifest.v1.${workspace ?? "unattached"}`;
 const chunk = (workspace: string | undefined, index: number) => `custom-ai-studio.development-chat.chunk.v1.${workspace ?? "unattached"}.${index}`;
 
-describe("development chat history storage", () => {
+// Sprint 190: Bei isolate:false teilt sich der Stub-Zustand mit allen
+  // spaeter im selben Worker laufenden Dateien (vgl. rn-import-regression).
+  // Deshalb wird der Test-Storage-Modus nach der Suite wieder abgeschaltet.
+  afterAll(() => {
+    setUseTestStorageValues(false);
+    Platform.OS = "web";
+  });
+
+  describe("development chat history storage", () => {
   beforeEach(() => {
     Platform.OS = "web";
     setUseTestStorageValues(true);

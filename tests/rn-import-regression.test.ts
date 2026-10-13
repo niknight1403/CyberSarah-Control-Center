@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+// Sprint 190: Bei isolate:false kann eine fruehere Testdatei den Stub-
+// Zustand (useTestStorageValues, Platform.OS) veraendern. Der
+// Regressionstest herstellt deshalb den dokumentierten Default selbst.
+import { asyncStorageValues, secureStorageValues, setUseTestStorageValues } from "./stubs/react-native-stub.mjs";
+
 import { useStudioSettings } from "../lib/studio-settings";
 import * as chatHistory from "../lib/development-chat-history";
 import * as liveRuntime from "../lib/live-runtime-client";
@@ -25,9 +30,13 @@ describe("vitest rn-import-regression", () => {
   it("liefert statische RN-Exporte und nicht-thenbare Stubs", async () => {
     const { Platform, Pressable, useColorScheme } = await import("react-native");
     expect(typeof Platform.select).toBe("function");
-    // Andere Tests ändern den gemeinsamen Stub bei isolate:false auf ios/android.
-    // Für diesen Regressionstest den dokumentierten Default explizit herstellen.
+    // Andere Tests ändern den gemeinsamen Stub bei isolate:false auf ios/android
+    // oder schalten den Test-Storage-Modus ein. Den dokumentierten Default
+    // explizit herstellen, damit dieser Test nicht von der Testreihenfolge abhängt.
     Platform.OS = "web";
+    setUseTestStorageValues(false);
+    asyncStorageValues.clear();
+    secureStorageValues.clear();
     expect(Platform.OS).toBe("web");
     expect(typeof Pressable).toBe("function");
     expect(useColorScheme()).toBe("light");
