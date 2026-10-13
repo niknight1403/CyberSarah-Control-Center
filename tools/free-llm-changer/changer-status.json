@@ -1,14 +1,14 @@
 {
-  "stand": "2026-10-13T16:13:55",
+  "stand": "2026-10-13T21:24:49",
   "aktiv": "groq",
   "aktiv_name": "Groq Free Tier",
   "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-20b",
+  "modell": "qwen/qwen3.8-27b",
   "anbieter": [
     {
       "id": "gemini",
       "status": "NICHT KONFIGURIERT/ERREICHBAR",
-      "modell": "000 gemma-4-31b-it"
+      "modell": "500 gemma-4-31b-it"
     },
     {
       "id": "gemini-backup",
@@ -18,12 +18,12 @@
     {
       "id": "groq",
       "status": "VERFUEGBAR",
-      "modell": "openai/gpt-oss-20b"
+      "modell": "qwen/qwen3.8-27b"
     },
     {
       "id": "openrouter",
       "status": "LIMIT ERREICHT",
-      "modell": "429 liquid/lfm-2.5-2.6b:free) — Changer rotiert weiter"
+      "modell": "429 nvidia/nemotron-3.5-lightning:free) — Changer rotiert weiter"
     },
     {
       "id": "cerebras",
