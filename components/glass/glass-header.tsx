@@ -37,7 +37,7 @@ export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotific
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   return (
-    <GlassCard accent="purple" glow={0} style={styles.card}>
+    <GlassCard accent="purple" glow={1} style={styles.card}>
       <View style={styles.brandRow}>
         <View style={styles.brandLeft}>
           <AiCore size={34} state={online ? "idle" : "warning"} />
