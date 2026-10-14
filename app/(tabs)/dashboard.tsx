@@ -4,6 +4,10 @@
  * Glass-Primitives umgestellt — GlowButton (secondary, accent blue) statt
  * eigener Pressable-Karten-Styles. Keine Ad-hoc-Flaechen mehr in diesem Screen.
  *
+ * Sprint 196 (Rundum-Update): VILLA-HUB-KARTE — Live-Status des VillaForge-
+ * Hubs (hub.cybersarah-ki.com) via oeffentlichem /api/health (CORS, 30-s-
+ * Polling): Version, LLM-Routen, Hub online. Antippen oeffnet den Hub.
+ *
  * KEINE reine Farbaenderung: neuer Hintergrund (atmosphaerischer Deep-Void
  * mit Lichtwolken), neuer vereinheitlichter Header (Logo+Avatar+Status in
  * EINEM Modul statt zwei getrennten Karten), MetricTiles statt KPI-Karten,
@@ -11,8 +15,8 @@
  * Holo-Line-Chart statt Balken-Sparkline, AI-Core-Hero-Card fuer den
  * Superagenten. Alle Daten bleiben echt (useDashboardData) — kein Mock.
  */
-import { useMemo } from "react";
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Linking, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -30,9 +34,37 @@ import { chatStatusCopy, formatUptime, systemStatusCopy, workspaceStatusCopy } f
 import { isWideViewport } from "@/lib/viewport-logic";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 
+type HubStatus = { ok: boolean; version: string; routes: number } | null;
+
+/** Sprint 196: Live-Status des VillaForge-Hubs (v1.41.1+, CORS offen). */
+function useHubStatus(): HubStatus {
+  const [hub, setHub] = useState<HubStatus>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("https://hub.cybersarah-ki.com/api/health", {
+          headers: { Accept: "application/json" },
+        });
+        const data: { ok?: boolean; version?: string; routes?: number } = await res.json();
+        if (!cancelled) {
+          setHub({ ok: !!data.ok, version: String(data.version ?? "—"), routes: Number(data.routes ?? 0) });
+        }
+      } catch {
+        if (!cancelled) setHub(null);
+      }
+    };
+    load();
+    const timer = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, []);
+  return hub;
+}
+
 export default function DashboardScreen() {
   const glass = useGlassTheme();
   const { vm, state, hasAlerts, isAdmin, retry, serverUptimeText } = useDashboardData();
+  const hub = useHubStatus();
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
   const styles = useMemo(() => createStyles(glass, wide), [glass, wide]);
@@ -142,6 +174,23 @@ export default function DashboardScreen() {
               accent={vm.workspace.status === "ready" ? "blue" : "amber"}
               live={vm.workspace.status === "ready"}
               onPress={() => router.push("/" as never)}
+            />
+            <ControlModuleCard
+              icon="sparkles"
+              title="Villa-Hub"
+              description={
+                hub
+                  ? `Version ${hub.version} · Villen, Qualitäts-Tor & GitHub-Produkte`
+                  : "Verbinde mit hub.cybersarah-ki.com …"
+              }
+              metricValue={hub ? String(hub.routes) : undefined}
+              metricLabel="LLM-Routen"
+              statusLabel={hub ? (hub.ok ? "Hub online" : "Nicht erreichbar") : "Verbinde …"}
+              accent={hub ? (hub.ok ? "cyan" : "red") : "amber"}
+              live={!!hub?.ok}
+              onPress={() => {
+                void Linking.openURL("https://hub.cybersarah-ki.com").catch(() => undefined);
+              }}
             />
           </View>
 
