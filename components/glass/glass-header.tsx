@@ -45,7 +45,7 @@ export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotific
             <Text style={styles.brandTitle}>
               Cyber<Text style={{ color: glass.glassPalette.cyan }}>Sarah</Text>
             </Text>
-            <Text style={styles.brandSubtitle}>CONTROL CENTER</Text>
+            <Text style={styles.brandSubtitle}>AUTONOMOUS AI OPERATIONS</Text>
           </View>
         </View>
         <Pressable
@@ -82,7 +82,10 @@ export function GlassHeader({ name, roleBadge, online, hasAlerts, onPressNotific
           onPress={onPressProfile ?? (() => router.push("/account"))}
           style={styles.profileButton}
         >
-          <Text style={styles.profileButtonText}>Profil</Text>
+          <View style={styles.profileButtonRow}>
+            <Text style={styles.profileButtonText}>Profil</Text>
+            <IconSymbol name="chevron.right" size={12} color={glass.glassPalette.cyan} />
+          </View>
         </Pressable>
       </View>
     </GlassCard>
@@ -154,5 +157,6 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: glass.accentAlpha("cyan", 0.1),
   },
-  profileButtonText: { color: glass.glassPalette.cyan, fontWeight: "700", fontSize: 12 },
+  profileButtonRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  profileButtonText: { color: glass.glassPalette.cyan, fontWeight: "800", fontSize: 12 },
 });
