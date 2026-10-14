@@ -77,6 +77,11 @@ export default function DashboardScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <GlassHeader name={vm.user.name} roleBadge={roleBadge} online={vm.user.online} hasAlerts={hasAlerts} />
 
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionEyebrow}>LIVE TELEMETRY</Text>
+            <Text style={styles.sectionTitle}>System in Echtzeit</Text>
+          </View>
+
           <View style={styles.metricRow}>
             <MetricTile
               icon="sparkles"
@@ -99,6 +104,11 @@ export default function DashboardScreen() {
               value={formatUptime(vm.kpis.uptime)}
               accent={vm.system.status === "healthy" ? "green" : "amber"}
             />
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionEyebrow}>CONTROL MODULES</Text>
+            <Text style={styles.sectionTitle}>Steuerung & Verbindungen</Text>
           </View>
 
           <View style={styles.moduleRow}>
@@ -135,8 +145,16 @@ export default function DashboardScreen() {
             />
           </View>
 
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionEyebrow}>ACTIVITY</Text>
+            <Text style={styles.sectionTitle}>Aktivität & Entwicklung</Text>
+          </View>
           <HoloActivityCard count={vm.activity.count} changePercent={vm.activity.changePercent} points={vm.activity.points} />
 
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionEyebrow}>AI CORE</Text>
+            <Text style={styles.sectionTitle}>Autonome Intelligenz</Text>
+          </View>
           <SuperagentHeroCard status={vm.superAgent.status} name={vm.superAgent.name} detail={vm.superAgent.detail} onRetry={retry} />
 
           <GlowButton
@@ -164,7 +182,10 @@ function createStyles(glass: RuntimeGlassTheme, wide: boolean) {
       width: "100%",
       alignSelf: "center" as const,
     },
-    metricRow: { flexDirection: "row", gap: glass.glassSpacing.md },
+    sectionHeader: { gap: 2, marginTop: glass.glassSpacing.xs, paddingHorizontal: 2 },
+    sectionEyebrow: { ...glass.glassType.label, color: glass.glassPalette.cyan },
+    sectionTitle: { ...glass.glassType.title, color: glass.glassSurface.textPrimary, fontSize: wide ? 17 : 15 },
+    metricRow: wide ? { flexDirection: "row", gap: glass.glassSpacing.md } : { flexDirection: "column", gap: glass.glassSpacing.sm },
     moduleRow: wide ? { flexDirection: "row", gap: glass.glassSpacing.md } : { flexDirection: "column", gap: glass.glassSpacing.md },
     footnote: { fontSize: 11, color: glass.glassSurface.textMuted, textAlign: "center", paddingTop: 4 },
   });
