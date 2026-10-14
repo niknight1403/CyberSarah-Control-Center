@@ -154,7 +154,7 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     justifyContent: "center",
   },
   iconWrapActive: { backgroundColor: glass.accentAlpha("cyan", 0.1) },
-  itemTitle: { color: glass.glassSurface.textSecondary, fontSize: 13, fontWeight: "650", flex: 1 },
+  itemTitle: { color: glass.glassSurface.textSecondary, fontSize: 13, fontWeight: "600", flex: 1 },
   itemTitleActive: { color: glass.glassSurface.textPrimary, fontWeight: "800" },
   footer: {
     flexDirection: "row",
