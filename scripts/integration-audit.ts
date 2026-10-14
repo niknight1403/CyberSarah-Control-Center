@@ -11,6 +11,7 @@
  * Aufruf: npm run audit [-- --send-telegram] [-- --url https://…]
  * Exit-Code 1 bei Fehlschlag — CI-faehig.
  */
+import { execFileSync } from "node:child_process";
 import { computeBackoffDelayMs, createToolProxyQueue, isRetryableTaskError } from "../lib/tool-proxy-queue-logic";
 import {
   buildTelegramMessage,
@@ -48,12 +49,31 @@ const check = (name: string, ok: boolean, detail: string) => {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name} — ${detail}`);
 };
 
+function curlStatus(url: string, timeoutMs: number): number {
+  try {
+    const seconds = Math.max(1, Math.ceil(timeoutMs / 1000));
+    const output = execFileSync(
+      "curl",
+      ["-L", "-sS", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", String(seconds), url],
+      { encoding: "utf8", timeout: timeoutMs + 2_000, stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    const status = Number.parseInt(output, 10);
+    return Number.isFinite(status) ? status : 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function fetchOk(url: string, timeoutMs = 10_000): Promise<{ ok: boolean; status: number }> {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     return { ok: response.ok, status: response.status };
   } catch {
-    return { ok: false, status: 0 };
+    // GitHub-Runner koennen bei Node-fetch sporadisch an DNS/IPv6/TLS scheitern,
+    // waehrend derselbe Host per curl erreichbar ist. Der Uptime-Waechter nutzt
+    // ebenfalls curl; execFileSync vermeidet Shell-Interpolation des URLs.
+    const status = curlStatus(url, timeoutMs);
+    return { ok: status >= 200 && status < 300, status };
   }
 }
 
