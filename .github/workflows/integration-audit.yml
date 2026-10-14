@@ -7,6 +7,10 @@ name: Integrations-Audit
 # Secrets kommen aus den Repo-Secrets — nie im Klartext im Workflow.
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/integration-audit.yml"
+      - "scripts/integration-audit.ts"
   workflow_dispatch:
     inputs:
       sendTelegramTest:
