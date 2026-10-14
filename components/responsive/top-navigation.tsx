@@ -95,7 +95,7 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   title: {
     color: glass.glassSurface.textPrimary,
     fontSize: 18,
-    fontWeight: "850",
+    fontWeight: "800",
     marginTop: 2,
   },
   subtitle: {
