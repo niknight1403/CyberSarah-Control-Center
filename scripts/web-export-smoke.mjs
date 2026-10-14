@@ -136,7 +136,10 @@ let rootEl = null;
 let rootText = "";
 let startupShellHidden = false;
 
-const maxWaitMs = 12000;
+// Sprint 196: 30 s statt 12 s — Render-Free-Tier-Cold-Starts (Login-Auth-
+// Abfrage) brauchen gelegentlich laenger als 12 s. Kein Test-Matching-
+// Lockern: nur mehr Geduld beim Rendern.
+const maxWaitMs = 30000;
 const pollIntervalMs = 250;
 const startTime = Date.now();
 
