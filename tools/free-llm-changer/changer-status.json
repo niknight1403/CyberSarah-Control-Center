@@ -1,5 +1,5 @@
 {
-  "stand": "2026-10-15T22:57:44",
+  "stand": "2026-10-16T01:04:08",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -18,12 +18,12 @@
     {
       "id": "groq",
       "status": "VERFUEGBAR",
-      "modell": "openai/gpt-oss-20b"
+      "modell": "openai/gpt-oss-120b"
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT",
-      "modell": "429 liquid/lfm-2.5-2.6b:free) — Changer rotiert weiter"
+      "status": "VERFUEGBAR",
+      "modell": "nvidia/nemotron-3.5-super-vl:free"
     },
     {
       "id": "cerebras",
