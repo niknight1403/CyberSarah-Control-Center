@@ -13,10 +13,14 @@
  * Auth-Session nicht mehr bedingungslos im Login-Screen, sondern wird
  * erst gemountet, sobald die Konfiguration da ist (<GoogleLoginSession/>).
  * Ohne Client-ID bleibt der Hook sauber inert (kein Crash, kein Button).
- * React-Hook-Regeln bleiben gewahrt: useIdTokenAuthRequest laeuft
- * unbedingte INNERHALB der Session-Komponente, nie bedingt im Eltern-Hook.
+ *
+ * Lint-/Hook-Konventionen: useIdTokenAuthRequest laeuft unbedingte INNERHALB
+ * der Session-Komponente (nie bedingt im Eltern-Hook); Refs werden
+ * ausschliesslich in Effects/Callbacks geschrieben und gelesen, nie waehrend
+ * des Renders; die Bereitschaft des Auth-Requests wird der Elternkomponente
+ * per Callback gemeldet (kein Ref-Zugriff im Render-Pfad).
  */
-import { ReactNode, useCallback, useEffect, useRef } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import * as Google from "expo-auth-session/providers/google";
 
@@ -24,34 +28,47 @@ type IdTokenHandler = (idToken: string) => Promise<void>;
 
 /**
  * Gemountete Auth-Session. Ruft den Google-Hook NUR mit garantierter
- * Client-ID auf; promptAsync wird dem Eltern-Hook per Ref zugestellt.
+ * Client-ID auf; promptAsync wird dem Eltern-Hook per Callback zugestellt.
  * Rendert selbst nichts (null) — rein funktionales Bauteil.
  */
 export function GoogleLoginSession({
   clientId,
   onIdToken,
   onPrompt,
+  onReady,
 }: {
   clientId: string;
   onIdToken: IdTokenHandler;
   onPrompt: (prompt: () => void) => void;
+  onReady: (ready: boolean) => void;
 }) {
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     clientId,
   });
 
+  // Ref-Updates ausschliesslich in Effects (React-Regeln):
   const handlerRef = useRef(onIdToken);
-  handlerRef.current = onIdToken;
-  const handledRef = useRef(false);
-  const promptRef = useRef(promptAsync);
-  promptRef.current = promptAsync;
+  useEffect(() => {
+    handlerRef.current = onIdToken;
+  }, [onIdToken]);
 
+  const promptRef = useRef(promptAsync);
+  useEffect(() => {
+    promptRef.current = promptAsync;
+  }, [promptAsync]);
+
+  const handledRef = useRef(false);
+
+  // Prompt-Funktion beim Eltern-Hook hinterlegen + Bereitschaft melden,
+  // sobald der Auth-Request steht (request kann bis zum Discovery-Abschluss
+  // null sein — erst dann ist der Button wirklich klickbar).
   useEffect(() => {
     onPrompt(() => {
       handledRef.current = false;
       void promptRef.current();
     });
-  }, [onPrompt, request]);
+    onReady(Boolean(request));
+  }, [onPrompt, onReady, request]);
 
   useEffect(() => {
     if (response?.type === "success" && !handledRef.current) {
@@ -79,23 +96,32 @@ export function GoogleLoginSession({
  *    rendern, start() stoesst den Browser-Flow an.
  */
 export function useGoogleLogin(clientId: string | null, onIdToken: IdTokenHandler) {
+  const [sessionReady, setSessionReady] = useState(false);
   const promptRef = useRef<(() => void) | null>(null);
-  const onIdTokenRef = useRef(onIdToken);
-  onIdTokenRef.current = onIdToken;
 
   const onPrompt = useCallback((prompt: () => void) => {
     promptRef.current = prompt;
   }, []);
 
+  const onReady = useCallback((ready: boolean) => {
+    setSessionReady(ready);
+  }, []);
+
   const start = useCallback(() => {
-    if (promptRef.current) {
-      promptRef.current();
+    const prompt = promptRef.current;
+    if (prompt) {
+      prompt();
     }
   }, []);
 
   const session: ReactNode = clientId ? (
-    <GoogleLoginSession clientId={clientId} onIdToken={onIdToken} onPrompt={onPrompt} />
+    <GoogleLoginSession
+      clientId={clientId}
+      onIdToken={onIdToken}
+      onPrompt={onPrompt}
+      onReady={onReady}
+    />
   ) : null;
 
-  return { start, ready: Boolean(clientId) && Boolean(promptRef.current), session };
+  return { start, ready: Boolean(clientId) && sessionReady, session };
 }
