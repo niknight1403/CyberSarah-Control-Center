@@ -101,3 +101,7 @@ CyberSarah-ControlCenter-*.apk
 production.env
 .env
 tools/free-llm-changer/aktive-anbindung.env
+
+# Sprint-Aufräumung: nie eincommitten
+.env.bak*
+secrets-backup*
