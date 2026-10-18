@@ -88,6 +88,19 @@ window.addEventListener("error", (e) => {
     errors.push("WINDOW-ERROR: " + msg);
   }
 });
+
+// Node-Ebene: Der Web-Export startet im DOM-Harness FontFaceObserver-Ladungen,
+// deren Timeout (z. B. '12000ms timeout exceeded') als unbehandelte
+// Promise-Rejection durchschlaegt, sobald der Smoke laenger als das
+// Font-Timeout laeuft. Dieselben Muster gelten bereits als Harness-Noise
+// (HARNES_NOISE oben) — sie duerfen den Prozess nicht reissen; echte,
+// unbekannte Rejections fuehren weiterhin zum Abbruch.
+process.on("unhandledRejection", (reason) => {
+  const msg = String(reason?.stack ?? reason?.message ?? reason);
+  if (HARNES_NOISE.some((re) => re.test(msg))) return;
+  console.error("UNHANDLED-REJECTION: " + msg.split("\n").slice(0, 3).join(" | "));
+  process.exitCode = 1;
+});
 window.console.error = (...args) => {
   const text = args.map((a) => (a?.stack ? a.stack.split("\n").slice(0, 3).join(" | ") : String(a))).join(" ");
   if (!HARNES_NOISE.some((re) => re.test(text))) errors.push("CONSOLE.ERROR: " + text.slice(0, 400));
