@@ -147,6 +147,8 @@ let loginScreenOk = false;
 let navigationOk = false;
 let rootEl = null;
 let rootText = "";
+let loginHeaderSeen = false;
+let loginPromptSeen = false;
 let startupShellHidden = false;
 
 // Sprint 196: 30 s statt 12 s — Render-Free-Tier-Cold-Starts (Login-Auth-
@@ -166,6 +168,10 @@ while (Date.now() - startTime < maxWaitMs) {
   const hasLoginHeader = /CYBERSARAH|Control Center/i.test(rootText);
   const hasLoginPrompt = /Willkommen zurück|Anmelden|Login/i.test(rootText);
   loginScreenOk = hasLoginHeader && hasLoginPrompt;
+  if (mounted && !loginScreenOk) {
+    loginHeaderSeen ||= hasLoginHeader;
+    loginPromptSeen ||= hasLoginPrompt;
+  }
 
   // 2. Echte Kern-Navigation-Pruefung
   const hasTabRoutesInBundle = /agent|chat|revenue-os|settings|dashboard|account/i.test(js);
@@ -179,7 +185,9 @@ while (Date.now() - startTime < maxWaitMs) {
 }
 
 console.log(`web-export-smoke [DOM]: #root ${mounted ? "enthaelt Markup" : "LEER"} (${rootEl?.innerHTML.length ?? 0} Bytes) | __csMounted=${startupShellHidden}`);
-console.log(`web-export-smoke [Login-Screen]: ${loginScreenOk ? "OK (Header + Prompt im DOM verifiziert)" : "FEHLGESCHLAGEN"}`);
+console.log(
+  `web-export-smoke [Login-Screen]: ${loginScreenOk ? "OK (Header + Prompt im DOM verifiziert)" : `FEHLGESCHLAGEN (Header=${loginHeaderSeen}, Prompt=${loginPromptSeen}, Root-Text: ${JSON.stringify(rootText.slice(0, 300))}`}`
+);
 console.log(`web-export-smoke [Kern-Navigation]: ${navigationOk ? "OK (Tab-Routen im Bundle + Nav-DOM verifiziert)" : "FEHLGESCHLAGEN"}`);
 
 if (errors.length) {
