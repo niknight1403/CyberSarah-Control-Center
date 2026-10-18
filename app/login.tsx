@@ -20,6 +20,7 @@ import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { ScreenContainer } from "@/components/screen-container";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { trpc } from "@/lib/trpc";
+import { useGoogleLogin } from "@/lib/google-login";
 
 export default function LoginScreen() {
   const styles = useMemo(() => createStyles(), []);
@@ -31,8 +32,30 @@ export default function LoginScreen() {
 
   const loginMutation = trpc.account.login.useMutation();
   const registerMutation = trpc.account.register.useMutation();
+  const googleLoginMutation = trpc.account.loginWithGoogle.useMutation();
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
-  const busy = loginMutation.isPending || registerMutation.isPending;
+  const googleConfigQuery = trpc.account.googleLoginConfig.useQuery(undefined, { retry: false });
+  const googleClientId = googleConfigQuery.data?.enabled ? googleConfigQuery.data.clientId : null;
+  const busy = loginMutation.isPending || registerMutation.isPending || googleLoginMutation.isPending;
+
+  const finishLogin = async (result: { sessionToken: string; user: Awaited<ReturnType<typeof Auth.getUserInfo>> | { id: number; openId: string; name: string | null; email: string | null; loginMethod: string | null; role: "user" | "admin"; lastSignedIn: Date; designTheme: string | null } }) => {
+    await Auth.setSessionToken(result.sessionToken);
+    await Auth.setUserInfo(result.user as never);
+    await accountQuery.refetch();
+    router.replace("/");
+  };
+
+  const handleGoogleIdToken = async (idToken: string) => {
+    setMessage("");
+    try {
+      const result = await googleLoginMutation.mutateAsync({ idToken });
+      await finishLogin(result);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Die Google-Anmeldung konnte nicht abgeschlossen werden.");
+    }
+  };
+
+  const googleLogin = useGoogleLogin(googleClientId, handleGoogleIdToken);
 
   const submit = async () => {
     setMessage("");
@@ -112,6 +135,18 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
+            {googleClientId ? (
+              <Pressable
+                accessibilityLabel="Mit Google anmelden"
+                accessibilityRole="button"
+                disabled={busy || !googleLogin.ready}
+                onPress={googleLogin.start}
+                style={({ pressed }) => [styles.googleButton, (busy || !googleLogin.ready) && styles.disabled, pressed && styles.pressed]}
+              >
+                <Text style={styles.googleText}>Mit Google anmelden</Text>
+              </Pressable>
+            ) : null}
+
             {message.length > 0 ? <Text style={styles.message}>{message}</Text> : null}
 
             <View style={styles.switchRow}>
@@ -144,6 +179,8 @@ function createStyles() {
     disabled: { opacity: 0.5 },
     pressed: { opacity: 0.8 },
     message: { color: glassPalette.red, fontSize: 12, lineHeight: 17 },
+    googleButton: { alignItems: "center", backgroundColor: "transparent", borderColor: glassPalette.cyan, borderRadius: 12, borderWidth: 1, justifyContent: "center", minHeight: 46 },
+    googleText: { color: glassPalette.cyan, fontWeight: "800" },
     switchRow: { alignItems: "center", marginTop: 4 },
     switchText: { color: glassPalette.cyan, fontSize: 12, fontWeight: "700" },
     footnote: { color: glassSurface.textMuted, fontSize: 10, lineHeight: 15, marginTop: 14, textAlign: "center" },
