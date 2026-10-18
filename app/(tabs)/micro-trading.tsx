@@ -7,6 +7,7 @@ import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { ScreenContainer } from "@/components/screen-container";
 import { useMicroTrading } from "@/hooks/use-micro-trading";
+import { usePaperTrading } from "@/hooks/use-paper-trading";
 import { formatPercentGerman, formatPriceGerman, TRADING_DISCLAIMER } from "@/lib/micro-trading-logic";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 
@@ -25,6 +26,7 @@ const PROMPT_HINTS = [
 export default function MicroTradingScreen() {
   const drawer = useNavDrawer();
   const { state, refreshWatchlist, runPrompt } = useMicroTrading();
+  const paper = usePaperTrading(state.watchlist);
   const [prompt, setPrompt] = useState("");
   const styles = useMemo(() => createStyles(), []);
 
@@ -88,6 +90,61 @@ export default function MicroTradingScreen() {
                 {entry.status === "error" && <Text style={styles.errorNote}>{entry.note}</Text>}
               </View>
             ))}
+          </GlassCard>
+
+          <GlassCard accent="green" style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Kapital-Loop · Paper-Engine (20 €)</Text>
+              <Pressable
+                accessibilityLabel={paper.autoTrade ? "Auto-Trading stoppen" : "Auto-Trading starten"}
+                onPress={paper.toggleAutoTrade}
+                style={[styles.refreshButton, { borderColor: paper.autoTrade ? `${glassPalette.green}cc` : glassSurface.border }]}
+              >
+                <Text style={[styles.refreshText, { color: paper.autoTrade ? glassPalette.green : glassSurface.textMuted }]}>
+                  {paper.autoTrade ? "AUTO AKTIV" : "AUTO STARTEN"}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.statRow}>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>Eigenkapital</Text>
+                <Text style={styles.statValue}>{paper.stats.equity.toFixed(2)} €</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>Realisiert</Text>
+                <Text style={[styles.statValue, { color: paper.stats.realized >= 0 ? glassPalette.green : glassPalette.amber }]}>
+                  {paper.stats.realized >= 0 ? "+" : ""}{paper.stats.realized.toFixed(2)} €
+                </Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>Offen</Text>
+                <Text style={styles.statValue}>{paper.stats.openPositions} · {paper.stats.trades} T</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>Trefferquote</Text>
+                <Text style={styles.statValue}>{(paper.stats.winRate * 100).toFixed(0)} %</Text>
+              </View>
+            </View>
+            <Text style={styles.noteText}>
+              Guardrails: Start {paper.guardrails.startCapital} € · Stop-Loss {paper.guardrails.stopLossPercent} % · Ziel {paper.guardrails.takeProfitPercent} % · max. {paper.guardrails.maxPositions} Positionen à {Math.round(paper.guardrails.maxPositionShare * 100)} % · Gebühr {paper.guardrails.feePercent} %
+            </Text>
+            {paper.wallet.positions.map((position) => (
+              <View key={position.id} style={styles.row}>
+                <Text style={styles.symbol}>{position.symbol}</Text>
+                <Text style={styles.statLabel}>
+                  {position.qty} @ {formatPriceGerman(position.entryPrice)}
+                </Text>
+                <Pressable accessibilityLabel={`${position.symbol} schließen`} onPress={() => paper.closeManually(position.id)} style={styles.refreshButton}>
+                  <Text style={styles.refreshText}>Schließen</Text>
+                </Pressable>
+              </View>
+            ))}
+            {paper.events.slice(0, 4).map((event, index) => (
+              <Text key={`${index}-${event.note.slice(0, 10)}`} style={styles.eventText}>• {event.note}</Text>
+            ))}
+            <Pressable accessibilityLabel="Paper-Konto zurücksetzen" onPress={paper.reset} style={styles.analyzeButton}>
+              <Text style={styles.analyzeButtonText}>Paper-Konto auf {paper.guardrails.startCapital} € zurücksetzen</Text>
+            </Pressable>
           </GlassCard>
 
           <GlassCard accent="purple" style={styles.card}>
@@ -166,5 +223,10 @@ function createStyles() {
     analyzeButtonText: { color: glassPalette.purple, fontSize: 12, fontWeight: "800" },
     resultLine: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 17, marginBottom: 3 },
     disclaimer: { color: glassSurface.textMuted, fontSize: 10, lineHeight: 15, marginTop: 6 },
+    statRow: { flexDirection: "row", gap: 8 },
+    statCell: { backgroundColor: glassSurface.border + "55", borderRadius: 10, flex: 1, paddingHorizontal: 8, paddingVertical: 8 },
+    statLabel: { color: glassSurface.textMuted, fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
+    statValue: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "900", marginTop: 2 },
+    eventText: { color: glassSurface.textSecondary, fontSize: 10, lineHeight: 15 },
   });
 }
