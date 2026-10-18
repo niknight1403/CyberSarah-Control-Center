@@ -135,6 +135,9 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
+            {/* Auth-Session erst mounten, wenn die Server-Konfiguration da ist
+                (Web-Fix: useIdTokenAuthRequest crasht ohne Client-ID). */}
+            {googleLogin.session}
             {googleClientId ? (
               <Pressable
                 accessibilityLabel="Mit Google anmelden"
