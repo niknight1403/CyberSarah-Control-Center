@@ -20,6 +20,7 @@ on:
           - x-post-live-test
           - user-status
           - user-set-password
+          - quota-diagnose
         default: chat-clear-preview
         email:
           description: "E-Mail fuer user-status/user-set-password"
@@ -93,3 +94,13 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install pg --no-audit --no-fund >/dev/null 2>&1
           node publishing-live-test.mjs
+
+      - name: Quota-Diagnose (schreibgeschuetzt)
+        if: github.event.inputs.operation == 'quota-diagnose'
+        working-directory: scripts/db-ops
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install pg --no-audit --no-fund >/dev/null 2>&1
+          node quota-diagnose.mjs
