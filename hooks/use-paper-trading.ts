@@ -69,7 +69,7 @@ export function usePaperTrading(watchlist: WatchlistEntry[]) {
     .filter((entry): entry is WatchlistEntry & { lastPrice: number } => entry.status === "ok" && entry.lastPrice != null)
     .map((entry) => {
       const meta = getSymbol(entry.symbolId) ?? MICRO_TRADING_SYMBOLS[0];
-      return { symbolId: entry.symbolId, symbol: meta.symbol, price: entry.lastPrice, changePercent: entry.changePercent };
+      return { symbolId: entry.symbolId, symbol: meta.label, price: entry.lastPrice, changePercent: entry.changePercent };
     });
 
   const priceById = Object.fromEntries(markets.map((m) => [m.symbolId, m.price]));
