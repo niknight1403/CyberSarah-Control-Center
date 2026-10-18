@@ -50,7 +50,11 @@ export function usePaperTrading(watchlist: WatchlistEntry[]) {
   const [autoTrade, setAutoTrade] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const autoRef = useRef(false);
-  autoRef.current = autoTrade;
+  // Ref-Update nur im Effect (react-hooks/lint: nie Refs waehrend des Renders
+  // schreiben) — lesend bleibt autoRef in Ticks/Callbacks gleich aktuell.
+  useEffect(() => {
+    autoRef.current = autoTrade;
+  }, [autoTrade]);
 
   useEffect(() => {
     void loadWallet().then((w) => {
