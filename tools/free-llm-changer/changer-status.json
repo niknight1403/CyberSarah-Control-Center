@@ -1,14 +1,14 @@
 {
-  "stand": "2026-10-18T02:55:31",
+  "stand": "2026-10-18T07:45:53",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemma-4-26b-a4b-it",
+  "modell": "gemini-flash-latest",
   "anbieter": [
     {
       "id": "gemini",
       "status": "VERFUEGBAR",
-      "modell": "gemma-4-26b-a4b-it"
+      "modell": "gemini-flash-latest"
     },
     {
       "id": "gemini-backup",
@@ -18,12 +18,12 @@
     {
       "id": "groq",
       "status": "VERFUEGBAR",
-      "modell": "openai/gpt-oss-20b"
+      "modell": "openai/gpt-oss-120b"
     },
     {
       "id": "openrouter",
-      "status": "VERFUEGBAR",
-      "modell": "xingchen-agi/xing4.0-29b-a4b:free"
+      "status": "LIMIT ERREICHT",
+      "modell": "429 dots-studio/dots-3-note-preview:free) — Changer rotiert weiter"
     },
     {
       "id": "cerebras",
