@@ -20,8 +20,10 @@ export const TRADING_GUARDRAILS = {
   takeProfitPercent: 4,
   /** Maximal gleichzeitig offene Micro-Positionen. */
   maxPositions: 3,
-  /** Maximaler Anteil des Barbestands je Position. */
-  maxPositionShare: 0.25,
+  /** Hartes Limit je Position: Anteil des STARTKAPITALS (nie mehr als 40%). */
+  maxPositionShare: 0.4,
+  /** Re-Entry-Sperre nach Stop-Loss (Millisekunden) — nie ins fallende Messer zurück. */
+  stopLossCooldownMs: 30 * 60_000,
   /** Kleinster sinnvoller Auftrag (Euro) — darunter kein Einstieg. */
   minNotional: 3,
   /** Kauf-Signal: Symbol im Watchlist-Dip (24h-Aenderung in Prozent). */
@@ -61,6 +63,8 @@ export type PaperWallet = {
   startCapital: number;
   positions: PaperPosition[];
   history: PaperTrade[];
+  /** symbolId -> Sperrzeitstempel (Re-Entry nach Stop-Loss). */
+  cooldowns?: Record<string, number>;
 };
 
 export type TickEvent =
@@ -71,7 +75,7 @@ export type TickEvent =
 export type MarketPrice = { symbolId: string; symbol: string; price: number; changePercent: number | null };
 
 export function createPaperWallet(startCapital: number = TRADING_GUARDRAILS.startCapital): PaperWallet {
-  return { version: 1, cash: startCapital, startCapital, positions: [], history: [] };
+  return { version: 1, cash: startCapital, startCapital, positions: [], history: [], cooldowns: {} };
 }
 
 export function unrealizedPnlOf(wallet: PaperWallet, priceById: Record<string, number>): number {
@@ -103,9 +107,17 @@ function feeOn(notional: number): number {
   return (notional * TRADING_GUARDRAILS.feePercent) / 100;
 }
 
+/**
+ * Positionssizing: Das Barvermoegen wird gleichmaessig auf die freien Slots
+ * verteilt (20 EUR / 3 Slots = 6,67 EUR), je Position gedeckelt auf
+ * maxPositionShare des STARTKAPITALS. So koennen auch kleine Konten alle
+ * Slots fuellen, ohne das Mindestvolumen zu unterlaufen.
+ */
 export function positionBudget(wallet: PaperWallet): number {
-  const budget = Math.min(wallet.cash * TRADING_GUARDRAILS.maxPositionShare, wallet.cash);
-  return Math.floor(budget * 100) / 100;
+  const freeSlots = Math.max(1, TRADING_GUARDRAILS.maxPositions - wallet.positions.length);
+  const perSlot = wallet.cash / freeSlots;
+  const cap = wallet.startCapital * TRADING_GUARDRAILS.maxPositionShare;
+  return Math.floor(Math.min(perSlot, cap) * 100) / 100;
 }
 
 /** Einstieg: Guardrails pruefen, Menge runden, Gebuehr sofort abziehen. */
@@ -193,7 +205,7 @@ export function autoTradeTick(wallet: PaperWallet, markets: MarketPrice[], nowMs
     if (!price) continue;
     if (price <= position.stopLoss) {
       const res = closePosition(current, position, price, "STOP_LOSS", nowMs);
-      current = res.wallet;
+      current = { ...res.wallet, cooldowns: { ...(res.wallet.cooldowns ?? {}), [position.symbolId]: nowMs + TRADING_GUARDRAILS.stopLossCooldownMs } };
       events.push({ type: "CLOSE", symbol: position.symbol, reason: "STOP_LOSS", pnl: res.trade.pnl, note: `${position.symbol} Stop-Loss bei ${price.toFixed(2)} USD` });
     } else if (price >= position.takeProfit) {
       const res = closePosition(current, position, price, "TAKE_PROFIT", nowMs);
@@ -203,9 +215,11 @@ export function autoTradeTick(wallet: PaperWallet, markets: MarketPrice[], nowMs
   }
 
   if (current.positions.length < TRADING_GUARDRAILS.maxPositions) {
+    const cooldowns = current.cooldowns ?? {};
     const candidates = markets
       .filter((m) => m.changePercent != null && m.changePercent <= TRADING_GUARDRAILS.dipSignalPercent)
       .filter((m) => !current.positions.some((p) => p.symbolId === m.symbolId))
+      .filter((m) => (cooldowns[m.symbolId] ?? 0) <= nowMs) // Re-Entry-Sperre nach Stop-Loss
       .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0));
     for (const dip of candidates) {
       const res = openPosition(current, dip, nowMs);
