@@ -21,6 +21,15 @@ import { z } from "zod";
 import { router, adminProcedure } from "./_core/trpc";
 import { invokeLLM, type Message } from "./_core/llm";
 import { countPendingDraftsByKind, insertPendingDraft } from "./draft-engine";
+import { getDb } from "./db";
+import { affiliateProducts, funnelCampaigns } from "../drizzle/schema";
+import { desc, eq } from "drizzle-orm";
+import {
+  renderLandingHtml,
+  slugifyLanding,
+  validateFunnelForLaunch,
+  type LandingFunnelPayload,
+} from "../lib/digistore24-launch-logic";
 import { DRAFT_MAX_PENDING_PER_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
 import {
   buildEvaluationMessages,
@@ -132,6 +141,45 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
       payload,
       "digistore24-engine"
     );
+
+    // Block 4: Produkt upserten und Kampagne fuer den One-Click-Launch anlegen.
+    try {
+      const db = await getDb();
+      const inserted = await db
+        .insert(affiliateProducts)
+        .values({ slug: product.slug, title: productTitle, productUrl: product.url })
+        .onConflictDoUpdate({
+          target: affiliateProducts.slug,
+          set: { title: productTitle, productUrl: product.url, updatedAt: new Date() },
+        })
+        .returning({ id: affiliateProducts.id });
+      const productId = inserted[0]?.id;
+      if (productId) {
+        await db.insert(funnelCampaigns).values({
+          productId,
+          name: funnel.name,
+          hypothesis: funnel.hypothesis,
+          stages: funnel.stages,
+          metric: funnel.metric,
+          landingJson: {
+            headline: funnel.headline ?? funnel.name,
+            subheadline: funnel.subheadline ?? "",
+            benefits: funnel.benefits ?? funnel.stages,
+            ctaText: funnel.ctaText ?? "Jetzt Zugang sichern",
+            audience: funnel.audience ?? "",
+            keywords: funnel.keywords ?? [],
+          },
+        });
+      }
+    } catch (persistError) {
+      return {
+        queued: true,
+        ok: false,
+        detail: `Funnel in Freigabe-Queue, aber Persistenz fehlgeschlagen: ${
+          persistError instanceof Error ? persistError.message : String(persistError)
+        }`,
+      };
+    }
     return {
       queued: true,
       ok: true,
@@ -141,6 +189,43 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
   } catch (error) {
     return { queued: false, ok: false, detail: `Funnel-Generierung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}` };
   }
+}
+
+/** Kampagnen-Verwaltung: One-Click-Launch (Block 4, HITL-Freigabe). */
+async function launchCampaign(campaignId: number) {
+  const db = await getDb();
+  const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.id, campaignId)).limit(1);
+  const campaign = rows[0];
+  if (!campaign) return { ok: false as const, reason: "Kampagne nicht gefunden." };
+
+  const productRows = await db
+    .select()
+    .from(affiliateProducts)
+    .where(eq(affiliateProducts.id, campaign.productId))
+    .limit(1);
+  const product = productRows[0];
+
+  const funnel = (campaign.landingJson ?? null) as LandingFunnelPayload | null;
+  const check = validateFunnelForLaunch({
+    productTitle: product?.title ?? null,
+    affiliateUrl: product?.productUrl ?? null,
+    funnel,
+  });
+  if (!check.ok) {
+    return { ok: false as const, reason: check.reason };
+  }
+
+  const slug = slugifyLanding(campaign.name);
+  const affiliateUrl = product!.productUrl!;
+  await db
+    .update(funnelCampaigns)
+    .set({ status: "live", slug, affiliateUrl, approvedAt: new Date(), updatedAt: new Date() })
+    .where(eq(funnelCampaigns.id, campaignId));
+  return {
+    ok: true as const,
+    landingUrl: `/landings/${slug}`,
+    affiliateUrl,
+  };
 }
 
 export const digistore24Router = router({
@@ -156,4 +241,36 @@ export const digistore24Router = router({
       })
     )
     .mutation(async ({ input }) => generateDigistoreFunnel(input.slug, input.productTitle)),
+
+  /** Block 4: Alle Kampagnen mit Status und Landing-URLs (Admin-Uebersicht). */
+  campaigns: adminProcedure.query(async () => {
+    const db = await getDb();
+    const rows = await db.select().from(funnelCampaigns).orderBy(desc(funnelCampaigns.createdAt)).limit(100);
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      hypothesis: r.hypothesis,
+      status: r.status,
+      slug: r.slug ?? null,
+      affiliateUrl: r.affiliateUrl ?? null,
+      createdAt: r.createdAt,
+    }));
+  }),
+
+  /** Block 4: One-Click-Launch — schaltet eine Kampagne nach Pruefung live. */
+  launch: adminProcedure
+    .input(z.object({ campaignId: z.number().int().positive() }))
+    .mutation(async ({ input }) => launchCampaign(input.campaignId)),
+
+  /** Block 4: Kampagne pausieren (Landing wird sofort unauffindbar). */
+  revoke: adminProcedure
+    .input(z.object({ campaignId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      await db
+        .update(funnelCampaigns)
+        .set({ status: "paused", updatedAt: new Date() })
+        .where(eq(funnelCampaigns.id, input.campaignId));
+      return { ok: true as const };
+    }),
 });

@@ -25,6 +25,12 @@ export type FunnelPackage = {
   hypothesis: string;
   stages: string[];
   metric: string;
+  /** Landing-Felder (Block 4) — optional, Validator verlangt sie vor dem Launch. */
+  headline?: string;
+  subheadline?: string;
+  benefits?: string[];
+  ctaText?: string;
+  audience?: string;
 };
 
 /** Marketplace-URL des deutschen Digistore24-Produktkatalogs. */
@@ -128,6 +134,8 @@ export function buildFunnelMessages(product: DigistoreProduct): Array<{ role: "u
         `Erstelle fuer das Digistore24-Affiliate-Produkt "${product.title}" (URL: ${product.url}) ` +
         `einen hochkonvertierenden Launch-Funnel im deutschsprachigen Raum. Antworte NUR mit JSON: ` +
         `{"name":"Kampagnen-Name","hypothesis":"warum dieses Produkt Geld verdient (Zielgruppe + Hebel)",` +
+        `"headline":"<Landingpage-Headline, max 12 Woerter>","subheadline":"<Unterzeile, max 20 Woerter>",` +
+        `"benefits":["<Nutzen 1>","<Nutzen 2>","<Nutzen 3>"],"ctaText":"<CTA-Button-Text>","audience":"<Zielgruppe in 1 Satz>",` +
         `"stages":["STAGE 1: Landingpage: <Headline + 3 Bullets + CTA-Text>",` +
         `"STAGE 2: E-Mail-Sequenz: <3 Betreffzeilen mit je 1-Satz-Anreisern>",` +
         `"STAGE 3: Sales-Copy: <kurzer Verkaufstext fuer Social>",` +
@@ -157,5 +165,22 @@ export function parseFunnel(text: string): FunnelPackage | null {
     : [];
   const metric = typeof r.metric === "string" ? r.metric.trim() : "";
   if (!name || name.length < 4 || !hypothesis || stages.length < 3 || !metric) return null;
-  return { name: name.slice(0, 120), hypothesis: hypothesis.slice(0, 600), stages: stages.slice(0, 6), metric: metric.slice(0, 200) };
+  const headline = typeof r.headline === "string" ? r.headline.trim().slice(0, 160) : undefined;
+  const subheadline = typeof r.subheadline === "string" ? r.subheadline.trim().slice(0, 240) : undefined;
+  const benefits = Array.isArray(r.benefits)
+    ? r.benefits.filter((b): b is string => typeof b === "string" && b.trim().length > 0).map((b) => b.trim().slice(0, 240)).slice(0, 6)
+    : undefined;
+  const ctaText = typeof r.ctaText === "string" ? r.ctaText.trim().slice(0, 60) : undefined;
+  const audience = typeof r.audience === "string" ? r.audience.trim().slice(0, 240) : undefined;
+  return {
+    name: name.slice(0, 120),
+    hypothesis: hypothesis.slice(0, 600),
+    stages: stages.slice(0, 6),
+    metric: metric.slice(0, 200),
+    ...(headline ? { headline } : {}),
+    ...(subheadline ? { subheadline } : {}),
+    ...(benefits && benefits.length ? { benefits } : {}),
+    ...(ctaText ? { ctaText } : {}),
+    ...(audience ? { audience } : {}),
+  };
 }

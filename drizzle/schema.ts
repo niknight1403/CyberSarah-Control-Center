@@ -389,6 +389,10 @@ export const funnelCampaigns = pgTable("funnel_campaigns", {
   status: varchar("status", { length: 32 }).default("awaiting_approval").notNull(),
   /** Affiliate-Link inkl. Tracking-Parameter (nach Freigabe gesetzt). */
   affiliateUrl: varchar("affiliateUrl", { length: 800 }),
+  /** Oeffentlicher Landing-Slug (nur live-Kampagnen werden ausgeliefert). */
+  slug: varchar("slug", { length: 120 }).unique(),
+  /** Vollstaendiger Funnel-Payload fuer die Landingpage-Renderung. */
+  landingJson: jsonb("landingJson"),
   approvedAt: timestamp("approvedAt", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
