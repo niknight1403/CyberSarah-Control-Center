@@ -22,11 +22,11 @@ on:
           - user-set-password
           - quota-diagnose
         default: chat-clear-preview
-        email:
+      email:
           description: "E-Mail fuer user-status/user-set-password"
           required: false
           default: ""
-        hash:
+      hash:
           description: "scrypt-Hash (scrypt$salt$derived) fuer user-set-password — niemals Klartext"
           required: false
           default: ""
