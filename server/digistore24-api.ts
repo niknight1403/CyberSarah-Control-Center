@@ -109,6 +109,7 @@ async function recordCommission(
   commissionSign: 1 | -1,
 ): Promise<"inserted" | "duplicate"> {
   const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar.");
   const id = item.id ?? item.transaction_id ?? item.purchase_id ?? "unknown";
   const orderKey = `d24:${id}:${eventType}`;
   const amountCents = cents(item.amount as number) * commissionSign;

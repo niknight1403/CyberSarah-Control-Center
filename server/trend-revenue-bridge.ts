@@ -80,21 +80,24 @@ async function generateContentDraft(input: {
     product: input.productTitle,
   });
   if (!pkg) return { ok: false, detail: "LLM-Ergebnis war kein gueltiges Content-JSON — ehrlich verworfen." };
-  const draft = await insertPendingDraft(
-    "content",
-    `Viraler Content bereit: ${input.productTitle} (${input.platform})`,
-    {
-      personaId: "cybersarah",
-      platform: pkg.platform,
-      topic: pkg.trend || input.productTitle,
-      content: `HOOK: ${pkg.hook}\n\nSCRIPT: ${pkg.script}\n\nCAPTION: ${pkg.caption}\n\nHASHTAGS: ${pkg.hashtags
-        .map((h) => `#${h}`)
-        .join(" ")}`,
-    },
-    input.userId
-  );
-  if (!draft) return { ok: false, detail: "Entwurf konnte nicht gespeichert werden (DB nicht verfuegbar)." };
-  return { ok: true, detail: `Entwurf #${draft.id} in der Freigabe-Queue.` };
+  try {
+    await insertPendingDraft(
+      "content",
+      `Viraler Content bereit: ${input.productTitle} (${input.platform})`,
+      {
+        personaId: "cybersarah",
+        platform: pkg.platform,
+        topic: pkg.trend || input.productTitle,
+        content: `HOOK: ${pkg.hook}\n\nSCRIPT: ${pkg.script}\n\nCAPTION: ${pkg.caption}\n\nHASHTAGS: ${pkg.hashtags
+          .map((h) => `#${h}`)
+          .join(" ")}`,
+      },
+      String(input.userId),
+    );
+  } catch {
+    return { ok: false, detail: "Entwurf konnte nicht gespeichert werden (DB nicht verfuegbar)." };
+  }
+  return { ok: true, detail: "Entwurf in der Freigabe-Queue." };
 }
 
 export const trendRevenueRouter = router({
@@ -109,7 +112,7 @@ export const trendRevenueRouter = router({
       if (!db) return { ...fetched, ranked: [], detail: `${fetched.detail} (Produkt-Ranking ohne DB nicht moeglich.)` };
       const product = (await db.select().from(affiliateProducts).where(eq(affiliateProducts.id, input.productId)).limit(1))[0];
       if (!product) return { ...fetched, ranked: [], detail: "Produkt nicht gefunden." };
-      const terms = [product.title ?? "", product.niche ?? ""];
+      const terms = [product.title ?? "", product.slug ?? ""];
       const ranked = rankTrendsForProduct(fetched.trends, terms).slice(0, 10);
       return { ok: true, trends: fetched.trends, detail: fetched.detail, ranked };
     }),
@@ -135,12 +138,12 @@ export const trendRevenueRouter = router({
       let trend: RankedTrend | null = null;
       const fetched = await fetchTrendSignals();
       if (fetched.ok) {
-        const ranked = rankTrendsForProduct(fetched.trends, [product.title ?? "", product.niche ?? ""]);
+        const ranked = rankTrendsForProduct(fetched.trends, [product.title ?? "", product.slug ?? ""]);
         trend = input.trendTitle ? ranked.find((t) => t.title === input.trendTitle) ?? ranked[0] ?? null : ranked[0] ?? null;
       }
       const result = await generateContentDraft({
         productTitle: product.title ?? `Produkt #${product.id}`,
-        productUrl: product.affiliateUrl ?? product.productUrl ?? "",
+        productUrl: product.url ?? "",
         trend,
         platform: input.platform,
         userId: ctx.user.id,
@@ -158,27 +161,27 @@ export const trendRevenueRouter = router({
       await db
         .select({
           events: sql<number>`count(*)::int`,
-          gross: sql<string>`coalesce(sum(${conversionEvents.amount}), 0)::text`,
-          commission: sql<string>`coalesce(sum(${conversionEvents.commission}), 0)::text`,
+          gross: sql<string>`coalesce(sum(${conversionEvents.amountCents}), 0)::text`,
+          commission: sql<string>`coalesce(sum(${conversionEvents.commissionCents}), 0)::text`,
         })
         .from(conversionEvents)
-        .where(and(gte(conversionEvents.createdAt, since), eq(conversionEvents.verified, true)))
+        .where(gte(conversionEvents.occurredAt, since))
     )[0];
     const perProduct = await db
       .select({
-        productId: conversionEvents.productId,
+        productSlug: conversionEvents.productSlug,
         events: sql<number>`count(*)::int`,
-        commission: sql<string>`coalesce(sum(${conversionEvents.commission}), 0)::text`,
+        commission: sql<string>`coalesce(sum(${conversionEvents.commissionCents}), 0)::text`,
       })
       .from(conversionEvents)
-      .where(gte(conversionEvents.createdAt, since))
-      .groupBy(conversionEvents.productId)
+      .where(gte(conversionEvents.occurredAt, since))
+      .groupBy(conversionEvents.productSlug)
       .orderBy(desc(sql`count(*)`))
       .limit(20);
     const daily = await db
       .select()
       .from(revenueDailyStats)
-      .orderBy(desc(revenueDailyStats.statDate))
+      .orderBy(desc(revenueDailyStats.day))
       .limit(days);
     return { ok: true, detail: `Zeitraum ${days} Tage.`, totals, perProduct, daily };
   }),

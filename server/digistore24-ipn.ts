@@ -80,6 +80,10 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
     res.status(503).json({ ok: false, detail: "Datenbank nicht verfügbar." });
     return;
   }
+  if (!db) {
+    res.status(503).json({ ok: false, detail: "Datenbank nicht verfügbar." });
+    return;
+  }
 
   // Auto-Discovery: unbekanntes Produkt ehrlich anlegen (kein Fake-Titel).
   if (productSlug) {

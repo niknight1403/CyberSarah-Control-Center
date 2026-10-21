@@ -31,6 +31,7 @@ export type FunnelPackage = {
   benefits?: string[];
   ctaText?: string;
   audience?: string;
+  keywords?: string[];
 };
 
 /** Marketplace-URL des deutschen Digistore24-Produktkatalogs. */

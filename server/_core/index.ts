@@ -225,6 +225,7 @@ async function startServer() {
   app.get("/landings/:slug/click", async (req, res) => {
     try {
       const db = await getDb();
+      if (!db) throw new Error("Tracking-Datenbank nicht verfuegbar.");
       const slug = String(req.params.slug ?? "").slice(0, 120);
       const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.slug, slug)).limit(1);
       const campaign = rows[0];
@@ -245,6 +246,7 @@ async function startServer() {
   app.get("/landings/:slug", async (req, res) => {
     try {
       const db = await getDb();
+      if (!db) throw new Error("Tracking-Datenbank nicht verfuegbar.");
       const slug = String(req.params.slug ?? "").slice(0, 120);
       const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.slug, slug)).limit(1);
       const campaign = rows[0];

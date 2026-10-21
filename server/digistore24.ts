@@ -146,12 +146,13 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
     // Block 4: Produkt upserten und Kampagne fuer den One-Click-Launch anlegen.
     try {
       const db = await getDb();
+      if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
       const inserted = await db
         .insert(affiliateProducts)
-        .values({ slug: product.slug, title: productTitle, productUrl: product.url })
+        .values({ slug: product.slug, title: productTitle, url: product.url })
         .onConflictDoUpdate({
           target: affiliateProducts.slug,
-          set: { title: productTitle, productUrl: product.url, updatedAt: new Date() },
+          set: { title: productTitle, url: product.url, updatedAt: new Date() },
         })
         .returning({ id: affiliateProducts.id });
       const productId = inserted[0]?.id;
@@ -195,6 +196,7 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
 /** Kampagnen-Verwaltung: One-Click-Launch (Block 4, HITL-Freigabe). */
 async function launchCampaign(campaignId: number) {
   const db = await getDb();
+  if (!db) return { ok: false as const, reason: "Die Kontodatenbank ist nicht verfuegbar." };
   const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.id, campaignId)).limit(1);
   const campaign = rows[0];
   if (!campaign) return { ok: false as const, reason: "Kampagne nicht gefunden." };
@@ -209,7 +211,7 @@ async function launchCampaign(campaignId: number) {
   const funnel = (campaign.landingJson ?? null) as LandingFunnelPayload | null;
   const check = validateFunnelForLaunch({
     productTitle: product?.title ?? null,
-    affiliateUrl: product?.productUrl ?? null,
+    affiliateUrl: product?.url ?? null,
     funnel,
   });
   if (!check.ok) {
@@ -217,7 +219,7 @@ async function launchCampaign(campaignId: number) {
   }
 
   const slug = slugifyLanding(campaign.name);
-  const affiliateUrl = product!.productUrl!;
+  const affiliateUrl = product!.url!;
   await db
     .update(funnelCampaigns)
     .set({ status: "live", slug, affiliateUrl, approvedAt: new Date(), updatedAt: new Date() })
@@ -251,6 +253,7 @@ export const digistore24Router = router({
   /** Block 4: Alle Kampagnen mit Status und Landing-URLs (Admin-Uebersicht). */
   campaigns: adminProcedure.query(async () => {
     const db = await getDb();
+    if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
     const rows = await db.select().from(funnelCampaigns).orderBy(desc(funnelCampaigns.createdAt)).limit(100);
     return rows.map((r) => ({
       id: r.id,
@@ -273,6 +276,7 @@ export const digistore24Router = router({
     .input(z.object({ campaignId: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
+      if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
       await db
         .update(funnelCampaigns)
         .set({ status: "paused", updatedAt: new Date() })
@@ -283,6 +287,7 @@ export const digistore24Router = router({
   /** Block 4: Woechentlicher Wachstums-Report — ganze Funnel-Messkette live. */
   growthReport: adminProcedure.query(async () => {
     const db = await getDb();
+    if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
     const campaigns = await db.select().from(funnelCampaigns).orderBy(desc(funnelCampaigns.createdAt)).limit(100);
     const events = await db.select().from(conversionEvents).orderBy(desc(conversionEvents.occurredAt)).limit(500);
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
