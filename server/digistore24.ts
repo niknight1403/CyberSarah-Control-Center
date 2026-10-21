@@ -22,7 +22,7 @@ import { router, adminProcedure } from "./_core/trpc";
 import { invokeLLM, type Message } from "./_core/llm";
 import { countPendingDraftsByKind, insertPendingDraft } from "./draft-engine";
 import { getDb } from "./db";
-import { affiliateProducts, funnelCampaigns } from "../drizzle/schema";
+import { affiliateProducts, conversionEvents, funnelCampaigns } from "../drizzle/schema";
 import { desc, eq } from "drizzle-orm";
 import {
   renderLandingHtml,
@@ -273,4 +273,47 @@ export const digistore24Router = router({
         .where(eq(funnelCampaigns.id, input.campaignId));
       return { ok: true as const };
     }),
+
+  /** Block 4: Woechentlicher Wachstums-Report — ganze Funnel-Messkette live. */
+  growthReport: adminProcedure.query(async () => {
+    const db = await getDb();
+    const campaigns = await db.select().from(funnelCampaigns).orderBy(desc(funnelCampaigns.createdAt)).limit(100);
+    const events = await db.select().from(conversionEvents).orderBy(desc(conversionEvents.occurredAt)).limit(500);
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+    const weekEvents = events.filter((e) => new Date(e.occurredAt) >= since);
+    const revenueCents = weekEvents.reduce((sum, e) => sum + (e.commissionCents ?? 0), 0);
+    const views = campaigns.reduce((sum, c) => sum + (c.viewCount ?? 0), 0);
+    const clicks = campaigns.reduce((sum, c) => sum + (c.clickCount ?? 0), 0);
+    const products = await db.select().from(affiliateProducts).limit(500);
+    const productSlugById = new Map(products.map((prod) => [prod.id, prod.slug] as const));
+    const perCampaign = campaigns.map((c) => {
+      const slug = productSlugById.get(c.productId) ?? "";
+      const conv = weekEvents.filter((e) => slug && e.productSlug === slug);
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        slug: c.slug,
+        views: c.viewCount ?? 0,
+        clicks: c.clickCount ?? 0,
+        ctr: (c.viewCount ?? 0) > 0 ? Math.round(((c.clickCount ?? 0) / (c.viewCount ?? 1)) * 1000) / 10 : 0,
+        conversions7d: conv.length,
+        commissionCents7d: conv.reduce((sum, e) => sum + (e.commissionCents ?? 0), 0),
+      };
+    });
+    return {
+      ok: true,
+      windowDays: 7,
+      totals: {
+        campaigns: campaigns.length,
+        live: campaigns.filter((c) => c.status === "live").length,
+        views,
+        clicks,
+        ctr: views > 0 ? Math.round((clicks / views) * 1000) / 10 : 0,
+        conversions: weekEvents.length,
+        revenueCents,
+      },
+      perCampaign,
+    };
+  }),
 });

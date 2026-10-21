@@ -82,3 +82,30 @@ describe("digistore24-launch-logic", () => {
     expect(html).toContain("Test &lt;Produkt&gt;");
   });
 });
+
+describe("CTA-Tracking", () => {
+  const base = {
+    campaignName: "Test-Kampagne",
+    productTitle: "Test-Produkt",
+    affiliateUrl: "https://example.com/aff?ref=1",
+    funnel: {
+      headline: "Sicher",
+      subheadline: "",
+      benefits: ["A"],
+      ctaText: "Kaufen",
+      audience: "",
+      keywords: [],
+    },
+  };
+
+  it("nutzt clickUrl als CTA-Ziel, wenn gesetzt", () => {
+    const html = renderLandingHtml({ ...base, clickUrl: "https://hub.cybersarah-ki.com/ccc/landings/test/click" });
+    expect(html).toContain('href="https://hub.cybersarah-ki.com/ccc/landings/test/click"');
+    expect(html).not.toContain('href="https://example.com/aff?ref=1"');
+  });
+
+  it("verlinkt ohne clickUrl direkt auf den Affiliate-Link", () => {
+    const html = renderLandingHtml({ ...base });
+    expect(html).toContain('href="https://example.com/aff?ref=1"');
+  });
+});

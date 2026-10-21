@@ -24,7 +24,7 @@ import { registerRenderProxy } from "./renderProxy";
 import { appRouter } from "../routers";
 import { getDb } from "../db";
 import { funnelCampaigns } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { renderLandingHtml, type LandingFunnelPayload } from "../../lib/digistore24-launch-logic";
 import { createContext } from "./context";
 import {
@@ -201,6 +201,31 @@ async function startServer() {
   // Funnel-Kampagnen-Tabelle. Nur status='live' wird ausgeliefert, alles
   // andere erhaelt 404 + noindex. HTML wird serverseitig aus dem geprueften
   // Payload gerendert und komplett escaped (kein XSS aus LLM-Texten).
+  /**
+   * Block-4-Performance-Tracking: Getrackter Affiliate-Klick.
+   * Zaehlt den Klick und leitet mit 302 auf den Affiliate-Link weiter.
+   * Nur live-Kampagnen; alles andere 404 + noindex (Ehrlichkeit statt Loop).
+   */
+  app.get("/landings/:slug/click", async (req, res) => {
+    try {
+      const db = await getDb();
+      const slug = String(req.params.slug ?? "").slice(0, 120);
+      const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.slug, slug)).limit(1);
+      const campaign = rows[0];
+      if (!campaign || campaign.status !== "live" || !campaign.affiliateUrl) {
+        res.status(404).setHeader("X-Robots-Tag", "noindex").type("html")
+          .send("<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"utf-8\"><title>Nicht gefunden</title></head><body style=\"font-family:sans-serif;text-align:center;padding-top:12vh;background:#080c16;color:#9aa6c2\"><h1 style=\"color:#e8ecf7\">Angebot nicht verfuegbar</h1></body></html>");
+        return;
+      }
+      await db.update(funnelCampaigns).set({ clickCount: sql`${funnelCampaigns.clickCount} + 1` })
+        .where(eq(funnelCampaigns.id, campaign.id));
+      res.status(302).setHeader("Cache-Control", "no-store").setHeader("Referrer-Policy", "no-referrer-when-downgrade")
+        .redirect(campaign.affiliateUrl);
+    } catch {
+      res.status(503).json({ ok: false, detail: "Tracking-Datenbank nicht verfuegbar." });
+    }
+  });
+
   app.get("/landings/:slug", async (req, res) => {
     try {
       const db = await getDb();
@@ -220,13 +245,19 @@ async function startServer() {
         return;
       }
       const funnel = (campaign.landingJson ?? {}) as LandingFunnelPayload;
+      const publicBase = (process.env.LANDING_PUBLIC_BASE ?? "").trim().replace(/\/+$/, "");
+      const clickUrl = publicBase ? `${publicBase}/landings/${slug}/click` : "";
       const html = renderLandingHtml({
         campaignName: campaign.name,
         productTitle: campaign.name,
         affiliateUrl: campaign.affiliateUrl,
+        ...(clickUrl ? { clickUrl } : {}),
         funnel,
       });
-      res.status(200).setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+      // Block-4-Tracking: Views zaehlen (best effort, kein Ausfallgrund).
+      db.update(funnelCampaigns).set({ viewCount: sql`${funnelCampaigns.viewCount} + 1` })
+        .where(eq(funnelCampaigns.id, campaign.id)).catch(() => {});
+      res.status(200).setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
       res.type("html").send(html);
     } catch (error) {
       res.status(503).json({ ok: false, detail: "Landing-Datenbank nicht verfuegbar." });

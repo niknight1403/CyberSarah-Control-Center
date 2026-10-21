@@ -91,6 +91,8 @@ export function renderLandingHtml(input: {
   campaignName: string;
   productTitle: string;
   affiliateUrl: string;
+  /** Getrackte CTA-URL (falls gesetzt) statt Direktlink. */
+  clickUrl?: string;
   funnel: LandingFunnelPayload;
 }): string {
   const headline = escapeHtml(input.funnel.headline);
@@ -98,7 +100,7 @@ export function renderLandingHtml(input: {
   const benefits = (input.funnel.benefits ?? []).filter((b) => (b ?? "").trim());
   const ctaText = escapeHtml((input.funnel.ctaText ?? "").trim() || "Jetzt Zugang sichern");
   const audience = escapeHtml(input.funnel.audience ?? "");
-  const url = escapeHtml(input.affiliateUrl);
+  const url = escapeHtml((input.clickUrl ?? "").trim() || input.affiliateUrl);
   const title = escapeHtml(input.productTitle);
 
   const cta = `<a class="cta" href="${url}" rel="nofollow sponsored noopener" target="_blank">${ctaText}</a>`;

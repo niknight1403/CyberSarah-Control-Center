@@ -393,6 +393,10 @@ export const funnelCampaigns = pgTable("funnel_campaigns", {
   slug: varchar("slug", { length: 120 }).unique(),
   /** Vollstaendiger Funnel-Payload fuer die Landingpage-Renderung. */
   landingJson: jsonb("landingJson"),
+  /** Landing-Aufrufe (Block 4 Performance-Tracking). */
+  viewCount: integer("viewCount").default(0).notNull(),
+  /** Klicks auf den Affiliate-CTA. */
+  clickCount: integer("clickCount").default(0).notNull(),
   approvedAt: timestamp("approvedAt", { withTimezone: true }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
