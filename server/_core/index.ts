@@ -31,6 +31,7 @@ import {
 } from "../billing";
 import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
+import { handleDigistore24Ipn } from "../digistore24-ipn";
 import { checkDatabaseHealth } from "../db";
 import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
@@ -184,6 +185,12 @@ async function startServer() {
       console.error("[Publishing] Auto-Karte fehlgeschlagen:", error instanceof Error ? error.message : "unbekannt");
       res.status(500).json({ error: "Karte konnte nicht generiert werden." });
     }
+  });
+
+  // Block 2 (2026-10-21): Digistore24-IPN — Signatur-validiert, idempotent,
+  // Auto-Discovery, aggregiert in affiliate_products/revenue_daily_stats.
+  app.post("/api/v1/webhooks/digistore24", (req, res) => {
+    void handleDigistore24Ipn(req, res);
   });
 
   app.get("/api/health", (_req, res) => {

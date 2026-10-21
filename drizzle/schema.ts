@@ -347,3 +347,74 @@ export type InsertPlatformTokenRow = typeof platformTokens.$inferInsert;
 
 export type PublishingJobRow = typeof publishingJobs.$inferSelect;
 export type InsertPublishingJobRow = typeof publishingJobs.$inferInsert;
+
+/* ======================================================================
+ * Phase 2 der Revenue-OS-Mission (2026-10-21): Digistore24-Affiliate-Kern.
+ * Zero-Stub: echte Tabellen fuer Produktkatalog, Funnel-Kampagnen mit
+ * Freigabe-Gate und idempotente Conversion-Events aus dem IPN-Webhook.
+ * ==================================================================== */
+
+/** Affiliate-Produkte aus Discovery/Scraping oder IPN-Auto-Discovery. */
+export const affiliateProducts = pgTable("affiliate_products", {
+  id: serial("id").primaryKey(),
+  /** Eindeutige Produkt-Kennung der Plattform (Digistore24-Slug). */
+  slug: varchar("slug", { length: 200 }).notNull().unique(),
+  title: varchar("title", { length: 300 }).notNull(),
+  url: varchar("url", { length: 500 }).notNull(),
+  /** Plattform-Herkunft (z. B. "digistore24"). */
+  platform: varchar("platform", { length: 64 }).default("digistore24").notNull(),
+  /** LLM-Bewertung 0-100 (Provision/Conversion/Nachfrage). */
+  score: integer("score"),
+  scoreReason: text("scoreReason"),
+  /** Provision in Prozent, sofern bekannt (aus Discovery oder IPN). */
+  commissionPercent: integer("commissionPercent"),
+  /** EPC in Cent, sofern von der Plattform geliefert. */
+  epcCents: integer("epcCents"),
+  /** Aktive Verkaeufe aus IPN-Events (idempotent aggregiert). */
+  conversionCount: integer("conversionCount").default(0).notNull(),
+  revenueCents: integer("revenueCents").default(0).notNull(),
+  discoveredAt: timestamp("discoveredAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Funnel-Kampagne mit HITL-Freigabe-Gate (awaiting_approval -> live). */
+export const funnelCampaigns = pgTable("funnel_campaigns", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  hypothesis: text("hypothesis").notNull(),
+  stages: jsonb("stages").notNull(),
+  metric: varchar("metric", { length: 200 }).notNull(),
+  /** awaiting_approval | live | paused | rejected */
+  status: varchar("status", { length: 32 }).default("awaiting_approval").notNull(),
+  /** Affiliate-Link inkl. Tracking-Parameter (nach Freigabe gesetzt). */
+  affiliateUrl: varchar("affiliateUrl", { length: 800 }),
+  approvedAt: timestamp("approvedAt", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Conversion-Events aus dem Digistore24-IPN (idempotent ueber orderKey). */
+export const conversionEvents = pgTable("conversion_events", {
+  id: serial("id").primaryKey(),
+  /** Idempotenz-Schluessel: order_id + event-Typ. */
+  orderKey: varchar("orderKey", { length: 200 }).notNull().unique(),
+  productSlug: varchar("productSlug", { length: 200 }),
+  eventType: varchar("eventType", { length: 64 }).notNull(),
+  amountCents: integer("amountCents").default(0).notNull(),
+  commissionCents: integer("commissionCents").default(0).notNull(),
+  currency: varchar("currency", { length: 8 }).default("EUR").notNull(),
+  buyerEmailHash: varchar("buyerEmailHash", { length: 128 }),
+  rawPayload: jsonb("rawPayload"),
+  occurredAt: timestamp("occurredAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Abo-Kennzahlen fuer das Wachstums-Dashboard (taeglich aggregiert). */
+export const revenueDailyStats = pgTable("revenue_daily_stats", {
+  id: serial("id").primaryKey(),
+  day: varchar("day", { length: 10 }).notNull().unique(),
+  clicks: integer("clicks").default(0).notNull(),
+  conversions: integer("conversions").default(0).notNull(),
+  revenueCents: integer("revenueCents").default(0).notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
