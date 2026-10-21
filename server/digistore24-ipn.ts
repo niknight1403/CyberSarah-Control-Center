@@ -111,7 +111,7 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
     }).onConflictDoNothing({ target: conversionEvents.orderKey }).returning({ id: conversionEvents.id });
 
     if (inserted.length === 0) {
-      res.status(200).json({ ok: true, duplicate: true, orderKey });
+      res.status(200).type("text/plain").send(`OK duplicate_orderKey:${orderKey}`);
       return;
     }
     if (productSlug) {
@@ -130,7 +130,7 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
       SET "conversions" = revenue_daily_stats."conversions" + 1,
           "revenueCents" = revenue_daily_stats."revenueCents" + ${commissionCents},
           "updatedAt" = now()`);
-    res.status(200).json({ ok: true, recorded: true, orderKey });
+    res.status(200).type("text/plain").send(`OK recorded_orderKey:${orderKey}`);
   } catch (error) {
     res.status(503).json({ ok: false, detail: `Conversion nicht speicherbar: ${error instanceof Error ? error.message : String(error)}` });
   }
