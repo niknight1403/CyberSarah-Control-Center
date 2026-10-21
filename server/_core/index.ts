@@ -36,6 +36,7 @@ import {
 import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
 import { handleDigistore24Ipn } from "../digistore24-ipn";
+import { syncDigistore24Commissions } from "../digistore24-api";
 import { checkDatabaseHealth } from "../db";
 import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
@@ -195,6 +196,21 @@ async function startServer() {
   // Auto-Discovery, aggregiert in affiliate_products/revenue_daily_stats.
   app.post("/api/v1/webhooks/digistore24", (req, res) => {
     void handleDigistore24Ipn(req, res);
+  });
+
+  // Digistore24-API-Sync (2026-10-21): Manuelter/Automatischer Pull der
+  // Commissionen via REST-API — geschuetzt durch die IPN-Passphrase als
+  // X-Sync-Key (kein offener Trigger). Idempotent wie der IPN-Pfad.
+  app.post("/api/v1/webhooks/digistore24-sync", async (req, res) => {
+    const expectedKey = process.env.DIGISTORE24_IPN_PASSPHRASE?.trim();
+    const providedKey = (req.header("x-sync-key") ?? "").trim();
+    if (!expectedKey || providedKey !== expectedKey) {
+      res.status(401).json({ ok: false, detail: "Ungültiger Sync-Key." });
+      return;
+    }
+    const days = Math.min(90, Math.max(1, Number.parseInt(String(req.query.days ?? "30"), 10) || 30));
+    const result = await syncDigistore24Commissions(days);
+    res.status(result.ok ? 200 : 502).json(result);
   });
 
   // Block 4 (2026-10-21): Oeffentliche Affiliate-Landingpages aus der
@@ -492,6 +508,18 @@ async function startServer() {
     console.log(`[api] server listening on port ${port}`);
     startOptimizerLoop();
     startPublishingAutopilot();
+    if (process.env.DIGISTORE24_API_KEY?.trim()) {
+      const pullOnce = async (reason: string) => {
+        const r = await syncDigistore24Commissions(30);
+        if (r.ok) {
+          console.log(`[d24-sync] ${reason}: ${r.inserted} neu, ${r.duplicates} dupliziert (${r.paymentsFetched} Zahlungen, ${r.refundsFetched} Rueckerstattungen)`);
+        } else {
+          console.error(`[d24-sync] ${reason} fehlgeschlagen: ${r.detail ?? "unbekannt"}`);
+        }
+      };
+      setTimeout(() => void pullOnce("initial"), 45_000);
+      setInterval(() => void pullOnce("alle 6h"), 6 * 60 * 60 * 1000);
+    }
   });
 }
 

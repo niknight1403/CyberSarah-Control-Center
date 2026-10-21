@@ -19,6 +19,7 @@
 import axios from "axios";
 import { z } from "zod";
 import { router, adminProcedure } from "./_core/trpc";
+import { syncDigistore24Commissions } from "./digistore24-api";
 import { invokeLLM, type Message } from "./_core/llm";
 import { countPendingDraftsByKind, insertPendingDraft } from "./draft-engine";
 import { getDb } from "./db";
@@ -231,6 +232,11 @@ async function launchCampaign(campaignId: number) {
 export const digistore24Router = router({
   /** Phase 2.1: Produkte entdecken und bewerten. */
   discover: adminProcedure.query(async () => discoverDigistoreProducts()),
+
+  /** API-Sync (2026-10-21): Commissionen via Digistore24-REST-API ziehen. */
+  pullCommissions: adminProcedure
+    .input(z.object({ days: z.number().int().min(1).max(90).optional() }).optional())
+    .mutation(async ({ input }) => syncDigistore24Commissions(input?.days ?? 30)),
 
   /** Phase 2.2/2.3: Launch-Funnel generieren und zur Bestätigung einreihen. */
   funnel: adminProcedure
