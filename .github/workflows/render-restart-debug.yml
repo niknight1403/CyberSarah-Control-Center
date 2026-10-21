@@ -1,0 +1,42 @@
+name: Render Restart & Logs
+
+# Startet die Free-Instanz per Neu-Deploy neu, pollt eng und versucht die
+# Render-Log-Endpunkte (Crash-Loop-Diagnose).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Logs ziehen + Neustart + Monitoring
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          api() { curl -s -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" "https://api.render.com/v1/$1"; }
+          SVID=srv-dahjgllg1s2s73bf9u4g
+          echo "== Service-Details =="
+          api "services/$SVID" | python3 -m json.tool | grep -E '"name"|"suspended"|"publicUrl"|"serviceDetails"|"runtime"|"plan"' | head -8 || true
+          echo "== Log-Endpunkt-Versuche =="
+          for EP in "services/$SVID/logs?limit=100" "services/$SVID/deploys/dep-dbckpl8473hc739cnfi0/logs" "logs?service=$SVID&limit=100"; do
+            CODE=$(curl -s -o /tmp/lep.json -w "%{http_code}" -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" "https://api.render.com/v1/$EP")
+            echo "-- $EP -> HTTP $CODE"
+            [ "$CODE" != "404" ] && [ "$CODE" != "400" ] && head -c 1500 /tmp/lep.json && echo
+          done
+          echo "== Neustart via Neu-Deploy =="
+          curl -s -X POST -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" "https://api.render.com/v1/services/$SVID/deploys" -o /tmp/nd.json -w "POST=%{http_code}\n"
+          head -c 300 /tmp/nd.json; echo
+          echo "== Monitoring 6 Min: /api/health + /api/ready =="
+          for i in $(seq 1 18); do
+            H=$(curl -s -o /tmp/h.txt -w "%{http_code}" --max-time 30 "https://cybersarah-control-center.onrender.com/api/health")
+            R=$(curl -s -o /tmp/r.txt -w "%{http_code}" --max-time 30 "https://cybersarah-control-center.onrender.com/api/ready")
+            RD=$(head -c 200 /tmp/r.txt | tr -d '\n')
+            echo "T+$((i*20))s health=$H ready=$R body=$RD"
+            if [ "$R" = "200" ] || [ "$R" = "503" ]; then break; fi
+            sleep 20
+          done
+          echo "== Finales ready =="; cat /tmp/r.txt 2>/dev/null | head -c 600; echo
