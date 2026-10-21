@@ -35,6 +35,7 @@ import { agentsRouter } from "./agents-router";
 import { revenueRouter } from "./revenue-router";
 import { draftEngineRouter } from "./draft-engine-router";
 import { campaignBridgeRouter } from "./campaign-bridge-router";
+import { digistore24Router } from "./digistore24";
 import { pillarsRouter } from "./pillars-router";
 import { haraRouter, saasRouter, crossSellRouter, expansionRouter, subscriptionManagementRouter, revenueTradingRouter } from "./revenue-command-router";
 import { publicProcedure, router } from "./_core/trpc";
@@ -77,6 +78,7 @@ export const appRouter = router({
   publishing: publishingRouter,
   draftEngine: draftEngineRouter,
   campaignBridge: campaignBridgeRouter,
+  digistore24: digistore24Router,
   pillars: pillarsRouter,
   hara: haraRouter,
   saas: saasRouter,
