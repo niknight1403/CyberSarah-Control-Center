@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { AiCore } from "@/components/glass/ai-core";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
+import { AutonomousDraftsCard } from "@/components/glass/autonomous-drafts";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { ScreenContainer } from "@/components/screen-container";
 import { useLoopEngineering } from "@/hooks/use-loop-engineering";
@@ -130,6 +131,13 @@ export default function LoopEngineeringScreen() {
               <Text style={styles.disclaimer}>{state.result.disclaimer}</Text>
             </GlassCard>
           )}
+
+          <AutonomousDraftsCard
+            kinds={["revenue-loop"]}
+            revenueHubs={["loop"]}
+            accent="blue"
+            autoGenerate
+          />
 
           <Text style={styles.disclaimer}>{LOOP_DISCLAIMER}</Text>
         </ScrollView>
