@@ -31,8 +31,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci --ignore-scripts
+      - name: Install readiness-only Postgres client
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund pg@8.23.0
       - name: Open temporary SSH tunnel to local Revenue Postgres
         env:
           SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
