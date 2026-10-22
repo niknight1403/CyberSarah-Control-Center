@@ -71,6 +71,27 @@ describe("validateDraftPayload", () => {
     }
   });
 
+  it("bewahrt ausfuehrbare Experiment- und Zielwerte fuer Revenue-Loops", () => {
+    const result = validateDraftPayload("revenue-loop", {
+      hub: "loop",
+      name: "SaaS Conversion",
+      hypothesis: "Onboarding verbessert die Aktivierung.",
+      stages: ["Trial", "Aktivierung", "Abo"],
+      experiment: "Vier Wochen Onboarding-Variante testen",
+      metric: "Abo-Umwandlungen",
+      unit: "Abos",
+      targetValue: 25,
+      currentValue: 0,
+    });
+    expect(result.valid).toBe(true);
+    if (result.valid && "targetValue" in result.payload) {
+      expect(result.payload.experiment).toContain("Vier Wochen");
+      expect(result.payload.unit).toBe("Abos");
+      expect(result.payload.targetValue).toBe(25);
+      expect(result.payload.currentValue).toBe(0);
+    }
+  });
+
   it("akzeptiert explizite Revenue-Hub-Zuordnung", () => {
     const result = validateDraftPayload("revenue-loop", { hub: "saas", name: "N", hypothesis: "H", metric: "M", stages: ["A"] });
     expect(result.valid).toBe(true);

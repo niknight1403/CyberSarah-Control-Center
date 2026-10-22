@@ -13,6 +13,7 @@ import {
   type LoopStatus,
 } from "@/lib/revenue-loop-logic";
 import { loadLoops, saveLoops, type KeyValueAdapter } from "@/lib/revenue-loop-store";
+import type { RevenueLoopDraftPayload } from "@/lib/draft-engine-logic";
 
 /**
  * Sprint 229 — React-Kleber des Loop-Engineering-Moduls: Laden, Prompt-
@@ -144,9 +145,39 @@ export function useLoopEngineering(adapter?: KeyValueAdapter) {
     await persist(next);
   }, [state.pending, state.lastPrompt, persist]);
 
+  /** Uebernimmt einen serverseitig freigegebenen autonomen Loop als lokalen Plan-Entwurf. */
+  const adoptAutonomousLoop = useCallback(async (payload: RevenueLoopDraftPayload): Promise<{ ok: boolean; reason: string }> => {
+    if (!payload.experiment || !payload.unit || typeof payload.targetValue !== "number") {
+      return { ok: false, reason: "Dieser ältere Entwurf enthält noch keinen vollständigen Experiment-/Zielplan. Bitte neu erzeugen." };
+    }
+    const loops = loopsRef.current;
+    if (loops.some((loop) => loop.name.trim().toLowerCase() === payload.name.trim().toLowerCase())) {
+      return { ok: false, reason: `Schleife "${payload.name}" ist bereits integriert.` };
+    }
+    try {
+      const loop = createLoopDraft({
+        name: payload.name,
+        flow: payload.stages.join(" → "),
+        hypothesis: payload.hypothesis,
+        experiment: payload.experiment,
+        metric: payload.metric,
+        unit: payload.unit,
+        targetValue: payload.targetValue,
+        currentValue: payload.currentValue ?? 0,
+      });
+      const next = [...loops, loop];
+      loopsRef.current = next;
+      setState((prev) => ({ ...prev, loops: next, result: CONFIRMED_RESULT }));
+      await persist(next);
+      return { ok: true, reason: "" };
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : "Autonomer Loop konnte nicht integriert werden." };
+    }
+  }, [persist]);
+
   const dismissPending = useCallback((): void => {
     setState((prev) => ({ ...prev, pending: null }));
   }, []);
 
-  return { state, runPrompt, approvePending, dismissPending };
+  return { state, runPrompt, approvePending, dismissPending, adoptAutonomousLoop };
 }

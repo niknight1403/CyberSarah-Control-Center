@@ -72,6 +72,34 @@ describe("model-router-logic — Kandidaten-Reihenfolge", () => {
     expect(openaiRank).toBeLessThan(huggingfaceRank);
   });
 
+  it("routet Routinearbeit local-first zu Ollama", () => {
+    const order = buildProviderOrder({
+      taskType: "chat",
+      complexity: "light",
+      health: {},
+      configuredProviders: ALL_CONFIGURED,
+      now: NOW,
+    });
+    expect(order[0].provider).toBe("ollama");
+    expect(order.findIndex((entry) => entry.provider === "ollama")).toBeLessThan(
+      order.findIndex((entry) => entry.provider === "openai"),
+    );
+  });
+
+  it("eskaliert schwere Arbeit weiterhin zu starken Cloud-Modellen", () => {
+    const order = buildProviderOrder({
+      taskType: "reasoning",
+      complexity: "heavy",
+      health: {},
+      configuredProviders: ALL_CONFIGURED,
+      now: NOW,
+    });
+    expect(order[0].provider).not.toBe("ollama");
+    expect(order.findIndex((entry) => entry.provider === "openai")).toBeLessThan(
+      order.findIndex((entry) => entry.provider === "ollama"),
+    );
+  });
+
   it("respektiert bevorzugte Admin-Reihenfolge", () => {
     const order = buildProviderOrder({
       taskType: "chat",

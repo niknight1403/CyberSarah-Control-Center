@@ -49,6 +49,11 @@ export type RevenueLoopDraftPayload = {
   hypothesis: string;
   stages: string[];
   metric: string;
+  /** Ausfuehrbarer Loop-Plan; bei Legacy-Zeilen optional. */
+  experiment?: string;
+  unit?: string;
+  targetValue?: number;
+  currentValue?: number;
   /** Optionale, deterministische Autopilot-Metadaten fuer Deduplizierung und UI. */
   autopilotKey?: string;
   baseline?: string;
@@ -142,6 +147,10 @@ export function validateDraftPayload(
     const autopilotKey = nonEmpty(raw.autopilotKey, 120);
     const baseline = nonEmpty(raw.baseline, 160);
     const target = nonEmpty(raw.target, 160);
+    const experiment = nonEmpty(raw.experiment, 300);
+    const unit = nonEmpty(raw.unit, 20);
+    const targetValue = typeof raw.targetValue === "number" && Number.isFinite(raw.targetValue) && raw.targetValue > 0 ? raw.targetValue : undefined;
+    const currentValue = typeof raw.currentValue === "number" && Number.isFinite(raw.currentValue) && raw.currentValue >= 0 ? raw.currentValue : undefined;
     const rawScore = typeof raw.score === "number" && Number.isFinite(raw.score) ? raw.score : null;
     const score = rawScore === null ? undefined : Math.max(0, Math.min(100, Math.round(rawScore)));
     return {
@@ -152,6 +161,10 @@ export function validateDraftPayload(
         hypothesis,
         stages,
         metric,
+        ...(experiment ? { experiment } : {}),
+        ...(unit ? { unit } : {}),
+        ...(targetValue !== undefined ? { targetValue } : {}),
+        ...(currentValue !== undefined ? { currentValue } : {}),
         ...(autopilotKey ? { autopilotKey } : {}),
         ...(baseline ? { baseline } : {}),
         ...(target ? { target } : {}),
