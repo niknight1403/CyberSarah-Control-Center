@@ -8,14 +8,15 @@
 import type { RevenueHub } from "./draft-engine-logic";
 
 export type RevenueAutopilotSnapshot = {
-  landingViews: number;
-  signups: number;
-  checkoutStarts: number;
-  upgrades: number;
+  landingViews: number | null;
+  signups: number | null;
+  checkoutStarts: number | null;
+  upgrades: number | null;
   stripeCheckoutStarted: number | null;
   stripeCheckoutCompleted: number | null;
   stripeCheckoutSuccessRate: number | null;
   invoiceSuccessRate: number | null;
+  invoiceAttempts: number | null;
   mrrEur: number | null;
   activeSubscriptions: number | null;
   affiliateClicks: number | null;
@@ -59,8 +60,8 @@ export type RevenueOpportunity = {
   stages: string[];
 };
 
-function pct(part: number, whole: number): number | null {
-  if (!Number.isFinite(part) || !Number.isFinite(whole) || whole <= 0) return null;
+function pct(part: number | null, whole: number | null): number | null {
+  if (part === null || whole === null || !Number.isFinite(part) || !Number.isFinite(whole) || whole <= 0) return null;
   return Math.max(0, Math.min(100, (part / whole) * 100));
 }
 
@@ -121,7 +122,7 @@ export function buildRevenueOpportunities(
     hub: "saas",
     title: "Landing → Signup verbessern",
     current: signupRate,
-    denominator: snapshot.landingViews,
+    denominator: snapshot.landingViews ?? 0,
     target: targets.signupRatePct,
     weight: 0.9,
     metric: "Signup-Rate Landing → Registrierung",
@@ -136,7 +137,7 @@ export function buildRevenueOpportunities(
     hub: "saas",
     title: "Signup → Checkout aktivieren",
     current: checkoutStartRate,
-    denominator: snapshot.signups,
+    denominator: snapshot.signups ?? 0,
     target: targets.checkoutStartRatePct,
     weight: 1,
     metric: "Checkout-Start-Rate aus Signups",
@@ -151,7 +152,7 @@ export function buildRevenueOpportunities(
     hub: "saas",
     title: "Checkout → Upgrade steigern",
     current: upgradeRate,
-    denominator: snapshot.checkoutStarts,
+    denominator: snapshot.checkoutStarts ?? 0,
     target: targets.upgradeRatePct,
     weight: 1.2,
     metric: "Upgrade-Rate aus Checkout-Starts",
@@ -182,7 +183,7 @@ export function buildRevenueOpportunities(
       hub: "saas",
       title: "Abo-Zahlungserfolg verbessern",
       current: snapshot.invoiceSuccessRate,
-      denominator: Math.max(5, snapshot.activeSubscriptions ?? 0),
+      denominator: snapshot.invoiceAttempts ?? 0,
       target: targets.invoiceSuccessRatePct,
       weight: 1.15,
       metric: "Erfolgsquote Subscription-Invoices",
@@ -225,7 +226,7 @@ export function buildRevenueOpportunities(
     stages: ["Regeln nach Empfehlung→Conversion sortieren", "Schwache Regel mit besserem Produkt-Fit ersetzen", "Conversion nach Testfenster vergleichen"],
   });
 
-  if ((snapshot.validatedExpansionOpportunities ?? 0) === 0) {
+  if (snapshot.validatedExpansionOpportunities === 0) {
     list.push({
       key: "expansion.discovery",
       hub: "loop",
