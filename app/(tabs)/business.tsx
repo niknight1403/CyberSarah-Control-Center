@@ -15,6 +15,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton } from "@/components/glass/glass-primitives";
 import { AiCore } from "@/components/glass/ai-core";
+import { RevenueAutopilotCard } from "@/components/glass/revenue-autopilot-card";
 import { trpc } from "@/lib/trpc";
 import { useOfflineDashboard } from "@/hooks/use-offline-dashboard";
 import { summarizeBackupExport, type BackupExport } from "@/lib/backup-self-service-logic";
@@ -456,6 +457,7 @@ export default function BusinessDashboardScreen() {
           ) : null}
 
           {data?.revenueOs ? <RevenueOsTile data={data.revenueOs} /> : null}
+          <RevenueAutopilotCard />
 
           {isAdmin && meteringQuery.data ? <MeteringTile overview={meteringQuery.data} /> : null}
 
