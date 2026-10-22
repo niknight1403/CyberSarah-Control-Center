@@ -73,11 +73,32 @@ describe("HTTP security middleware", () => {
     const next = vi.fn();
     const first = response();
     const second = response();
-    const request = { method: "GET", headers: {}, ip: "1.2.3.4" } as never;
+    const request = { method: "GET", path: "/api/health", headers: {}, ip: "1.2.3.4" } as never;
     middleware(request, first as never, next);
     middleware(request, second as never, next);
     expect(next).toHaveBeenCalledOnce();
     expect(second.statusCode).toBe(429);
+  });
+
+  it("does not charge static assets against the API rate limit", () => {
+    vi.stubEnv("APP_ALLOWED_ORIGINS", "");
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const middleware = createSecurityMiddleware();
+    const next = vi.fn();
+    for (let index = 0; index < 5; index += 1) {
+      middleware(
+        { method: "GET", path: `/_expo/static/js/app-${index}.js`, headers: {}, ip: "5.5.5.5" } as never,
+        response() as never,
+        next,
+      );
+    }
+    const apiFirst = response();
+    const apiSecond = response();
+    const apiRequest = { method: "GET", path: "/api/health", headers: {}, ip: "5.5.5.5" } as never;
+    middleware(apiRequest, apiFirst as never, next);
+    middleware(apiRequest, apiSecond as never, next);
+    expect(apiFirst.statusCode).toBe(200);
+    expect(apiSecond.statusCode).toBe(429);
   });
 
   it("passes tRPC rate-limit rejections through as res.locals instead of raw JSON", () => {

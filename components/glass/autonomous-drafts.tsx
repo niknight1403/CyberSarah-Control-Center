@@ -7,7 +7,7 @@
  * Karte veroeffentlicht, aktiviert oder versendet. Ideen-Freigabe nimmt
  * die Idee ueber den onAdoptIdea-Rueckruf in die lokale Inbox auf.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
@@ -19,6 +19,9 @@ import {
   type DraftKind,
   type DraftRow,
   type IdeaDraftPayload,
+  revenueDraftHub,
+  revenueHubLabel,
+  type RevenueHub,
   type RevenueLoopDraftPayload,
 } from "@/lib/draft-engine-logic";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
@@ -28,6 +31,10 @@ type DraftsCardProps = {
   accent?: "cyan" | "green" | "purple" | "blue";
   /** Nur fuer kind "idea": legt die freigegebene Idee in die Inbox. */
   onAdoptIdea?: (payload: IdeaDraftPayload) => Promise<{ ok: boolean; reason: string }>;
+  /** Optional: Revenue-Loop-Entwuerfe auf konkrete Revenue-Hubs begrenzen. */
+  revenueHubs?: readonly RevenueHub[];
+  /** Leere Hub-Queue bei Admin automatisch durch die Draft-Engine auffuellen. */
+  autoGenerate?: boolean;
 };
 
 function describePayload(row: DraftRow): string {
@@ -37,24 +44,42 @@ function describePayload(row: DraftRow): string {
   }
   if (row.kind === "revenue-loop") {
     const payload = row.payload as RevenueLoopDraftPayload;
-    return `${payload.hypothesis}\n\nStufen: ${payload.stages.join(" → ")}\nMetrik: ${payload.metric}`;
+    return `${revenueHubLabel(revenueDraftHub(payload))} · ${payload.hypothesis}\n\nStufen: ${payload.stages.join(" → ")}\nMetrik: ${payload.metric}`;
   }
   const payload = row.payload as IdeaDraftPayload;
   return `${payload.note}\n\nWarum: ${payload.rationale}`;
 }
 
-export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea }: DraftsCardProps) {
+export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, revenueHubs, autoGenerate = true }: DraftsCardProps) {
   const styles = useMemo(() => createStyles(), []);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const queueQuery = trpc.draftEngine.queue.useQuery(undefined, { retry: false });
+  const queueQuery = trpc.draftEngine.queue.useQuery(undefined, { retry: false, staleTime: 15_000 });
+  const meQuery = trpc.auth.me.useQuery(undefined, { staleTime: 60_000 });
   const decideMutation = trpc.draftEngine.decide.useMutation();
+  const runMutation = trpc.draftEngine.runNow.useMutation();
+  const autoStarted = useRef(false);
   const utils = trpc.useUtils();
 
   const rows = (queueQuery.data?.pending ?? [])
     .filter((group) => kinds.includes(group.kind))
-    .flatMap((group) => group.items);
+    .flatMap((group) => group.items)
+    .filter((row) => row.kind !== "revenue-loop" || !revenueHubs?.length || revenueHubs.includes(revenueDraftHub(row.payload)));
+
+  useEffect(() => {
+    if (!autoGenerate || autoStarted.current || queueQuery.isLoading || queueQuery.isError) return;
+    if (meQuery.data?.role !== "admin" || rows.length > 0) return;
+    autoStarted.current = true;
+    runMutation.mutate(undefined, {
+      onSuccess: async () => {
+        await utils.draftEngine.queue.invalidate();
+      },
+      onError: () => {
+        // Nicht endlos automatisch wiederholen; manueller Button bleibt verfuegbar.
+      },
+    });
+  }, [autoGenerate, meQuery.data?.role, queueQuery.isError, queueQuery.isLoading, rows.length, runMutation, utils.draftEngine.queue]);
 
   const decide = async (row: DraftRow, action: "approve" | "reject") => {
     setNotice(null);
@@ -86,12 +111,29 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea }: 
       <Text style={styles.subtitle}>
         {kinds.map((kind) => draftKindLabel(kind)).join(" · ")} — erzeugt von der täglichen Draft-Engine, warten auf deine Freigabe.
       </Text>
-      {queueQuery.isLoading ? (
-        <ActivityIndicator color={glassPalette[accent]} />
+      {queueQuery.isLoading || runMutation.isPending ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator color={glassPalette[accent]} />
+          <Text style={styles.emptyNote}>{runMutation.isPending ? "Autonome Engine erzeugt fehlende Entwürfe …" : "Entwürfe werden geladen …"}</Text>
+        </View>
       ) : queueQuery.isError ? (
         <Text style={styles.errorNote}>Freigabe-Queue nicht erreichbar: {queueQuery.error.message}</Text>
       ) : rows.length === 0 ? (
-        <Text style={styles.emptyNote}>Keine offenen Entwürfe. Die Engine ergänzt automatisch, sobald Platz in der Queue ist.</Text>
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyNote}>Keine offenen Entwürfe für diesen Bereich.</Text>
+          {runMutation.error ? <Text style={styles.errorNote}>Automatischer Lauf fehlgeschlagen: {runMutation.error.message}</Text> : null}
+          {meQuery.data?.role === "admin" ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Fehlende Entwürfe jetzt erzeugen"
+              disabled={runMutation.isPending}
+              onPress={() => runMutation.mutate(undefined, { onSuccess: async () => { await utils.draftEngine.queue.invalidate(); } })}
+              style={styles.generateButton}
+            >
+              <Text style={styles.generateText}>Entwürfe jetzt erzeugen</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : (
         rows.map((row) => (
           <View key={row.id} style={styles.row}>
@@ -129,6 +171,10 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea }: 
 function createStyles() {
   return StyleSheet.create({
     card: { gap: 12 },
+    loadingRow: { alignItems: "center", flexDirection: "row", gap: 10 },
+    emptyWrap: { gap: 10 },
+    generateButton: { alignItems: "center", borderColor: glassPalette.purple, borderRadius: 12, borderWidth: 1, paddingVertical: 10 },
+    generateText: { color: glassPalette.purple, fontSize: 12, fontWeight: "800" },
     title: { color: glassSurface.textPrimary, fontSize: 17, fontWeight: "900" },
     subtitle: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
     errorNote: { color: glassPalette.amber, fontSize: 11, lineHeight: 16 },

@@ -72,6 +72,7 @@ function InfluencerSection() {
       <GlowButton label={generateMutation.isPending ? "Generierung läuft …" : `${selected.name}-Content generieren`} accent={accent} onPress={() => { if (topic.trim().length >= 3) generateMutation.mutate({ personaId: selected.id, topic: topic.trim(), platform }); }} disabled={generateMutation.isPending || topic.trim().length < 3} />
       {generatedContent ? <View style={styles.resultBox}><View style={styles.resultHeader}><Text style={styles.resultTitle}>Generierter Entwurf</Text><StatusChip label="Entwurf" accent="green" /></View><Text selectable style={styles.resultText}>{generatedContent}</Text><Text style={styles.resultNote}>Noch nicht veröffentlicht. Veröffentlichung bleibt ein separater Freigabeschritt.</Text></View> : null}
     </GlassCard>
+    <AutonomousDraftsCard kinds={["content"]} accent="cyan" />
   </>;
 }
 
@@ -105,10 +106,10 @@ function HaraSection() {
       }
     },
   });
-  return <FeatureCard accent="purple" title="HARA" subtitle="Hyper-Autonomer Revenue Agent" body="Vorschläge und Kampagnenstatus direkt aus der Revenue-Datenbank. Ein Scan wird nur auf Anforderung angestoßen." cta="HARA-Scan starten" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Daten geladen"} loading={q.isLoading || scan.isPending} error={q.error?.message ?? scan.error?.message} metrics={[metric("Chancen", q.data?.counts.proposals ?? "—"), metric("In Umsetzung", q.data?.counts.active ?? "—"), metric("Abgeschlossen", q.data?.counts.completed ?? "—")]} details={[
+  return <><FeatureCard accent="purple" title="HARA" subtitle="Hyper-Autonomer Revenue Agent" body="Vorschläge und Kampagnenstatus direkt aus der Revenue-Datenbank. Ein Scan wird nur auf Anforderung angestoßen." cta="HARA-Scan starten" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Daten geladen"} loading={q.isLoading || scan.isPending} error={q.error?.message ?? scan.error?.message} metrics={[metric("Chancen", q.data?.counts.proposals ?? "—"), metric("In Umsetzung", q.data?.counts.active ?? "—"), metric("Abgeschlossen", q.data?.counts.completed ?? "—")]} details={[
     ...(q.data?.proposals.slice(0, 5).map(p => `${p.titel}: ${p.status} (${p.kanal})`) ?? []),
     ...(scan.data?.accepted ? ["Scan angenommen. Ergebnis wird nach Abschluss sichtbar, kein garantierter Erfolg."] : []),
-  ]} onPress={() => scan.mutate()} />;
+  ]} onPress={() => scan.mutate()} /><AutonomousDraftsCard kinds={["revenue-loop"]} revenueHubs={["hara"]} accent="purple" /></>;
 }
 
 function SaasSection() {
@@ -116,7 +117,7 @@ function SaasSection() {
   const subscriptions = q.data?.subscriptions;
   const status = q.isError ? "nicht verbunden" : q.isLoading ? "lädt" :
     q.data?.stripeStatus === "ready" && q.data.subscriptionsStatus === "ready" ? "Daten geladen" : "teilweise verfügbar";
-  return <FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Stripe-Produkte und Checkout-Sessions werden unabhängig von der separaten Revenue-Datenbank geladen. Ohne Abo-Daten bleiben MRR und Trials unbekannt." cta="SaaS-Daten aktualisieren" status={status} loading={q.isLoading || q.isFetching} error={q.error?.message} metrics={[
+  return <><FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Stripe-Produkte und Checkout-Sessions werden unabhängig von der separaten Revenue-Datenbank geladen. Ohne Abo-Daten bleiben MRR und Trials unbekannt." cta="SaaS-Daten aktualisieren" status={status} loading={q.isLoading || q.isFetching} error={q.error?.message} metrics={[
     metric("Stripe-Produkte", q.data?.stripeStatus === "ready" ? q.data.stripeProducts.length : "—"),
     metric("Trials", subscriptions?.trials ?? "—"),
     metric("MRR", subscriptions ? formatEur(subscriptions.mrrEur) : "—"),
@@ -130,7 +131,7 @@ function SaasSection() {
     ] : ["Abonnements und MRR: separate Revenue-Datenbank nicht erreichbar."]),
     `Checkout-Erfolg (30 Tage): ${q.data.checkout?.successRate == null ? "nicht messbar" : q.data.checkout.successRate.toFixed(1) + " %"}${q.data.checkout?.capped ? " (Stichprobe, maximal 1.000 Sessions)" : ""} · Quelle: ${q.data.checkoutStatus}`,
     "Funnel-CVR: nicht messbar, Event-Tracking fehlt.",
-  ] : undefined} onPress={() => void q.refetch()} />;
+  ] : undefined} onPress={() => void q.refetch()} /><AutonomousDraftsCard kinds={["revenue-loop"]} revenueHubs={["saas"]} accent="purple" /></>;
 }
 
 function LoopSection() {
@@ -138,16 +139,16 @@ function LoopSection() {
   const expansion = trpc.expansion.overview.useQuery(undefined, { retry: false });
   const scan = trpc.expansion.scan.useMutation({ onSuccess: () => void expansion.refetch() });
   const error = cross.error?.message ?? expansion.error?.message ?? scan.error?.message;
-  return <FeatureCard accent="blue" title="Loop Engineering" subtitle="Cross-Sell und Expansion" body="Echte Cross-Sell-Regeln und Chancen. Die Expansion-Suche ist ein expliziter, admin-geschützter Trigger, keine automatische Veröffentlichung." cta="Expansion-Scan starten" status={error ? "nicht verbunden" : cross.isLoading || expansion.isLoading ? "lädt" : "Daten geladen"} loading={cross.isLoading || expansion.isLoading || scan.isPending} error={error} metrics={[metric("Regeln", cross.data?.rules.length ?? "—"), metric("Aktive Regeln", cross.data?.rules.filter(r => r.aktiv).length ?? "—"), metric("Chancen", expansion.data?.opportunities.length ?? "—")]} details={[
+  return <><FeatureCard accent="blue" title="Loop Engineering" subtitle="Cross-Sell und Expansion" body="Echte Cross-Sell-Regeln und Chancen. Die Expansion-Suche ist ein expliziter, admin-geschützter Trigger, keine automatische Veröffentlichung." cta="Expansion-Scan starten" status={error ? "nicht verbunden" : cross.isLoading || expansion.isLoading ? "lädt" : "Daten geladen"} loading={cross.isLoading || expansion.isLoading || scan.isPending} error={error} metrics={[metric("Regeln", cross.data?.rules.length ?? "—"), metric("Aktive Regeln", cross.data?.rules.filter(r => r.aktiv).length ?? "—"), metric("Chancen", expansion.data?.opportunities.length ?? "—")]} details={[
     ...(cross.data?.recommendationCounts.map(c => `Empfehlungen ${c.status}: ${c.count}`) ?? []),
     ...(expansion.data?.opportunities.slice(0, 3).map(o => `${o.titel}: ${o.status}`) ?? []),
     ...(scan.data?.accepted ? ["Scan angenommen; Ausführungsergebnis noch nicht bestätigt."] : []),
-  ]} onPress={() => scan.mutate()} />;
+  ]} onPress={() => scan.mutate()} /><AutonomousDraftsCard kinds={["revenue-loop"]} revenueHubs={["loop"]} accent="blue" /></>;
 }
 
 function TradingSection() {
   const q = trpc.revenueTrading.overview.useQuery(undefined, { retry: false });
-  return <FeatureCard accent="green" title="Micro Trading" subtitle="Live-Marktbeobachtung, keine Orderausführung" body="Live-Kurse kommen aus Binance mit Kraken-Fallback. Kein Broker-Zugriff über diesen Bildschirm." cta="Trading-Analyse öffnen" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Marktdaten"} loading={q.isLoading} error={q.error?.message} metrics={[metric("Datenstatus", q.data?.status ?? "—")]} details={q.data?.status === "ok" ? q.data.tickers.map(t => `${t.symbol}: ${t.priceUsd.toLocaleString("de-DE")} USD (${t.changePercent.toFixed(2)} %)`) : q.data?.error ? [q.data.error] : undefined} onPress={() => router.push("/micro-trading" as never)} />;
+  return <><FeatureCard accent="green" title="Micro Trading" subtitle="Live-Marktbeobachtung, keine Orderausführung" body="Live-Kurse kommen aus Binance mit Kraken-Fallback. Kein Broker-Zugriff über diesen Bildschirm." cta="Trading-Analyse öffnen" status={q.isError ? "nicht verbunden" : q.isLoading ? "lädt" : "Marktdaten"} loading={q.isLoading} error={q.error?.message} metrics={[metric("Datenstatus", q.data?.status ?? "—")]} details={q.data?.status === "ok" ? q.data.tickers.map(t => `${t.symbol}: ${t.priceUsd.toLocaleString("de-DE")} USD (${t.changePercent.toFixed(2)} %)`) : q.data?.error ? [q.data.error] : undefined} onPress={() => router.push("/micro-trading" as never)} /><AutonomousDraftsCard kinds={["revenue-loop"]} revenueHubs={["trading"]} accent="green" /></>;
 }
 
 function OtherSection({ section }: { section: Exclude<Section, "influencer"> }) {
@@ -161,7 +162,7 @@ export default function RevenueOsScreen() {
   const [section, setSection] = useState<Section>("influencer");
   const navDrawer = useNavDrawer();
   const active = useMemo(() => SECTIONS.find((item) => item.key === section) ?? SECTIONS[0], [section]);
-  return <GlassBackdrop accent={active.accent}><ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent"><View style={styles.topBar}><NavDrawerButton {...navDrawer.hamburgerProps} tint={glassPalette.cyan} /><View style={styles.titleBlock}><Text style={styles.eyebrow}>CYBERSARAH · REVENUE OS</Text><Text style={styles.title}>Revenue Hub</Text></View><StatusChip label="Live-Status je Modul" accent="cyan" /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow} accessibilityLabel="Revenue-OS-Bereiche">{SECTIONS.map((item) => <SectionButton key={item.key} item={item} active={item.key === section} onPress={() => setSection(item.key)} />)}</ScrollView><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><GlassCard accent={active.accent} glow={2} style={styles.heroCard}><Text style={styles.heroKicker}>INTEGRIERTES REVENUE-OS</Text><Text style={styles.heroTitle}>Alle Umsatzsysteme an einem Ort.</Text><Text style={styles.heroText}>Live-Daten pro Bereich statt Demo-Kennzahlen. Fehlende Verbindungen werden sichtbar angezeigt.</Text></GlassCard>{section === "influencer" ? <InfluencerSection /> : <OtherSection section={section} />}<AutonomousDraftsCard kinds={["content", "revenue-loop"]} accent="purple" /></ScrollView></ScreenContainer><NavDrawer {...navDrawer.drawerProps} /></GlassBackdrop>;
+  return <GlassBackdrop accent={active.accent}><ScreenContainer edges={["top", "left", "right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent"><View style={styles.topBar}><NavDrawerButton {...navDrawer.hamburgerProps} tint={glassPalette.cyan} /><View style={styles.titleBlock}><Text style={styles.eyebrow}>CYBERSARAH · REVENUE OS</Text><Text style={styles.title}>Revenue Hub</Text></View><StatusChip label="Live-Status je Modul" accent="cyan" /></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow} accessibilityLabel="Revenue-OS-Bereiche">{SECTIONS.map((item) => <SectionButton key={item.key} item={item} active={item.key === section} onPress={() => setSection(item.key)} />)}</ScrollView><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><GlassCard accent={active.accent} glow={2} style={styles.heroCard}><Text style={styles.heroKicker}>INTEGRIERTES REVENUE-OS</Text><Text style={styles.heroTitle}>Alle Umsatzsysteme an einem Ort.</Text><Text style={styles.heroText}>Live-Daten pro Bereich statt Demo-Kennzahlen. Fehlende Verbindungen werden sichtbar angezeigt.</Text></GlassCard>{section === "influencer" ? <InfluencerSection /> : <OtherSection section={section} />}</ScrollView></ScreenContainer><NavDrawer {...navDrawer.drawerProps} /></GlassBackdrop>;
 }
 
 const styles = StyleSheet.create({

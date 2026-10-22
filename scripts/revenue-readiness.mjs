@@ -69,37 +69,63 @@ async function checkEngine() {
     return true;
   } catch { console.log('REVENUE_BRIDGE: UNAVAILABLE_OR_UNPROTECTED'); return false; }
 }
-async function checkOpenAI() {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) { console.log('OPENAI_API_KEY: NOT_CONFIGURED'); return false; }
+async function probeBearer(label, url, key) {
+  if (!key) return false;
   try {
-    const response = await fetch('https://api.openai.com/v1/models?limit=1', {
-      headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(7000),
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(7000),
     });
-    console.log(`OPENAI_API_KEY: ${response.ok ? 'REACHABLE' : 'UNAVAILABLE'}`);
-    return response.ok;
-  } catch { console.log('OPENAI_API_KEY: UNAVAILABLE'); return false; }
+    if (response.ok) {
+      console.log(`FREE_LLM_ROUTE: READY (${label})`);
+      return true;
+    }
+  } catch {}
+  return false;
 }
+
+async function checkFreeLlm() {
+  const candidates = [
+    ['GROQ', 'https://api.groq.com/openai/v1/models', process.env.GROQ_API_KEY],
+    ['OPENROUTER', 'https://openrouter.ai/api/v1/models', process.env.OPENROUTER_API_KEY],
+    ['GEMINI', 'https://generativelanguage.googleapis.com/v1beta/openai/models', process.env.GEMINI_API_KEY],
+  ];
+  for (const [label, url, key] of candidates) {
+    if (await probeBearer(label, url, key)) return true;
+  }
+  // Paid OpenAI is only a compatibility fallback, never required for readiness.
+  const openAi = process.env.OPENAI_API_KEY;
+  if (openAi && await probeBearer('OPENAI_FALLBACK', 'https://api.openai.com/v1/models?limit=1', openAi)) {
+    console.log('FREE_LLM_ROUTE: UNAVAILABLE; paid fallback reachable');
+    return true;
+  }
+  console.log('FREE_LLM_ROUTE: UNAVAILABLE');
+  return false;
+}
+
 async function main() {
   const dedicated = await checkDb('REVENUE_OS_DATABASE_URL', process.env.REVENUE_OS_DATABASE_URL);
   if (!dedicated) await checkDb('DATABASE_URL (nur Schema-Diagnose, kein Ersatz)', process.env.DATABASE_URL);
   const stripeKey = process.env.STRIPE_SECRET_KEY;
-  let stripeReady = false;
+  let stripeConnected = false;
+  let stripeLive = false;
   if (!stripeKey) console.log('STRIPE_SECRET_KEY: NOT_CONFIGURED');
   else {
     try {
       await new Stripe(stripeKey).products.list({ limit: 1 });
-      stripeReady = stripeKey.startsWith('sk_live_');
-      console.log(`STRIPE_SECRET_KEY: REACHABLE (${stripeReady ? 'LIVE' : 'TEST'})`);
+      stripeConnected = true;
+      stripeLive = stripeKey.startsWith('sk_live_');
+      console.log(`STRIPE_SECRET_KEY: REACHABLE (${stripeLive ? 'LIVE' : 'TEST'})`);
     } catch { console.log('STRIPE_SECRET_KEY: CONNECTION_OR_PERMISSION_ERROR'); }
   }
-  const aiReady = await checkOpenAI();
+  const aiReady = await checkFreeLlm();
   const bridgeReady = await checkEngine();
-  if (!dedicated || !stripeReady || !aiReady || !bridgeReady) {
+  if (!dedicated || !stripeConnected || !aiReady || !bridgeReady) {
     console.log('REVENUE_INTEGRATION: NOT_READY');
     process.exitCode = 1;
   } else {
-    console.log('REVENUE_INTEGRATION: READY (proposal scans are guarded, not auto-executed)');
+    console.log(`REVENUE_COMMERCE_MODE: ${stripeLive ? 'LIVE' : 'TEST_ONLY'}`);
+    console.log('REVENUE_INTEGRATION: READY (DB + Revenue bridge + LLM route + Stripe connectivity)');
   }
 }
 await main();
