@@ -1,5 +1,8 @@
 /** Read-only GitHub-Actions-Check. Nie Secret-Werte, URLs oder Fehlerdetails ausgeben. */
-import { Pool } from 'pg';
+const pgModule = process.env.REVENUE_READINESS_PG_MODULE
+  ? await import(process.env.REVENUE_READINESS_PG_MODULE)
+  : await import('pg');
+const { Pool } = pgModule;
 
 const requiredTables = [
   'hara_proposals', 'hara_performance', 'subscription_plans',
