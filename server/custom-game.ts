@@ -23,7 +23,7 @@ import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { isFreeManagedSource, resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
+import { isFreeManagedSource, managedLlmEnvFromProcess, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
 import {
   calculateQualityGate,
   scoreStandaloneHtmlPerformance,
@@ -125,7 +125,7 @@ async function generateCustomGame(idea: string, fixIssues: string[]): Promise<Ge
   if (localHtml) return { html: localHtml, source: "local_ollama", issues: [] };
 
   // Stufe 2: kostenlose Cloud-Eskalation bei lokalem Timeout/Ausfall.
-  const endpoint = resolveManagedLlmEndpoint(process.env as unknown as ManagedLlmEnv);
+  const endpoint = resolveManagedLlmEndpoint(managedLlmEnvFromProcess(process.env));
   if (endpoint && isFreeManagedSource(endpoint.source)) {
     const html = await generateFromEndpoint(
       endpoint.url,
