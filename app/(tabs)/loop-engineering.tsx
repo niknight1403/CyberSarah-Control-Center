@@ -26,7 +26,7 @@ const PROMPT_HINTS = [
  */
 export default function LoopEngineeringScreen() {
   const drawer = useNavDrawer();
-  const { state, runPrompt, approvePending, dismissPending } = useLoopEngineering();
+  const { state, runPrompt, approvePending, dismissPending, adoptAutonomousLoop } = useLoopEngineering();
   const [prompt, setPrompt] = useState("");
   const styles = useMemo(() => createStyles(), []);
 
@@ -137,6 +137,7 @@ export default function LoopEngineeringScreen() {
             revenueHubs={["loop"]}
             accent="blue"
             autoGenerate
+            onAdoptRevenueLoop={adoptAutonomousLoop}
           />
 
           <Text style={styles.disclaimer}>{LOOP_DISCLAIMER}</Text>
