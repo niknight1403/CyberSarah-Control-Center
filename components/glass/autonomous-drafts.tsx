@@ -44,7 +44,9 @@ function describePayload(row: DraftRow): string {
   }
   if (row.kind === "revenue-loop") {
     const payload = row.payload as RevenueLoopDraftPayload;
-    return `${revenueHubLabel(revenueDraftHub(payload))} · ${payload.hypothesis}\n\nStufen: ${payload.stages.join(" → ")}\nMetrik: ${payload.metric}`;
+    const autopilot = payload.autopilotKey ? `Autopilot · Score ${payload.score ?? "—"}/100\n` : "";
+    const baseline = payload.baseline || payload.target ? `\nBaseline/Ziel: ${payload.baseline ?? "—"} → ${payload.target ?? "—"}` : "";
+    return `${autopilot}${revenueHubLabel(revenueDraftHub(payload))} · ${payload.hypothesis}\n\nStufen: ${payload.stages.join(" → ")}\nMetrik: ${payload.metric}${baseline}`;
   }
   const payload = row.payload as IdeaDraftPayload;
   return `${payload.note}\n\nWarum: ${payload.rationale}`;

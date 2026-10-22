@@ -49,6 +49,11 @@ export type RevenueLoopDraftPayload = {
   hypothesis: string;
   stages: string[];
   metric: string;
+  /** Optionale, deterministische Autopilot-Metadaten fuer Deduplizierung und UI. */
+  autopilotKey?: string;
+  baseline?: string;
+  target?: string;
+  score?: number;
 };
 
 export type IdeaDraftPayload = {
@@ -134,7 +139,26 @@ export function validateDraftPayload(
     if (!hub || !name || !hypothesis || !metric || stages.length === 0) {
       return { valid: false, reason: "Revenue-Entwurf unvollstaendig (Hub/Name/Hypothese/Metrik/Stufen)." };
     }
-    return { valid: true, payload: { hub, name, hypothesis, stages, metric }, title: name };
+    const autopilotKey = nonEmpty(raw.autopilotKey, 120);
+    const baseline = nonEmpty(raw.baseline, 160);
+    const target = nonEmpty(raw.target, 160);
+    const rawScore = typeof raw.score === "number" && Number.isFinite(raw.score) ? raw.score : null;
+    const score = rawScore === null ? undefined : Math.max(0, Math.min(100, Math.round(rawScore)));
+    return {
+      valid: true,
+      payload: {
+        hub,
+        name,
+        hypothesis,
+        stages,
+        metric,
+        ...(autopilotKey ? { autopilotKey } : {}),
+        ...(baseline ? { baseline } : {}),
+        ...(target ? { target } : {}),
+        ...(score !== undefined ? { score } : {}),
+      },
+      title: name,
+    };
   }
   const note = nonEmpty(raw.note, 300);
   const rationale = nonEmpty(raw.rationale, 600);

@@ -1,0 +1,29 @@
+name: revenue-autopilot
+
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revenue-autopilot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Revenue-Autopilot-Lauf
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Revenue-Autopilot aufrufen
+        env:
+          ENDPOINT: ${{ secrets.RENDER_PUBLIC_URL }}/api/cron/revenue-autopilot
+          TOKEN: ${{ secrets.METRICS_TOKEN }}
+        run: |
+          set +e
+          body=$(curl -sS -X POST --max-time 120 -H "Authorization: Bearer $TOKEN" "$ENDPOINT")
+          echo "$body"
+          echo "$body" | grep -q '"ok":true' && exit 0 || exit 1

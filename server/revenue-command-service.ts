@@ -61,6 +61,7 @@ export async function subscriptionsOverview() {
   return { plans, counts, active, trials, mrrEur: Number(mrrRows[0]?.mrr_eur ?? 0), newMrr7dEur: Number(mrrRows[0]?.new_mrr_7d ?? 0), newMrr1dEur: Number(mrrRows[0]?.new_mrr_1d ?? 0),
     paidEur7d: Number(invoice?.paid_eur_7d ?? 0), paidEur30d: Number(invoice?.paid_eur_30d ?? 0),
     invoiceSuccessRate: attempts ? (invoice!.paid_count / attempts) * 100 : null,
+    invoiceAttempts: attempts,
     // Ohne dedizierte Funnel-Events kann keine Content-to-Lead-CVR behauptet werden.
     funnelConversionRate: null as number | null, fetchedAt: new Date().toISOString() };
 }
