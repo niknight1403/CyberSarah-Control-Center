@@ -55,6 +55,26 @@ export type ManagedLlmEnv = {
   allowPaidFallback?: boolean;
 };
 
+/** Maps real process-style ENV names into the typed managed routing config. */
+export function managedLlmEnvFromProcess(env: Record<string, string | undefined>): ManagedLlmEnv {
+  const read = (...keys: string[]) => keys.map((key) => env[key]?.trim()).find(Boolean);
+  return {
+    forgeApiUrl: read("BUILT_IN_FORGE_API_URL"),
+    forgeApiKey: read("BUILT_IN_FORGE_API_KEY"),
+    geminiApiKey: read("AI_GEMINI_API_KEY", "GEMINI_API_KEY"),
+    openaiBaseUrl: read("AI_OPENAI_BASE_URL"),
+    openaiApiKey: read("AI_OPENAI_API_KEY", "OPENAI_API_KEY"),
+    groqApiKey: read("AI_GROQ_API_KEY", "GROQ_API_KEY"),
+    groqBaseUrl: read("AI_GROQ_BASE_URL"),
+    openrouterApiKey: read("AI_OPENROUTER_API_KEY", "OPENROUTER_API_KEY"),
+    openrouterBaseUrl: read("AI_OPENROUTER_BASE_URL"),
+    openrouterReferer: read("APP_BASE_URL"),
+    customApiKey: read("AI_CUSTOM_API_KEY", "CUSTOM_OPENAI_API_KEY"),
+    customBaseUrl: read("AI_CUSTOM_BASE_URL", "CUSTOM_OPENAI_BASE_URL"),
+    allowPaidFallback: read("AI_ALLOW_PAID_LLM_FALLBACK") === "true",
+  };
+}
+
 const OPENAI_DEFAULT_URL = "https://api.openai.com/v1/chat/completions";
 const GROQ_DEFAULT_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OPENROUTER_DEFAULT_URL = "https://openrouter.ai/api/v1/chat/completions";
