@@ -1,6 +1,10 @@
 name: Build Android APK
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/release-requests/**'
   workflow_dispatch:
     inputs:
       version_name:
