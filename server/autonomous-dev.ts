@@ -42,6 +42,11 @@ import {
   type ProjectSpec,
 } from "../lib/autonomous-dev-logic";
 import { isFreeManagedSource, resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
+import {
+  calculateQualityGate,
+  scoreStandaloneHtmlPerformance,
+  scoreStandaloneHtmlSecurity,
+} from "../lib/quality-gate-logic";
 
 const LEDGER_KEY = "autonomousDev.runLedger";
 const MAX_LEDGER_ENTRIES = 50;
@@ -55,6 +60,8 @@ export interface AutonomousDevRun {
   artifactPath: string;
   htmlBytes: number;
   verificationOk: boolean;
+  qualityScore: number;
+  qualityGatePassed: boolean;
   enhancementSource: "free_cloud_llm" | "local_ollama" | "template_defaults";
   llmProviderUsed?: string;
   iterations: number;
@@ -203,6 +210,20 @@ export async function runAutonomousDevelopment(input: { kind: string; wish?: str
     verification = evaluateArtifact(html, verifyScriptSyntax(html));
   }
 
+  const htmlBytes = Buffer.byteLength(html, "utf-8");
+  const quality = calculateQualityGate({
+    syntax: verification.ok ? 100 : 0,
+    tests: verification.issues.some((issue) => issue.code === "structure_incomplete") ? 0 : 100,
+    security: scoreStandaloneHtmlSecurity(html),
+    performance: scoreStandaloneHtmlPerformance(htmlBytes),
+  });
+  if (!quality.passed) {
+    throw new Error(
+      `QUALITY_GATE_GESCHEITERT: Score ${quality.score}/100 < ${quality.threshold}. ` +
+      `Syntax=${quality.syntax}, Tests=${quality.tests}, Security=${quality.security}, Performance=${quality.performance}`,
+    );
+  }
+
   const artifactDir = join(process.cwd(), "artifacts", "autonomous-dev", plan.slug);
   mkdirSync(artifactDir, { recursive: true });
   const artifactPath = join(artifactDir, "index.html");
@@ -215,8 +236,10 @@ export async function runAutonomousDevelopment(input: { kind: string; wish?: str
     wish: spec.wish,
     slug: plan.slug,
     artifactPath: relativeToCwd(artifactPath),
-    htmlBytes: Buffer.byteLength(html, "utf-8"),
+    htmlBytes,
     verificationOk: verification.ok,
+    qualityScore: quality.score,
+    qualityGatePassed: quality.passed,
     enhancementSource: enhancementResult.source,
     llmProviderUsed: enhancementResult.provider,
     iterations,
