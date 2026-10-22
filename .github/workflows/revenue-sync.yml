@@ -61,7 +61,9 @@ jobs:
 
           # 3) Einspielen in den VM-Spiegel (psql ueber die oeffentliche SNI-443-Route)
           echo "Spiele Dump in die VM-Spiegel-DB ein …"
-          psql "$REV_URL" -v ON_ERROR_STOP=1 -q -f /tmp/revenue_dump.sql
+          # PG18-Dumps enthalten SET transaction_timeout (PG16 kennt es nicht) — filtern.
+          grep -v 'transaction_timeout' /tmp/revenue_dump.sql > /tmp/revenue_dump16.sql || true
+          psql "$REV_URL" -v ON_ERROR_STOP=1 -q -f /tmp/revenue_dump16.sql
           rm -f /tmp/revenue_dump.sql /tmp/revenue_url
 
           # 4) Zeilenzaehlung als Synchronisationsnachweis
