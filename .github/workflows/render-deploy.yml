@@ -64,10 +64,8 @@ jobs:
         if: inputs.target == 'app'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          # Echte Render-URL (Render haengt Suffixe an, wenn der Name vergeben
-          # ist — aktuell cybersarah-control-center-hmlc.onrender.com). Wird
-          # das Secret nicht gepflegt, leitet das Skript die URL per API ab.
-          RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          # RENDER_PUBLIC_URL (echte Render-URL, s. unten) — das Skript nutzt
+          # sie als konfigurierte Basis-URL und prueft Health gegen sie.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
@@ -144,10 +142,8 @@ jobs:
         if: inputs.target == 'domain'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          # Echte Render-URL (Render haengt Suffixe an, wenn der Name vergeben
-          # ist — aktuell cybersarah-control-center-hmlc.onrender.com). Wird
-          # das Secret nicht gepflegt, leitet das Skript die URL per API ab.
-          RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          # RENDER_PUBLIC_URL (echte Render-URL, s. unten) — das Skript nutzt
+          # sie als konfigurierte Basis-URL und prueft Health gegen sie.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
