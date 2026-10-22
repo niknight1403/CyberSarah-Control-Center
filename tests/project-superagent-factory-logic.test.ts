@@ -20,6 +20,9 @@ describe("project superagent factory (Sprint 364)", () => {
     expect(blueprint.superagent.color).toMatch(/^#[0-9A-F]{6}$/i);
     expect(blueprint.toolGrants).toContain("repo.searchCode");
     expect(validateVillaBlueprint(blueprint.villa)).toEqual([]);
+    expect(blueprint.contract.goal).toContain("passes the production quality gate");
+    expect(blueprint.contract.constraints.join(" ")).toContain("no pseudocode");
+    expect(blueprint.qualityGate.threshold).toBe(85);
 
     const same = createProjectSuperagentBlueprint({ name: "Zahlungs-Flow", kind: "web-app", goal: "Checkout in 3 Tagen" });
     expect(same).toEqual(blueprint);
