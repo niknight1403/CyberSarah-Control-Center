@@ -1,0 +1,17 @@
+name: App Keep-Alive (Render 24/7)
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Render-Dienst warm halten
+        run: |
+          CODE=$(curl -s -o /tmp/ka.json -w "%{http_code}" --max-time 120 "https://app.cybersarah-ki.com/api/ready" || echo 000)
+          echo "Keep-Alive HTTP=$CODE $(head -c 120 /tmp/ka.json 2>/dev/null)"
+          test "$CODE" = "200" || exit 1
