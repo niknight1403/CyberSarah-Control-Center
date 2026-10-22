@@ -30,7 +30,7 @@ import {
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import type { Message } from "./_core/llm";
-import { isFreeManagedSource, managedLlmEnvFromProcess, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
+import { isFreeManagedSource, managedLlmEnvFromProcess, openAiCompatibleChatUrl, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
 
 async function callDraftChatEndpoint(
   url: string,
@@ -61,7 +61,7 @@ async function defaultDraftLlm(messages: Message[]): Promise<string> {
   const ollamaBase = (process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434").replace(/\/+$/, "");
   try {
     return await callDraftChatEndpoint(
-      `${ollamaBase}/v1/chat/completions`,
+      openAiCompatibleChatUrl(ollamaBase),
       process.env.AI_OLLAMA_MODEL ?? process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b",
       messages,
     );
