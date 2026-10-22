@@ -25,10 +25,14 @@ jobs:
           RAW=$($SSH "pm2 jlist 2>/dev/null" | python3 -c "import json,sys; apps=json.load(sys.stdin); ids=[a.get('pm_id') for a in apps if any(k in (a.get('name','')+' '+a.get('pm2_env',{}).get('pm_exec_path','')).lower() for k in ('revenue','bridge','cyber'))]; print(ids[0] if ids else '')")
           if [ -z "${RAW:-}" ]; then echo "Engine-PM2-ID nicht gefunden"; exit 1; fi
           echo "PM2-ID: $RAW"
-          KEYLINE=$($SSH "pm2 env $RAW 2>/dev/null" | grep -E "(API_KEY|INTERNAL_KEY)" | grep 6C57 | head -1)
-          if [ -z "$KEYLINE" ]; then echo "Key-Variable nicht gefunden"; exit 1; fi
-          KEYNAME=$(printf "%s" "$KEYLINE" | cut -d= -f1 | tr -d ' ')
-          KEYVAL=$(printf "%s" "$KEYLINE" | cut -d= -f2-)
-          echo "Gefunden: $KEYNAME (Laenge ${#KEYVAL})"
+          echo "== pm2 env $RAW: KEY-Variablennamen =="
+          $SSH "pm2 env $RAW 2>/dev/null" | grep -oE "^[A-Za-z_0-9]*(KEY|TOKEN)[A-Za-z_0-9]*=" | sort -u | head -12
+          echo "== Engine-Quellcode: Key-Pruefung =="
+          $SSH "grep -rhoE 'process\\.env\\.[A-Z_]*(KEY|TOKEN)[A-Z_]*' /opt/cyber*/src/*.ts /opt/cyber*/*.ts 2>/dev/null | sort -u | head -8; grep -rl 'x-internal-api-key' /opt/cyber*/src /opt/cyber*/dist 2>/dev/null | head -3"
+          KEYLINE=$($SSH "pm2 env $RAW 2>/dev/null" | grep -E "(API_KEY|INTERNAL_KEY)" | grep -vE "OLLAMA_API_KEY|OPENROUTER" | head -3)
+          echo "== Kandidaten (Name + Laenge) =="
+          printf "%s\n" "$KEYLINE" | while IFS= read -r L; do [ -n "$L" ] && echo "$(printf '%s' "$L" | cut -d= -f1) Laenge=$(printf '%s' "$L" | cut -d= -f2- | wc -c)"; done
+          KEYVAL=$(printf "%s\n" "$KEYLINE" | grep -vE "^(SK_|pk_|sk-)" | head -1 | cut -d= -f2-)
+          if [ -z "$KEYVAL" ]; then echo "Key-Kandidat nicht identifizierbar"; exit 1; fi
           pip3 install pynacl --quiet
           GH_PAT="$GH_PAT" python3 scripts/set-af2-secret.py "$KEYVAL"
