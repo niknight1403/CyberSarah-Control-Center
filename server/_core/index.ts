@@ -43,6 +43,7 @@ import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
 import { restoreRouteRotationState } from "../route-rotation-agent";
 import { runDraftEngine } from "../draft-engine";
+import { runRevenueAutopilot } from "../revenue-autopilot";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -371,6 +372,28 @@ async function startServer() {
       res.json({ ok: true, result, timestamp: Date.now() });
     } catch (error) {
       console.error("[Draft-Engine] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
+  // Revenue-Autopilot: bewertet reale Funnel-/Stripe-/Affiliate-Signale
+  // und legt nur deduplizierte, messbare Experimente als pending Drafts ab.
+  app.post("/api/cron/revenue-autopilot", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runRevenueAutopilot(3);
+      console.info("[Revenue-Autopilot] Lauf abgeschlossen:", JSON.stringify({
+        status: result.status,
+        generated: result.generated,
+        skipped: result.skipped,
+      }));
+      res.json({ ok: true, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Revenue-Autopilot] Lauf fehlgeschlagen:", error);
       res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
     }
   });
