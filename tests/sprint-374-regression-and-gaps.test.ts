@@ -304,7 +304,7 @@ describe("Sprint 374 — Kritische Pfade & Test-Lücken (Serie J)", () => {
       expect(contentPlan?.slots).toBe(0);
       expect(contentPlan?.reason).toBe("limit");
 
-      expect(revPlan?.slots).toBe(2);
+      expect(revPlan?.slots).toBe(3);
       expect(revPlan?.reason).toBe("quota");
 
       expect(ideaPlan?.slots).toBe(3);
