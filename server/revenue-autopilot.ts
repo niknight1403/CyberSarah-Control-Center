@@ -7,7 +7,6 @@ import {
   haraOverview,
   saasOverview,
 } from "./revenue-command-service";
-import { listDraftQueue } from "./draft-engine";
 import { getDb } from "./db";
 import { draftQueue } from "../drizzle/schema";
 import {
@@ -74,16 +73,6 @@ export async function revenueAutopilotOverview() {
     opportunities,
     generatedAt: new Date().toISOString(),
   };
-}
-
-function pendingAutopilotKeys(rows: Awaited<ReturnType<typeof listDraftQueue>>): Set<string> {
-  const keys = new Set<string>();
-  for (const row of rows) {
-    if (row.kind !== "revenue-loop" || row.status !== "pending") continue;
-    const payload = row.payload as RevenueLoopDraftPayload;
-    if (payload.autopilotKey) keys.add(payload.autopilotKey);
-  }
-  return keys;
 }
 
 async function persistAutopilotDraftsAtomic(
