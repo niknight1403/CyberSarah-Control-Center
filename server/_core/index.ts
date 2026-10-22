@@ -1,4 +1,5 @@
 import { resolveDeploymentInfo } from "../../lib/deployment-info";
+import { resolvePgSslConfig } from "../../lib/db-ssl-logic";
 import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
 import compression from "compression";
@@ -296,6 +297,62 @@ async function startServer() {
       deployedAt: deployment.deployedAt,
       timestamp: Date.now(),
     });
+  });
+
+  // Ops-Debug (Sprint VM-Migration): Zeigt NUR Host/Port/DB (Passwort bleibt
+  //_maskiert) und fuehrt einen echten Verbindungsauftrag mit kurzem Timeout
+  // aus, damit die exakte Fehlerursache ohne Dashboard-Log-Zugang sichtbar wird.
+  app.get("/api/db-debug", async (req, res) => {
+    const token = process.env.METRICS_TOKEN?.trim();
+    if (!token || req.header("authorization") !== `Bearer ${token}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    let host: string | null = null;
+    let port: string | null = null;
+    let database: string | null = null;
+    let sslmode: string | null = null;
+    try {
+      const u = new URL(process.env.DATABASE_URL ?? "");
+      host = u.hostname;
+      port = u.port || "5432";
+      database = u.pathname.replace(/^\//, "") || null;
+      sslmode = u.searchParams.get("sslmode");
+    } catch {
+      // Keine gueltige URL — Felder bleiben null.
+    }
+    const startedAt = Date.now();
+    try {
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        connectionTimeoutMillis: 8000,
+        max: 1,
+        ssl: resolvePgSslConfig(process.env.DATABASE_URL ?? "") || undefined,
+      });
+      const result = await pool.query("SELECT current_database() AS db, version() AS v");
+      await pool.end();
+      res.json({
+        ok: true,
+        host,
+        port,
+        database,
+        sslmode,
+        ms: Date.now() - startedAt,
+        liveDb: result.rows[0]?.db ?? null,
+        version: String(result.rows[0]?.v ?? "").slice(0, 90),
+      });
+    } catch (error) {
+      res.status(502).json({
+        ok: false,
+        host,
+        port,
+        database,
+        sslmode,
+        ms: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   app.get("/api/metrics", metricsHandler);
