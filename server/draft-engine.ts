@@ -145,7 +145,7 @@ async function generateRevenueLoopDraft(
     REVENUE_HUB_BRIEFS[hub],
     "Vollstaendig ehrlich: keine erfundenen Zahlen, keine garantierten Einnahmen.",
     "Der Entwurf bleibt bis zur Freigabe rein planerisch.",
-    "Antworte NUR mit einem JSON-Objekt: {\"hub\": \"" + hub + "\", \"name\": \"<Kurzname>\", \"hypothesis\": \"<1-2 Saetze Hypothese>\", \"stages\": [\"<Stufe 1>\", \"<Stufe 2>\", \"<Stufe 3>\"], \"metric\": \"<Erfolgsmetrik>\"}",
+    "Antworte NUR mit einem JSON-Objekt: {\"hub\": \"" + hub + "\", \"name\": \"<Kurzname>\", \"hypothesis\": \"<1-2 Saetze Hypothese>\", \"stages\": [\"<Stufe 1>\", \"<Stufe 2>\", \"<Stufe 3>\"], \"experiment\": \"<konkreter Test, mindestens 10 Zeichen>\", \"metric\": \"<Erfolgsmetrik>\", \"unit\": \"<Einheit>\", \"targetValue\": <positive Zahl>, \"currentValue\": 0}",
   ].join("\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
