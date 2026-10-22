@@ -31,7 +31,7 @@ describe("planDraftRun", () => {
     const plan = planDraftRun({ content: 1, "revenue-loop": 3, idea: 0 });
     expect(plan).toEqual([
       { kind: "content", slots: 2, reason: "quota" },
-      { kind: "revenue-loop", slots: 0, reason: "limit" },
+      { kind: "revenue-loop", slots: 1, reason: "quota" },
       { kind: "idea", slots: 3, reason: "quota" },
     ]);
   });
@@ -61,7 +61,20 @@ describe("validateDraftPayload", () => {
   it("akzeptiert Revenue-Loops mit Stufen und filtert Leereinträge", () => {
     const result = validateDraftPayload("revenue-loop", { name: "N", hypothesis: "H", metric: "M", stages: ["A", "  ", "B"] });
     expect(result.valid).toBe(true);
-    if (result.valid && "stages" in result.payload) expect(result.payload.stages).toEqual(["A", "B"]);
+    if (result.valid && "stages" in result.payload) {
+      expect(result.payload.stages).toEqual(["A", "B"]);
+      expect(result.payload.hub).toBe("loop");
+    }
+  });
+
+  it("akzeptiert explizite Revenue-Hub-Zuordnung", () => {
+    const result = validateDraftPayload("revenue-loop", { hub: "saas", name: "N", hypothesis: "H", metric: "M", stages: ["A"] });
+    expect(result.valid).toBe(true);
+    if (result.valid && "hub" in result.payload) expect(result.payload.hub).toBe("saas");
+  });
+
+  it("verwirft unbekannte Revenue-Hubs", () => {
+    expect(validateDraftPayload("revenue-loop", { hub: "casino", name: "N", hypothesis: "H", metric: "M", stages: ["A"] }).valid).toBe(false);
   });
 
   it("verwirft Ideen ohne Begruendung", () => {
@@ -79,7 +92,7 @@ describe("buildDraftQueueView", () => {
       row({ id: 1 }),
       row({ id: 2, kind: "idea", payload: { note: "N", rationale: "R" } }),
       row({ id: 3, status: "approved", decidedAtMs: NOW + 1000 }),
-      row({ id: 4, kind: "revenue-loop", payload: { name: "N", hypothesis: "H", stages: ["A"], metric: "M" } }),
+      row({ id: 4, kind: "revenue-loop", payload: { hub: "loop", name: "N", hypothesis: "H", stages: ["A"], metric: "M" } }),
     ];
     const view = buildDraftQueueView(rows, NOW);
     expect(view.counts).toEqual({ pending: 3, approved: 1, rejected: 0 });
