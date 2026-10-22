@@ -3,6 +3,7 @@ import {
   GEMINI_OPENAI_COMPAT_URL,
   MANAGED_LLM_NO_KEY_MESSAGE,
   isFreeManagedSource,
+  managedLlmEnvFromProcess,
   resolveManagedLlmEndpoint,
   resolveManagedLlmEndpoints,
   type ManagedLlmEnv,
