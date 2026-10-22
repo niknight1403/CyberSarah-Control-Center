@@ -52,8 +52,8 @@ describe("render-deploy-logic: validateDatabaseUrl", () => {
 describe("render-deploy-logic: buildServiceEnv", () => {
   const base = {
     databaseUrl: "postgresql://u:p@ep-x.neon.tech/db",
-    appBaseUrl: "https://cybersarah-control-center.onrender.com",
-    allowedOrigins: "https://cybersarah-control-center.onrender.com",
+    appBaseUrl: "https://cybersarah-control-center-hmlc.onrender.com",
+    allowedOrigins: "https://cybersarah-control-center-hmlc.onrender.com",
     jwtSecret: "jwt-geheim",
   };
 
@@ -228,10 +228,10 @@ describe("render-deploy-logic: Workspace-CORS & Render-Proxy (Sprint 73)", () =>
   it("buildWorkspaceEnv uebernimmt komma-separierte ALLOWED_ORIGIN-Werte", () => {
     const lines = buildWorkspaceEnv({
       serviceAccessToken: "tok",
-      allowedOrigin: "https://app.cybersarah-ki.com,https://cybersarah-control-center.onrender.com",
+      allowedOrigin: "https://app.cybersarah-ki.com,https://cybersarah-control-center-hmlc.onrender.com",
     });
     expect(lines).toContain(
-      "ALLOWED_ORIGIN=https://app.cybersarah-ki.com,https://cybersarah-control-center.onrender.com",
+      "ALLOWED_ORIGIN=https://app.cybersarah-ki.com,https://cybersarah-control-center-hmlc.onrender.com",
     );
   });
 

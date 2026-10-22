@@ -21,12 +21,12 @@ jobs:
           echo "== /api/ready =="
           curl -s --max-time 90 "https://app.cybersarah-ki.com/api/ready" | head -c 300; echo
           echo "== Admin-Zeile in der VM-DB =="
-          psql "$DATABASE_URL" -tA -c "SELECT email, role, created_at::date FROM users WHERE lower(email)='niko.oeben@gmail.com';" 2>&1 | head -3
+          psql "$DATABASE_URL" -tA -c "SELECT email, role, "createdAt"::date FROM users WHERE lower(email)='niko.oeben@gmail.com';" 2>&1 | head -3
           echo "== Login-Smoke (falsches Passwort erwartet) =="
           CODE=$(curl -s -o /tmp/login.json -w "%{http_code}" --max-time 90 -X POST \
             -H "Content-Type: application/json" \
-            -d '{"email":"niko.oeben@gmail.com","password":"definitiv-falsches-passwort"}' \
-            "https://app.cybersarah-ki.com/api/trpc/account.login")
+            -d '{"0":{"json":{"email":"niko.oeben@gmail.com","password":"definitiv-falsches-passwort"}}}' \
+            "https://app.cybersarah-ki.com/api/trpc/account.login?batch=1")
           echo "HTTP=$CODE"
           head -c 400 /tmp/login.json; echo
           echo "== App-Wurzel (static web) =="

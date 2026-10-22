@@ -209,7 +209,12 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
     });
     const liveDeploy = await waitForLive(existing.id, priorDeployIds);
     if (liveDeploy) log(`Deploy ${liveDeploy.id ?? ""} live.`);
-    let publicUrl = publicServiceUrl((await apiFetch(`/services/${existing.id}`)).service ?? {}) ?? assumedUrl;
+    // GET /services/{id} liefert das Service-Objekt direkt (kein .service-Wrapper).
+    // Der fruehere .service-Zugriff lieferte undefined und fiel auf die
+    // angenommene URL zurueck — Render vergibt Suffixe (z. B. "-hmlc"), wenn
+    // der Name bereits vergeben ist. Immer die ECHTE serviceDetails.url nutzen.
+    const serviceById = await apiFetch(`/services/${existing.id}`);
+    let publicUrl = publicServiceUrl(serviceById?.service ?? serviceById ?? {}) ?? assumedUrl;
     log(`Oeffentliche URL: ${publicUrl}`);
     return { service: existing, publicUrl };
   }
@@ -226,8 +231,9 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
   const liveDeploy = await waitForLive(service.id);
   if (liveDeploy) log(`Deploy ${liveDeploy.id ?? ""} live.`);
 
+  const serviceById = await apiFetch(`/services/${service.id}`);
   let publicUrl = publicServiceUrl(
-    (await apiFetch(`/services/${service.id}`)).service ?? {},
+    serviceById?.service ?? serviceById ?? {},
   ) ?? assumedUrl;
   log(`Oeffentliche URL: ${publicUrl}`);
   return { service, publicUrl };

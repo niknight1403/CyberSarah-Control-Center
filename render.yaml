@@ -25,7 +25,7 @@ services:
       - key: DATABASE_URL
         sync: false # Neon-Connection-String (postgresql://…neon.tech/…)
       - key: APP_BASE_URL
-        sync: false # https://cybersarah-control-center.onrender.com
+        sync: false # https://cybersarah-control-center-hmlc.onrender.com (+ Custom Domain app.cybersarah-ki.com)
       - key: APP_ALLOWED_ORIGINS
         sync: false # onrender-Domain + app.cybersarah-ki.com
       - key: JWT_SECRET

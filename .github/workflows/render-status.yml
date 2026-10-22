@@ -42,12 +42,12 @@ jobs:
       - name: Wecken und Health pruefen
         run: |
           for i in $(seq 1 12); do
-            CODE=$(curl -s -o /tmp/h.txt -w "%{http_code}" --max-time 60 "https://cybersarah-control-center.onrender.com/api/health")
-            ROUTE=$(curl -s -D- -o /dev/null --max-time 30 "https://cybersarah-control-center.onrender.com/api/health" | grep -i "x-render-routing" | tr -d '\r' || true)
+            CODE=$(curl -s -o /tmp/h.txt -w "%{http_code}" --max-time 60 "https://cybersarah-control-center-hmlc.onrender.com/api/health")
+            ROUTE=$(curl -s -D- -o /dev/null --max-time 30 "https://cybersarah-control-center-hmlc.onrender.com/api/health" | grep -i "x-render-routing" | tr -d '\r' || true)
             echo "Versuch $i: HTTP=$CODE $ROUTE"
             [ "$CODE" = "200" ] && break
             sleep 20
           done
           echo "== /api/health =="; cat /tmp/h.txt; echo
           echo "== /api/ready =="
-          curl -s --max-time 90 "https://cybersarah-control-center.onrender.com/api/ready"; echo
+          curl -s --max-time 90 "https://cybersarah-control-center-hmlc.onrender.com/api/ready"; echo

@@ -32,8 +32,8 @@ jobs:
           head -c 300 /tmp/nd.json; echo
           echo "== Monitoring 6 Min: /api/health + /api/ready =="
           for i in $(seq 1 18); do
-            H=$(curl -s -o /tmp/h.txt -w "%{http_code}" --max-time 30 "https://cybersarah-control-center.onrender.com/api/health")
-            R=$(curl -s -o /tmp/r.txt -w "%{http_code}" --max-time 30 "https://cybersarah-control-center.onrender.com/api/ready")
+            H=$(curl -s -o /tmp/h.txt -w "%{http_code}" --max-time 30 "https://cybersarah-control-center-hmlc.onrender.com/api/health")
+            R=$(curl -s -o /tmp/r.txt -w "%{http_code}" --max-time 30 "https://cybersarah-control-center-hmlc.onrender.com/api/ready")
             RD=$(head -c 200 /tmp/r.txt | tr -d '\n')
             echo "T+$((i*20))s health=$H ready=$R body=$RD"
             if [ "$R" = "200" ] || [ "$R" = "503" ]; then break; fi
