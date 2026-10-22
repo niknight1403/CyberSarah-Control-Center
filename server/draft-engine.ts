@@ -10,19 +10,22 @@
  * Ergebnisse, wird die Art uebersprungen und im Lauf-Bericht vermerkt —
  * keine Fake-Entwuerfe, keine stillen Fehler.
  */
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "./db";
 import { draftQueue, type DraftQueueRow, type InsertDraftQueueRow } from "../drizzle/schema";
 import {
   DRAFT_KINDS,
-  DRAFT_MAX_PENDING_PER_KIND,
+  DRAFT_MAX_PENDING_BY_KIND,
+  REVENUE_HUBS,
+  revenueDraftHub,
   planDraftRun,
   validateDraftPayload,
   type DraftKind,
   type DraftPayloadByKind,
   type DraftRunPlan,
   type DraftStatus,
+  type RevenueHub,
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import { invokeLLM, type Message } from "./_core/llm";
@@ -68,18 +71,33 @@ export type DraftEngineDeps = {
   now?: () => number;
 };
 
-/** Zaehlt offene Entwuerfe pro Art (Null bei fehlender DB — ehrlich). */
-export async function countPendingDraftsByKind(): Promise<Record<DraftKind, number> | null> {
+type PendingDraftCoverage = {
+  counts: Record<DraftKind, number>;
+  revenueHubs: Set<RevenueHub>;
+};
+
+/** Offene Entwuerfe plus Revenue-Hub-Abdeckung. Legacy-Loops zaehlen zu "loop". */
+async function pendingDraftCoverage(): Promise<PendingDraftCoverage | null> {
   const db = await getDb();
   if (!db) return null;
   const rows = await db
-    .select({ kind: draftQueue.kind, open: sql<number>`count(*)::int` })
+    .select({ kind: draftQueue.kind, payload: draftQueue.payload })
     .from(draftQueue)
-    .where(eq(draftQueue.status, "pending"))
-    .groupBy(draftQueue.kind);
+    .where(eq(draftQueue.status, "pending"));
   const counts = { content: 0, "revenue-loop": 0, idea: 0 } as Record<DraftKind, number>;
-  for (const row of rows) counts[row.kind as DraftKind] = row.open;
-  return counts;
+  const revenueHubs = new Set<RevenueHub>();
+  for (const row of rows) {
+    const kind = row.kind as DraftKind;
+    if (kind === "revenue-loop") revenueHubs.add(revenueDraftHub(row.payload));
+    else counts[kind] += 1;
+  }
+  counts["revenue-loop"] = revenueHubs.size;
+  return { counts, revenueHubs };
+}
+
+/** Zaehlt offene Entwuerfe pro Art; Revenue-Loops nach abgedeckten Hubs. */
+export async function countPendingDraftsByKind(): Promise<Record<DraftKind, number> | null> {
+  return (await pendingDraftCoverage())?.counts ?? null;
 }
 
 export async function insertPendingDraft(kind: DraftKind, title: string, payload: DraftPayloadByKind[DraftKind], createdBy: string): Promise<void> {
@@ -108,12 +126,26 @@ async function generateContentDraft(llm: (messages: Message[]) => Promise<string
   return { ok: true };
 }
 
-async function generateRevenueLoopDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number): Promise<{ ok: true } | { ok: false; reason: string }> {
+const REVENUE_HUB_BRIEFS: Record<RevenueHub, string> = {
+  hara: "HARA: formuliere eine konkrete, pruefbare Revenue-Chance oder Kampagnen-Hypothese. Keine erfundenen Live-Zahlen.",
+  saas: "SaaS: entwirf eine Produkt-, Abo-, Funnel- oder Retention-Verbesserung mit messbarer Kennzahl.",
+  loop: "Loop Engineering: entwirf ein Cross-Sell-, Expansion- oder Feedback-Loop-Experiment mit klaren Stufen.",
+  trading: "Micro Trading: entwirf ausschliesslich eine Marktbeobachtungs-/Analyse-Hypothese. Keine Orderausfuehrung und keine Renditegarantie.",
+};
+
+async function generateRevenueLoopDraft(
+  llm: (messages: Message[]) => Promise<string>,
+  nowMs: number,
+  slotOffset: number,
+  hubOverride?: RevenueHub,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const hub = hubOverride ?? REVENUE_HUBS[slotOffset % REVENUE_HUBS.length]!;
   const prompt = [
     "Du bist der Revenue-OS-Analyst des CyberSarah Control Centers.",
-    "Entwirf EINE konkrete, testbare Einnahme-Hypothese fuer ein KI-Produkt (App, Template, Micro-Service oder digitales Produkt).",
+    REVENUE_HUB_BRIEFS[hub],
     "Vollstaendig ehrlich: keine erfundenen Zahlen, keine garantierten Einnahmen.",
-    "Antworte NUR mit einem JSON-Objekt: {\"name\": \"<Kurzname>\", \"hypothesis\": \"<1-2 Saetze Hypothese>\", \"stages\": [\"<Stufe 1>\", \"<Stufe 2>\", \"<Stufe 3>\"], \"metric\": \"<Erfolgsmetrik>\"}",
+    "Der Entwurf bleibt bis zur Freigabe rein planerisch.",
+    "Antworte NUR mit einem JSON-Objekt: {\"hub\": \"" + hub + "\", \"name\": \"<Kurzname>\", \"hypothesis\": \"<1-2 Saetze Hypothese>\", \"stages\": [\"<Stufe 1>\", \"<Stufe 2>\", \"<Stufe 3>\"], \"metric\": \"<Erfolgsmetrik>\"}",
   ].join("\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
@@ -153,29 +185,33 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
   });
 
   const result: DraftEngineRunResult = { plan: [], generated: {}, skipped: [] };
-  let pending: Record<DraftKind, number> | null = null;
+  let coverage: PendingDraftCoverage | null = null;
   try {
-    pending = await countPendingDraftsByKind();
+    coverage = await pendingDraftCoverage();
   } catch (error) {
     result.skipped.push({ kind: "idea", reason: `DB nicht lesbar: ${error instanceof Error ? error.message : "unbekannt"}` });
     return result;
   }
-  if (pending === null) {
+  if (coverage === null) {
     result.skipped.push({ kind: "idea", reason: "Datenbank nicht konfiguriert — Lauf abgebrochen." });
     return result;
   }
 
-  result.plan = planDraftRun(pending, DRAFT_MAX_PENDING_PER_KIND);
+  result.plan = planDraftRun(coverage.counts, DRAFT_MAX_PENDING_BY_KIND);
   for (const entry of result.plan) {
     if (entry.slots <= 0) continue;
     let okCount = 0;
-    for (let slot = 0; slot < entry.slots; slot++) {
+    const missingRevenueHubs = entry.kind === "revenue-loop"
+      ? REVENUE_HUBS.filter((hub) => !coverage!.revenueHubs.has(hub))
+      : [];
+    const slots = entry.kind === "revenue-loop" ? Math.min(entry.slots, missingRevenueHubs.length) : entry.slots;
+    for (let slot = 0; slot < slots; slot++) {
       try {
         const outcome =
           entry.kind === "content"
             ? await generateContentDraft(llm, nowMs, slot)
             : entry.kind === "revenue-loop"
-              ? await generateRevenueLoopDraft(llm, nowMs, slot)
+              ? await generateRevenueLoopDraft(llm, nowMs, slot, missingRevenueHubs[slot])
               : await generateIdeaDraft(llm, nowMs, slot);
         if (outcome.ok) okCount++;
         else result.skipped.push({ kind: entry.kind, reason: outcome.reason });
