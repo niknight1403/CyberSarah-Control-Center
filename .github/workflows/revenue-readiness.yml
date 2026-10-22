@@ -31,8 +31,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci --ignore-scripts
+      - name: Install readiness-only Postgres client
+        run: npm install --prefix /tmp/revenue-readiness --ignore-scripts --no-audit --no-fund pg@8.23.0
       - name: Open temporary SSH tunnel to local Revenue Postgres
         env:
           SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
@@ -49,6 +49,7 @@ jobs:
       - name: Read-only DB schema and Stripe connectivity
         env:
           REVENUE_OS_DB_TUNNEL_PORT: 15432
+          REVENUE_READINESS_PG_MODULE: /tmp/revenue-readiness/node_modules/pg/lib/index.js
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           REVENUE_OS_DATABASE_URL: ${{ secrets.REVENUE_OS_DATABASE_URL }}
           REVENUE_OS_API_BASE_URL: ${{ secrets.REVENUE_OS_API_BASE_URL }}
