@@ -82,6 +82,8 @@ function pendingAutopilotKeys(rows: Awaited<ReturnType<typeof listDraftQueue>>):
   return keys;
 }
 
+export const REVENUE_AUTOPILOT_MAX_PENDING = 3;
+
 export type RevenueAutopilotRunResult = {
   status: ReturnType<typeof revenueAutopilotStatus>;
   generated: number;
@@ -95,11 +97,12 @@ export async function runRevenueAutopilot(maxDrafts = 3): Promise<RevenueAutopil
   const status = revenueAutopilotStatus(opportunities);
   const rows = await listDraftQueue(200);
   const pendingKeys = pendingAutopilotKeys(rows);
+  const availableSlots = Math.max(0, REVENUE_AUTOPILOT_MAX_PENDING - pendingKeys.size);
   let generated = 0;
   const skipped: string[] = [];
 
   for (const opportunity of opportunities) {
-    if (generated >= Math.max(1, Math.min(5, maxDrafts))) break;
+    if (generated >= Math.min(availableSlots, Math.max(1, Math.min(5, maxDrafts)))) break;
     if (pendingKeys.has(opportunity.key)) {
       skipped.push(`${opportunity.key}: bereits offen`);
       continue;
@@ -121,5 +124,6 @@ export async function runRevenueAutopilot(maxDrafts = 3): Promise<RevenueAutopil
     generated += 1;
   }
 
+  if (availableSlots === 0 && opportunities.length > 0) skipped.push("Autopilot-Queue voll: zuerst bestehende Experimente pruefen.");
   return { status, generated, skipped, opportunities };
 }
