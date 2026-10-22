@@ -23,7 +23,7 @@ import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { isFreeManagedSource, managedLlmEnvFromProcess, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
+import { isFreeManagedSource, managedLlmEnvFromProcess, openAiCompatibleChatUrl, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
 import {
   calculateQualityGate,
   scoreStandaloneHtmlPerformance,
@@ -117,7 +117,7 @@ async function generateCustomGame(idea: string, fixIssues: string[]): Promise<Ge
 
   // Stufe 1: Lokales Ollama — Codegen bleibt standardmaessig lokal.
   const localHtml = await generateFromEndpoint(
-    `${OLLAMA_BASE()}/v1/chat/completions`,
+    openAiCompatibleChatUrl(OLLAMA_BASE()),
     {},
     process.env.OLLAMA_CODEGEN_MODEL ?? "qwen2.5-coder:7b",
     prompt,
