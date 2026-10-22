@@ -16,6 +16,7 @@
  */
 
 import { SUPER_AGENT_COLORS, SUPER_AGENT_PURPOSE_MAX_LENGTH, SUPER_AGENT_NAME_MAX_LENGTH } from "./super-agents-logic";
+import { buildProjectPromptContract, type PromptContract } from "./prompt-contract-logic";
 import {
   buildVillaBlueprint,
   validateVillaBlueprint,
@@ -69,6 +70,8 @@ export type ProjectSuperagentBlueprint = {
   villa: VillaBlueprint;
   toolGrants: string[];
   autonomy: AutonomyProfile;
+  contract: PromptContract;
+  qualityGate: { threshold: 85; formula: "0.30*syntax + 0.30*tests + 0.20*security + 0.20*performance" };
 };
 
 export function normalizeProjectName(name: string): string {
@@ -112,6 +115,8 @@ export function createProjectSuperagentBlueprint(input: {
   if (villaErrors.length) throw new Error(`Villa-Blueprint ungueltig: ${villaErrors[0]}`);
 
   const purpose = `Dedizierter Projekt-Superagent fuer "${name}" (${input.kind}). Ziel: ${goal}. Fuehrt Projektarbeit mit Kern-Team (${villa.coreTeam.length} Live-Worker) und Spawn-on-Demand-Pool (Kapazitaet ${villa.poolCapacity}, max. ${villa.liveWorkerCap} gleichzeitig aktiv) autonom aus.`;
+  const toolGrants = KIND_TOOLS[input.kind];
+  const contract = buildProjectPromptContract({ projectName: name, goal, toolGrants });
   if (purpose.length > SUPER_AGENT_PURPOSE_MAX_LENGTH * 2) {
     throw new Error("Projektbeschreibung zu lang.");
   }
@@ -125,7 +130,12 @@ export function createProjectSuperagentBlueprint(input: {
       status: "aktiv" as const,
     },
     villa,
-    toolGrants: KIND_TOOLS[input.kind],
+    toolGrants,
     autonomy: MAXIMAL_AUTONOMY_PROFILE,
+    contract,
+    qualityGate: {
+      threshold: 85,
+      formula: "0.30*syntax + 0.30*tests + 0.20*security + 0.20*performance",
+    },
   };
 }
