@@ -11,3 +11,5 @@ Enthaelt:
 - PR-Agent-/Ops-Workflow-Stabilisierung
 
 Build-Gate: TypeScript, Tests, Web-Smoke, Capacitor, Debug-APK, signierte Admin-APK und signiertes AAB.
+
+Finaler Nachtrag: Instagram-Publishing-Fallback und Provider-Alias-Korrekturen eingeschlossen.
