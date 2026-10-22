@@ -5,10 +5,14 @@ on:
   pull_request:
     paths:
       - 'server/revenue-command-*'
+      - 'server/data-hub.ts'
       - 'server/draft-engine.ts'
       - 'lib/draft-engine-logic.ts'
       - 'components/glass/autonomous-drafts.tsx'
       - 'app/(tabs)/revenue-os.tsx'
+      - 'app/(tabs)/business.tsx'
+      - 'app/(tabs)/loop-engineering.tsx'
+      - '.github/workflows/revenue-sync.yml'
       - 'scripts/revenue-readiness.mjs'
       - '.github/workflows/revenue-readiness.yml'
   push:
