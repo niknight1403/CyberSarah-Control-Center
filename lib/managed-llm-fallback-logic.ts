@@ -75,6 +75,14 @@ export function managedLlmEnvFromProcess(env: Record<string, string | undefined>
   };
 }
 
+/** Normalizes an OpenAI-compatible base URL without duplicating /v1. */
+export function openAiCompatibleChatUrl(baseUrl: string): string {
+  const base = baseUrl.trim().replace(/\/+$/, "");
+  if (base.endsWith("/chat/completions")) return base;
+  if (base.endsWith("/v1")) return `${base}/chat/completions`;
+  return `${base}/v1/chat/completions`;
+}
+
 const OPENAI_DEFAULT_URL = "https://api.openai.com/v1/chat/completions";
 const GROQ_DEFAULT_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OPENROUTER_DEFAULT_URL = "https://openrouter.ai/api/v1/chat/completions";
