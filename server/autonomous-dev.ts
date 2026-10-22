@@ -5,9 +5,9 @@
  * 0-EUR-Garantie:
  *
  * 1. PLANUNG  : planProject() — jeder Schritt definitionsgemaess kostenlos.
- * 2. PERSONALISIERUNG (optional): freier LLM-Vorschlag fuer Titel/Farben/
- *    Text — bevorzugt aus der Gratis-Kette (Groq > OpenRouter :free >
- *    Gemini), sonst lokales Ollama (unbegrenzt), sonst Template-Defaults.
+ * 2. PERSONALISIERUNG (optional): Local-first ueber Ollama. Nur wenn der
+ *    lokale Endpoint ausfaellt, eskaliert die Pipeline in die kostenlose
+ *    Cloud-Kette (Groq > OpenRouter :free > Gemini), danach Template-Defaults.
  *    Bezahlte Endpoints (Forge/OpenAI) werden NIE angefasst.
  * 3. GENERIERUNG: deterministische Standalone-HTML5-Templates (Canvas-
  *    Spiele + Apps mit localStorage) — ohne Build-Tools, ohne CDN-Zwang.
@@ -119,7 +119,16 @@ async function enhanceWithFreeLlm(
 ): Promise<{ enhancement: ArtifactEnhancement; source: AutonomousDevRun["enhancementSource"]; provider?: string }> {
   const prompt = buildEnhancementPrompt(spec);
 
-  // Stufe 1: Kostenloser Managed-Endpoint (Groq > OpenRouter > Gemini).
+  // Stufe 1: Lokales Ollama — Routinearbeit bleibt lokal, privat und 0 EUR.
+  const localResult = await requestEnhancementFromEndpoint(
+    `${OLLAMA_BASE()}/v1/chat/completions`,
+    {},
+    process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b",
+    prompt,
+  );
+  if (localResult) return { enhancement: localResult.enhancement, source: "local_ollama", provider: "ollama" };
+
+  // Stufe 2: kostenlose Cloud-Eskalation nur bei lokalem Ausfall.
   const endpoint = resolveManagedLlmEndpoint(process.env as unknown as ManagedLlmEnv);
   if (endpoint && isFreeManagedSource(endpoint.source)) {
     const result = await requestEnhancementFromEndpoint(
@@ -131,15 +140,6 @@ async function enhanceWithFreeLlm(
     );
     if (result) return { enhancement: result.enhancement, source: "free_cloud_llm", provider: endpoint.source };
   }
-
-  // Stufe 2: Lokales Ollama — unbegrenzt, offline, 0 EUR.
-  const localResult = await requestEnhancementFromEndpoint(
-    `${OLLAMA_BASE()}/v1/chat/completions`,
-    {},
-    process.env.OLLAMA_MODEL ?? "llama3.1",
-    prompt,
-  );
-  if (localResult) return { enhancement: localResult.enhancement, source: "local_ollama", provider: "ollama" };
 
   // Stufe 3: Template-Defaults — garantiert autonom ohne jede Anbindung.
   return { enhancement: {}, source: "template_defaults" };
