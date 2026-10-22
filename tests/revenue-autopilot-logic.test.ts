@@ -15,6 +15,7 @@ const base: RevenueAutopilotSnapshot = {
   stripeCheckoutCompleted: null,
   stripeCheckoutSuccessRate: null,
   invoiceSuccessRate: null,
+  invoiceAttempts: null,
   mrrEur: null,
   activeSubscriptions: null,
   affiliateClicks: null,
@@ -78,6 +79,33 @@ describe("Revenue Autopilot", () => {
     expect(opportunities.find((item) => item.key === "cross-sell.conversion")?.hub).toBe("loop");
   });
 
+  it("ignoriert nicht erreichbare Funnel- und Expansion-Quellen", () => {
+    const opportunities = buildRevenueOpportunities({
+      ...base,
+      landingViews: null,
+      signups: null,
+      checkoutStarts: null,
+      upgrades: null,
+      validatedExpansionOpportunities: null,
+    });
+    expect(opportunities.find((item) => item.key === "instrumentation.funnel")).toBeUndefined();
+    expect(opportunities.find((item) => item.key === "expansion.discovery")).toBeUndefined();
+  });
+
+  it("nutzt echte Invoice-Stichprobe fuer die Evidenz", () => {
+    const opportunities = buildRevenueOpportunities({
+      ...base,
+      landingViews: 100,
+      signups: 20,
+      checkoutStarts: 10,
+      upgrades: 1,
+      invoiceSuccessRate: 50,
+      invoiceAttempts: 1,
+      activeSubscriptions: 500,
+    });
+    expect(opportunities.find((item) => item.key === "saas.invoice-reliability")).toBeUndefined();
+  });
+
   it("markiert einen gesunden Zustand ohne belegte Luecken", () => {
     const opportunities = buildRevenueOpportunities({
       ...base,
@@ -89,6 +117,7 @@ describe("Revenue Autopilot", () => {
       stripeCheckoutCompleted: 9,
       stripeCheckoutSuccessRate: 90,
       invoiceSuccessRate: 99,
+      invoiceAttempts: 25,
       activeSubscriptions: 20,
       affiliateClicks: 100,
       affiliateConversions: 5,
