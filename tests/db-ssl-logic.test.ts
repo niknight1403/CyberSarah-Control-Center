@@ -14,8 +14,14 @@ describe("db-ssl-logic", () => {
     expect(extractSslMode("nicht-eine-url")).toBeNull();
   });
 
-  it("erzwingt Zertifikatspruefung fuer require/prefer/verify-ca/verify-full", () => {
-    for (const mode of ["require", "prefer", "verify-ca", "verify-full"]) {
+  it("erzwingt TLS ohne Zertifikatspruefung fuer require/prefer (libpq-Semantik)", () => {
+    for (const mode of ["require", "prefer"]) {
+      expect(resolvePgSslConfig(`postgresql://u:p@host/db?sslmode=${mode}`)).toEqual({ rejectUnauthorized: false });
+    }
+  });
+
+  it("erzwingt volle Zertifikatspruefung fuer verify-ca/verify-full", () => {
+    for (const mode of ["verify-ca", "verify-full"]) {
       expect(resolvePgSslConfig(`postgresql://u:p@host/db?sslmode=${mode}`)).toEqual({ rejectUnauthorized: true });
     }
   });

@@ -28,14 +28,22 @@ export function extractSslMode(connectionString: string): string | null {
 
 /**
  * Leitet die explizite pg-SSL-Konfiguration aus dem sslmode-Parameter ab.
- * 'disable' → kein TLS. 'prefer' | 'require' | 'verify-ca' | 'verify-full' →
- * TLS mit Zertifikatspruefung (deckt sich mit pg's bisherigem Verhalten).
+ * 'disable' → kein TLS. 'verify-ca' | 'verify-full' → TLS mit voller
+ * Zertifikats- und Hostnamenpruefung. 'require' | 'prefer' → TLS erzwungen,
+ * aber OHNE Zertifikats-/Hostnamenpruefung — exakt die libpq-Semantik von
+ * sslmode=require (verschluesselt, kein Identitaetsnachweis). Das ist
+ * wichtig fuer VM-Hosts hinter einer SNI-Stream-Route (z. B. Postgres
+ * ueber nginx:443 auf einer IP ohne passenden SAN im Zertifikat).
  * Kein sslmode-Parameter → keine TLS-Erzwingung (lokale Entwicklung).
  */
 export function resolvePgSslConfig(connectionString: string): PgSslConfig {
   const mode = extractSslMode(connectionString);
   if (!mode) return false;
   if (mode === "disable") return false;
+  if (mode === "require" || mode === "prefer") {
+    // libpq-Semantik: verschluesselt verbinden, Zertifikat nicht pruefen.
+    return { rejectUnauthorized: false };
+  }
   return { rejectUnauthorized: true };
 }
 
