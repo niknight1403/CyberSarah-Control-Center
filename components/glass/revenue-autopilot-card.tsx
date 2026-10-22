@@ -81,7 +81,7 @@ export function RevenueAutopilotCard() {
       ) : null}
 
       {run.error ? <Text style={styles.error} accessibilityRole="alert">{run.error.message}</Text> : null}
-      {runFeedback && !run.error ? <Text style={styles.feedback} accessibilityRole="status">{runFeedback}</Text> : null}
+      {runFeedback && !run.error ? <Text style={styles.feedback} accessibilityLiveRegion="polite">{runFeedback}</Text> : null}
 
       <Pressable
         accessibilityRole="button"
