@@ -1,0 +1,22 @@
+name: Hetzner-Kapazitaets-Audit
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+    steps:
+      - name: Hetzner-Server-Specs pruefen
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/hz_key
+          chmod 600 ~/.ssh/hz_key
+          SSH="ssh -i ~/.ssh/hz_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 $SSH_USER@$SSH_HOST"
+          $SSH "echo '== Specs =='; nproc; free -h | head -2; df -h / | tail -1; uname -m; echo '== Last =='; uptime; echo '== Laeuft =='; pm2 jlist 2>/dev/null | python3 -c \"import json,sys; [print(a.get('name'),a.get('pm2_env',{}).get('status')) for a in json.load(sys.stdin)]\" 2>/dev/null || true; ss -tlnp 2>/dev/null | grep -c LISTEN; echo '== Ollama vorhanden? =='; which ollama || echo 'nicht installiert'"
