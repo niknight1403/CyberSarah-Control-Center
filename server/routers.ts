@@ -7,6 +7,7 @@ import { developmentChatRouter } from "./development-chat";
 import { opsRouter } from "./ops-router";
 import { featuresRouter } from "./features-router";
 import { appStatusRouter } from "./app-status-router";
+import { villaforgeRouter } from "./villaforge-router";
 import { adminRouter } from "./admin-router";
 import { dataHubRouter } from "./data-hub";
 import { memoryRouter } from "./memory-router";
@@ -57,6 +58,7 @@ export const appRouter = router({
   ops: opsRouter,
   features: featuresRouter,
   appStatus: appStatusRouter,
+  villaforge: villaforgeRouter,
   admin: adminRouter,
   dataHub: dataHubRouter,
   memory: memoryRouter,
