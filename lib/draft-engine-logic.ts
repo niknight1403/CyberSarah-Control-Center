@@ -20,6 +20,10 @@ export type DraftStatus = "pending" | "approved" | "rejected";
 
 export const DRAFT_KINDS: readonly DraftKind[] = ["content", "revenue-loop", "idea"] as const;
 
+export type RevenueHub = "hara" | "saas" | "loop" | "trading";
+
+export const REVENUE_HUBS: readonly RevenueHub[] = ["hara", "saas", "loop", "trading"] as const;
+
 /** Maximale offene (pending) Entwuerfe pro Art — danach pausiert die Engine. */
 export const DRAFT_MAX_PENDING_PER_KIND = 3;
 export const DRAFT_MAX_PENDING_BY_KIND: Readonly<Record<DraftKind, number>> = {
@@ -37,10 +41,6 @@ export type ContentDraftPayload = {
   topic: string;
   content: string;
 };
-
-export type RevenueHub = "hara" | "saas" | "loop" | "trading";
-
-export const REVENUE_HUBS: readonly RevenueHub[] = ["hara", "saas", "loop", "trading"] as const;
 
 export type RevenueLoopDraftPayload = {
   /** Ziel-Hub, in dem dieser autonome Entwurf angezeigt wird. */
