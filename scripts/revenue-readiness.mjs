@@ -2,7 +2,8 @@
 const pgModule = process.env.REVENUE_READINESS_PG_MODULE
   ? await import(process.env.REVENUE_READINESS_PG_MODULE)
   : await import('pg');
-const { Pool } = pgModule;
+const Pool = pgModule.Pool ?? pgModule.default?.Pool;
+if (typeof Pool !== 'function') throw new Error('readiness_pg_client_unavailable');
 
 const requiredTables = [
   'hara_proposals', 'hara_performance', 'subscription_plans',
