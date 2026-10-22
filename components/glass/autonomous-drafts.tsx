@@ -31,6 +31,8 @@ type DraftsCardProps = {
   accent?: "cyan" | "green" | "purple" | "blue";
   /** Nur fuer kind "idea": legt die freigegebene Idee in die Inbox. */
   onAdoptIdea?: (payload: IdeaDraftPayload) => Promise<{ ok: boolean; reason: string }>;
+  /** Fuer Revenue-Loops: Freigabe integriert den Plan in Loop Engineering. */
+  onAdoptRevenueLoop?: (payload: RevenueLoopDraftPayload) => Promise<{ ok: boolean; reason: string }>;
   /** Optional: Revenue-Loop-Entwuerfe auf konkrete Revenue-Hubs begrenzen. */
   revenueHubs?: readonly RevenueHub[];
   /** Leere Hub-Queue bei Admin automatisch durch die Draft-Engine auffuellen. */
@@ -52,7 +54,7 @@ function describePayload(row: DraftRow): string {
   return `${payload.note}\n\nWarum: ${payload.rationale}`;
 }
 
-export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, revenueHubs, autoGenerate = true }: DraftsCardProps) {
+export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, onAdoptRevenueLoop, revenueHubs, autoGenerate = true }: DraftsCardProps) {
   const styles = useMemo(() => createStyles(), []);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -85,14 +87,25 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, re
 
   const decide = async (row: DraftRow, action: "approve" | "reject") => {
     setNotice(null);
-    if (row.kind === "idea" && action === "approve" && onAdoptIdea) {
-      const payload = row.payload as IdeaDraftPayload;
-      setBusyId(row.id);
-      const adoption = await onAdoptIdea({ note: payload.note, rationale: payload.rationale });
-      if (!adoption.ok) {
-        setBusyId(null);
-        setNotice(adoption.reason);
-        return;
+    if (action === "approve") {
+      if (row.kind === "idea" && onAdoptIdea) {
+        const payload = row.payload as IdeaDraftPayload;
+        setBusyId(row.id);
+        const adoption = await onAdoptIdea({ note: payload.note, rationale: payload.rationale });
+        if (!adoption.ok) {
+          setBusyId(null);
+          setNotice(adoption.reason);
+          return;
+        }
+      }
+      if (row.kind === "revenue-loop" && onAdoptRevenueLoop) {
+        setBusyId(row.id);
+        const adoption = await onAdoptRevenueLoop(row.payload as RevenueLoopDraftPayload);
+        if (!adoption.ok) {
+          setBusyId(null);
+          setNotice(adoption.reason);
+          return;
+        }
       }
     }
     setBusyId(row.id);
