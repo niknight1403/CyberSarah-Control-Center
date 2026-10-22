@@ -15,7 +15,7 @@ import {
   type RevenueAutopilotSnapshot,
   type RevenueOpportunity,
 } from "../lib/revenue-autopilot-logic";
-import type { RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
+import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
 
 async function safe<T>(fn: () => Promise<T>): Promise<T | null> {
   try {
@@ -75,6 +75,8 @@ export async function revenueAutopilotOverview() {
   };
 }
 
+export const REVENUE_AUTOPILOT_MAX_PENDING = 3;
+
 async function persistAutopilotDraftsAtomic(
   opportunities: RevenueOpportunity[],
   maxDrafts: number,
@@ -98,7 +100,9 @@ async function persistAutopilotDraftsAtomic(
     }
 
     const totalPendingRevenue = pendingRows.length;
-    const availableSlots = Math.max(0, REVENUE_AUTOPILOT_MAX_PENDING - totalPendingRevenue);
+    const autopilotSlots = Math.max(0, REVENUE_AUTOPILOT_MAX_PENDING - pendingKeys.size);
+    const revenueQueueSlots = Math.max(0, DRAFT_MAX_PENDING_BY_KIND["revenue-loop"] - totalPendingRevenue);
+    const availableSlots = Math.min(autopilotSlots, revenueQueueSlots);
     let generated = 0;
     const skipped: string[] = [];
 
