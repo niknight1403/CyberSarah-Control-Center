@@ -38,7 +38,11 @@ describe("planDraftRun", () => {
 
   it("negatives/negatives-fehlendes Pending wird als 0 gelesen", () => {
     const plan = planDraftRun({} as never);
-    expect(plan.every((entry) => entry.slots === 3)).toBe(true);
+    expect(plan).toEqual([
+      { kind: "content", slots: 3, reason: "quota" },
+      { kind: "revenue-loop", slots: 4, reason: "quota" },
+      { kind: "idea", slots: 3, reason: "quota" },
+    ]);
   });
 });
 
