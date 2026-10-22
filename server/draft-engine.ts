@@ -30,7 +30,7 @@ import {
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import type { Message } from "./_core/llm";
-import { isFreeManagedSource, resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
+import { isFreeManagedSource, managedLlmEnvFromProcess, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
 
 async function callDraftChatEndpoint(
   url: string,
@@ -66,7 +66,7 @@ async function defaultDraftLlm(messages: Message[]): Promise<string> {
       messages,
     );
   } catch {
-    const endpoint = resolveManagedLlmEndpoint(process.env as unknown as ManagedLlmEnv);
+    const endpoint = resolveManagedLlmEndpoint(managedLlmEnvFromProcess(process.env));
     if (!endpoint || !isFreeManagedSource(endpoint.source)) {
       throw new Error("Lokales Ollama nicht erreichbar und keine kostenlose Cloud-Fallback-Route konfiguriert.");
     }
