@@ -20,9 +20,25 @@ const routeQueries = [
   'SELECT status FROM cross_sell_recommendations LIMIT 0',
   'SELECT id, titel, status, kategorie, geschaetzter_umsatz, validiert, prioritaet, created_at FROM expansion_chancen LIMIT 0',
 ];
-async function checkDb(label, url) {
+function tunnelConnectionString(url) {
+  try {
+    const target = new URL(url);
+    const port = process.env.REVENUE_OS_DB_TUNNEL_PORT;
+    if (!port || !/^\d{2,5}$/.test(port)) return null;
+    target.hostname = '127.0.0.1';
+    target.port = port;
+    target.searchParams.delete('sslmode');
+    target.searchParams.delete('ssl');
+    return target.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function checkDb(label, url, forceTunnel = false) {
   if (!url) { console.log(`${label}: NOT_CONFIGURED`); return false; }
-  let connectionString = url;
+  let connectionString = forceTunnel ? tunnelConnectionString(url) : url;
+  if (!connectionString) { console.log(`${label}: INVALID_CONFIGURATION`); return false; }
   // Lokale Produktions-DB nie ins Internet exponieren: GitHub Runner nutzt einen
   // kurzlebigen SSH-Tunnel. Die Postgres-Zugangsdaten bleiben als Actions-Secret.
   if (label === 'REVENUE_OS_DATABASE_URL') {
@@ -53,24 +69,34 @@ async function checkDb(label, url) {
   } catch { console.log(`${label}: CONNECTION_OR_PERMISSION_ERROR`); return false; }
   finally { await pool.end().catch(() => undefined); }
 }
-async function checkEngine() {
-  const raw = process.env.REVENUE_OS_API_BASE_URL;
-  const key = process.env.REVENUE_OS_API_KEY;
-  if (!raw || !key) { console.log('REVENUE_BRIDGE: NOT_CONFIGURED'); return false; }
+async function probeEngine(raw, key) {
   try {
     const base = new URL(raw);
     const local = base.protocol === 'http:' && base.hostname === '127.0.0.1' && base.port === '18741';
-    if (!local && base.protocol !== 'https:') throw new Error('unsupported_endpoint');
+    if (!local && base.protocol !== 'https:') return false;
     const health = await fetch(new URL('/api/healthz', base), { signal: AbortSignal.timeout(7000) });
-    if (!health.ok || (await health.json()).status !== 'ready') throw new Error('health_unavailable');
+    if (!health.ok || (await health.json()).status !== 'ready') return false;
     const overview = await fetch(new URL('/api/hara/overview', base), { headers: { 'X-Revenue-Internal-Key': key }, signal: AbortSignal.timeout(7000) });
-    if (!overview.ok) throw new Error('authenticated_read_unavailable');
-    // Kein echter Scan im Readiness-Check: nur Ablehnung ohne Zugangsschluessel pruefen.
+    if (!overview.ok) return false;
     const rejected = await fetch(new URL('/api/hara/scan', base), { method: 'POST', signal: AbortSignal.timeout(7000) });
-    if (rejected.status !== 403) throw new Error('scan_not_protected');
-    console.log('REVENUE_BRIDGE: READY (DB health, authenticated read, scan denied without key)');
-    return true;
-  } catch { console.log('REVENUE_BRIDGE: UNAVAILABLE_OR_UNPROTECTED'); return false; }
+    return rejected.status === 403;
+  } catch {
+    return false;
+  }
+}
+async function checkEngine() {
+  const raw = process.env.REVENUE_OS_API_BASE_URL;
+  const key = process.env.REVENUE_OS_API_KEY;
+  if (!key) { console.log('REVENUE_BRIDGE: NOT_CONFIGURED'); return false; }
+  const candidates = [raw, 'http://127.0.0.1:18741'].filter(Boolean);
+  for (const candidate of candidates) {
+    if (await probeEngine(candidate, key)) {
+      console.log('REVENUE_BRIDGE: READY (health, authenticated read, scan denied without key)');
+      return true;
+    }
+  }
+  console.log('REVENUE_BRIDGE: UNAVAILABLE_OR_UNPROTECTED');
+  return false;
 }
 async function probeBearer(label, url, key) {
   if (!key) return false;
@@ -108,7 +134,8 @@ async function checkFreeLlm() {
 
 async function main() {
   const dedicated = await checkDb('REVENUE_OS_DATABASE_URL', process.env.REVENUE_OS_DATABASE_URL);
-  if (!dedicated) await checkDb('DATABASE_URL (nur Schema-Diagnose, kein Ersatz)', process.env.DATABASE_URL);
+  const tunnelDb = dedicated ? false : await checkDb('PRODUCTION_DB_VIA_SSH_TUNNEL', process.env.DATABASE_URL, true);
+  const databaseReady = dedicated || tunnelDb;
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   let stripeConnected = false;
   let stripeLive = false;
@@ -128,7 +155,7 @@ async function main() {
   }
   const aiReady = await checkFreeLlm();
   const bridgeReady = await checkEngine();
-  if (!dedicated || !stripeConnected || !aiReady || !bridgeReady) {
+  if (!databaseReady || !stripeConnected || !aiReady || !bridgeReady) {
     console.log('REVENUE_INTEGRATION: NOT_READY');
     process.exitCode = 1;
   } else {
