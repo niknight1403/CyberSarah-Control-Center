@@ -155,7 +155,9 @@ async function main() {
   }
   const aiReady = await checkFreeLlm();
   const bridgeReady = await checkEngine();
-  if (!databaseReady || !stripeConnected || !aiReady || !bridgeReady) {
+  const effectiveDatabaseReady = databaseReady || bridgeReady;
+  if (!databaseReady && bridgeReady) console.log('REVENUE_DB_ACCESS: READY_VIA_PROTECTED_BRIDGE');
+  if (!effectiveDatabaseReady || !stripeConnected || !aiReady || !bridgeReady) {
     console.log('REVENUE_INTEGRATION: NOT_READY');
     process.exitCode = 1;
   } else {

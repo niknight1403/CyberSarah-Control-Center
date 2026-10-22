@@ -19,6 +19,7 @@ on:
     branches: [main, integration/revenue-os-live-data]
     paths:
       - 'server/revenue-command-*'
+      - 'scripts/revenue-readiness.mjs'
       - 'modules/revenue-os/artifacts/api-server/src/app.ts'
       - 'scripts/revenue-readiness.mjs'
       - '.github/workflows/revenue-readiness.yml'
