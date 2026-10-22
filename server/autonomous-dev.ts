@@ -41,7 +41,7 @@ import {
   type ProjectPlan,
   type ProjectSpec,
 } from "../lib/autonomous-dev-logic";
-import { isFreeManagedSource, managedLlmEnvFromProcess, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
+import { isFreeManagedSource, managedLlmEnvFromProcess, openAiCompatibleChatUrl, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
 import {
   calculateQualityGate,
   scoreStandaloneHtmlPerformance,
@@ -128,7 +128,7 @@ async function enhanceWithFreeLlm(
 
   // Stufe 1: Lokales Ollama — Routinearbeit bleibt lokal, privat und 0 EUR.
   const localResult = await requestEnhancementFromEndpoint(
-    `${OLLAMA_BASE()}/v1/chat/completions`,
+    openAiCompatibleChatUrl(OLLAMA_BASE()),
     {},
     process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b",
     prompt,
