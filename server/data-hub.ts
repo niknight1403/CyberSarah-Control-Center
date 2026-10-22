@@ -312,7 +312,7 @@ export async function fetchContentSnapshot(): Promise<ContentSnapshot> {
     name: "Threads",
     status: process.env.THREADS_PUBLISH_TOKEN?.trim() && process.env.THREADS_PUBLISH_USER_ID?.trim() ? "ok" : "not-configured",
   });
-  const instagramToken = (process.env.INSTAGRAM_ACCESS_TOKEN ?? process.env.INSTAGRAM_PUBLISH_TOKEN)?.trim();
+  const instagramToken = (process.env.INSTAGRAM_ACCESS_TOKEN?.trim() || process.env.INSTAGRAM_PUBLISH_TOKEN?.trim()) || undefined;
   if (!instagramToken) {
     channels.push({ name: "Instagram", status: "not-configured" });
   } else {
