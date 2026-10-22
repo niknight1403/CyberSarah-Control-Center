@@ -9,24 +9,26 @@ permissions:
 jobs:
   url:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - name: publicUrl + Deploy-Status
+      - name: Service-JSON + Domains + Health
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
           api() { curl -s -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" "https://api.render.com/v1/$1"; }
           api "services/srv-dahjgllg1s2s73bf9u4g" | python3 -m json.tool > /tmp/svc.json
-          grep -E '"id"|"name"|"publicUrl"|"suspended"|"type"|"runtime"' /tmp/svc.json | head -10
-          echo "== Neuester Deploy =="
-          api "services/srv-dahjgllg1s2s73bf9u4g/deploys?limit=1" | python3 -c "
-          import json,sys
-          d = json.load(sys.stdin)[0].get('deploy')
-          print(d.get('id'), d.get('status'))
+          echo "== Top-Level-Keys =="
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/svc.json'))
+          print('keys:', sorted(d.keys()))
+          print('serviceDetails keys:', sorted(d.get('serviceDetails', {}).keys()))
+          print('serviceDetails:', json.dumps(d.get('serviceDetails', {}))[:400])
           "
-          URL=$(python3 -c "import json; print(json.load(open('/tmp/svc.json')).get('serviceDetails',{}).get('publicUrl') or '')")
-          echo "ECHTE URL: $URL"
-          if [ -n "$URL" ]; then
-            echo "== Health auf echter URL =="
-            curl -s --max-time 90 -w "\nHTTP=%{http_code}\n" "$URL/api/ready" | head -6
-          fi
+          echo "== Domains =="
+          api "services/srv-dahjgllg1s2s73bf9u4g/domains" | python3 -m json.tool | head -40
+          echo "== Health-Versuche =="
+          for U in "https://cybersarah-control-center.onrender.com" "https://app.cybersarah-ki.com"; do
+            echo "-- $U"
+            curl -s -o /tmp/h.txt -w "HTTP=%{http_code} " --max-time 60 "$U/api/ready" && head -c 220 /tmp/h.txt; echo
+          done
