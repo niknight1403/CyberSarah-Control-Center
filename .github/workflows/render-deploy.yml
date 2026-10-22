@@ -94,6 +94,10 @@ jobs:
           # Fallback: gleiches Token wie der Workspace-Service selbst (SERVICE_ACCESS_TOKEN)
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          REVENUE_OS_DATABASE_URL: ${{ secrets.REVENUE_OS_DATABASE_URL }}
+          REVENUE_OS_API_BASE_URL: ${{ secrets.REVENUE_OS_API_BASE_URL }}
+          REVENUE_OS_API_KEY: ${{ secrets.REVENUE_OS_API_KEY }}
+          RATE_LIMIT_MAX_REQUESTS: ${{ secrets.RATE_LIMIT_MAX_REQUESTS }}
           # Sprint 112 — Integrations-Keys fuer Daten-Hub, Dev-Agent-Tools und
           # Content-Kanaele. CCC_ADMIN_GITHUB_TOKEN wird auf den Namen gemappt,
           # den der Server liest (ADMIN_GITHUB_TOKEN, Vorrang vor GITHUB_TOKEN).

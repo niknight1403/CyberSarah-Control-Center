@@ -284,6 +284,12 @@ function makeAppEnvBuilder(databaseUrl) {
     "PERPLEXITY_API_KEY",
     "ELEVENLABS_API_KEY",
     "TIKTOK_SYMPHONY_API_KEY",
+    // Sprint 372 — Revenue-OS-Anbindung (VM-Spiegel-DB + Scan-Relay) und
+    // Rate-Limit-Tuning; nur gesetzt, wenn das zugehoerige Secret existiert.
+    "REVENUE_OS_DATABASE_URL",
+    "REVENUE_OS_API_BASE_URL",
+    "REVENUE_OS_API_KEY",
+    "RATE_LIMIT_MAX_REQUESTS",
   ]) {
     const value = env(key, "").trim();
     if (value) integrationExtra.push(`${key}=${value}`);

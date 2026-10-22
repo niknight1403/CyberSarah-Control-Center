@@ -2,6 +2,7 @@
 import { TRPCError } from "@trpc/server";
 import { Pool, type QueryResultRow } from "pg";
 import Stripe from "stripe";
+import { stripSslModeParam } from "../lib/db-ssl-logic";
 import { fetchTradingSnapshot } from "./data-hub";
 
 let pool: Pool | undefined;
@@ -11,7 +12,17 @@ function database(): Pool {
   if (!url) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "REVENUE_OS_DATABASE_URL ist nicht konfiguriert." });
   if (!pool || poolUrl !== url) {
     if (pool) void pool.end();
-    pool = new Pool({ connectionString: url, max: 4, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000, statement_timeout: 5000 });
+    // Sprint 372 — entfernte Revenue-DBs (VM-Route via nginx-SNI) erhalten TLS
+    // ohne Hostnamenpruefung; sslmode wird aus der URL gestriffen, damit pg's
+    // interne Auswertung das explizite ssl-Objekt nicht ueberschreibt.
+    pool = new Pool({
+      connectionString: stripSslModeParam(url),
+      ssl: url.includes("localhost") || url.includes("127.0.0.1") ? undefined : { rejectUnauthorized: false },
+      max: 4,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 10000,
+      statement_timeout: 5000,
+    });
     poolUrl = url;
   }
   return pool;

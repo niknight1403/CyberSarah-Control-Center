@@ -14,6 +14,7 @@
  *     Ursache statt haarstraeubender Fehler.
  */
 import { Client } from "pg";
+import { stripSslModeParam } from "../lib/db-ssl-logic";
 
 import {
   buildRevenueOsSnapshot,
@@ -33,7 +34,11 @@ async function getRevenueOsClient(): Promise<Client | null> {
   if (cachedClient && cachedClientUrl === url) return cachedClient;
 
   const client = new Client({
-    connectionString: url,
+    // Sprint 372 — sslmode aus der URL streifen: pg's interne sslmode-
+    // Auswertung (require => verify-full mit Hostnamenpruefung gegen
+    // 'localhost') ueberschreibt sonst das explizite ssl-Objekt. Die
+    // SSL-Semantik liegt allein hier (siehe lib/db-ssl-logic.ts).
+    connectionString: stripSslModeParam(url),
     ssl: url.includes("localhost") || url.includes("127.0.0.1") ? undefined : { rejectUnauthorized: false },
     statement_timeout: 5_000,
     query_timeout: 5_000,
