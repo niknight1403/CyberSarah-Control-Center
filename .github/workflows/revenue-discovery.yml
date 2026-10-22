@@ -1,0 +1,37 @@
+name: Revenue-OS Server-Discovery
+
+# Read-only Erkundung des Revenue-OS-Produktionsservers, um die oeffentliche
+# Anbindung (DB + API) zu planen. Keine schreibenden Operationen.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+    steps:
+      - name: Umgebung erkunden
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/disc_key
+          chmod 600 ~/.ssh/disc_key
+          SSH="ssh -i ~/.ssh/disc_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 $SSH_USER@$SSH_HOST"
+          echo "== Hostname / OS =="; $SSH 'hostname; hostname -f; cat /etc/os-release | head -2'
+          echo "== Oeffentliche IP =="; $SSH 'curl -s --max-time 8 ifconfig.me || true; echo'
+          echo "== nginx aktiv? =="; $SSH 'systemctl is-active nginx 2>/dev/null || echo "kein nginx"; nginx -v 2>&1 || true'
+          echo "== nginx 443/stream config =="; $SSH 'grep -rE "listen|server_name|proxy_pass|stream" /etc/nginx/ 2>/dev/null | grep -v "#" | head -30 || true'
+          echo "== Let's-Encrypt-Zertifikate =="; $SSH 'ls /etc/letsencrypt/live/ 2>/dev/null || true'
+          echo "== Offene Ports (listen) =="; $SSH 'ss -tlnp 2>/dev/null | awk "NR>1 {print \$4, \$6}" | sort -u | head -25'
+          echo "== Firewall =="; $SSH 'ufw status 2>/dev/null | head -20 || iptables -L INPUT -n 2>/dev/null | head -10 || true'
+          echo "== PM2-Prozesse =="; $SSH 'pm2 jlist 2>/dev/null | head -c 1200 || pm2 list'
+          echo "== Revenue-DB (lokal) =="; $SSH 'sudo -n -u postgres psql -Atq -d postgres -c "SELECT datname FROM pg_database WHERE NOT datistemplate;" 2>/dev/null | head -10 || true'
+          echo "== Revenue-DB-Name aus /opt/cybersarah/.env =="; $SSH 'grep -m1 "^DATABASE_URL=" /opt/cybersarah/.env 2>/dev/null | sed "s|.*@|@|; s|/[a-zA-Z0-9_-]*$|/<db>|" || echo "nicht gefunden"'
+          echo "== Bridge-App-Port =="; $SSH 'grep -rE "PORT|18741" /opt/cybersarah*/ecosystem.config.* 2>/dev/null | head -5 || true; ss -tlnp 2>/dev/null | grep 18741 || true'
