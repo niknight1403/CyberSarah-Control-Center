@@ -41,7 +41,7 @@ import {
   type ProjectPlan,
   type ProjectSpec,
 } from "../lib/autonomous-dev-logic";
-import { isFreeManagedSource, resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
+import { isFreeManagedSource, managedLlmEnvFromProcess, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
 import {
   calculateQualityGate,
   scoreStandaloneHtmlPerformance,
@@ -81,7 +81,7 @@ export function getProjectCatalog() {
 
 /** Aktiver Zero-Cost-Stack inkl. Nachweis (Admin-Diagnose). */
 export function getFreeStackSnapshot(): FreeStackSnapshot {
-  return resolveFreeStack(process.env as unknown as Partial<ManagedLlmEnv>);
+  return resolveFreeStack(managedLlmEnvFromProcess(process.env));
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ async function enhanceWithFreeLlm(
   if (localResult) return { enhancement: localResult.enhancement, source: "local_ollama", provider: "ollama" };
 
   // Stufe 2: kostenlose Cloud-Eskalation nur bei lokalem Ausfall.
-  const endpoint = resolveManagedLlmEndpoint(process.env as unknown as ManagedLlmEnv);
+  const endpoint = resolveManagedLlmEndpoint(managedLlmEnvFromProcess(process.env));
   if (endpoint && isFreeManagedSource(endpoint.source)) {
     const result = await requestEnhancementFromEndpoint(
       endpoint.url,
