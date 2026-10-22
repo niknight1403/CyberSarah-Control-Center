@@ -31,7 +31,7 @@ import {
   validateFunnelForLaunch,
   type LandingFunnelPayload,
 } from "../lib/digistore24-launch-logic";
-import { DRAFT_MAX_PENDING_PER_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
+import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
 import {
   buildEvaluationMessages,
   buildFunnelMessages,
@@ -122,7 +122,7 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
     if (pending === null) {
       return { queued: false, ok: false, detail: "Datenbank nicht konfiguriert — Funnel nicht speicherbar." };
     }
-    if ((pending["revenue-loop"] ?? 0) >= DRAFT_MAX_PENDING_PER_KIND) {
+    if ((pending["revenue-loop"] ?? 0) >= DRAFT_MAX_PENDING_BY_KIND["revenue-loop"]) {
       return { queued: false, ok: false, detail: `Freigabe-Queue voll (${pending["revenue-loop"]} offene Revenue-Loops). Bitte erst bestätigen.` };
     }
     const raw = await callLlm(buildFunnelMessages(product), 1200);
@@ -131,6 +131,7 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
       return { queued: false, ok: false, detail: "LLM-Antwort enthielt keinen vollständigen Funnel (Name/Hypothese/Stages/Metrik)." };
     }
     const payload: RevenueLoopDraftPayload = {
+      hub: "saas",
       name: `Digistore24: ${funnel.name} (${productTitle})`,
       hypothesis: funnel.hypothesis,
       stages: funnel.stages,
