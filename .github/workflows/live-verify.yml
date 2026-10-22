@@ -5,12 +5,16 @@ name: Live-Verifikation (App + DB + Login)
 # UNAUTHORIZED-Antwort beweist Routing + DB-Lookup + scrypt-Compare).
 on:
   workflow_dispatch: {}
+  workflow_run:
+    workflows: ["Render Deploy"]
+    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
   verify:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
