@@ -1,6 +1,5 @@
 /** Read-only GitHub-Actions-Check. Nie Secret-Werte, URLs oder Fehlerdetails ausgeben. */
 import { Pool } from 'pg';
-import Stripe from 'stripe';
 
 const requiredTables = [
   'hara_proposals', 'hara_performance', 'subscription_plans',
@@ -112,10 +111,15 @@ async function main() {
   if (!stripeKey) console.log('STRIPE_SECRET_KEY: NOT_CONFIGURED');
   else {
     try {
-      await new Stripe(stripeKey).products.list({ limit: 1 });
+      const stripeResponse = await fetch('https://api.stripe.com/v1/products?limit=1', {
+        headers: { Authorization: `Bearer ${stripeKey}` },
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!stripeResponse.ok) throw new Error('stripe_unreachable');
       stripeConnected = true;
-      stripeLive = stripeKey.startsWith('sk_live_');
-      console.log(`STRIPE_SECRET_KEY: REACHABLE (${stripeLive ? 'LIVE' : 'TEST'})`);
+      stripeLive = stripeKey.startsWith('sk_live_') || stripeKey.startsWith('rk_live_');
+      const stripeRestricted = stripeKey.startsWith('rk_');
+      console.log(`STRIPE_SECRET_KEY: REACHABLE (${stripeLive ? 'LIVE' : 'TEST'}${stripeRestricted ? ', RESTRICTED' : ''})`);
     } catch { console.log('STRIPE_SECRET_KEY: CONNECTION_OR_PERMISSION_ERROR'); }
   }
   const aiReady = await checkFreeLlm();
