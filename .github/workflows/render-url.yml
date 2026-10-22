@@ -11,24 +11,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Service-JSON + Domains + Health
+      - name: URL + Domains + DNS
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
           api() { curl -s -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" "https://api.render.com/v1/$1"; }
-          api "services/srv-dahjgllg1s2s73bf9u4g" | python3 -m json.tool > /tmp/svc.json
-          echo "== Top-Level-Keys =="
-          python3 -c "
-          import json
-          d = json.load(open('/tmp/svc.json'))
-          print('keys:', sorted(d.keys()))
-          print('serviceDetails keys:', sorted(d.get('serviceDetails', {}).keys()))
-          print('serviceDetails:', json.dumps(d.get('serviceDetails', {}))[:400])
+          echo "== serviceDetails.url + renderSubdomainPolicy =="
+          api "services/srv-dahjgllg1s2s73bf9u4g" | python3 -c "
+          import json,sys
+          d = json.load(sys.stdin)
+          sd = d.get('serviceDetails', {})
+          print('url:', sd.get('url'))
+          print('renderSubdomainPolicy:', json.dumps(sd.get('renderSubdomainPolicy')))
+          print('sshAddress:', sd.get('sshAddress'))
+          print('autoDeploy:', d.get('autoDeploy'), d.get('autoDeployTrigger'))
           "
-          echo "== Domains =="
-          api "services/srv-dahjgllg1s2s73bf9u4g/domains" | python3 -m json.tool | head -40
-          echo "== Health-Versuche =="
-          for U in "https://cybersarah-control-center.onrender.com" "https://app.cybersarah-ki.com"; do
-            echo "-- $U"
-            curl -s -o /tmp/h.txt -w "HTTP=%{http_code} " --max-time 60 "$U/api/ready" && head -c 220 /tmp/h.txt; echo
+          echo "== Domains (roh) =="
+          curl -s -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-dahjgllg1s2s73bf9u4g/domains" | head -c 2000; echo
+          echo "== DNS A/AAAA =="
+          for H in cybersarah-ki.com www.cybersarah-ki.com hub.cybersarah-ki.com app.cybersarah-ki.com; do
+            A=$(dig +short A "$H" | tr '\n' ' ')
+            AAAA=$(dig +short AAAA "$H" | tr '\n' ' ')
+            echo "$H | A: $A| AAAA: $AAAA"
           done
+          echo "== Health-Check auf Deploy-Status =="
+          curl -s --max-time 90 "https://app.cybersarah-ki.com/api/ready" | head -c 300; echo
