@@ -21,6 +21,7 @@ on:
           - integrate-free-llm
           - verify-free-llm
           - agent-smoke
+          - runtime-diag
         default: install
 
 concurrency:
