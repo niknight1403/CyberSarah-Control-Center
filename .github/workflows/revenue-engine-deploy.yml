@@ -109,5 +109,6 @@ jobs:
           allowed=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -H "X-Revenue-Internal-Key: $api_key" http://127.0.0.1:18741/api/hara/overview)
           test "$allowed" = 200
           printf '%s' "$api_key" | gh secret set REVENUE_OS_API_KEY --repo '${{ github.repository }}'
-          printf '%s' 'http://127.0.0.1:18741' | gh secret set REVENUE_OS_API_BASE_URL --repo '${{ github.repository }}'
+                    # Render erreicht den Loopback-Tunnel nicht — der oeffentliche Relay-Pfad ist die produktive Basis-URL.
+          printf '%s' 'https://hub.cybersarah-ki.com/revenue-api' | gh secret set REVENUE_OS_API_BASE_URL --repo '${{ github.repository }}'
           echo 'Revenue bridge: authenticated read-only route and unauthorized-scan denial verified; API secrets stored.'

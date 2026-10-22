@@ -47,5 +47,13 @@ jobs:
           echo "== Scan-Relay (403 erwartet: Key noetig) =="
           RC=$(curl -s -o /tmp/relay.json -w "%{http_code}" --max-time 40 -X POST "https://hub.cybersarah-ki.com/revenue-api/api/hara/scan" -H "Content-Type: application/json" -d "{}")
           echo "Relay-HTTP=$RC"
+          echo "== Engine authentifiziert (Overview, 200 erwartet) =="
+          if [ -n "${{ secrets.REVENUE_OS_API_KEY }}" ]; then
+            OV=$(curl -s -o /tmp/ov.json -w "%{http_code}" --max-time 40               -H "X-Revenue-Internal-Key: ${{ secrets.REVENUE_OS_API_KEY }}"               "https://hub.cybersarah-ki.com/revenue-api/api/hara/overview")
+            echo "Engine-Overview-HTTP=$OV"
+            head -c 200 /tmp/ov.json; echo
+          else
+            echo "REVENUE_OS_API_KEY fehlt — Engine-Check uebersprungen"
+          fi
           echo "== App-Wurzel (static web) =="
           curl -s -o /dev/null -w "HTTP=%{http_code} type=%{content_type}\n" --max-time 60 "https://app.cybersarah-ki.com/"

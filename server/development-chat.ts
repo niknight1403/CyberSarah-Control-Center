@@ -299,6 +299,16 @@ function isTransientChatError(error: unknown) {
     (error instanceof Error && error.name === "AbortError");
 }
 
+/**
+ * Auth-Fehler bedeuten strukturell defekte Zugangsdaten (Key abgelaufen oder
+ * ungueltig, Guthaben aufgebraucht, Provider gesperrt) — vom Handy aus nicht
+ * behebbar. Der Chat self-healt auf die Managed-Gratis-Kette statt zu blockieren.
+ */
+function isFatalProviderAuthError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(401|402|403)\b/.test(message) || /invalid_api_key|incorrect api key|unauthorized/i.test(message);
+}
+
 function getFallbackProviders(provider: ProviderId) {
   const configured: string[] = (getEnv("AI_FALLBACK_PROVIDERS") ?? getEnv("AI_FALLBACK_PROVIDER") ?? "")
     .split(",")
@@ -1090,6 +1100,22 @@ export async function handleDevelopmentChat(input: {
         : { kind: "failure", retryable: isTransientChatError(error), rateLimited: /\b429\b/.test(primaryMessage) },
       Date.now(),
     );
+    if (isFatalProviderAuthError(error)) {
+      const managedStartedAt = Date.now();
+      try {
+        const reply = await callProvider("managed", input.messages, input.model);
+        recordRouterOutcome("managed", { kind: "success", latencyMs: Date.now() - managedStartedAt }, Date.now());
+        return { ...reply, providerUsed: "managed", fallbackUsed: true, receivedAt: new Date().toISOString() };
+      } catch (managedError) {
+        recordRouterOutcome(
+          "managed",
+          managedError instanceof Error && managedError.name === "AbortError"
+            ? { kind: "timeout" }
+            : { kind: "failure", retryable: isTransientChatError(managedError), rateLimited: /\b429\b/.test(String((managedError as Error)?.message ?? managedError)) },
+          Date.now(),
+        );
+      }
+    }
     if (isTransientChatError(error)) {
       let lastFallbackError: unknown = error;
       for (const fallbackProvider of getFallbackProviders(input.provider)) {
