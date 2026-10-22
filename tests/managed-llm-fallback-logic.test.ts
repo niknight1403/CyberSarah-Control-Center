@@ -4,6 +4,7 @@ import {
   MANAGED_LLM_NO_KEY_MESSAGE,
   isFreeManagedSource,
   managedLlmEnvFromProcess,
+  openAiCompatibleChatUrl,
   resolveManagedLlmEndpoint,
   resolveManagedLlmEndpoints,
   type ManagedLlmEnv,
