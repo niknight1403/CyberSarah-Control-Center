@@ -29,6 +29,9 @@ jobs:
           nft list ruleset 2>/dev/null | head -40 || echo kein-nft
           echo "== Policy =="
           iptables -S INPUT 2>/dev/null | head -5
-          echo "== Verbindungen auf 18742 =="
-          ss -tn | grep 18742 | head -5 || echo keine-verbindungen
+          echo "== UFW-Ausnahme fuer VM-IP =="
+          ufw allow from 92.5.177.159 to any port 18742 proto tcp comment "VM Revenue-Relay"
+          ufw status | grep 18742 || true
+          echo "== iptables danach =="
+          iptables -L INPUT -n --line-numbers 2>/dev/null | grep -E "18742|Chain" || true
           EOS
