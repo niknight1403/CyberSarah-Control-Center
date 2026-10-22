@@ -19,7 +19,8 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/ip_key
           chmod 600 ~/.ssh/ip_key
-          IP=$(ssh -i ~/.ssh/ip_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'curl -s --max-time 10 ifconfig.me' | tr -dc "0-9.")
-          test -n "$IP" && echo "IP erfasst: $IP"
+          IP=$(ssh -i ~/.ssh/ip_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 "$SSH_USER@$SSH_HOST" 'ip -4 route get 1.1.1.1 2>/dev/null | grep -oP "src \K[0-9.]+" || curl -s --max-time 10 ifconfig.me')
+          IP=$(printf "%s" "$IP" | grep -oE "([0-9]{1,3}\.){3}[0-9]{1,3}" | head -1)
+          test -n "$IP" && echo "IP erfasst (Laenge ${#IP})"
           gh variable set HETZNER_PUBLIC_IP --body "$IP" --repo "${{ github.repository }}"
           echo "Variable gesetzt."
