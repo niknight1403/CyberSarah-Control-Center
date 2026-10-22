@@ -26,6 +26,7 @@ import {
   type DraftRunPlan,
   type DraftStatus,
   type RevenueHub,
+  type RevenueLoopDraftPayload,
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import { invokeLLM, type Message } from "./_core/llm";
@@ -152,6 +153,10 @@ async function generateRevenueLoopDraft(
   if (!parsed) return { ok: false, reason: "Revenue-Loop-LLM lieferte kein auswertbares JSON." };
   const validated = validateDraftPayload("revenue-loop", parsed);
   if (!validated.valid) return { ok: false, reason: validated.reason };
+  const loop = validated.payload as RevenueLoopDraftPayload;
+  if (!loop.experiment || !loop.unit || typeof loop.targetValue !== "number") {
+    return { ok: false, reason: "Revenue-Loop-LLM lieferte keinen ausfuehrbaren Experiment-/Zielplan." };
+  }
   await insertPendingDraft("revenue-loop", validated.title, validated.payload, "draft-engine");
   return { ok: true };
 }
