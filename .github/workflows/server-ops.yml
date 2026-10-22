@@ -1,142 +1,20 @@
-name: Server-Ops
+name: Server-Ops (Legacy)
 
-# Sichere Operations-Bruecke zum CyberSarah-Produktionsserver.
-# Zweck: Status-Checks, PM2-Restarts, Log-Abruf und Self-Healing aus der
-# CI heraus — ohne beliebigen Shell-Input, nur fest definierte Operationen.
-# Ausloesung: GitHub UI → Actions → "Server-Ops" → Run workflow.
-# Alle Zugangsdaten kommen aus Repo-Secrets — die frischen Suffix-2-Varianten
-# (PRODUCTION_SSH_KEY2/HOST2/USER2) haben Vorrang, alte Namen als Fallback.
-
+# Der fruehere monolithische Workflow ueberschritt GitHubs Expression-Limit.
+# Alle aktiven Produktionsoperationen liegen in ccc-ops.yml und den
+# spezialisierten Deploy-/OpenHands-Workflows. Diese kleine Legacy-Huelle
+# bleibt nur fuer einen klaren Hinweis in der Actions-Oberflaeche erhalten.
 on:
   workflow_dispatch:
-    inputs:
-      operation:
-        description: "Operation auf dem Produktionsserver"
-        type: choice
-        options:
-          - status
-          - pm2-restart
-          - logs
-          - health
-          - disk-report
-          - disk-clean
-          - db-migrate
-          - pm2-redeploy
-          - pm2-env-sync
-          - db-fix
-          - db-probe2
-          - db-probe
-          - db-check
-          - deploy
-          - deploy-pull
-          - probe
-          - openhands-probe
-          - openhands-probe2
-          - openhands-probe3
-          - env-set-github-token
-        default: status
-      service:
-        description: "PM2-Service fuer Restart (leer = alle)"
-        required: false
-        default: ""
-
-concurrency:
-  group: server-ops
-  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  ops:
-    name: "Server-Ops: ${{ github.event.inputs.operation }}"
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - name: SSH-Zugang einrichten
+      - name: Hinweis
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/prod_key
-          chmod 600 ~/.ssh/prod_key
-
-      - name: Operation ausfuehren
-        env:
-          OP: ${{ github.event.inputs.operation }}
-          SVC: ${{ github.event.inputs.service }}
-          GH_TOKEN_VALUE: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
-          SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
-        run: |
-          case "$OP" in
-            status)
-              $SSH_CMD 'echo "== pm2 =="; (pm2 list 2>/dev/null || echo "pm2 nicht gefunden"); echo "== systemd =="; (systemctl list-units --type=service --state=running 2>/dev/null | head -20 || true); echo "== docker =="; (docker ps --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || echo "docker nicht gefunden"); echo "== system =="; uptime; df -h / | tail -1; ls -la /opt/cybersarah-control-center 2>/dev/null | head -15 || true'
-              ;;
-            pm2-restart)
-              if [ -n "$SVC" ]; then
-                $SSH_CMD "pm2 restart $SVC --update-env && sleep 3 && pm2 list"
-              else
-                $SSH_CMD 'pm2 restart all --update-env && sleep 3 && pm2 list'
-              fi
-              ;;
-            logs)
-              $SSH_CMD 'pm2 logs --nostream --lines 100 2>/dev/null || journalctl -n 100 --no-pager 2>/dev/null | tail -100'
-              ;;
-            health)
-              $SSH_CMD 'echo "== lokale Dienste =="; curl -s -o /dev/null -w "localhost:3000/ → HTTP %{http_code}\n" --max-time 5 http://localhost:3000/ || true; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 5 http://localhost:3000/api/ready || true; curl -s -o /dev/null -w "localhost:10000 → HTTP %{http_code}\n" --max-time 5 http://localhost:10000/ || true; echo "== pm2 health =="; pm2 jlist 2>/dev/null | head -c 2000 || true'
-              ;;
-            disk-report)
-              $SSH_CMD 'echo "== df =="; df -h / | tail -1; echo "== groesste Verzeichnisse =="; du -xh --max-depth=2 / 2>/dev/null | sort -rh | head -20; echo "== Top-Dateien /opt =="; find /opt/cybersarah-control-center -type f -size +50M -exec ls -lh {} \; 2>/dev/null | head -10; echo "== journal =="; journalctl --disk-usage 2>/dev/null || true; echo "== apt/npm cache =="; du -sh /var/cache/apt /home/*/.npm /root/.npm 2>/dev/null || true'
-              ;;
-            disk-clean)
-              $SSH_CMD 'echo "== Vorher =="; df -h / | tail -1; echo "== npm-Cache =="; npm cache clean --force 2>/dev/null || true; echo "== Gradle-Cache =="; rm -rf ~/.gradle/caches/* 2>/dev/null || true; echo "== pip-Cache =="; rm -rf ~/.cache/pip 2>/dev/null || true; echo "== Journal auf 200M =="; sudo -n journalctl --vacuum-size=200M 2>/dev/null || journalctl --vacuum-size=200M 2>/dev/null || echo "journal nicht vacuumbar"; echo "== apt-Cache =="; sudo -n apt-get clean 2>/dev/null || true; echo "== bashrc =="; sed -i "/AAAAB3NzaC1yc2EAAAADAQABAAACAQDBuTFmaD/d;/u0_a691@localhost/d" ~/.bashrc && echo "bashrc bereinigt" || echo "bashrc fix fehlgeschlagen"; echo "== Nachher =="; df -h / | tail -1'
-              ;;
-            db-fix)
-              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "CmNvbnN0IGNwID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCBmcyA9IHJlcXVpcmUoJ2ZzJyk7Cgpjb25zdCBvdXQgPSBjcC5leGVjU3luYygncG0yIGVudiAxJykudG9TdHJpbmcoKTsKY29uc3QgbGluZSA9IG91dC5zcGxpdCgnXG4nKS5maW5kKGwgPT4gbC5zdGFydHNXaXRoKCdEQVRBQkFTRV9VUkw6JykpOwppZiAoIWxpbmUpIHsgY29uc29sZS5sb2coJ0ZFSExFUjogUE0yLVByb3plc3MgaGF0IGtlaW5lIERBVEFCQVNFX1VSTCcpOyBwcm9jZXNzLmV4aXQoMSk7IH0KY29uc3QgdXJsID0gbGluZS5yZXBsYWNlKC9eREFUQUJBU0VfVVJMOlxzKi8sICcnKS50cmltKCk7CmNvbnN0IHUgPSBuZXcgVVJMKHVybCk7CmNvbnN0IHVzZXIgPSBkZWNvZGVVUklDb21wb25lbnQodS51c2VybmFtZSk7CmNvbnN0IGRiID0gdS5wYXRobmFtZS5zbGljZSgxKTsKY29uc29sZS5sb2coJz09IFppZWwgPT0gdXNlcj0nICsgdXNlciArICcgZGI9JyArIGRiKTsKCi8vIGRyaXp6bGUta2l0IG5hY2hpbnN0YWxsaWVyZW4sIGZhbGxzIGFscyBkZXZEZXAgdW50ZXIgTk9ERV9FTlY9cHJvZHVjdGlvbiBnZWZlaGx0CmlmICghZnMuZXhpc3RzU3luYygnLi9ub2RlX21vZHVsZXMvLmJpbi9kcml6emxlLWtpdCcpKSB7CiAgY29uc29sZS5sb2coJz09IGRyaXp6bGUta2l0ID09IGZlaGx0LCB3aXJkIG5hY2hpbnN0YWxsaWVydCcpOwogIGNwLmV4ZWNTeW5jKCducG0gaW5zdGFsbCBkcml6emxlLWtpdCAtLW5vLXNhdmUgLS1uby1hdWRpdCAtLW5vLWZ1bmQgMj4mMSB8IHRhaWwgLTEnLCB7IHNoZWxsOiAnL2Jpbi9iYXNoJyB9KTsKfQovLyBNaWdyYXRpb24KY29uc29sZS5sb2coJz09IE1pZ3JhdGlvbiA9PScpOwp0cnkgewogIGNvbnN0IG1pZyA9IGNwLmV4ZWNTeW5jKAogICAgIkRBVEFCQVNFX1VSTD0nIiArIHVybC5yZXBsYWNlKC8nL2csICInXFwnJyIpICsgIicgLi9ub2RlX21vZHVsZXMvLmJpbi9kcml6emxlLWtpdCBtaWdyYXRlIDI+JjEgfCB0YWlsIC00IiwKICAgIHsgc2hlbGw6ICcvYmluL2Jhc2gnIH0KICApLnRvU3RyaW5nKCk7CiAgY29uc29sZS5sb2cobWlnLnRyaW0oKSk7Cn0gY2F0Y2ggKGUpIHsKICBjb25zb2xlLmxvZygnTWlncmF0aW9uLUZlaGxlcjogJyArIFN0cmluZyhlLm1lc3NhZ2UpLnNwbGl0KCdcbicpWzBdKTsKfQovLyBUYWJlbGxlbi1TdGFuZApjb25zdCBQb29sID0gcmVxdWlyZSgncGcnKS5Qb29sOwpjb25zdCBwID0gbmV3IFBvb2woeyBjb25uZWN0aW9uU3RyaW5nOiB1cmwgfSk7CnAucXVlcnkoIlNFTEVDVCBjb3VudCgqKSBBUyB0YWJlbGxlbiBGUk9NIGluZm9ybWF0aW9uX3NjaGVtYS50YWJsZXMgV0hFUkUgdGFibGVfc2NoZW1hPSdwdWJsaWMnIikKICAudGhlbihyID0+IHsgY29uc29sZS5sb2coJz09IFRhYmVsbGVuIGluIHB1YmxpYyA9PSAnICsgci5yb3dzWzBdLnRhYmVsbGVuKTsgcmV0dXJuIHAucXVlcnkoJ1NFTEVDVCAxJyk7IH0pCiAgLnRoZW4oKCkgPT4gY29uc29sZS5sb2coJz09IFZFUkJJTkRVTkdTVEVTVCA9PSBPSycpKQogIC5jYXRjaChlID0+IGNvbnNvbGUubG9nKCc9PSBGRUhMRVIgPT0gJyArIGUuY29kZSArICcgfCAnICsgZS5tZXNzYWdlLnNwbGl0KCdcbicpWzBdKSk7Cg==" | base64 -d | node -'
-              ;;
-            pm2-env-sync)
-              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "CmNvbnN0IGNwID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCBmcyA9IHJlcXVpcmUoJ2ZzJyk7Ci8vIDEpIC5lbnYgcm9oIGVpbmxlc2VuIChrZWluZSBTaGVsbC1FeHBhbnNpb24pCmNvbnN0IGVudkZpbGUgPSB7fTsKZm9yIChjb25zdCBsIG9mIGZzLnJlYWRGaWxlU3luYygnLmVudicsICd1dGY4Jykuc3BsaXQoJ1xuJykpIHsKICBjb25zdCBpID0gbC5pbmRleE9mKCc9Jyk7CiAgaWYgKGkgPiAwICYmICFsLnRyaW0oKS5zdGFydHNXaXRoKCcjJykpIGVudkZpbGVbbC5zbGljZSgwLCBpKS50cmltKCldID0gbC5zbGljZShpICsgMSkudHJpbSgpLnJlcGxhY2UoL15bIiddfFsiJ10kL2csICcnKTsKfQpjb25zb2xlLmxvZygnPT0gLmVudi1WYXJpYWJsZW4gPT0gJyArIE9iamVjdC5rZXlzKGVudkZpbGUpLmpvaW4oJywgJykpOwovLyAyKSBBa3R1ZWxsZW4gUE0yLVByb3plc3MtRW52IGhvbGVuCmNvbnN0IHByb2NzID0gSlNPTi5wYXJzZShjcC5leGVjU3luYygncG0yIGpsaXN0JykudG9TdHJpbmcoKSk7CmNvbnN0IHAgPSBwcm9jcy5maW5kKHggPT4geC5uYW1lID09PSAnY3liZXJzYXJhaC1jb250cm9sLWNlbnRlcicpOwppZiAoIXApIHsgY29uc29sZS5sb2coJ0ZFSExFUjogUE0yLVByb3plc3MgbmljaHQgZ2VmdW5kZW4nKTsgcHJvY2Vzcy5leGl0KDEpOyB9CmNvbnN0IGN1ciA9IHAucG0yX2Vudi5lbnYgfHwge307CmNvbnNvbGUubG9nKCc9PSBQTTItRW52IHZvciBTeW5jID09ICcgKyBPYmplY3Qua2V5cyhjdXIpLmxlbmd0aCArICcgVmFyaWFibGVuJyk7Ci8vIDMpIE1lcmdlbjogUHJvemVzcy1FbnYgYWxzIEJhc2lzLCAuZW52LU92ZXJyaWRlcyBvYmVuZHJhdWYKY29uc3QgbWVyZ2VkID0geyAuLi5jdXIsIC4uLmVudkZpbGUgfTsKY29uc3QgY2hhbmdlZCA9IE9iamVjdC5rZXlzKGVudkZpbGUpLmZpbHRlcihrID0+IChjdXJba10gfHwgJycpICE9PSBlbnZGaWxlW2tdKTsKY29uc29sZS5sb2coJz09IEdlYW5kZXJ0ID09ICcgKyAoY2hhbmdlZC5qb2luKCcsICcpIHx8ICduaWNodHMnKSk7Ci8vIDQpIFJlc3RhcnQgbWl0IGdlbWVyZ2VtIEVudgpjcC5leGVjU3luYygncG0yIHJlc3RhcnQgY3liZXJzYXJhaC1jb250cm9sLWNlbnRlciAtLXVwZGF0ZS1lbnYnLCB7IGVudjogbWVyZ2VkIH0pOwpjb25zb2xlLmxvZygnUE0yLVByb3plc3MgbWl0IGFrdHVhbGlzaWVydGVtIEVudiBuZXUgZ2VzdGFydGV0Jyk7Ci8vIDUpIFZlcmlmaWthdGlvbgpzZXRUaW1lb3V0KCgpID0+IHsKICBjb25zdCBhZnRlciA9IEpTT04ucGFyc2UoY3AuZXhlY1N5bmMoJ3BtMiBqbGlzdCcpLnRvU3RyaW5nKCkpLmZpbmQoeCA9PiB4Lm5hbWUgPT09ICdjeWJlcnNhcmFoLWNvbnRyb2wtY2VudGVyJyk7CiAgY29uc3QgYUVudiA9IGFmdGVyLnBtMl9lbnYuZW52IHx8IHt9OwogIGNvbnN0IG9rQWxsID0gT2JqZWN0LmtleXMoZW52RmlsZSkuZXZlcnkoayA9PiBhRW52W2tdID09PSBlbnZGaWxlW2tdKTsKICBjb25zb2xlLmxvZygnPT0gVmVyaWZpa2F0aW9uID09ICcgKyAob2tBbGwgPyAnUE0yLUVudiBzdGltbXQgbWl0IC5lbnYgdWViZXJlaW4nIDogJ0FCV0VJQ0hVTkcgZXJrYW5udCcpKTsKICB0cnkgewogICAgY29uc3QgY29kZSA9IGNwLmV4ZWNTeW5jKCdjdXJsIC1zIC1vIC9kZXYvbnVsbCAtdyAiJXtodHRwX2NvZGV9IiAtLW1heC10aW1lIDggaHR0cDovL2xvY2FsaG9zdDozMDAwL2FwaS9yZWFkeScpLnRvU3RyaW5nKCk7CiAgICBjb25zb2xlLmxvZygnPT0gL2FwaS9yZWFkeSA9PSBIVFRQICcgKyBjb2RlKTsKICB9IGNhdGNoIChlKSB7IGNvbnNvbGUubG9nKCc9PSAvYXBpL3JlYWR5ID09IG5pY2h0IGVycmVpY2hiYXInKTsgfQp9LCA4MDAwKTsK" | base64 -d | node -'
-              ;;
-            db-probe2)
-              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "Y29uc3QgZnM9cmVxdWlyZSgnZnMnKSxjcD1yZXF1aXJlKCdjaGlsZF9wcm9jZXNzJyksUG9vbD1yZXF1aXJlKCdwZycpLlBvb2w7ZnVuY3Rpb24gc2hhcGUodSl7dHJ5e2NvbnN0IHA9bmV3IFVSTCh1KTtyZXR1cm4gcC5wcm90b2NvbCsnLy8nK3AuaG9zdG5hbWUrJzonK3AucG9ydCsnLycrcC5wYXRobmFtZS5zbGljZSgxKSsnIHBhc3M6JysocC5wYXNzd29yZD8nbGFuZyAnK3AucGFzc3dvcmQubGVuZ3RoOidGRUhMVCcpfWNhdGNoKGUpe3JldHVybiAnVVJMLXVuZ3VlbHRpZyd9fWZ1bmN0aW9uIHRlc3QodGFnLHUpe3JldHVybiBuZXcgUG9vbCh7Y29ubmVjdGlvblN0cmluZzp1fSkucXVlcnkoJ1NFTEVDVCAxJykudGhlbigoKT0+Y29uc29sZS5sb2codGFnKyc6IE9LJykpLmNhdGNoKGU9PmNvbnNvbGUubG9nKHRhZysnOiBGRUhMRVI6JyxlLmNvZGUsJ3wnLGUubWVzc2FnZS5zcGxpdCgnXG4nKVswXSkpfTsoYXN5bmMoKT0+e2NvbnN0IHJhdz1mcy5yZWFkRmlsZVN5bmMoJy5lbnYnLCd1dGY4Jykuc3BsaXQoJ1xuJykuZmluZChsPT5sLnN0YXJ0c1dpdGgoJ0RBVEFCQVNFX1VSTD0nKSk7Y29uc3QgZW52VXJsPXJhdz9yYXcuc2xpY2UoMTMpLnRyaW0oKS5yZXBsYWNlKC9eW1wiXCddfFtcIlwnXSQvZywnJyk6bnVsbDtjb25zb2xlLmxvZygnPT0gLmVudi1VUkwgRm9ybSA9PScpO2NvbnNvbGUubG9nKGVudlVybD9zaGFwZShlbnZVcmwpOidmZWhsdCcpO2lmKGVudlVybClhd2FpdCB0ZXN0KCdFTlYnLGVudlVybCk7Y29uc3Qgb3V0PWNwLmV4ZWNTeW5jKCdwbTIgZW52IDEnKS50b1N0cmluZygpO2NvbnN0IGxpbmU9b3V0LnNwbGl0KCdcbicpLmZpbmQobD0+bC5zdGFydHNXaXRoKCdEQVRBQkFTRV9VUkw6JykpO2NvbnN0IHBtMlVybD1saW5lP2xpbmUucmVwbGFjZSgvXkRBVEFCQVNFX1VSTDpccyovLCcnKS50cmltKCk6bnVsbDtjb25zb2xlLmxvZygnPT0gUE0yLVVSTCBGb3JtID09Jyk7Y29uc29sZS5sb2cocG0yVXJsP3NoYXBlKHBtMlVybCk6J2ZlaGx0Jyk7aWYocG0yVXJsKWF3YWl0IHRlc3QoJ1BNMicscG0yVXJsKTtjb25zb2xlLmxvZygnPT0gLmVudi1WYXJuYW1lbiA9PScpO2NvbnNvbGUubG9nKGZzLnJlYWRGaWxlU3luYygnLmVudicsJ3V0ZjgnKS5zcGxpdCgnXG4nKS5maWx0ZXIobD0+bC5pbmNsdWRlcygnPScpKS5tYXAobD0+bC5zcGxpdCgnPScpWzBdKS5qb2luKCcsJykpfSkoKQ==" | base64 -d | node -'
-              ;;
-            db-probe)
-              $SSH_CMD 'cd /opt/cybersarah-control-center; set -a; . ./.env 2>/dev/null; set +a; echo "== Test mit .env-URL =="; node -e "const {Pool}=require(String.fromCharCode(112,103)); const p=new Pool({connectionString:process.env.DATABASE_URL}); p.query(String.fromCharCode(83,69,76,69,67,84,32,49)).then(r=>{console.log(String.fromCharCode(68,66,45,79,75));process.exit(0)}).catch(e=>{console.log(String.fromCharCode(68,66,45,70,69,72,76,69,82,58), e.code, String.fromCharCode(124), e.message.split(String.fromCharCode(10))[0]);process.exit(0)})"; echo "== URL-Hash .env =="; sed -n "s/^DATABASE_URL=//p" .env 2>/dev/null | tr -d "\r\n" | sha256sum | cut -c1-16; echo "== URL-Hash PM2-Prozess =="; pm2 env 1 2>/dev/null | sed -n "s/^DATABASE_URL: //p" | tr -d "\r\n" | sha256sum | cut -c1-16; echo "== ecosystem.config.js DATABASE_URL-Zeile vorhanden? =="; grep -c "DATABASE_URL" ecosystem.config.js 2>/dev/null || echo "keine ecosystem.config.js"; echo "== Hat PM2-Prozess DATABASE_URL? =="; pm2 env 1 2>/dev/null | grep -c "^DATABASE_URL:" || true; echo "== Postgres-Log (letzte Auth-/Verbindungsfehler) =="; sudo -n journalctl -u postgresql@18-main --since "18:40" --no-pager 2>/dev/null | grep -iE "auth|fatal|error|reject" | tail -8 || echo "kein sudo-journal"; echo "== Letzte App-Fehler komplett =="; tail -6 /opt/cybersarah-control-center/logs/pm2-error.log 2>/dev/null || true'
-              ;;
-            db-check)
-              $SSH_CMD 'echo "== Postgres-Dienst =="; (sudo -n systemctl is-active postgresql 2>/dev/null || systemctl is-active postgresql 2>/dev/null || echo "unbekannt"); echo "== Port 5432 =="; ss -tlnp 2>/dev/null | grep ":5432" || echo "5432 nicht gebunden"; echo "== pg_isready =="; pg_isready 2>/dev/null || sudo -n pg_isready 2>/dev/null || echo "pg_isready nicht verfuegbar"; echo "== Postgres-Prozesse =="; ps aux | grep -c "[p]ostgres" || true; echo "== Alle postgres-Systemdienste =="; systemctl list-units --type=service 2>/dev/null | grep -i postgres || echo "kein postgres-Service aktiv"; echo "== Platte =="; df -h / | tail -1; echo "== Letzte PM2-Fehler =="; tail -12 /opt/cybersarah-control-center/logs/pm2-error.log 2>/dev/null || tail -12 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null || true'
-              ;;
-            db-migrate)
-              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "== vorhandene Migrationen =="; ls drizzle/*.sql 2>/dev/null | tail -4; echo "== .env vorhanden =="; test -f .env && echo ja || echo "keine .env — DATABASE_URL nicht verfuegbar"; echo "== drizzle-kit vorhanden? =="; if [ ! -x ./node_modules/.bin/drizzle-kit ]; then echo "fehlt — wird nachinstalliert"; NODE_ENV=development npm install drizzle-kit --no-save --no-audit --no-fund 2>&1 | tail -2; fi; echo "== Migration ausfuehren =="; set -a; . ./.env 2>/dev/null; set +a; ./node_modules/.bin/drizzle-kit migrate 2>&1 | tail -15; echo "== Tabellen-Check =="; npx drizzle-kit check 2>&1 | tail -5 || true'
-              ;;
-            pm2-redeploy)
-              $SSH_CMD 'echo "== Port 3000 vorher =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "frei"; echo "== PM2 stop =="; pm2 stop all; sleep 2; echo "== Port-Inhaber killen (fuser) =="; fuser -k 3000/tcp 2>/dev/null && echo "Prozess auf 3000 beendet" || echo "Port 3000 war bereits frei"; sleep 2; echo "== PM2 start =="; pm2 start all; sleep 5; echo "== Status =="; pm2 list; echo "== Port nachher =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "nicht gebunden"; echo "== HTTP-Check =="; curl -s -o /dev/null -w "localhost:3000/ → HTTP %{http_code}\n" --max-time 5 http://localhost:3000/ || true; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 5 http://localhost:3000/api/ready || true; echo "== Letzte App-Logzeilen =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
-              ;;
-            deploy)
-              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "== Git vorher =="; git log --oneline -2; echo "== Arbeitskopie pruefen =="; if ! git diff-index --quiet HEAD --; then echo "ABBRUCH: modifizierte Dateien"; git status --porcelain | grep -v "^??"; exit 1; else echo "OK: sauber, untracked ignoriert"; fi; echo "== Pull =="; git pull --ff-only origin main && echo "== Git nachher =="; git log --oneline -2 && echo "== Abhaengigkeiten (inkl. dev, fuer drizzle-kit) =="; npm ci --include=dev --no-audit --no-fund 2>&1 | tail -3 && echo "== Build =="; npm run build 2>&1 | tail -5 && echo "== Migration =="; set -a; . ./.env 2>/dev/null; set +a; ./node_modules/.bin/drizzle-kit migrate 2>&1 | tail -5 && echo "== PM2 Neustart =="; pm2 stop all; sleep 2; fuser -k 3000/tcp 2>/dev/null && echo "Alte Prozesse beendet" || echo "Port 3000 war frei"; sleep 2; pm2 start all; sleep 6; echo "== Status =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000 → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready || true; echo "== Letzte App-Logzeilen =="; tail -8 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -8 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
-              ;;
-                      env-set-github-token)
-              REMOTE_SCRIPT=$(printf 'cd /opt/cybersarah-control-center && echo "== Vorher =="; grep -c "^ADMIN_GITHUB_TOKEN=" .env 2>/dev/null || echo "0"; if grep -q "^ADMIN_GITHUB_TOKEN=" .env 2>/dev/null; then sed -i "s|^ADMIN_GITHUB_TOKEN=.*|ADMIN_GITHUB_TOKEN=%s|" .env; else printf "\nADMIN_GITHUB_TOKEN=%s\n" >> .env; fi; echo "== .env aktualisiert (Wert nie ausgeben) =="; pm2 restart cybersarah-backend --update-env > /dev/null 2>&1; sleep 4; echo "== PM2 =="; pm2 list | grep cybersarah-backend; echo "== Token im PM2-Env? =="; pm2 env 1 2>/dev/null | grep -c "^ADMIN_GITHUB_TOKEN:"; echo "== Health =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %%{http_code}\n" --max-time 8 http://localhost:3000/api/ready' "$GH_TOKEN_VALUE" "$GH_TOKEN_VALUE")
-              $SSH_CMD "$REMOTE_SCRIPT"
-              ;;
-          probe)
-              for U in root cybersarah ubuntu debian admin; do
-                echo "== Teste Benutzer: $U =="
-                ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes -o PasswordAuthentication=no $U@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }} 'echo LOGIN_OK als $USER; hostname' && break || true
-              done
-              ;;
-            deploy-pull)
-              $SSH_CMD 'cd /opt/cybersarah-control-center && git fetch origin main && git status && git log --oneline -3 && echo "ACHTUNG: Pull erfolgt nur nach expliziter Freigabe" '
-              ;;
-            openhands-probe)
-              $SSH_CMD 'echo "CmNvbnN0IGNwID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCBydW4gPSAoY21kKSA9PiB7IHRyeSB7IHJldHVybiBjcC5leGVjU3luYyhjbWQsIHtzdGRpbzpbJ3BpcGUnLCdwaXBlJywncGlwZSddfSkudG9TdHJpbmcoKS50cmltKCk7IH0gY2F0Y2goZSkgeyByZXR1cm4gJ05JQ0hULVZFUkZVRUdCQVInOyB9IH07Cgpjb25zb2xlLmxvZygnPT0gRG9ja2VyID09Jyk7CmNvbnNvbGUubG9nKCdkb2NrZXI6ICcgKyAocnVuKCdkb2NrZXIgLS12ZXJzaW9uJykgPT09ICdOSUNIVC1WRVJGVUVHQkFSJyA/ICdOSUNIVCBJTlNUQUxMSUVSVCcgOiBydW4oJ2RvY2tlciAtLXZlcnNpb24nKSkpOwpjb25zb2xlLmxvZygnY29tcG9zZTogJyArIChydW4oJ2RvY2tlciBjb21wb3NlIHZlcnNpb24nKSA9PT0gJ05JQ0hULVZFUkZVRUdCQVInID8gJ05JQ0hUIElOU1RBTExJRVJUJyA6IHJ1bignZG9ja2VyIGNvbXBvc2UgdmVyc2lvbicpLnNwbGl0KCdcbicpWzBdKSk7CmNvbnNvbGUubG9nKCdkYWVtb246ICcgKyBydW4oJ2RvY2tlciBpbmZvIC0tZm9ybWF0ICJ7ey5TZXJ2ZXJWZXJzaW9ufX0gfCBTdG9yYWdlOiB7ey5Ecml2ZXJ9fSB8IENvbnRhaW5lcnM6IHt7LkNvbnRhaW5lcnN9fSInKSk7Cgpjb25zb2xlLmxvZygnPT0gT2xsYW1hID09Jyk7CmNvbnNvbGUubG9nKCdiaW5hcnk6ICcgKyAocnVuKCd3aGljaCBvbGxhbWEnKSA9PT0gJ05JQ0hULVZFUkZVRUdCQVInID8gJ05JQ0hUIElOU1RBTExJRVJUJyA6IHJ1bignd2hpY2ggb2xsYW1hJykpKTsKY29uc29sZS5sb2coJ3N5c3RlbWQ6ICcgKyBydW4oJ3N5c3RlbWN0bCBpcy1hY3RpdmUgb2xsYW1hIDI+L2Rldi9udWxsIHx8IHRydWUnKSk7CmNvbnNvbGUubG9nKCdhcGktbG9rYWw6ICcgKyAocnVuKCdjdXJsIC1zIC0tbWF4LXRpbWUgMyBodHRwOi8vMTI3LjAuMC4xOjExNDM0L2FwaS90YWdzIHwgaGVhZCAtYyAxNTAnKSB8fCAnS0VJTkUgQU5UV09SVCcpKTsKY29uc29sZS5sb2coJ2FwaS1leHRlcm46ICcgKyAocnVuKCdjdXJsIC1zIC0tbWF4LXRpbWUgMyBodHRwOi8vMTY3LjIzMy4xOTYuMjA6MTE0MzQvYXBpL3RhZ3MgfCBoZWFkIC1jIDE1MCcpIHx8ICdLRUlORSBBTlRXT1JUJykpOwoKY29uc29sZS5sb2coJz09IFJlc3NvdXJjZW4gPT0nKTsKY29uc29sZS5sb2cocnVuKCJkZiAtaCAvIHwgdGFpbCAtMSB8IGF3ayAne3ByaW50IFwiRGlzazogXCIgJDMgXCIgdXNlZCwgXCIgJDQgXCIgZnJlZSAoXCIgJDUgXCIpXCJ9JyIpKTsKY29uc29sZS5sb2cocnVuKCJmcmVlIC1oIHwgYXdrICcvTWVtLyB7cHJpbnQgXCJSQU06IFwiICQzIFwiIHVzZWQsIFwiICQ0IFwiIGZyZWUgb2YgXCIgJDJ9JyIpKTsKCmNvbnNvbGUubG9nKCc9PSBQb3J0cyA9PScpOwpjb25zb2xlLmxvZygnMzAwMDogJyArIChydW4oJ3NzIC10bG4gfCBncmVwIC1jICI6MzAwMCAiJykgPT09ICcwJyA/ICdGUkVJJyA6ICdCRUxFR1QgKEN5YmVyU2FyYWgtQXBwKScpKTsKY29uc29sZS5sb2coJzMwMDE6ICcgKyAocnVuKCdzcyAtdGxuIHwgZ3JlcCAtYyAiOjMwMDEgIicpID09PSAnMCcgPyAnRlJFSScgOiAnQkVMRUdUJykpOwoKY29uc29sZS5sb2coJz09IE9yYWNsZS1TcHVyZW4gPT0nKTsKY29uc3Qgb3JhY2xlID0gcnVuKCJncmVwIC1ybmlFICdvcmFjbGV8b3JhY2xlY2xvdWQnIC9vcHQvY3liZXJzYXJhaC1jb250cm9sLWNlbnRlci8uZW52KiB+Ly5iYXNoX2hpc3RvcnkgMj4vZGV2L251bGwgfCBncmVwIC12aUUgJ3NlY3JldHxwYXNzd29yZHx0b2tlbicgfCBoZWFkIC01Iik7CmNvbnNvbGUubG9nKG9yYWNsZSB8fCAna2VpbmUgZ2VmdW5kZW4nKTsK" | base64 -d | node -'
-              ;;
-            openhands-probe2)
-              $SSH_CMD 'echo "CmNvbnN0IGNwID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCBydW4gPSAoY21kKSA9PiB7IHRyeSB7IHJldHVybiBjcC5leGVjU3luYyhjbWQsIHtzdGRpbzpbJ3BpcGUnLCdwaXBlJywncGlwZSddLCBzaGVsbDonL2Jpbi9iYXNoJ30pLnRvU3RyaW5nKCkudHJpbSgpOyB9IGNhdGNoKGUpIHsgcmV0dXJuICdOSUNIVC1WRVJGVUVHQkFSJzsgfSB9OwoKY29uc29sZS5sb2coJz09IExhdWZlbmRlIENvbnRhaW5lciA9PScpOwpjb25zb2xlLmxvZyhydW4oJ2RvY2tlciBwcyAtYSAtLWZvcm1hdCAie3suTmFtZXN9fSB8IHt7LkltYWdlfX0gfCB7ey5TdGF0dXN9fSB8IHt7LlBvcnRzfX0iJykpOwoKY29uc29sZS5sb2coJz09IERvY2tlci1TcGVpY2hlciA9PScpOwpjb25zb2xlLmxvZyhydW4oImRvY2tlciBzeXN0ZW0gZGYgLS1mb3JtYXQgJ3t7LlR5cGV9fToge3suU2l6ZX19IChyZWNsYWltYWJsZSB7ey5SZWNsYWltYWJsZX19KScgfCBoZWFkIC00IikpOwoKY29uc29sZS5sb2coJz09IFBvcnQgMzAwMSA9PScpOwpjb25zb2xlLmxvZyhydW4oInNzIC10bG5wIHwgZ3JlcCAnOjMwMDEgJyB8fCBlY2hvIEZSRUkiKSk7Cgpjb25zb2xlLmxvZygnPT0gU3dhcCA9PScpOwpjb25zb2xlLmxvZyhydW4oImZyZWUgLWggfCBncmVwIC1pIHN3YXAgfHwgZWNobyAna2VpbiBTd2FwJyIpKTsKCmNvbnNvbGUubG9nKCc9PSBPbGxhbWEtU3RhdHVzID09Jyk7CmNvbnNvbGUubG9nKHJ1bignc3lzdGVtY3RsIHN0YXR1cyBvbGxhbWEgLS1uby1wYWdlciAyPiYxIHwgaGVhZCAtNScpKTsKY29uc29sZS5sb2coJ1VzZXI6ICcgKyBydW4oJ2lkIC11IG9sbGFtYSAyPi9kZXYvbnVsbCB8fCB0cnVlJykgKyAnIHwgJyArIHJ1bigibHMgLWxhIC91c3Ivc2hhcmUvb2xsYW1hIDI+L2Rldi9udWxsIHwgaGVhZCAtMyIpKTsKCmNvbnNvbGUubG9nKCc9PSBPcmFjbGUtS29udGV4dCAoLmJhc2hfaGlzdG9yeSkgPT0nKTsKY29uc29sZS5sb2cocnVuKCJzZWQgLW4gJzM0NSwzNzVwJyB+Ly5iYXNoX2hpc3RvcnkgMj4vZGV2L251bGwgfCBoZWFkIC0yNSIpKTsK" | base64 -d | node -'
-              ;;
-            openhands-probe3)
-              $SSH_CMD 'echo "CmNvbnN0IGNwID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCBydW4gPSAoY21kKSA9PiB7IHRyeSB7IHJldHVybiBjcC5leGVjU3luYyhjbWQsIHtzdGRpbzpbJ3BpcGUnLCdwaXBlJywncGlwZSddLCBzaGVsbDonL2Jpbi9iYXNoJ30pLnRvU3RyaW5nKCkudHJpbSgpOyB9IGNhdGNoKGUpIHsgcmV0dXJuICdOSUNIVC1WRVJGVUVHQkFSJzsgfSB9OwoKY29uc29sZS5sb2coJz09IE9yYWNsZS1FbmRwdW5rdCAobWl0IFRva2VuIGF1cyBIaXN0b3J5LCBuaWUgZ2Vsb2dndCkgPT0nKTsKY29uc3QgdG9rID0gcnVuKCJncmVwIC1vRSAnT0xMQU1BX1RPS0VOPVthLWYwLTldKycgfi8uYmFzaF9oaXN0b3J5IHwgdGFpbCAtMSB8IGN1dCAtZD0gLWYyIik7CmlmICghdG9rKSB7CiAgY29uc29sZS5sb2coJ1Rva2VuIG5pY2h0IGluIEhpc3RvcnkgZ2VmdW5kZW4nKTsKfSBlbHNlIHsKICBjb25zb2xlLmxvZygnVG9rZW4gZ2VmdW5kZW4gKExhZW5nZSAnICsgdG9rLmxlbmd0aCArICcpJyk7CiAgY29uc3QgdGFncyA9IHJ1bigiY3VybCAtcyAtLW1heC10aW1lIDEwIC1IICdBdXRob3JpemF0aW9uOiBCZWFyZXIgIiArIHRvayArICInIGh0dHBzOi8vb2xsYW1hLmN5YmVyc2FyYWgta2kuY29tL2FwaS90YWdzIik7CiAgdHJ5IHsKICAgIGNvbnN0IGogPSBKU09OLnBhcnNlKHRhZ3MpOwogICAgY29uc29sZS5sb2coJ09yYWNsZS1Nb2RlbGxlOiAnICsgKGoubW9kZWxzIHx8IFtdKS5tYXAobSA9PiBtLm5hbWUpLmpvaW4oJywgJykpOwogIH0gY2F0Y2goZSkgeyBjb25zb2xlLmxvZygnQW50d29ydDogJyArIHRhZ3Muc2xpY2UoMCwgMTUwKSk7IH0KfQoKY29uc29sZS5sb2coJz09IHZpbGxhLmNvbmYgKEhldHpuZXIgT2xsYW1hLURyb3AtSW4pID09Jyk7CmNvbnNvbGUubG9nKHJ1bignY2F0IC9ldGMvc3lzdGVtZC9zeXN0ZW0vb2xsYW1hLnNlcnZpY2UuZC92aWxsYS5jb25mIDI+L2Rldi9udWxsIHx8IGVjaG8gZmVobHQnKSk7Cgpjb25zb2xlLmxvZygnPT0gRGlzay1IZXJkZW4gPT0nKTsKY29uc29sZS5sb2cocnVuKCJkdSAtc2ggL29wdC8qIDI+L2Rldi9udWxsIHwgc29ydCAtcmggfCBoZWFkIC02IikpOwpjb25zb2xlLmxvZyhydW4oImR1IC1zaCAvdmFyL2xpYi9kb2NrZXIgL3Zhci9jYWNoZS9hcHQgL3Zhci9sb2cgL3Jvb3QvLmNhY2hlIC91c3IvbG9jYWwvbGliL25vZGVfbW9kdWxlcyAvdG1wIDI+L2Rldi9udWxsIikpOwoKY29uc29sZS5sb2coJz09IERvY2tlci1JbWFnZXMgPT0nKTsKY29uc29sZS5sb2cocnVuKCJkb2NrZXIgaW1hZ2VzIC0tZm9ybWF0ICd7ey5SZXBvc2l0b3J5fX06e3suVGFnfX0ge3suU2l6ZX19IHt7LkNyZWF0ZWRTaW5jZX19JyB8IGhlYWQgLTEwIikpOwoKY29uc29sZS5sb2coJz09IGRlcGxveS12aWxsYS0xID09Jyk7CmNvbnNvbGUubG9nKHJ1bigiZG9ja2VyIGluc3BlY3QgZGVwbG95LXZpbGxhLTEgLS1mb3JtYXQgJ3t7LkNvbmZpZy5JbWFnZX19IHwge3suSG9zdENvbmZpZy5Qb3J0QmluZGluZ3N9fScgMj4vZGV2L251bGwgfCBoZWFkIC0zIikpOwo=" | base64 -d | node -'
-              ;;
-            *)
-              echo "Unbekannte Operation: $OP" >&2
-              exit 1
-              ;;
-          esac
+          echo "Server-Ops ist stillgelegt."
+          echo "Bitte CCC-Ops fuer Deploy, Health, PM2 und Revenue-DB-URL verwenden."
