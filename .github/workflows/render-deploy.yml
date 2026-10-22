@@ -7,6 +7,16 @@ name: Render Deploy
 # Ausloesen: GitHub UI → Actions → "Render Deploy" → Run workflow.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'app/**'
+      - 'components/**'
+      - 'lib/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/render-deploy.yml'
   workflow_dispatch:
     inputs:
       target:
@@ -28,7 +38,7 @@ jobs:
       - name: Node einrichten
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Abhaengigkeiten installieren
@@ -61,7 +71,7 @@ jobs:
           npm test
 
       - name: Auf Render deployen (App, Migrationen + Health-Check)
-        if: inputs.target == 'app'
+        if: github.event_name == 'push' || inputs.target == 'app'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           # RENDER_PUBLIC_URL (echte Render-URL, s. unten) — das Skript nutzt
