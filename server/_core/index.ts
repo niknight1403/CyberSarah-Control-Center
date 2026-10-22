@@ -302,57 +302,55 @@ async function startServer() {
   // Ops-Debug (Sprint VM-Migration): Zeigt NUR Host/Port/DB (Passwort bleibt
   //_maskiert) und fuehrt einen echten Verbindungsauftrag mit kurzem Timeout
   // aus, damit die exakte Fehlerursache ohne Dashboard-Log-Zugang sichtbar wird.
+  // Ops-Debug (Sprint VM-Migration): testet alle Host/SSL-Varianten fuer den
+  // VM-Postgres ueber die nginx-SNI-443-Route in einem Durchlauf. NUR Host/
+  // Port/DB + Erfolgsmeldung — Passwoerter bleiben garantiert maskiert.
   app.get("/api/db-debug", async (req, res) => {
     const token = process.env.METRICS_TOKEN?.trim();
     if (!token || req.header("authorization") !== `Bearer ${token}`) {
       res.status(401).json({ error: "Nicht autorisiert." });
       return;
     }
-    let host: string | null = null;
-    let port: string | null = null;
-    let database: string | null = null;
-    let sslmode: string | null = null;
+    const url = process.env.DATABASE_URL ?? "";
+    let user = "";
+    let database = "";
+    let password = "";
     try {
-      const u = new URL(process.env.DATABASE_URL ?? "");
-      host = u.hostname;
-      port = u.port || "5432";
-      database = u.pathname.replace(/^\//, "") || null;
-      sslmode = u.searchParams.get("sslmode");
+      const u = new URL(url);
+      user = u.username;
+      database = u.pathname.replace(/^\//, "");
+      password = u.password;
     } catch {
-      // Keine gueltige URL — Felder bleiben null.
+      // ungueltige URL — Varianten laufen mit leeren Credentials
     }
-    const startedAt = Date.now();
-    try {
-      const { Pool } = await import("pg");
-      const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        connectionTimeoutMillis: 8000,
-        max: 1,
-        ssl: resolvePgSslConfig(process.env.DATABASE_URL ?? "") || undefined,
-      });
-      const result = await pool.query("SELECT current_database() AS db, version() AS v");
-      await pool.end();
-      res.json({
-        ok: true,
-        host,
-        port,
-        database,
-        sslmode,
-        ms: Date.now() - startedAt,
-        liveDb: result.rows[0]?.db ?? null,
-        version: String(result.rows[0]?.v ?? "").slice(0, 90),
-      });
-    } catch (error) {
-      res.status(502).json({
-        ok: false,
-        host,
-        port,
-        database,
-        sslmode,
-        ms: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    const { Pool } = await import("pg");
+    const variants: Array<{ name: string; config: Record<string, unknown> }> = [
+      { name: "ip_no_verify", config: { host: "92.5.177.159", port: 443, user, database, password, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "ip_sni_www_no_verify", config: { host: "92.5.177.159", port: 443, user, database, password, ssl: { rejectUnauthorized: false, servername: "www.cybersarah-ki.com" }, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "www_no_verify", config: { host: "www.cybersarah-ki.com", port: 443, user, database, password, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "www_sslmode_require_url", config: { connectionString: url, ssl: undefined, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "ip_no_verify_disabled", config: { host: "92.5.177.159", port: 443, user, database, password, ssl: false, connectionTimeoutMillis: 6000, max: 1 } },
+    ];
+    const results: Array<Record<string, unknown>> = [];
+    for (const variant of variants) {
+      let pool: import("pg").Pool | null = null;
+      const startedAt = Date.now();
+      try {
+        pool = new Pool(variant.config as never);
+        const r = await pool.query("SELECT current_database() AS db, now() AS ts");
+        results.push({ name: variant.name, ok: true, ms: Date.now() - startedAt, db: r.rows[0]?.db ?? null });
+      } catch (error) {
+        results.push({
+          name: variant.name,
+          ok: false,
+          ms: Date.now() - startedAt,
+          error: error instanceof Error ? error.message.slice(0, 220) : String(error).slice(0, 220),
+        });
+      } finally {
+        try { await pool?.end(); } catch { /* Pool-Ende ist best effort */ }
+      }
     }
+    res.json({ ok: results.some((r) => r.ok === true), database, results });
   });
 
   app.get("/api/metrics", metricsHandler);
