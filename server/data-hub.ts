@@ -203,7 +203,7 @@ export async function fetchRevenueSnapshot(): Promise<RevenueSnapshot> {
     }
   }
   console.warn(`[DataHub] Revenue-Snapshot fehlgeschlagen: ${lastError}`);
-  return { status: "error", error: "Stripe ist verbunden, aber die vorhandenen Keys duerfen die benoetigten Revenue-Daten nicht vollstaendig lesen." };
+  return { status: "error", error: "Stripe ist konfiguriert, aber die Revenue-Daten sind derzeit nicht abrufbar. Berechtigungen, Key-Status und Netzwerk werden beim naechsten Lauf erneut geprueft." };
 }
 
 
@@ -345,9 +345,9 @@ export type AiServicesSnapshot = { services: AiServiceStatus[] };
 export function fetchAiServicesSnapshot(): AiServicesSnapshot {
   return {
     services: [
-      { name: "Groq", configured: Boolean(process.env.GROQ_API_KEY?.trim()) },
-      { name: "OpenRouter", configured: Boolean(process.env.OPENROUTER_API_KEY?.trim()) },
-      { name: "Gemini", configured: Boolean(process.env.GEMINI_API_KEY?.trim()) },
+      { name: "Groq", configured: Boolean(process.env.AI_GROQ_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim()) },
+      { name: "OpenRouter", configured: Boolean(process.env.AI_OPENROUTER_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim()) },
+      { name: "Gemini", configured: Boolean(process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()) },
       { name: "Ollama", configured: Boolean(process.env.AI_OLLAMA_BASE_URL?.trim()) },
       { name: "Hugging Face", configured: Boolean(process.env.AI_HUGGINGFACE_API_KEY?.trim() || process.env.HF_TOKEN?.trim()) },
       { name: "Perplexity (Recherche)", configured: Boolean(process.env.PERPLEXITY_API_KEY?.trim()) },
