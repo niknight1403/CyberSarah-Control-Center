@@ -22,6 +22,11 @@ export const DRAFT_KINDS: readonly DraftKind[] = ["content", "revenue-loop", "id
 
 /** Maximale offene (pending) Entwuerfe pro Art — danach pausiert die Engine. */
 export const DRAFT_MAX_PENDING_PER_KIND = 3;
+export const DRAFT_MAX_PENDING_BY_KIND: Readonly<Record<DraftKind, number>> = {
+  content: 3,
+  "revenue-loop": REVENUE_HUBS.length,
+  idea: 3,
+};
 
 /** Wie viele Tage ein unbeantworteter Entwurf maximal in der Queue bleibt. */
 export const DRAFT_PENDING_STALE_DAYS = 14;
@@ -33,7 +38,13 @@ export type ContentDraftPayload = {
   content: string;
 };
 
+export type RevenueHub = "hara" | "saas" | "loop" | "trading";
+
+export const REVENUE_HUBS: readonly RevenueHub[] = ["hara", "saas", "loop", "trading"] as const;
+
 export type RevenueLoopDraftPayload = {
+  /** Ziel-Hub, in dem dieser autonome Entwurf angezeigt wird. */
+  hub: RevenueHub;
   name: string;
   hypothesis: string;
   stages: string[];
@@ -71,11 +82,14 @@ export type DraftRunPlan = {
 /** Plant, wie viele neue Entwuerfe pro Art erzeugt werden duerfen. */
 export function planDraftRun(
   pendingByKind: Record<DraftKind, number>,
-  maxPendingPerKind: number = DRAFT_MAX_PENDING_PER_KIND,
+  maxPendingPerKind: number | Partial<Record<DraftKind, number>> = DRAFT_MAX_PENDING_BY_KIND,
 ): DraftRunPlan[] {
   return DRAFT_KINDS.map((kind) => {
     const open = pendingByKind[kind] ?? 0;
-    const slots = Math.max(0, maxPendingPerKind - open);
+    const limit = typeof maxPendingPerKind === "number"
+      ? maxPendingPerKind
+      : maxPendingPerKind[kind] ?? DRAFT_MAX_PENDING_PER_KIND;
+    const slots = Math.max(0, limit - open);
     return { kind, slots, reason: slots > 0 ? "quota" : "limit" } as DraftRunPlan;
   });
 }
@@ -105,16 +119,22 @@ export function validateDraftPayload(
     return { valid: true, payload: { personaId, platform, topic, content }, title: topic.slice(0, 120) };
   }
   if (kind === "revenue-loop") {
+    const rawHub = nonEmpty(raw.hub, 40);
+    const hub: RevenueHub | null = rawHub === null
+      ? "loop" // Legacy-Entwuerfe vor der Hub-Zuordnung bleiben sichtbar.
+      : (REVENUE_HUBS as readonly string[]).includes(rawHub)
+        ? rawHub as RevenueHub
+        : null;
     const name = nonEmpty(raw.name, 120);
     const hypothesis = nonEmpty(raw.hypothesis, 600);
     const metric = nonEmpty(raw.metric, 160);
     const stages = Array.isArray(raw.stages)
       ? raw.stages.map((stage) => nonEmpty(stage, 80)).filter((stage): stage is string => stage !== null)
       : [];
-    if (!name || !hypothesis || !metric || stages.length === 0) {
-      return { valid: false, reason: "Revenue-Loop-Entwurf unvollstaendig (Name/Hypothese/Metrik/Stufen)." };
+    if (!hub || !name || !hypothesis || !metric || stages.length === 0) {
+      return { valid: false, reason: "Revenue-Entwurf unvollstaendig (Hub/Name/Hypothese/Metrik/Stufen)." };
     }
-    return { valid: true, payload: { name, hypothesis, stages, metric }, title: name };
+    return { valid: true, payload: { hub, name, hypothesis, stages, metric }, title: name };
   }
   const note = nonEmpty(raw.note, 300);
   const rationale = nonEmpty(raw.rationale, 600);
@@ -174,6 +194,21 @@ export function draftKindLabel(kind: DraftKind): string {
  * Ehrlicher Hinweistext pro Art, was die Bestaetigung bewirkt — die UI
  * schwaerzt nicht, dass Freigabe ≠ Veroeffentlichung ist.
  */
+export function revenueDraftHub(payload: unknown): RevenueHub {
+  if (typeof payload === "object" && payload !== null) {
+    const hub = (payload as { hub?: unknown }).hub;
+    if (typeof hub === "string" && (REVENUE_HUBS as readonly string[]).includes(hub)) return hub as RevenueHub;
+  }
+  return "loop";
+}
+
+export function revenueHubLabel(hub: RevenueHub): string {
+  if (hub === "hara") return "HARA";
+  if (hub === "saas") return "SaaS";
+  if (hub === "trading") return "Micro Trading";
+  return "Loop Engineering";
+}
+
 export function draftApprovalHint(kind: DraftKind): string {
   if (kind === "content") return "Freigabe markiert den Entwurf als geprüft. Veroeffentlichen bleibt ein separater Schritt.";
   if (kind === "revenue-loop") return "Freigabe nimmt den Loop in die Planung auf. Aktiv testen bleibt ein separater Schritt.";
