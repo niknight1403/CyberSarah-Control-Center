@@ -1,14 +1,14 @@
 {
-  "stand": "2026-10-22T08:49:11",
+  "stand": "2026-10-22T14:19:36",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemma-4-26b-a4b-it",
+  "modell": "gemma-4-31b-it",
   "anbieter": [
     {
       "id": "gemini",
       "status": "VERFUEGBAR",
-      "modell": "gemma-4-26b-a4b-it"
+      "modell": "gemma-4-31b-it"
     },
     {
       "id": "gemini-backup",
@@ -22,8 +22,8 @@
     },
     {
       "id": "openrouter",
-      "status": "VERFUEGBAR",
-      "modell": "minimax/minimax-m3.1-flash:free"
+      "status": "LIMIT ERREICHT",
+      "modell": "429 nvidia/nemotron-3.5-super-vl:free) — Changer rotiert weiter"
     },
     {
       "id": "cerebras",
