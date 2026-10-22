@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 
 export function RevenueAutopilotCard() {
   const styles = useMemo(() => createStyles(), []);
+  const [runFeedback, setRunFeedback] = useState<string | null>(null);
   const me = trpc.auth.me.useQuery(undefined, { staleTime: 60_000 });
   const isAdmin = me.data?.role === "admin";
   const overview = trpc.revenueAutopilot.overview.useQuery(undefined, {
@@ -21,8 +22,8 @@ export function RevenueAutopilotCard() {
   if (!isAdmin) return null;
 
   const data = overview.data;
-  const statusAccent = data?.status === "healthy" ? "green" : data?.status === "instrument" ? "amber" : "cyan";
-  const statusLabel = data?.status === "healthy"
+  const statusAccent = overview.isError ? "red" : overview.isLoading ? "cyan" : data?.status === "healthy" ? "green" : data?.status === "instrument" ? "amber" : "cyan";
+  const statusLabel = overview.isError ? "Fehler beim Laden" : overview.isLoading ? "Lädt" : data?.status === "healthy"
     ? "stabil"
     : data?.status === "instrument"
       ? "Messung ausbauen"
@@ -79,15 +80,22 @@ export function RevenueAutopilotCard() {
         </>
       ) : null}
 
-      {run.error ? <Text style={styles.error}>{run.error.message}</Text> : null}
+      {run.error ? <Text style={styles.error} accessibilityRole="alert">{run.error.message}</Text> : null}
+      {runFeedback && !run.error ? <Text style={styles.feedback} accessibilityRole="status">{runFeedback}</Text> : null}
 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Revenue Autopilot jetzt ausführen"
-        disabled={run.isPending}
+        disabled={run.isPending || overview.isLoading}
         onPress={() => {
+          setRunFeedback(null);
           run.mutate(undefined, {
-            onSuccess: async () => {
+            onSuccess: async (result) => {
+              setRunFeedback(result.generated > 0
+                ? `${result.generated} neue${result.generated === 1 ? "r" : ""} Entwurf${result.generated === 1 ? "" : "e"} erstellt. Bitte vor Veröffentlichung prüfen.`
+                : result.skipped.length > 0
+                  ? `Keine neuen Entwürfe: ${result.skipped.join(" · ")}`
+                  : "Keine neuen Entwürfe. Es liegen derzeit keine priorisierten Chancen vor.");
               await Promise.all([
                 utils.revenueAutopilot.overview.invalidate(),
                 utils.draftEngine.queue.invalidate(),
@@ -142,6 +150,7 @@ function createStyles() {
     opportunityMetric: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4 },
     note: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
     error: { color: glassPalette.amber, fontSize: 11, lineHeight: 16 },
+    feedback: { color: glassPalette.green, fontSize: 11, lineHeight: 17 },
     button: { alignItems: "center", backgroundColor: `${glassPalette.cyan}18`, borderColor: `${glassPalette.cyan}88`, borderRadius: 14, borderWidth: 1, paddingVertical: 12 },
     buttonPressed: { opacity: 0.75 },
     buttonDisabled: { opacity: 0.5 },
