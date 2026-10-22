@@ -54,7 +54,12 @@ jobs:
 
           # 2) Read-only Dump des Revenue-Schemas von der Produktion
           echo "Erzeuge Dump auf dem Produktionsserver …"
-          $SSH 'sudo -n -u postgres pg_dump --schema=public --no-owner --no-privileges --clean --if-exists --quote-all-identifiers cybersarah' > /tmp/revenue_dump.sql
+          # Manche Remote-Shell-Profile schreiben Environment-Zeilen auf stdout.
+          # Nur der eigentliche pg_dump ab seiner eindeutigen Kopfzeile darf in
+          # die SQL-Datei gelangen; sonst wird der Spiegel durch Shell-Text zerstoert.
+          $SSH 'sudo -n -u postgres pg_dump --schema=public --no-owner --no-privileges --clean --if-exists --quote-all-identifiers cybersarah' \
+            | sed -n '/^-- PostgreSQL database dump/,$p' > /tmp/revenue_dump.sql
+          grep -q '^-- PostgreSQL database dump' /tmp/revenue_dump.sql
           DUMP_BYTES=$(wc -c < /tmp/revenue_dump.sql)
           echo "Dump-Groesse: $DUMP_BYTES Bytes"
           test "$DUMP_BYTES" -gt 1000
