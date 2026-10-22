@@ -117,7 +117,7 @@ function SaasSection() {
   const subscriptions = q.data?.subscriptions;
   const status = q.isError ? "nicht verbunden" : q.isLoading ? "lädt" :
     q.data?.stripeStatus === "ready" && q.data.subscriptionsStatus === "ready" ? "Daten geladen" : "teilweise verfügbar";
-  return <FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Stripe-Produkte und Checkout-Sessions werden unabhängig von der separaten Revenue-Datenbank geladen. Ohne Abo-Daten bleiben MRR und Trials unbekannt." cta="SaaS-Daten aktualisieren" status={status} loading={q.isLoading || q.isFetching} error={q.error?.message} metrics={[
+  return <><FeatureCard accent="magenta" title="SaaS-System" subtitle="Produkte, Funnels und Subscriptions" body="Stripe-Produkte und Checkout-Sessions werden unabhängig von der separaten Revenue-Datenbank geladen. Ohne Abo-Daten bleiben MRR und Trials unbekannt." cta="SaaS-Daten aktualisieren" status={status} loading={q.isLoading || q.isFetching} error={q.error?.message} metrics={[
     metric("Stripe-Produkte", q.data?.stripeStatus === "ready" ? q.data.stripeProducts.length : "—"),
     metric("Trials", subscriptions?.trials ?? "—"),
     metric("MRR", subscriptions ? formatEur(subscriptions.mrrEur) : "—"),
@@ -139,7 +139,7 @@ function LoopSection() {
   const expansion = trpc.expansion.overview.useQuery(undefined, { retry: false });
   const scan = trpc.expansion.scan.useMutation({ onSuccess: () => void expansion.refetch() });
   const error = cross.error?.message ?? expansion.error?.message ?? scan.error?.message;
-  return <FeatureCard accent="blue" title="Loop Engineering" subtitle="Cross-Sell und Expansion" body="Echte Cross-Sell-Regeln und Chancen. Die Expansion-Suche ist ein expliziter, admin-geschützter Trigger, keine automatische Veröffentlichung." cta="Expansion-Scan starten" status={error ? "nicht verbunden" : cross.isLoading || expansion.isLoading ? "lädt" : "Daten geladen"} loading={cross.isLoading || expansion.isLoading || scan.isPending} error={error} metrics={[metric("Regeln", cross.data?.rules.length ?? "—"), metric("Aktive Regeln", cross.data?.rules.filter(r => r.aktiv).length ?? "—"), metric("Chancen", expansion.data?.opportunities.length ?? "—")]} details={[
+  return <><FeatureCard accent="blue" title="Loop Engineering" subtitle="Cross-Sell und Expansion" body="Echte Cross-Sell-Regeln und Chancen. Die Expansion-Suche ist ein expliziter, admin-geschützter Trigger, keine automatische Veröffentlichung." cta="Expansion-Scan starten" status={error ? "nicht verbunden" : cross.isLoading || expansion.isLoading ? "lädt" : "Daten geladen"} loading={cross.isLoading || expansion.isLoading || scan.isPending} error={error} metrics={[metric("Regeln", cross.data?.rules.length ?? "—"), metric("Aktive Regeln", cross.data?.rules.filter(r => r.aktiv).length ?? "—"), metric("Chancen", expansion.data?.opportunities.length ?? "—")]} details={[
     ...(cross.data?.recommendationCounts.map(c => `Empfehlungen ${c.status}: ${c.count}`) ?? []),
     ...(expansion.data?.opportunities.slice(0, 3).map(o => `${o.titel}: ${o.status}`) ?? []),
     ...(scan.data?.accepted ? ["Scan angenommen; Ausführungsergebnis noch nicht bestätigt."] : []),
