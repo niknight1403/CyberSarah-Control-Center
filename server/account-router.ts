@@ -61,8 +61,9 @@ export const accountRouter = router({
       return { user: toAccountUser(user), sessionToken };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
-      const message = error instanceof Error ? error.message : "Das Konto konnte nicht erstellt werden.";
-      throw new TRPCError({ code: message.includes("existiert bereits") ? "CONFLICT" : "INTERNAL_SERVER_ERROR", message });
+      const isConflict = error instanceof Error && error.message.includes("existiert bereits");
+      console.error("[Account] Registration failed:", error);
+      throw new TRPCError({ code: isConflict ? "CONFLICT" : "INTERNAL_SERVER_ERROR", message: isConflict ? "Diese E-Mail-Adresse ist bereits registriert." : "Registrierung derzeit nicht möglich. Bitte später erneut versuchen." });
     }
   }),
   login: publicProcedure.input(loginSchema).mutation(async ({ ctx, input }) => {
@@ -78,7 +79,8 @@ export const accountRouter = router({
       return { user: toAccountUser(refreshed), sessionToken };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error instanceof Error ? error.message : "Die Anmeldung konnte nicht abgeschlossen werden." });
+      console.error("[Account] Login database/service failure:", error);
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Anmeldung derzeit nicht möglich. Bitte später erneut versuchen." });
     }
   }),
   /**
@@ -144,7 +146,8 @@ export const accountRouter = router({
       return { user: toAccountUser(created), sessionToken };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error instanceof Error ? error.message : "Die Google-Anmeldung konnte nicht abgeschlossen werden." });
+      console.error("[Account] Google login service failure:", error);
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Google-Anmeldung derzeit nicht möglich. Bitte später erneut versuchen." });
     }
   }),
 
