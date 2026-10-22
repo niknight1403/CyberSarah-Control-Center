@@ -40,6 +40,7 @@ import {
 } from "../lib/custom-game-logic";
 import {
   buildArtifact,
+  evaluateArtifact,
   extractScript,
   planProject,
   type ProjectSpec,
@@ -185,9 +186,9 @@ export async function runCustomGameDevelopment(input: { idea: string; wish?: str
     const plan = planProject(spec);
     deliveredHtml = buildArtifact(spec, {});
     codeSource = "template_fallback";
-    const fallbackValidation = validateGeneratedGame(deliveredHtml, verifyScriptSyntax(deliveredHtml), []);
-    if (!fallbackValidation.ok) {
-      throw new Error(`FALLBACK_VERIFIKATION_GESCHEITERT: ${JSON.stringify(fallbackValidation.issues)}`);
+    const fallbackVerification = evaluateArtifact(deliveredHtml, verifyScriptSyntax(deliveredHtml));
+    if (!fallbackVerification.ok) {
+      throw new Error(`FALLBACK_VERIFIKATION_GESCHEITERT: ${JSON.stringify(fallbackVerification.issues)}`);
     }
     validation = { ok: true, issues: [`Kein freier LLM verfuegbar — ehrlicher Fallback auf Template '${match.label}' (${plan.slug}).`] };
   }
