@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractSslMode, normalizeAliasSslModes, resolvePgSslConfig } from "../lib/db-ssl-logic";
+import { extractSslMode, normalizeAliasSslModes, resolvePgSslConfig, stripSslModeParam } from "../lib/db-ssl-logic";
 
 describe("db-ssl-logic", () => {
   it("liest sslmode aus einer Neon-Connection-URL", () => {
@@ -50,5 +50,27 @@ describe("db-ssl-logic", () => {
     ]) {
       expect(normalizeAliasSslModes(url)).toBe(url);
     }
+  });
+});
+
+describe("stripSslModeParam", () => {
+  it("entfernt sslmode aus der URL, behaelt Host/Port/Credentials/DB", () => {
+    const out = stripSslModeParam("postgres://u:p@92.5.177.159:443/cybersarah?sslmode=require");
+    expect(out).toBe("postgres://u:p@92.5.177.159:443/cybersarah");
+  });
+
+  it("laesst URLs ohne sslmode unangetastet", () => {
+    const url = "postgres://u:p@hub.example.com:5432/db";
+    expect(stripSslModeParam(url)).toBe(url);
+  });
+
+  it("behält andere Query-Parameter", () => {
+    const out = stripSslModeParam("postgres://u:p@h:5432/db?application_name=x&sslmode=require");
+    expect(out).toContain("application_name=x");
+    expect(out).not.toContain("sslmode");
+  });
+
+  it("gibt ungueltige URLs unveraendert zurueck", () => {
+    expect(stripSslModeParam("kein-url")).toBe("kein-url");
   });
 });

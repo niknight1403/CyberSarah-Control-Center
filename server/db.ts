@@ -22,7 +22,7 @@ import {
 
 import { ENV } from "./_core/env";
 import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
-import { resolvePgSslConfig } from "../lib/db-ssl-logic";
+import { resolvePgSslConfig, stripSslModeParam } from "../lib/db-ssl-logic";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
   .trim()
@@ -50,10 +50,11 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        // Sprint 112 — explizite SSL-Ableitung statt pg's impliziter
-        // sslmode-Aufloesung (vermeidet die "aliases for verify-full"
-        // SECURITY WARNING bei identischer Sicherheitsstufe).
+        // sslmode wird aus der URL entfernt (pg's interne sslmode-Aufloesung
+        // wendet sonst eine zusaetzliche Hostnamen-Pruefung an, die bei
+        // SNI-Stream-Routing/IP-Hosts scheitert). Die SSL-Semantik liegt
+        // allein im expliziten ssl-Objekt (Sprint 112).
+        connectionString: stripSslModeParam(process.env.DATABASE_URL),
         ssl: resolvePgSslConfig(process.env.DATABASE_URL),
         max: 10,
         idleTimeoutMillis: 30_000,

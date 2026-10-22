@@ -67,3 +67,21 @@ export function normalizeAliasSslModes(connectionString: string): string {
     return connectionString;
   }
 }
+
+/**
+ * Entfernt den sslmode-Query-Parameter aus einer Postgres-Connection-URL.
+ * Grund: pg wertet sslmode in der URL intern aus (require wird dabei wie
+ * verify-full mit Hostnamen-Pruefung behandelt) und ueberschreibt dadurch
+ * die explizite ssl-Option. Die SSL-Semantik steckt ausschliesslich im
+ * Rueckgabewert von resolvePgSslConfig — pg bekommt eine saubere URL.
+ */
+export function stripSslModeParam(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    if (!url.searchParams.has("sslmode")) return connectionString;
+    url.searchParams.delete("sslmode");
+    return url.search ? url.toString() : url.toString().replace(/\?$/, "");
+  } catch {
+    return connectionString;
+  }
+}
