@@ -29,7 +29,56 @@ import {
   type RevenueLoopDraftPayload,
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
-import { invokeLLM, type Message } from "./_core/llm";
+import type { Message } from "./_core/llm";
+import { isFreeManagedSource, resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
+
+async function callDraftChatEndpoint(
+  url: string,
+  model: string,
+  messages: Message[],
+  headers: Record<string, string> = {},
+  apiKey?: string,
+): Promise<string> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...headers,
+      ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: 700 }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!response.ok) throw new Error(`LLM HTTP ${response.status}`);
+  const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
+  const content = payload.choices?.[0]?.message?.content;
+  if (typeof content !== "string" || !content.trim()) throw new Error("LLM lieferte keinen Text.");
+  return content.trim();
+}
+
+/** Local-first, danach ausschliesslich konfigurierte kostenlose Cloud-Route. */
+async function defaultDraftLlm(messages: Message[]): Promise<string> {
+  const ollamaBase = (process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434").replace(/\/+$/, "");
+  try {
+    return await callDraftChatEndpoint(
+      `${ollamaBase}/v1/chat/completions`,
+      process.env.AI_OLLAMA_MODEL ?? process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b",
+      messages,
+    );
+  } catch {
+    const endpoint = resolveManagedLlmEndpoint(process.env as unknown as ManagedLlmEnv);
+    if (!endpoint || !isFreeManagedSource(endpoint.source)) {
+      throw new Error("Lokales Ollama nicht erreichbar und keine kostenlose Cloud-Fallback-Route konfiguriert.");
+    }
+    return callDraftChatEndpoint(
+      endpoint.url,
+      process.env.MANAGED_DRAFT_MODEL ?? "llama-3.1-8b-instant",
+      messages,
+      endpoint.headers ?? {},
+      endpoint.apiKey,
+    );
+  }
+}
 
 /** Taeglich rotierende Themen-Samen — deterministisch, kein Zufall. */
 const CONTENT_TOPIC_SEEDS = [
@@ -183,11 +232,7 @@ async function generateIdeaDraft(llm: (messages: Message[]) => Promise<string>, 
  */
 export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftEngineRunResult> {
   const nowMs = (deps.now ?? Date.now)();
-  const llm = deps.llm ?? (async (messages: Message[]) => {
-    const result = await invokeLLM({ model: "gpt-4o-mini", maxTokens: 700, messages });
-    const content = result.choices[0]?.message?.content;
-    return typeof content === "string" ? content : "";
-  });
+  const llm = deps.llm ?? defaultDraftLlm;
 
   const result: DraftEngineRunResult = { plan: [], generated: {}, skipped: [] };
   let coverage: PendingDraftCoverage | null = null;
