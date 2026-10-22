@@ -1,0 +1,34 @@
+name: Revenue-Key-Bridge (Hetzner -> AF2-Secret)
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Engine-Key extrahieren und als AF2-Secret setzen
+        env:
+          GH_PAT: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/rk_key
+          chmod 600 ~/.ssh/rk_key
+          SSH="ssh -i ~/.ssh/rk_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 $SSH_USER@$SSH_HOST"
+          RAW=$($SSH "pm2 jlist 2>/dev/null" | python3 -c "import json,sys; apps=json.load(sys.stdin); ids=[a.get('pm_id') for a in apps if any(k in (a.get('name','')+' '+a.get('pm2_env',{}).get('pm_exec_path','')).lower() for k in ('revenue','bridge','cyber'))]; print(ids[0] if ids else '')")
+          if [ -z "${RAW:-}" ]; then echo "Engine-PM2-ID nicht gefunden"; exit 1; fi
+          echo "PM2-ID: $RAW"
+          KEYLINE=$($SSH "pm2 env $RAW 2>/dev/null" | grep -E "(API_KEY|INTERNAL_KEY)" | grep 6C57 | head -1)
+          if [ -z "$KEYLINE" ]; then echo "Key-Variable nicht gefunden"; exit 1; fi
+          KEYNAME=$(printf "%s" "$KEYLINE" | cut -d= -f1 | tr -d ' ')
+          KEYVAL=$(printf "%s" "$KEYLINE" | cut -d= -f2-)
+          echo "Gefunden: $KEYNAME (Laenge ${#KEYVAL})"
+          pip3 install pynacl --quiet
+          GH_PAT="$GH_PAT" python3 scripts/set-af2-secret.py "$KEYVAL"
