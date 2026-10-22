@@ -55,6 +55,16 @@ export function createSecurityMiddleware() {
       return;
     }
 
+    const protectedTraffic =
+      req.path?.startsWith("/api/") === true ||
+      req.path?.startsWith("/oauth/") === true;
+    // Statische Web-/Expo-Assets, Fonts und Bilder duerfen das API-Budget nicht
+    // verbrauchen. Sonst kann ein normaler App-Start den Nutzer selbst drosseln.
+    if (!protectedTraffic) {
+      next();
+      return;
+    }
+
     const now = Date.now();
     // Speicher-Hygiene: abgelaufene IP-Eintraege rauswerfen, damit die
     // Map nicht unendlich waechst (Memory-Leak-Guard, O(n) nur bei Bedarf).
