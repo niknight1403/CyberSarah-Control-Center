@@ -748,6 +748,34 @@ export async function insertSuperAgentRecords(inputs: InsertSuperAgentRow[]) {
   return db.insert(superAgents).values(inputs).returning();
 }
 
+/**
+ * Built-in-Spezialisten atomar nachziehen. Ein nutzerbezogener Postgres
+ * Advisory-Lock serialisiert parallele list-Aufrufe, ohne globale Locks oder
+ * Schema-Migration. Bereits vorhandene Namen werden nie dupliziert.
+ */
+export async function insertMissingSuperAgentRecords(
+  userOpenId: string,
+  inputs: InsertSuperAgentRow[],
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagenten nicht speicherbar.");
+  if (inputs.length === 0) return [];
+
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userOpenId}))`);
+    const existing = await tx
+      .select({ name: superAgents.name })
+      .from(superAgents)
+      .where(eq(superAgents.userOpenId, userOpenId));
+    const names = new Set(existing.map((row) => row.name.trim().toLocaleLowerCase("de-DE")));
+    const missing = inputs.filter(
+      (row) => !names.has(String(row.name).trim().toLocaleLowerCase("de-DE")),
+    );
+    if (missing.length === 0) return [];
+    return tx.insert(superAgents).values(missing).returning();
+  });
+}
+
 export async function updateSuperAgentRecord(
   id: number,
   userOpenId: string,

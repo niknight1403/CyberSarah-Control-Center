@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { ENV } from "./_core/env";
-import { insertChatTurn, insertAgentLearningRecord, listChatMessages, listChatSessions, listRecentAgentLearnings } from "./db";
+import { insertChatTurn, insertAgentLearningRecord, listChatMessages, listChatSessions, listRecentAgentLearnings, listSuperAgentsForUser } from "./db";
 import {
   buildLearningRecord,
   deriveLearningFromTurn,
@@ -66,6 +66,7 @@ import {
   type RouterProviderId,
 } from "../lib/model-router-logic";
 import { buildSuperagentBrief, shouldAttachSuperagentBrief } from "../lib/superagent-brief-logic";
+import { buildSpecialistAgentContext } from "../lib/specialist-agents-logic";
 import { getRuntimeLogs } from "./runtime-logger";
 import { classifyRuntimeState } from "../lib/live-status-logic";
 import {
@@ -294,7 +295,10 @@ async function callManaged(messages: ChatMessage[], requestedModel?: string) {
 function isTransientChatError(error: unknown) {
   if (error instanceof TRPCError) return false;
   const message = error instanceof Error ? error.message : String(error);
-  return /\b(408|425|429|500|502|503|504)\b/.test(message) ||
+  // Auth/key failures are not retryable against the SAME provider, but they
+  // are recoverable by provider rotation. Treat them as failover-eligible.
+  return /\b(401|403|408|425|429|500|502|503|504)\b/.test(message) ||
+    /invalid[_ -]?api[_ -]?key|incorrect api key|unauthorized|expired key/i.test(message) ||
     (error instanceof TypeError) ||
     (error instanceof Error && error.name === "AbortError");
 }
@@ -321,7 +325,8 @@ function getFallbackProviders(provider: ProviderId) {
   const providers: ProviderId[] = parsed
     .filter((result): result is { success: true; data: ProviderId } => result.success && Boolean(result.data))
     .map((result) => result.data);
-  return providers.filter(
+  const withManagedSafetyNet: ProviderId[] = [...providers, "managed"];
+  return withManagedSafetyNet.filter(
     (candidate, index, all): candidate is Exclude<ProviderId, "auto"> =>
       candidate !== provider && candidate !== "auto" && all.indexOf(candidate) === index,
   );
@@ -799,6 +804,23 @@ async function loadLearningContext(userOpenId: string | undefined, prompt: strin
   }
 }
 
+/**
+ * Runtime-Profil des ausgewaehlten Superagenten laden. Benannte Agenten
+ * erhalten damit nicht nur eine isolierte Session, sondern ein echtes
+ * spezialisiertes Arbeitsprofil.
+ */
+async function loadSpecialistAgentContext(userOpenId?: string, sessionId?: string): Promise<string> {
+  if (!userOpenId || !sessionId) return "";
+  try {
+    const agents = await listSuperAgentsForUser(userOpenId);
+    const agent = agents.find((row) => row.sessionId === sessionId && row.status === "aktiv");
+    return buildSpecialistAgentContext(agent);
+  } catch (error) {
+    console.warn("[specialistAgent] Profil nicht geladen:", error instanceof Error ? error.message.slice(0, 120) : error);
+    return "";
+  }
+}
+
 /** Sprint 94 — save_learning ausfuehren (Datenbank statt Workspace-Service). */
 async function executeSaveLearningTool(userOpenId: string | undefined, args: Record<string, unknown>): Promise<string> {
   const title = typeof args.title === "string" ? args.title : "";
@@ -841,9 +863,12 @@ async function storeAutoLearning(input: AgentToolChatInput, userMessage: string,
 async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput): Promise<DevelopmentChatResult> {
   const githubToken = resolveAgentGithubToken(input.role, input.githubToken);
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
-  const learningContext = await loadLearningContext(input.userOpenId, lastUserMessage, input.sessionId);
+  const [learningContext, specialistContext] = await Promise.all([
+    loadLearningContext(input.userOpenId, lastUserMessage, input.sessionId),
+    loadSpecialistAgentContext(input.userOpenId, input.sessionId),
+  ]);
   const conversation: Message[] = [
-    { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main", provider)}${learningContext}` },
+    { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main", provider)}${specialistContext}${learningContext}` },
     ...input.messages.map((message) => ({ role: message.role, content: message.content })),
   ];
   const businessTools = BUSINESS_TOOL_NAMES.map((name) => ({
@@ -863,7 +888,21 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   const devTrace: { tool: string; args: string; resultSummary: string }[] = [];
 
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
-    const payload = await callProviderWithTools(provider, conversation, input.model, tools);
+    let payload: InvokeResult;
+    try {
+      payload = await callProviderWithTools(provider, conversation, input.model, tools);
+    } catch (error) {
+      // Sobald ein Tool bereits erfolgreich/fehlgeschlagen ausgefuehrt wurde,
+      // darf ein Providerwechsel den Loop nicht vom Originalprompt neu starten:
+      // Commit/Write/Send koennten sonst doppelt ausgefuehrt werden.
+      if (toolsUsedInTurn.size > 0) {
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: "KI-Provider nach bereits ausgefuehrten Werkzeugschritten ausgefallen. Fortschritt bleibt erhalten; automatischer Neustart wurde zum Schutz vor Doppelaktionen gestoppt.",
+        });
+      }
+      throw error;
+    }
     const choice = payload?.choices?.[0];
     const toolCalls: ToolCall[] = choice?.message?.tool_calls ?? [];
     if (!toolCalls.length) {
@@ -896,8 +935,20 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     }
   }
 
-  // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen.
-  const payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+  // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen. Nach
+  // Tool-Side-Effects kein Provider-Restart vom Originalzustand zulassen.
+  let payload: InvokeResult;
+  try {
+    payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+  } catch (error) {
+    if (toolsUsedInTurn.size > 0) {
+      throw new TRPCError({
+        code: "BAD_GATEWAY",
+        message: "KI-Provider nach bereits ausgefuehrten Werkzeugschritten ausgefallen. Fortschritt bleibt erhalten; automatischer Neustart wurde zum Schutz vor Doppelaktionen gestoppt.",
+      });
+    }
+    throw error;
+  }
   const finalContent = extractContent(payload);
   await storeAutoLearning(input, lastUserMessage, finalContent, [...toolsUsedInTurn]);
   return { content: finalContent, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString(), devTrace: devTrace.length ? devTrace : undefined };
@@ -908,7 +959,7 @@ async function handleAgentToolChat(input: AgentToolChatInput): Promise<Developme
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const providers = input.provider === "auto"
     ? await resolveAgentProviderCandidates(lastUserMessage, input.role)
-    : [input.provider];
+    : [input.provider, ...getFallbackProviders(input.provider)];
 
   let lastError: unknown = new Error("Kein verfuegbarer KI-Provider fuer die Werkzeug-Route.");
   for (const provider of providers) {
@@ -1082,12 +1133,21 @@ export async function handleDevelopmentChat(input: {
   if (input.workspaceId) {
     return handleAgentToolChat(input);
   }
+
+  // Auch ohne verbundenes Repository/Workspace muss die gewaehlte
+  // Superagenten-Persoenlichkeit wirksam sein. Eingabevalidierung bleibt
+  // user/assistant-only; der Systemkontext entsteht ausschliesslich serverseitig.
+  const specialistContext = await loadSpecialistAgentContext(input.userOpenId, input.sessionId);
+  const runtimeMessages = specialistContext
+    ? ([{ role: "system", content: specialistContext }, ...input.messages] as ChatMessage[])
+    : input.messages;
+
   if (input.provider === "auto") {
-    return handleAutoRoutedChat({ messages: input.messages, model: input.model, role: input.role });
+    return handleAutoRoutedChat({ messages: runtimeMessages, model: input.model, role: input.role });
   }
   const primaryStartedAt = Date.now();
   try {
-    const reply = await callProvider(input.provider, input.messages, input.model);
+    const reply = await callProvider(input.provider, runtimeMessages, input.model);
     recordRouterOutcome(input.provider, { kind: "success", latencyMs: Date.now() - primaryStartedAt }, Date.now());
     return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
   } catch (error) {
@@ -1121,7 +1181,7 @@ export async function handleDevelopmentChat(input: {
       for (const fallbackProvider of getFallbackProviders(input.provider)) {
         const fallbackStartedAt = Date.now();
         try {
-          const reply = await callProvider(fallbackProvider, input.messages, input.model);
+          const reply = await callProvider(fallbackProvider, runtimeMessages, input.model);
           recordRouterOutcome(fallbackProvider, { kind: "success", latencyMs: Date.now() - fallbackStartedAt }, Date.now());
           return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
         } catch (fallbackError) {
