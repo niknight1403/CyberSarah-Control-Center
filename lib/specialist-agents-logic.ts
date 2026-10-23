@@ -39,6 +39,11 @@ export const SPECIALIST_AGENT_SEEDS = [
 
 export type SpecialistAgentSeed = (typeof SPECIALIST_AGENT_SEEDS)[number];
 
+export function isBuiltInSpecialistName(name: string): boolean {
+  const normalized = name.trim().toLocaleLowerCase("de-DE");
+  return SPECIALIST_AGENT_SEEDS.some((seed) => seed.name.toLocaleLowerCase("de-DE") === normalized);
+}
+
 export function missingSpecialistAgentSeeds(existingNames: readonly string[]): SpecialistAgentSeed[] {
   const names = new Set(existingNames.map((name) => name.trim().toLocaleLowerCase("de-DE")));
   return SPECIALIST_AGENT_SEEDS.filter((seed) => !names.has(seed.name.toLocaleLowerCase("de-DE")));
