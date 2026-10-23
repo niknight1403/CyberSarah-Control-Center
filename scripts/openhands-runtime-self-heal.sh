@@ -78,21 +78,32 @@ fi
 # Kein zweites lokales Modell auf dem 38-GB-Host nachladen: die vorhandene
 # Remote-Ollama/Free-Cloud-Kaskade liefert das LLM, die Runtime bleibt lokal.
 rm -f /usr/share/ollama/.ollama/models/blobs/*-partial 2>/dev/null || true
-python3 - "$COMPOSE" "$RUNTIME_IMAGE" <<'PY'
+DOCKER_HOST_IP="$(docker inspect "$APP_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{println .Gateway}}{{end}}' 2>/dev/null | awk 'NF {print; exit}')"
+[ -n "$DOCKER_HOST_IP" ] || { echo "Docker-Host-Gateway nicht ermittelbar"; exit 1; }
+echo "OpenHands Runtime-Rueckroute: $DOCKER_HOST_IP"
+
+python3 - "$COMPOSE" "$RUNTIME_IMAGE" "$DOCKER_HOST_IP" <<'PY'
 from pathlib import Path
 import re, sys
 path = Path(sys.argv[1])
 image = sys.argv[2]
+host_ip = sys.argv[3]
 text = path.read_text()
-entry = f"      - SANDBOX_RUNTIME_CONTAINER_IMAGE={image}"
-pattern = r"(?m)^\s*-\s*SANDBOX_RUNTIME_CONTAINER_IMAGE=.*$"
-if re.search(pattern, text):
-    text = re.sub(pattern, entry, text, count=1)
-else:
-    marker = "    environment:\n"
-    if marker not in text:
-        raise SystemExit("environment-Block im OpenHands-Service fehlt")
-    text = text.replace(marker, marker + entry + "\n", 1)
+marker = "    environment:\n"
+if marker not in text:
+    raise SystemExit("environment-Block im OpenHands-Service fehlt")
+
+def set_env(name: str, value: str) -> None:
+    global text
+    entry = f"      - {name}={value}"
+    pattern = rf"(?m)^\s*-\s*{re.escape(name)}=.*$"
+    if re.search(pattern, text):
+        text = re.sub(pattern, entry, text, count=1)
+    else:
+        text = text.replace(marker, marker + entry + "\n", 1)
+
+set_env("SANDBOX_RUNTIME_CONTAINER_IMAGE", image)
+set_env("DOCKER_HOST_IP", host_ip)
 
 # OpenHands 0.28 erreicht die dynamisch publizierten Runtime-Ports ueber
 # host.docker.internal. Auf Linux muss der Host-Gateway explizit gesetzt sein.
