@@ -31,8 +31,8 @@ if [ "$FREE_KB" -lt 7340032 ]; then
   docker system df || true
   echo "== Dateisysteme =="
   df -hT || true
-  echo "== Groesste Root-Verzeichnisse =="
-  du -xhd1 / 2>/dev/null | sort -h | tail -15 || true
+  echo "== Relevante Speicherbereiche =="
+  du -xsh /var/lib/docker /opt /root /var/log /var/cache 2>/dev/null || true
   echo "== Blockgeraete =="
   lsblk -f || true
   exit 1
