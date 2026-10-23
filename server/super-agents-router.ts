@@ -11,12 +11,13 @@ import {
   deleteSuperAgentRecord,
   insertSuperAgentRecord,
   insertSuperAgentRecords,
+  insertMissingSuperAgentRecords,
   listSuperAgentsForUser,
   touchSuperAgentLastActive,
   updateSuperAgentRecord,
 } from "./db";
 import { createProjectSuperagent } from "./project-superagent-factory";
-import { missingSpecialistAgentSeeds } from "../lib/specialist-agents-logic";
+import { isBuiltInSpecialistName, missingSpecialistAgentSeeds } from "../lib/specialist-agents-logic";
 import {
   assertSuperAgentRemovable,
   defaultSeedSuperAgent,
@@ -75,7 +76,8 @@ export const superAgentsRouter = router({
 
     const missing = missingSpecialistAgentSeeds(rows.map((row) => row.name));
     if (missing.length > 0) {
-      await insertSuperAgentRecords(
+      await insertMissingSuperAgentRecords(
+        ctx.user.openId,
         missing.map((seed) => ({
           ...seed,
           purpose: seed.purpose.slice(0, 400),
@@ -131,6 +133,10 @@ export const superAgentsRouter = router({
   /** Loescht einen Superagenten dauerhaft. Der Standard-Agent kann nicht geloescht werden. */
   remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const rows = await listSuperAgentsForUser(ctx.user.openId);
+    const target = rows.find((row) => row.id === input.id);
+    if (target && isBuiltInSpecialistName(target.name)) {
+      throw new Error("Integrierte Spezialagenten bleiben als Systemfaehigkeit erhalten — pausiere oder archiviere sie stattdessen.");
+    }
     assertSuperAgentRemovable(rows, input.id);
     await deleteSuperAgentRecord(input.id, ctx.user.openId);
     return { success: true } as const;
