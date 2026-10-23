@@ -93,6 +93,18 @@ else:
     if marker not in text:
         raise SystemExit("environment-Block im OpenHands-Service fehlt")
     text = text.replace(marker, marker + entry + "\n", 1)
+
+# OpenHands 0.28 erreicht die dynamisch publizierten Runtime-Ports ueber
+# host.docker.internal. Auf Linux muss der Host-Gateway explizit gesetzt sein.
+if "host.docker.internal:host-gateway" not in text:
+    service = "  openhands:\n"
+    if service not in text:
+        raise SystemExit("openhands-Service im Compose fehlt")
+    text = text.replace(
+        service,
+        service + '    extra_hosts:\n      - "host.docker.internal:host-gateway"\n',
+        1,
+    )
 path.write_text(text)
 PY
 
