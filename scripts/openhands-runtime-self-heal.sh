@@ -15,11 +15,18 @@ case "$APP_IMAGE" in
   *) echo "Unerwartete OpenHands-Version: $APP_IMAGE"; exit 1 ;;
 esac
 
+RUNTIME_CACHED=0
+if docker image inspect "$RUNTIME_IMAGE" >/dev/null 2>&1; then
+  RUNTIME_CACHED=1
+fi
+
 echo "Docker-Speicher fuer die Runtime vorbereiten ..."
 docker ps -aq --filter name=openhands-runtime- | xargs -r docker rm -f >/dev/null 2>&1 || true
 docker container prune -f >/dev/null 2>&1 || true
 docker builder prune -af >/dev/null 2>&1 || true
-docker image prune -af >/dev/null 2>&1 || true
+if [ "$RUNTIME_CACHED" -eq 0 ]; then
+  docker image prune -af >/dev/null 2>&1 || true
+fi
 apt-get clean >/dev/null 2>&1 || true
 journalctl --vacuum-size=100M >/dev/null 2>&1 || true
 rm -rf /root/.npm/_cacache /root/.cache/pip /tmp/openhands-* /tmp/bx 2>/dev/null || true
@@ -28,9 +35,9 @@ rm -f /usr/share/ollama/.ollama/models/blobs/*-partial 2>/dev/null || true
 FREE_KB="$(df -Pk /var/lib/docker | awk 'NR==2 {print $4}')"
 echo "Freier Docker-Speicher nach Cleanup: $((FREE_KB / 1024)) MB"
 
-# 38-GB-Host: das 7B-Modell belegt ~4.7 GB. Fuer Local-First-Routine reicht
-# 1.5B; komplexe Aufgaben bleiben auf der bereits vorhandenen Free-Cloud-Kaskade.
-if [ "$FREE_KB" -lt 7340032 ] && command -v ollama >/dev/null 2>&1; then
+# 38-GB-Host: falls die Runtime noch nicht gecacht ist, schafft das alte
+# lokale 7B-Modell Platz. LLM-Routing bleibt ueber Remote-Ollama/Free-Failover aktiv.
+if [ "$RUNTIME_CACHED" -eq 0 ] && [ "$FREE_KB" -lt 7340032 ] && command -v ollama >/dev/null 2>&1; then
   if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx 'qwen2.5-coder:7b'; then
     echo "Ressourcenprofil: lokales 7B-Modell entfernen; Self-hosted/Free-Failover uebernimmt LLM-Routing"
     ollama rm qwen2.5-coder:7b >/dev/null
@@ -42,7 +49,7 @@ if [ "$FREE_KB" -lt 7340032 ] && command -v ollama >/dev/null 2>&1; then
   echo "Freier Speicher nach Modell-Rebalancing: $((FREE_KB / 1024)) MB"
 fi
 
-if [ "$FREE_KB" -lt 7340032 ]; then
+if [ "$RUNTIME_CACHED" -eq 0 ] && [ "$FREE_KB" -lt 7340032 ]; then
   echo "Zu wenig freier Speicher fuer die 5+ GB Runtime plus Extraktion."
   docker system df || true
   echo "== Dateisysteme =="
@@ -54,8 +61,12 @@ if [ "$FREE_KB" -lt 7340032 ]; then
   exit 1
 fi
 
-echo "Passendes OpenHands-0.28-Runtime-Image vorladen ..."
-docker pull "$RUNTIME_IMAGE" >/dev/null
+if [ "$RUNTIME_CACHED" -eq 0 ]; then
+  echo "Passendes OpenHands-0.28-Runtime-Image vorladen ..."
+  docker pull "$RUNTIME_IMAGE" >/dev/null
+else
+  echo "Passendes OpenHands-0.28-Runtime-Image bereits lokal vorhanden."
+fi
 
 # Kein zweites lokales Modell auf dem 38-GB-Host nachladen: die vorhandene
 # Remote-Ollama/Free-Cloud-Kaskade liefert das LLM, die Runtime bleibt lokal.
