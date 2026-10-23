@@ -104,6 +104,8 @@ def set_env(name: str, value: str) -> None:
 
 set_env("SANDBOX_RUNTIME_CONTAINER_IMAGE", image)
 set_env("DOCKER_HOST_IP", host_ip)
+set_env("DOCKER_HOST_ADDR", host_ip)
+set_env("SANDBOX_RUNTIME_BINDING_ADDRESS", host_ip)
 
 # OpenHands 0.28 erreicht die dynamisch publizierten Runtime-Ports ueber
 # host.docker.internal. Auf Linux muss der Host-Gateway explizit gesetzt sein.
