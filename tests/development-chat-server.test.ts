@@ -163,26 +163,29 @@ describe("development chat server chain", () => {
     await fallback.close();
   });
 
-  it("übergibt permanente Fehler ohne Fallback-Versuch", async () => {
+  it("rotiert bei ungueltigem Provider-Key autonom zum Fallback", async () => {
     const primary = await startMockServer((_body, res) => {
       res.writeHead(401);
-      res.end("Unauthorized");
+      res.end("Incorrect API key");
     });
     const fallback = await startMockServer((_body, res) =>
-      replyWithContent(res, "darf nicht erreicht werden"),
+      replyWithContent(res, "Auth-Fallback aktiv.", "fallback-model"),
     );
     process.env.AI_CUSTOM_BASE_URL = endpoint(primary);
-    process.env.AI_CUSTOM_API_KEY = "test-key";
+    process.env.AI_CUSTOM_API_KEY = "invalid-test-key";
     process.env.AI_LMSTUDIO_BASE_URL = endpoint(fallback);
+    process.env.AI_LMSTUDIO_MODEL = "fallback-model";
     process.env.AI_FALLBACK_PROVIDERS = "lmstudio";
 
-    await expect(
-      handleDevelopmentChat({
-        provider: "custom",
-        messages: [{ role: "user", content: "Status?" }],
-      }),
-    ).rejects.toMatchObject({ code: "BAD_GATEWAY" });
-    expect(fallback.requests).toHaveLength(0);
+    const result = await handleDevelopmentChat({
+      provider: "custom",
+      messages: [{ role: "user", content: "Status?" }],
+    });
+
+    expect(result.content).toBe("Auth-Fallback aktiv.");
+    expect(result.providerUsed).toBe("lmstudio");
+    expect(result.fallbackUsed).toBe(true);
+    expect(fallback.requests).toHaveLength(1);
     await primary.close();
     await fallback.close();
   });
