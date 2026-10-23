@@ -9,6 +9,9 @@ on:
       - scripts/openhands-runtime-self-heal.sh
       - .github/workflows/openhands-runtime-self-heal.yml
   workflow_dispatch:
+  workflow_run:
+    workflows: ["OpenHands Autonomous Deploy"]
+    types: [completed]
 
 concurrency:
   group: openhands-runtime-self-heal
@@ -19,6 +22,7 @@ permissions:
 
 jobs:
   repair-and-smoke:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
