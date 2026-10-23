@@ -888,7 +888,21 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   const devTrace: { tool: string; args: string; resultSummary: string }[] = [];
 
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
-    const payload = await callProviderWithTools(provider, conversation, input.model, tools);
+    let payload: InvokeResult;
+    try {
+      payload = await callProviderWithTools(provider, conversation, input.model, tools);
+    } catch (error) {
+      // Sobald ein Tool bereits erfolgreich/fehlgeschlagen ausgefuehrt wurde,
+      // darf ein Providerwechsel den Loop nicht vom Originalprompt neu starten:
+      // Commit/Write/Send koennten sonst doppelt ausgefuehrt werden.
+      if (toolsUsedInTurn.size > 0) {
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: "KI-Provider nach bereits ausgefuehrten Werkzeugschritten ausgefallen. Fortschritt bleibt erhalten; automatischer Neustart wurde zum Schutz vor Doppelaktionen gestoppt.",
+        });
+      }
+      throw error;
+    }
     const choice = payload?.choices?.[0];
     const toolCalls: ToolCall[] = choice?.message?.tool_calls ?? [];
     if (!toolCalls.length) {
@@ -921,8 +935,20 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     }
   }
 
-  // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen.
-  const payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+  // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen. Nach
+  // Tool-Side-Effects kein Provider-Restart vom Originalzustand zulassen.
+  let payload: InvokeResult;
+  try {
+    payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+  } catch (error) {
+    if (toolsUsedInTurn.size > 0) {
+      throw new TRPCError({
+        code: "BAD_GATEWAY",
+        message: "KI-Provider nach bereits ausgefuehrten Werkzeugschritten ausgefallen. Fortschritt bleibt erhalten; automatischer Neustart wurde zum Schutz vor Doppelaktionen gestoppt.",
+      });
+    }
+    throw error;
+  }
   const finalContent = extractContent(payload);
   await storeAutoLearning(input, lastUserMessage, finalContent, [...toolsUsedInTurn]);
   return { content: finalContent, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString(), devTrace: devTrace.length ? devTrace : undefined };
@@ -1107,12 +1133,21 @@ export async function handleDevelopmentChat(input: {
   if (input.workspaceId) {
     return handleAgentToolChat(input);
   }
+
+  // Auch ohne verbundenes Repository/Workspace muss die gewaehlte
+  // Superagenten-Persoenlichkeit wirksam sein. Eingabevalidierung bleibt
+  // user/assistant-only; der Systemkontext entsteht ausschliesslich serverseitig.
+  const specialistContext = await loadSpecialistAgentContext(input.userOpenId, input.sessionId);
+  const runtimeMessages = specialistContext
+    ? ([{ role: "system", content: specialistContext }, ...input.messages] as ChatMessage[])
+    : input.messages;
+
   if (input.provider === "auto") {
-    return handleAutoRoutedChat({ messages: input.messages, model: input.model, role: input.role });
+    return handleAutoRoutedChat({ messages: runtimeMessages, model: input.model, role: input.role });
   }
   const primaryStartedAt = Date.now();
   try {
-    const reply = await callProvider(input.provider, input.messages, input.model);
+    const reply = await callProvider(input.provider, runtimeMessages, input.model);
     recordRouterOutcome(input.provider, { kind: "success", latencyMs: Date.now() - primaryStartedAt }, Date.now());
     return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
   } catch (error) {
@@ -1146,7 +1181,7 @@ export async function handleDevelopmentChat(input: {
       for (const fallbackProvider of getFallbackProviders(input.provider)) {
         const fallbackStartedAt = Date.now();
         try {
-          const reply = await callProvider(fallbackProvider, input.messages, input.model);
+          const reply = await callProvider(fallbackProvider, runtimeMessages, input.model);
           recordRouterOutcome(fallbackProvider, { kind: "success", latencyMs: Date.now() - fallbackStartedAt }, Date.now());
           return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
         } catch (fallbackError) {
