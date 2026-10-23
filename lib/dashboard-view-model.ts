@@ -166,10 +166,14 @@ export function mapChatStatus(input: {
 }): { status: ChatStatus; provider?: string; model?: string } {
   if (input.providersConfigured === null) return { status: "unknown" };
   if ((input.providersConfigured ?? 0) === 0) return { status: "unavailable" };
-  // Ein vorhandener API-Key ist ein belastbarer Konfigurationszustand, aber noch kein\n  // Health-Beweis. Daher nicht endlos amber „wird geprüft“, sondern explizit\n  // „konfiguriert“. Erst ein realer erfolgreicher Router-Aufruf setzt ready.\n  if (!input.activeProvider) return { status: "configured" };
+  // Ein vorhandener API-Key ist ein belastbarer Konfigurationszustand, aber noch kein
+  // Health-Beweis. Daher nicht endlos amber „wird geprüft“, sondern explizit
+  // „konfiguriert“. Erst ein realer erfolgreicher Router-Aufruf setzt ready.
+  const activeProvider = input.activeProvider;
+  if (!activeProvider) return { status: "configured" };
   return {
     status: "ready",
-    provider: input.activeProvider,
+    provider: activeProvider,
     model: input.activeModel ?? undefined,
   };
 }
