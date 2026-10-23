@@ -29,6 +29,13 @@ if [ "$RUNTIME_CACHED" -eq 0 ]; then
 fi
 apt-get clean >/dev/null 2>&1 || true
 journalctl --vacuum-size=100M >/dev/null 2>&1 || true
+if command -v snap >/dev/null 2>&1; then
+  snap list --all 2>/dev/null | awk '$6=="disabled" {print $1, $3}' | while read -r name rev; do
+    [ -n "$name" ] && [ -n "$rev" ] && snap remove "$name" --revision="$rev" >/dev/null 2>&1 || true
+  done
+  rm -f /var/lib/snapd/cache/* 2>/dev/null || true
+fi
+rm -rf /var/lib/apt/lists/* 2>/dev/null || true
 rm -rf /root/.npm/_cacache /root/.cache/pip /tmp/openhands-* /tmp/bx 2>/dev/null || true
 rm -f /usr/share/ollama/.ollama/models/blobs/*-partial 2>/dev/null || true
 
@@ -101,6 +108,7 @@ done
 [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$BASE" || true)" = "200" ]
 
 docker inspect "$APP_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -Fx "SANDBOX_RUNTIME_CONTAINER_IMAGE=$RUNTIME_IMAGE" >/dev/null
+echo "Freier Speicher vor Agent-Smoke: $(( $(df -Pk / | awk 'NR==2 {print $4}') / 1024 )) MB"
 
 rm -f "$RESULT"
 CONV="$(curl -fsS --max-time 30 -X POST "$BASE/api/conversations" \
@@ -114,11 +122,20 @@ for _ in $(seq 1 120); do
     echo "OPENHANDS_RUNTIME_SMOKE=PASS"
     exit 0
   fi
-  STATUS="$(curl -fsS --max-time 10 "$BASE/api/conversations/$CID" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","?"))' 2>/dev/null || echo '?')"
+  META="$(curl -fsS --max-time 10 "$BASE/api/conversations/$CID" 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(str(d.get("status","?"))+"|"+str(d.get("runtime_status","?")))' 2>/dev/null || echo '?|?')"
+  STATUS="${META%%|*}"
+  RUNTIME_STATUS="${META#*|}"
   case "$STATUS" in
     STOPPED|ERROR|stopped|error)
-      echo "Agent stoppte vor erfolgreichem Dateibeweis: $STATUS"
-      docker logs --tail 100 "$APP_CONTAINER" 2>&1 | tail -100
+      echo "Agent stoppte vor erfolgreichem Dateibeweis: status=$STATUS runtime=$RUNTIME_STATUS"
+      echo "== Runtime-Container =="
+      docker ps -a --filter name=openhands-runtime- --format '{{.Names}} {{.Status}} {{.Image}}' || true
+      for rc in $(docker ps -aq --filter name=openhands-runtime-); do
+        echo "== Logs $rc =="
+        docker logs --tail 120 "$rc" 2>&1 | tail -120 || true
+      done
+      echo "== OpenHands-App-Logs =="
+      docker logs --tail 120 "$APP_CONTAINER" 2>&1 | tail -120
       exit 1
       ;;
   esac
