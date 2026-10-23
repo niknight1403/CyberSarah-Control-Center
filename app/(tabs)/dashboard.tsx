@@ -160,7 +160,7 @@ export default function DashboardScreen() {
               title="KI-Chat"
               description={vm.chat.provider ? `${vm.chat.provider}${vm.chat.model ? ` · ${vm.chat.model}` : ""}` : chatStatusCopy[vm.chat.status]}
               statusLabel={chatStatusCopy[vm.chat.status]}
-              accent={vm.chat.status === "ready" ? "cyan" : vm.chat.status === "unavailable" ? "red" : "amber"}
+              accent={vm.chat.status === "ready" || vm.chat.status === "configured" ? "cyan" : vm.chat.status === "unavailable" ? "red" : "amber"}
               live={vm.chat.status === "ready"}
               onPress={() => router.push("/chat" as never)}
             />

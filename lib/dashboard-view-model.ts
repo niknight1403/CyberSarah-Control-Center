@@ -37,10 +37,11 @@ export const systemStatusCopy: Record<SystemStatus, string> = {
   unknown: "Status nicht verfügbar",
 };
 
-export type ChatStatus = "ready" | "checking" | "unavailable" | "unknown";
+export type ChatStatus = "ready" | "configured" | "checking" | "unavailable" | "unknown";
 
 export const chatStatusCopy: Record<ChatStatus, string> = {
   ready: "Bereit für deine Fragen",
+  configured: "Provider konfiguriert",
   checking: "Provider wird geprüft",
   unavailable: "Kein Provider verfügbar",
   unknown: "Status unbekannt",
@@ -165,10 +166,14 @@ export function mapChatStatus(input: {
 }): { status: ChatStatus; provider?: string; model?: string } {
   if (input.providersConfigured === null) return { status: "unknown" };
   if ((input.providersConfigured ?? 0) === 0) return { status: "unavailable" };
-  if (!input.activeProvider) return { status: "checking" };
+  // Ein vorhandener API-Key ist ein belastbarer Konfigurationszustand, aber noch kein
+  // Health-Beweis. Daher nicht endlos amber „wird geprüft“, sondern explizit
+  // „konfiguriert“. Erst ein realer erfolgreicher Router-Aufruf setzt ready.
+  const activeProvider = input.activeProvider;
+  if (!activeProvider) return { status: "configured" };
   return {
     status: "ready",
-    provider: input.activeProvider,
+    provider: activeProvider,
     model: input.activeModel ?? undefined,
   };
 }

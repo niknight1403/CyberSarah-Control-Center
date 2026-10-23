@@ -127,6 +127,13 @@ export async function saasOverview() {
 
 export async function tradingOverview() { return fetchTradingSnapshot(); }
 
+/** Baut die feste Scan-URL, ohne einen Reverse-Proxy-Praefix wie /revenue-api
+ * zu verlieren. new URL('/api/...', base) wuerde den Prefix verwerfen. */
+export function revenueEngineUrl(base: URL, path: "hara/scan" | "expansion/scan"): URL {
+  const prefix = base.pathname.replace(/\/+$/, "");
+  return new URL(`${prefix}/api/${path}`, `${base.origin}/`);
+}
+
 /** Optionaler Trigger der vorhandenen Revenue-Engine: nur vorgegebene Pfade, kein Client-URL/SSRF. */
 export async function triggerRevenueScan(path: "hara/scan" | "expansion/scan") {
   const raw = process.env.REVENUE_OS_API_BASE_URL;
@@ -140,7 +147,7 @@ export async function triggerRevenueScan(path: "hara/scan" | "expansion/scan") {
   if ((!localOnly && base.protocol !== "https:") || base.username || base.password || base.search || base.hash) {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Revenue-Engine erfordert HTTPS oder den lokalen Loopback-Dienst." });
   }
-  const target = new URL(`/api/${path}`, base);
+  const target = revenueEngineUrl(base, path);
   try {
     const response = await fetch(target, { method: "POST", headers: { "X-Revenue-Internal-Key": secret }, signal: AbortSignal.timeout(10000), redirect: "error" });
     if (!response.ok) throw new Error("upstream_rejected");
