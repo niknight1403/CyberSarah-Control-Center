@@ -22,7 +22,7 @@ docker builder prune -af >/dev/null 2>&1 || true
 docker image prune -af >/dev/null 2>&1 || true
 apt-get clean >/dev/null 2>&1 || true
 journalctl --vacuum-size=100M >/dev/null 2>&1 || true
-rm -rf /root/.npm/_cacache /root/.cache/pip /tmp/* 2>/dev/null || true
+rm -rf /root/.npm/_cacache /root/.cache/pip /tmp/openhands-* /tmp/bx 2>/dev/null || true
 
 FREE_KB="$(df -Pk /var/lib/docker | awk 'NR==2 {print $4}')"
 echo "Freier Docker-Speicher nach Cleanup: $((FREE_KB / 1024)) MB"
