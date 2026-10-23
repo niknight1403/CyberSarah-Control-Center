@@ -12,7 +12,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { createNeonStyles } from "./neon-dashboard-styles";
 import { chatStatusCopy, type ChatStatus } from "@/lib/dashboard-view-model";
 
-const ACCENT = (glass: RuntimeGlassTheme) => ({ ready: glass.glassPalette.green, checking: glass.glassPalette.cyan, unavailable: glass.glassPalette.red, unknown: glass.glassSurface.textSecondary });
+const ACCENT = (glass: RuntimeGlassTheme): Record<ChatStatus, string> => ({ ready: glass.glassPalette.green, configured: glass.glassPalette.cyan, checking: glass.glassPalette.cyan, unavailable: glass.glassPalette.red, unknown: glass.glassSurface.textSecondary });
 
 export function AiChatStatusCard({
   status,
