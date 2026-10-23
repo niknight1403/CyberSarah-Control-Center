@@ -16,6 +16,7 @@ import {
   updateSuperAgentRecord,
 } from "./db";
 import { createProjectSuperagent } from "./project-superagent-factory";
+import { missingSpecialistAgentSeeds } from "../lib/specialist-agents-logic";
 import {
   assertSuperAgentRemovable,
   defaultSeedSuperAgent,
@@ -63,7 +64,7 @@ export const superAgentsRouter = router({
         autonomy: creation.blueprint.autonomy,
       };
     }),
-  /** Superagenten des Nutzers — seedet einmalig den Standard-Agenten ("Elara"), wenn leer. */
+  /** Superagenten des Nutzers — seedet Elara und die eingebauten Spezialisten idempotent. */
   list: protectedProcedure.query(async ({ ctx }) => {
     let rows = await listSuperAgentsForUser(ctx.user.openId);
     if (rows.length === 0) {
@@ -71,6 +72,21 @@ export const superAgentsRouter = router({
       await insertSuperAgentRecords([{ ...seed, userOpenId: ctx.user.openId }]);
       rows = await listSuperAgentsForUser(ctx.user.openId);
     }
+
+    const missing = missingSpecialistAgentSeeds(rows.map((row) => row.name));
+    if (missing.length > 0) {
+      await insertSuperAgentRecords(
+        missing.map((seed) => ({
+          ...seed,
+          purpose: seed.purpose.slice(0, 400),
+          sessionId: generateSuperAgentSessionId(randomUUID()),
+          userOpenId: ctx.user.openId,
+          isDefault: false,
+        })),
+      );
+      rows = await listSuperAgentsForUser(ctx.user.openId);
+    }
+
     return sortSuperAgentsByActivity(rows.map(serialize));
   }),
 
