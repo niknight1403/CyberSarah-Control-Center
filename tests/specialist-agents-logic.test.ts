@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SPECIALIST_AGENT_SEEDS,
   buildSpecialistAgentContext,
+  isBuiltInSpecialistName,
   missingSpecialistAgentSeeds,
 } from "../lib/specialist-agents-logic";
 
@@ -34,6 +35,12 @@ describe("specialist agent profiles", () => {
     expect(context).toContain("Programming Agent");
     expect(context).toContain("Implementiert und verifiziert Produktionscode.");
     expect(context).toContain("erweitert aber niemals Tool-Rechte");
+  });
+
+  it("recognizes protected built-in names case-insensitively", () => {
+    expect(isBuiltInSpecialistName("Ultra Orchestrator")).toBe(true);
+    expect(isBuiltInSpecialistName("security agent")).toBe(true);
+    expect(isBuiltInSpecialistName("Elara")).toBe(false);
   });
 
   it("does not inject an empty profile", () => {
