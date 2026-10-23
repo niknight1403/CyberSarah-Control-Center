@@ -1,0 +1,38 @@
+name: OpenHands Runtime Self-Heal
+
+on:
+  push:
+    branches:
+      - main
+      - fix/autonomy-runtime-drafts-2026-10-23
+    paths:
+      - scripts/openhands-runtime-self-heal.sh
+      - .github/workflows/openhands-runtime-self-heal.yml
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["OpenHands Autonomous Deploy"]
+    types: [completed]
+
+concurrency:
+  group: openhands-runtime-self-heal
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  repair-and-smoke:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH einrichten
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+          ssh-keyscan -H 167.233.196.20 >> ~/.ssh/known_hosts 2>/dev/null
+      - name: OpenHands Runtime reparieren und End-to-End testen
+        run: |
+          ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new root@167.233.196.20 'bash -s' < scripts/openhands-runtime-self-heal.sh

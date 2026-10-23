@@ -123,6 +123,10 @@ async function persistAutopilotDraftsAtomic(
         baseline: opportunity.baseline,
         target: opportunity.target,
         score: opportunity.score,
+        experiment: opportunity.experiment,
+        unit: opportunity.unit,
+        targetValue: opportunity.targetValue,
+        currentValue: opportunity.currentValue,
       };
       await tx.insert(draftQueue).values({
         kind: "revenue-loop",
