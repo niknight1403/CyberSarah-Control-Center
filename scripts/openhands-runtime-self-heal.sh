@@ -26,6 +26,21 @@ rm -rf /root/.npm/_cacache /root/.cache/pip /tmp/openhands-* /tmp/bx 2>/dev/null
 
 FREE_KB="$(df -Pk /var/lib/docker | awk 'NR==2 {print $4}')"
 echo "Freier Docker-Speicher nach Cleanup: $((FREE_KB / 1024)) MB"
+
+# 38-GB-Host: das 7B-Modell belegt ~4.7 GB. Fuer Local-First-Routine reicht
+# 1.5B; komplexe Aufgaben bleiben auf der bereits vorhandenen Free-Cloud-Kaskade.
+if [ "$FREE_KB" -lt 7340032 ] && command -v ollama >/dev/null 2>&1; then
+  if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx 'qwen2.5-coder:7b'; then
+    echo "Ressourcenprofil: qwen2.5-coder:7b -> 1.5b (Local-First bleibt erhalten)"
+    ollama rm qwen2.5-coder:7b >/dev/null
+  fi
+  if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx 'qwen2.5-coder:latest'; then
+    ollama rm qwen2.5-coder:latest >/dev/null
+  fi
+  FREE_KB="$(df -Pk /var/lib/docker | awk 'NR==2 {print $4}')"
+  echo "Freier Speicher nach Modell-Rebalancing: $((FREE_KB / 1024)) MB"
+fi
+
 if [ "$FREE_KB" -lt 7340032 ]; then
   echo "Zu wenig freier Speicher fuer die 5+ GB Runtime plus Extraktion."
   docker system df || true
@@ -40,6 +55,18 @@ fi
 
 echo "Passendes OpenHands-0.28-Runtime-Image vorladen ..."
 docker pull "$RUNTIME_IMAGE" >/dev/null
+
+if command -v ollama >/dev/null 2>&1; then
+  if ! ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx 'qwen2.5-coder:1.5b'; then
+    ollama pull qwen2.5-coder:1.5b >/dev/null
+  fi
+  ENV_FILE=/opt/openhands/.env
+  if [ -f "$ENV_FILE" ]; then
+    sed -i 's/^OLLAMA_MODEL=.*/OLLAMA_MODEL=qwen2.5-coder:1.5b/' "$ENV_FILE"
+    sed -i 's/^AI_OLLAMA_MODEL=.*/AI_OLLAMA_MODEL=qwen2.5-coder:1.5b/' "$ENV_FILE"
+    sed -i 's#^ACTIVE_LLM_MODEL=ollama/qwen2\.5-coder:7b#ACTIVE_LLM_MODEL=ollama/qwen2.5-coder:1.5b#' "$ENV_FILE"
+  fi
+fi
 
 python3 - "$COMPOSE" "$RUNTIME_IMAGE" <<'PY'
 from pathlib import Path
