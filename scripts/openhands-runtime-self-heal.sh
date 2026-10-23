@@ -29,6 +29,12 @@ echo "Freier Docker-Speicher nach Cleanup: $((FREE_KB / 1024)) MB"
 if [ "$FREE_KB" -lt 7340032 ]; then
   echo "Zu wenig freier Speicher fuer die 5+ GB Runtime plus Extraktion."
   docker system df || true
+  echo "== Dateisysteme =="
+  df -hT || true
+  echo "== Groesste Root-Verzeichnisse =="
+  du -xhd1 / 2>/dev/null | sort -h | tail -15 || true
+  echo "== Blockgeraete =="
+  lsblk -f || true
   exit 1
 fi
 
