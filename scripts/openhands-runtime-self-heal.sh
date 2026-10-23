@@ -3,7 +3,7 @@ set -euo pipefail
 
 COMPOSE=/opt/openhands/docker-compose.yml
 APP_CONTAINER=openhands-autonomous-app
-RUNTIME_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.28-nikolaik
+RUNTIME_IMAGE=ghcr.io/all-hands-ai/runtime:0.28-nikolaik
 BASE=http://localhost:3001
 WORKSPACE=/opt/openhands/workspace
 RESULT="$WORKSPACE/openhands-runtime-smoke.txt"
