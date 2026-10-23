@@ -76,7 +76,8 @@ describe("Sprint 156: Dashboard-View-Model", () => {
     expect(mapChatStatus({ providersConfigured: 0 }).status).toBe("unavailable");
     expect(chatStatusCopy.unavailable).toBe("Kein Provider verfügbar");
     expect(mapChatStatus({ providersConfigured: null }).status).toBe("unknown");
-    expect(mapChatStatus({ providersConfigured: 2 }).status).toBe("configured");\n    expect(chatStatusCopy.configured).toBe("Provider konfiguriert");
+    expect(mapChatStatus({ providersConfigured: 2 }).status).toBe("configured");
+    expect(chatStatusCopy.configured).toBe("Provider konfiguriert");
     expect(mapChatStatus({ providersConfigured: 2, activeProvider: "OpenAI", activeModel: "gpt-4o-mini" })).toEqual({
       status: "ready",
       provider: "OpenAI",
