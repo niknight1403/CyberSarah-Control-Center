@@ -23,6 +23,7 @@ docker image prune -af >/dev/null 2>&1 || true
 apt-get clean >/dev/null 2>&1 || true
 journalctl --vacuum-size=100M >/dev/null 2>&1 || true
 rm -rf /root/.npm/_cacache /root/.cache/pip /tmp/openhands-* /tmp/bx 2>/dev/null || true
+rm -f /usr/share/ollama/.ollama/models/blobs/*-partial 2>/dev/null || true
 
 FREE_KB="$(df -Pk /var/lib/docker | awk 'NR==2 {print $4}')"
 echo "Freier Docker-Speicher nach Cleanup: $((FREE_KB / 1024)) MB"
@@ -31,7 +32,7 @@ echo "Freier Docker-Speicher nach Cleanup: $((FREE_KB / 1024)) MB"
 # 1.5B; komplexe Aufgaben bleiben auf der bereits vorhandenen Free-Cloud-Kaskade.
 if [ "$FREE_KB" -lt 7340032 ] && command -v ollama >/dev/null 2>&1; then
   if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx 'qwen2.5-coder:7b'; then
-    echo "Ressourcenprofil: qwen2.5-coder:7b -> 1.5b (Local-First bleibt erhalten)"
+    echo "Ressourcenprofil: lokales 7B-Modell entfernen; Self-hosted/Free-Failover uebernimmt LLM-Routing"
     ollama rm qwen2.5-coder:7b >/dev/null
   fi
   if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx 'qwen2.5-coder:latest'; then
@@ -56,18 +57,9 @@ fi
 echo "Passendes OpenHands-0.28-Runtime-Image vorladen ..."
 docker pull "$RUNTIME_IMAGE" >/dev/null
 
-if command -v ollama >/dev/null 2>&1; then
-  if ! ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx 'qwen2.5-coder:1.5b'; then
-    ollama pull qwen2.5-coder:1.5b >/dev/null
-  fi
-  ENV_FILE=/opt/openhands/.env
-  if [ -f "$ENV_FILE" ]; then
-    sed -i 's/^OLLAMA_MODEL=.*/OLLAMA_MODEL=qwen2.5-coder:1.5b/' "$ENV_FILE"
-    sed -i 's/^AI_OLLAMA_MODEL=.*/AI_OLLAMA_MODEL=qwen2.5-coder:1.5b/' "$ENV_FILE"
-    sed -i 's#^ACTIVE_LLM_MODEL=ollama/qwen2\.5-coder:7b#ACTIVE_LLM_MODEL=ollama/qwen2.5-coder:1.5b#' "$ENV_FILE"
-  fi
-fi
-
+# Kein zweites lokales Modell auf dem 38-GB-Host nachladen: die vorhandene
+# Remote-Ollama/Free-Cloud-Kaskade liefert das LLM, die Runtime bleibt lokal.
+rm -f /usr/share/ollama/.ollama/models/blobs/*-partial 2>/dev/null || true
 python3 - "$COMPOSE" "$RUNTIME_IMAGE" <<'PY'
 from pathlib import Path
 import re, sys
