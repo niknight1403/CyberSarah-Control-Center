@@ -15,6 +15,23 @@ case "$APP_IMAGE" in
   *) echo "Unerwartete OpenHands-Version: $APP_IMAGE"; exit 1 ;;
 esac
 
+echo "Docker-Speicher fuer die Runtime vorbereiten ..."
+docker ps -aq --filter name=openhands-runtime- | xargs -r docker rm -f >/dev/null 2>&1 || true
+docker container prune -f >/dev/null 2>&1 || true
+docker builder prune -af >/dev/null 2>&1 || true
+docker image prune -af >/dev/null 2>&1 || true
+apt-get clean >/dev/null 2>&1 || true
+journalctl --vacuum-size=100M >/dev/null 2>&1 || true
+rm -rf /root/.npm/_cacache /root/.cache/pip /tmp/* 2>/dev/null || true
+
+FREE_KB="$(df -Pk /var/lib/docker | awk 'NR==2 {print $4}')"
+echo "Freier Docker-Speicher nach Cleanup: $((FREE_KB / 1024)) MB"
+if [ "$FREE_KB" -lt 7340032 ]; then
+  echo "Zu wenig freier Speicher fuer die 5+ GB Runtime plus Extraktion."
+  docker system df || true
+  exit 1
+fi
+
 echo "Passendes OpenHands-0.28-Runtime-Image vorladen ..."
 docker pull "$RUNTIME_IMAGE" >/dev/null
 
