@@ -15,7 +15,7 @@ on:
 
 concurrency:
   group: openhands-runtime-self-heal
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
