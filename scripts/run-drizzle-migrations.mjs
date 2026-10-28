@@ -18,6 +18,7 @@ try{
   console.log("[db-migrate] Drizzle-Migrationen erfolgreich angewendet.");
 }catch(error){
   const e=error instanceof Error?error:new Error(String(error));
+  const cause=e.cause&&typeof e.cause==="object"?e.cause:null;
   const details={
     name:e.name,
     message:e.message,
@@ -27,6 +28,17 @@ try{
     table:e.table,
     column:e.column,
     constraint:e.constraint,
+    cause:cause?{
+      name:cause.name,
+      message:cause.message,
+      code:cause.code,
+      detail:cause.detail,
+      hint:cause.hint,
+      schema:cause.schema,
+      table:cause.table,
+      column:cause.column,
+      constraint:cause.constraint,
+    }:null,
   };
   console.error("[db-migrate] Migration fehlgeschlagen:",maskSecrets(JSON.stringify(details)));
   process.exitCode=1;
