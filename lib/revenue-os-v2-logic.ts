@@ -34,7 +34,7 @@ export function allocatePersonaBudget(metrics: PersonaMetric[]): BudgetAllocatio
     const conversion=ratio(m.conversions,m.leads)??0;
     const revenue=m.revenueCents/10000;
     const confidence=Math.min(1,Math.log10(Math.max(10,m.impressions))/4);
-    const affinityScore=clamp((engagement*25+ctr*25+lead*20+conversion*20+Math.min(1,revenue)*10)*100*confidence);
+    const affinityScore=clamp((engagement*25+ctr*25+lead*20+conversion*20+Math.min(1,revenue)*10)*confidence);
     return {...m,affinityScore};
   });
   const floor=0.05;
