@@ -258,8 +258,8 @@ describe("Sprint 374 — Kritische Pfade & Test-Lücken (Serie J)", () => {
       expect(DRAFT_KINDS).toContain("revenue-loop");
       expect(DRAFT_KINDS).toContain("idea");
       expect(DRAFT_MAX_PENDING_PER_KIND).toBe(6);
-      expect(DRAFT_MAX_PENDING_BY_KIND.content).toBe(12);
-      expect(DRAFT_MAX_PENDING_BY_KIND.idea).toBe(6);
+      expect(DRAFT_MAX_PENDING_BY_KIND.content).toBe(24);
+      expect(DRAFT_MAX_PENDING_BY_KIND.idea).toBe(12);
     });
 
     it("validateDraftPayload prüft ContentDraftPayload valide", () => {
@@ -310,7 +310,7 @@ describe("Sprint 374 — Kritische Pfade & Test-Lücken (Serie J)", () => {
       expect(revPlan?.slots).toBe(3);
       expect(revPlan?.reason).toBe("quota");
 
-      expect(ideaPlan?.slots).toBe(6);
+      expect(ideaPlan?.slots).toBe(12);
       expect(ideaPlan?.reason).toBe("quota");
     });
   });

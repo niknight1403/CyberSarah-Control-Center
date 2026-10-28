@@ -85,16 +85,22 @@ async function defaultDraftLlm(messages: Message[]): Promise<string> {
 }
 
 /** Taeglich rotierende Themen-Samen — deterministisch, kein Zufall. */
-const CONTENT_TOPIC_SEEDS = [
+export const CONTENT_TOPIC_SEEDS = [
   "KI-Agenten im Alltag: was heute schon funktioniert",
   "Wie kleine Teams mit Automatisierung Zeit gewinnen",
   "Ehrliche Einblicke in den Aufbau eines digitalen Produkts",
   "Produktivität ohne Burnout: Systeme statt Disziplin",
   "Geld verstehen: Risiken zuerst denken",
   "Creator-Wirtschaft: Aufmerksamkeit planbar machen",
+  "Community-Aufbau: aus Zuschauern aktive Teilnehmer machen",
+  "Short-Video-Hooks: Neugier ohne Clickbait erzeugen",
+  "Vertrauen durch transparente KI-Kommunikation aufbauen",
+  "Social SEO: Inhalte fuer Suche und Empfehlungen strukturieren",
+  "Content-Serien: Wiedererkennung und Bindung systematisch steigern",
+  "Audience Affinity: Themen enger an echte Zielgruppenprobleme koppeln",
 ] as const;
 
-const CONTENT_PLATFORMS = ["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"] as const;
+export const CONTENT_PLATFORMS = ["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"] as const;
 
 function seedIndexForDay(nowMs: number, offset: number): number {
   return Math.floor(nowMs / 86_400_000 + offset) % CONTENT_TOPIC_SEEDS.length;
@@ -166,14 +172,15 @@ export async function insertPendingDraft(kind: DraftKind, title: string, payload
 }
 
 async function generateContentDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const persona = INFLUENCER_PERSONAS[(Math.floor(nowMs / 86_400_000) + slotOffset) % INFLUENCER_PERSONAS.length];
-  const platform = CONTENT_PLATFORMS[slotOffset % CONTENT_PLATFORMS.length];
+  const persona = INFLUENCER_PERSONAS[slotOffset % INFLUENCER_PERSONAS.length];
+  const platformRound = Math.floor(slotOffset / INFLUENCER_PERSONAS.length);
+  const platform = CONTENT_PLATFORMS[(slotOffset + platformRound) % CONTENT_PLATFORMS.length];
   const topic = CONTENT_TOPIC_SEEDS[seedIndexForDay(nowMs, slotOffset)];
   const prompt = [
     buildInfluencerPrompt(persona, topic, platform),
     "Der Content muss den KI-Charakter transparent halten und darf keine erfundenen persoenlichen Erlebnisse enthalten.",
     'Antworte NUR mit einem JSON-Objekt: {"personaId": "' + persona.id + '", "platform": "' + platform + '", "topic": "<Thema>", "content": "<fertiger Content>"}',
-  ].join("\n");
+  ].join("\\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
   if (!parsed) return { ok: false, reason: "Content-LLM lieferte kein auswertbares JSON." };
@@ -203,7 +210,7 @@ async function generateRevenueLoopDraft(
     "Vollstaendig ehrlich: keine erfundenen Zahlen, keine garantierten Einnahmen.",
     "Der Entwurf bleibt bis zur Freigabe rein planerisch.",
     "Antworte NUR mit einem JSON-Objekt: {\"hub\": \"" + hub + "\", \"name\": \"<Kurzname>\", \"hypothesis\": \"<1-2 Saetze Hypothese>\", \"stages\": [\"<Stufe 1>\", \"<Stufe 2>\", \"<Stufe 3>\"], \"experiment\": \"<konkreter Test, mindestens 10 Zeichen>\", \"metric\": \"<Erfolgsmetrik>\", \"unit\": \"<Einheit>\", \"targetValue\": <positive Zahl>, \"currentValue\": 0}",
-  ].join("\n");
+  ].join("\\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
   if (!parsed) return { ok: false, reason: "Revenue-Loop-LLM lieferte kein auswertbares JSON." };
@@ -222,7 +229,7 @@ async function generateIdeaDraft(llm: (messages: Message[]) => Promise<string>, 
     "Du bist der Ideen-Scout des CyberSarah Control Centers (KI-Assistent-App mit Chat, Superagenten, Revenue-OS und Ideen-Inbox).",
     "Schlage EINE konkrete Produkt- oder Feature-Idee vor, die in unter 2 Wochen umsetzbar waere.",
     "Antworte NUR mit einem JSON-Objekt: {\"note\": \"<Idee in einem Satz>\", \"rationale\": \"<Warum diese Idee jetzt: 1-2 Saetze>\"}",
-  ].join("\n");
+  ].join("\\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
   if (!parsed) return { ok: false, reason: "Ideen-LLM lieferte kein auswertbares JSON." };
@@ -262,7 +269,7 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
     const missingRevenueHubs = entry.kind === "revenue-loop"
       ? REVENUE_HUBS.filter((hub) => !coverage!.revenueHubs.has(hub))
       : [];
-    const perRunLimit = entry.kind === "content" ? INFLUENCER_PERSONAS.length : entry.kind === "idea" ? 2 : missingRevenueHubs.length;
+    const perRunLimit = entry.kind === "content" ? INFLUENCER_PERSONAS.length * 2 : entry.kind === "idea" ? 4 : missingRevenueHubs.length;
     const slots = entry.kind === "revenue-loop"
       ? Math.min(entry.slots, missingRevenueHubs.length)
       : Math.min(entry.slots, perRunLimit);
