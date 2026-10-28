@@ -14,8 +14,8 @@ import { useGlassTheme } from "@/lib/design/future-glass-runtime";
 
 /**
  * Die Routen bleiben als Expo-Router-Segmente erhalten, aber die mobile
- * Bottom-Tab-Bar ist bewusst deaktiviert. Die Navigation wird über das
- * Top-Menü geöffnet und reserviert keinen Platz am unteren Bildschirmrand.
+ * Bottom-Tab-Bar ist auf Smartphones für fünf Kernbereiche aktiviert.
+ * Auf großen Web-Viewports bleibt die bestehende Sidebar erhalten.
  */
 export default function TabLayout() {
   const glass = useGlassTheme();
@@ -49,13 +49,13 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
         tabBarItemStyle: { flex: 1, minWidth: 0 },
         tabBarIconStyle: { height: 24 },
-        tabBarStyle: { display: "none" },
+        tabBarStyle: wide ? { display: "none" } : { backgroundColor: "#11182C", borderTopColor: "#1F4561", borderTopWidth: 1, height: 64, paddingTop: 5, paddingBottom: 7 },
       }}
     >
         <Tabs.Screen
           name="dashboard"
           options={{
-            title: "Übersicht",
+            title: "Home",
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="cyan"><IconSymbol size={22} name="house.fill" color={color} /></GlassTabIcon>
             ),
@@ -65,6 +65,7 @@ export default function TabLayout() {
           name="business"
           options={{
             title: "Business",
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="blue"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
             ),
@@ -73,8 +74,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="revenue-os"
           options={{
-            title: "Revenue OS",
-            href: null,
+            title: "Autopilot",
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
             ),
@@ -103,8 +103,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="media-studio"
           options={{
-            title: "Medien-Studio",
-            href: null,
+            title: "Content",
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="video.fill" color={color} /></GlassTabIcon>
             ),
@@ -176,6 +175,7 @@ export default function TabLayout() {
           name="chat"
           options={{
             title: "Chat",
+            href: null,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="cyan"><IconSymbol size={22} name="message.fill" color={color} /></GlassTabIcon>
             ),
@@ -184,7 +184,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="agent"
           options={{
-            title: "Agent",
+            title: "KI",
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="sparkles" color={color} /></GlassTabIcon>
             ),
@@ -225,7 +225,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="account"
           options={{
-            title: "Konto",
+            title: "Mehr",
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="cyan"><IconSymbol size={22} name="person.crop.circle" color={color} /></GlassTabIcon>
             ),
