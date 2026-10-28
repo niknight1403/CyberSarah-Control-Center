@@ -31,6 +31,9 @@ describe("Revenue Autopilot", () => {
     const opportunities = buildRevenueOpportunities(base);
     expect(opportunities.some((item) => item.key === "instrumentation.funnel")).toBe(true);
     expect(revenueAutopilotStatus(opportunities)).toBe("instrument");
+    const instrumentation = opportunities.find((item) => item.key === "instrumentation.funnel");
+    expect(instrumentation).toMatchObject({ unit: "Event-Buckets", targetValue: 1, currentValue: 0 });
+    expect(instrumentation?.experiment.length).toBeGreaterThan(10);
   });
 
   it("erzeugt keine Funnel-Luecke, wenn interne Ziele erreicht sind", () => {
@@ -61,6 +64,10 @@ describe("Revenue Autopilot", () => {
     expect(stripe?.hub).toBe("saas");
     expect(stripe?.score).toBeGreaterThan(0);
     expect(stripe?.evidence).toBe("medium");
+    expect(stripe?.experiment.length).toBeGreaterThan(10);
+    expect(stripe?.unit).toBe("%");
+    expect(stripe?.targetValue).toBe(70);
+    expect(stripe?.currentValue).toBe(30);
   });
 
   it("nutzt echte Affiliate- und Cross-Sell-Signale", () => {
