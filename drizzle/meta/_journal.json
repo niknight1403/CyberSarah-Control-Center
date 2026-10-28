@@ -127,6 +127,13 @@
       "when": 1793160000000,
       "tag": "0017_agentforge_mesh",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793188000000,
+      "tag": "0018_b2b_influencer_learning",
+      "breakpoints": true
     }
   ]
 }
