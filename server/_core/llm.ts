@@ -330,17 +330,18 @@ const localLlmCandidates = (): LocalLlmCandidate[] => {
 
 /** Erreichbarkeits-Probe gegen den OpenAI-kompatiblen /models-Endpoint. */
 async function probeLocalLlmEndpoint(baseUrl: string, apiKey?: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4_000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4_000);
     const response = await fetch(`${baseUrl}/models`, {
       signal: controller.signal,
       headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
     });
-    clearTimeout(timer);
     return response.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
