@@ -11,6 +11,7 @@ import {
   allocatePersonaBudget, buildOneClickBusinessBrief, decideExperiment, deriveSystemState, evaluateCommercial, optimizeGrowthPortfolio, planContentFactory,
   profitGuard, summarizeAttribution, type AttributionEvent, type PersonaMetric,
 } from "../lib/revenue-os-v2-logic";
+import { compoundGrowthHealth, detectCreativeFatigue, diagnoseFunnel, prioritizeGrowthSignals } from "../lib/revenue-compounding-logic";
 
 const jsonObject=(text:string):Record<string,unknown>|null=>{
   const clean=text.trim().replace(/^\`\`\`(?:json)?\s*/i,"").replace(/\`\`\`\s*$/,"");
@@ -73,6 +74,25 @@ export async function revenueOsV2Overview(){
       costCents,
     };
   }));
+  const funnelIntelligence=diagnoseFunnel([
+    {key:"landing-signup",entrants:snapshot.landingViews??0,completions:snapshot.signups??0},
+    {key:"signup-checkout",entrants:snapshot.signups??0,completions:snapshot.checkoutStarts??0},
+    {key:"checkout-upgrade",entrants:snapshot.checkoutStarts??0,completions:snapshot.upgrades??0},
+  ]);
+  const midpoint=new Date(Date.now()-15*86_400_000);
+  const creativeKeys=[...new Set(events.map(e=>e.contentId).filter(Boolean))];
+  const creativeHealth=detectCreativeFatigue(creativeKeys.map(creativeKey=>{
+    const current=events.filter(e=>e.contentId===creativeKey&&e.occurredAt>=midpoint);
+    const previous=events.filter(e=>e.contentId===creativeKey&&e.occurredAt<midpoint);
+    const metric=(rows:typeof events)=>{
+      const impressions=rows.filter(e=>e.eventType==="impression").length;
+      const clicks=rows.filter(e=>e.eventType==="click").length;
+      const conversions=rows.filter(e=>e.eventType==="purchase").length;
+      return {impressions,clicks,conversions,ctrPct:impressions?clicks/impressions*100:null,conversionRatePct:clicks?conversions/clicks*100:null};
+    };
+    const now=metric(current),before=metric(previous);
+    return {creativeKey,impressions:now.impressions,clicks:now.clicks,conversions:now.conversions,previousCtrPct:before.ctrPct,previousConversionRatePct:before.conversionRatePct};
+  })).sort((a,b)=>(b.fatiguePct??-1)-(a.fatiguePct??-1));
   const activeOffers=offers.filter(o=>o.status==="active");
   const blockedJobs=jobs.filter(j=>j.status==="blocked");
   const deferredJobs=jobs.filter(j=>j.status==="deferred");
@@ -88,7 +108,15 @@ export async function revenueOsV2Overview(){
   const revenueCents=attribution.revenueCents+Math.round((snapshot.mrrEur??0)*100);
   const cost=(category:string)=>costs.filter(e=>e.category===category).reduce((sum,e)=>sum+Math.max(0,e.amountCents),0);
   const guard=profitGuard({revenueCents,variableCostCents:cost("variable")+cost("ads"),apiCostCents:cost("api"),refundsCents:Math.abs(attrEvents.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0))+cost("refund"),customers:attribution.purchases,leads:attribution.leads});
-  return {system,snapshot,attribution,budget,growthPortfolio,providerCircuits:circuits,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
+  const measuredFunnel=funnelIntelligence.filter(item=>item.entrants>=20);
+  const funnelHealthPct=measuredFunnel.length?Number((measuredFunnel.reduce((sum,item)=>sum+(item.conversionRatePct??0),0)/measuredFunnel.length).toFixed(2)):null;
+  const growthPriorities=prioritizeGrowthSignals([
+    ...funnelIntelligence.filter(item=>item.action==="FIX"||item.action==="TEST").map(item=>({key:`funnel.${item.key}`,impact:item.severity,confidence:Math.min(1,item.entrants/200),effort:25,risk:10,evidence:`${item.lost} measured drop-offs`})),
+    ...creativeHealth.filter(item=>item.action==="REFRESH"||item.action==="ITERATE").map(item=>({key:`creative.${item.creativeKey}`,impact:item.fatiguePct??20,confidence:Math.min(1,item.impressions/1000),effort:20,risk:5,evidence:`fatigue ${item.fatiguePct??"unknown"}%`})),
+    ...growthPortfolio.filter(item=>item.action==="SCALE"||item.action==="HOLD").map(item=>({key:`channel.${item.channelKey}`,impact:item.score,confidence:item.confidence,effort:15,risk:item.action==="HOLD"?85:15,evidence:`${item.action} from measured reach/profit`,requiresApproval:true})),
+  ]);
+  const compoundingHealth=compoundGrowthHealth({netProfitCents:guard.netProfitCents,retentionRatePct:null,incrementalLiftPct:null,funnelHealthPct,organicSharePct:null});
+  return {system,snapshot,attribution,budget,growthPortfolio,growthIntelligence:{funnel:funnelIntelligence,creativeHealth,growthPriorities,compoundingHealth,measurementGaps:{retention:"customer cohort/cancellation history required",incrementality:"exposed + holdout cohorts required",referral:"invite/referral events required"}},providerCircuits:circuits,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
 }
 
 export async function recordRevenueAttribution(input:{eventKey:string;personaId:string;contentId:string;platform:string;eventType:AttributionEvent["eventType"];valueCents?:number}){
