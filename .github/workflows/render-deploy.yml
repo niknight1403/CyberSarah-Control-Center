@@ -117,6 +117,10 @@ jobs:
           TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
           TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGISTORE24_API_KEY: ${{ secrets.DIGISTORE24_API_KEY }}
+          DIGISTORE24_IPN_SECRET: ${{ secrets.DIGISTORE24_IPN_SECRET }}
+          DIGISTORE24_IPN_PASSPHRASE: ${{ secrets.DIGISTORE24_IPN_PASSPHRASE }}
+          DIGISTORE24_AFFILIATE_ID: ${{ secrets.DIGISTORE24_AFFILIATE_ID }}
           # Sprint 367: Publishing-Tokens (optional — leere Secrets bleiben
           # leer, die Modus-Aufloesung ignoriert inaktive Plattformen).
           X_PUBLISH_TOKEN: ${{ secrets.X_PUBLISH_TOKEN }}
@@ -189,4 +193,8 @@ jobs:
           TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
           TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DIGISTORE24_API_KEY: ${{ secrets.DIGISTORE24_API_KEY }}
+          DIGISTORE24_IPN_SECRET: ${{ secrets.DIGISTORE24_IPN_SECRET }}
+          DIGISTORE24_IPN_PASSPHRASE: ${{ secrets.DIGISTORE24_IPN_PASSPHRASE }}
+          DIGISTORE24_AFFILIATE_ID: ${{ secrets.DIGISTORE24_AFFILIATE_ID }}
         run: node scripts/render-deploy.mjs --domain
