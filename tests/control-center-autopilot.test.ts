@@ -8,10 +8,20 @@ describe("control center autopilot", () => {
     generated: { content: 6, idea: 2, "revenue-loop": 1 },
     skipped: [],
   }));
+  const learnInfluencers = vi.fn(async () => ({
+    evolutions: [{ personaId: "juno" }],
+    plan: { queue: [{ personaId: "juno", dimension: "platform", value: "linkedin" }] },
+    windowDays: 30,
+  })) as never;
+  const b2bOverview = vi.fn(async () => ({
+    counts: { nodes: 12, edges: 9, qualified: 3, customers: 2, partners: 2, optedOut: 0 },
+    priorities: [], edges: [], autonomy: { discoveryAndScoring: true, unsolicitedOutreach: false, externalSendRequiresApproval: true },
+  })) as never;
+  const growthDeps = { learnInfluencers, b2bOverview };
 
   it("orchestriert echte Scans, Revenue und Drafts in einem Lauf", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
-    const result = await runControlCenterAutopilot({ scan, revenue, drafts });
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts, ...growthDeps });
     expect(scan).toHaveBeenCalledWith("hara/scan");
     expect(scan).toHaveBeenCalledWith("expansion/scan");
     expect(revenue).toHaveBeenCalledWith(5);
@@ -20,13 +30,15 @@ describe("control center autopilot", () => {
     expect(result.deferred).toEqual([]);
     expect(result.realActions.join(" ")).toContain("Creator-Content");
     expect(result.realActions.join(" ")).toContain("Revenue");
+    expect(result.growth).toMatchObject({ influencerPersonasLearned: 1, influencerExperimentsQueued: 1, b2bNodes: 12, b2bQualified: 3, b2bPartners: 2 });
+    expect(result.realActions.join(" ")).toContain("Influencer-Personas");
     expect(result.decision.action).toBe("VERIFY");
   });
 
   it("behandelt Provider-Quota ehrlich als verschobene Arbeit", async () => {
     const limitedDrafts = vi.fn(async () => ({ plan: [], generated: {}, skipped: [{ kind: "content" as const, reason: "LLM 429 Too Many Requests quota exceeded" }] }));
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
-    const result = await runControlCenterAutopilot({ scan, revenue, drafts: limitedDrafts });
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts: limitedDrafts, ...growthDeps });
     expect(result.ok).toBe(false);
     expect(result.deferred.join(" ")).toContain("429");
     expect(result.blocked).toEqual([]);
@@ -37,7 +49,7 @@ describe("control center autopilot", () => {
     const scan = vi.fn()
       .mockRejectedValueOnce(new Error("Relay offline"))
       .mockResolvedValueOnce({ accepted: true, completed: false, background: true });
-    const result = await runControlCenterAutopilot({ scan, revenue, drafts });
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts, ...growthDeps });
     expect(result.ok).toBe(false);
     expect(result.blocked.join(" ")).toContain("Relay offline");
     expect(result.decision.action).toBe("HEAL");

@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { buildAlwaysOnInfluencerPlan,evolveInfluencerFromEvidence,prioritizeB2BNetwork } from "../lib/b2b-influencer-network-logic";
+import { buildAlwaysOnInfluencerPlan,buildB2BNetworkHealth,evolveInfluencerFromEvidence,prioritizeB2BNetwork } from "../lib/b2b-influencer-network-logic";
 
 describe("B2B growth network",()=>{
   it("blocks opted-out nodes and prioritizes trusted partners",()=>{
@@ -10,6 +10,17 @@ describe("B2B growth network",()=>{
     expect(ranked[0]).toMatchObject({key:"partner-a",action:"PARTNER"});
     expect(ranked.find(x=>x.key==="optout")).toMatchObject({score:0,action:"BLOCK"});
   });
+  it("diagnoses stale relationships and pipeline conversion",()=>{
+    const health=buildB2BNetworkHealth([
+      {key:"a",kind:"lead",fit:80,intent:70,trust:70,relationshipStrength:40,lastActivityDays:45},
+      {key:"b",kind:"customer",fit:90,intent:90,trust:90,relationshipStrength:90,lastActivityDays:2},
+    ],[
+      {stage:"qualified",strength:70},{stage:"customer",strength:90},
+    ]);
+    expect(health.staleNodes).toBe(1);
+    expect(health.customerConversion).toBe(.5);
+    expect(health.nextActions.join(" ")).toContain("Re-Qualifizierung");
+  });
 });
 
 describe("24/7 influencer evolution",()=>{
@@ -19,6 +30,8 @@ describe("24/7 influencer evolution",()=>{
       {personaId:"juno",platform:"x",pillar:"SaaS",impressions:1000,clicks:20,leads:2,conversions:0,revenueCents:0,published:5,failed:1},
     ])[0];
     expect(result.platformWeights.linkedin).toBeGreaterThan(result.platformWeights.x);
+    expect(Object.keys(result.platformWeights)).toEqual(expect.arrayContaining(["instagram","tiktok","linkedin","x","threads","bluesky"]));
+    expect(result.nextExperiments.some(x=>x.dimension==="platform"&&x.reason.includes("Exploration floor"))).toBe(true);
     expect(result.pillarWeights["B2B-Wachstum"]).toBeGreaterThan(result.pillarWeights.SaaS);
     expect(result.guardrails.join(" ")).toContain("identity");
   });

@@ -14,6 +14,8 @@ on:
       - 'app/**'
       - 'components/**'
       - 'lib/**'
+      - 'drizzle/**'
+      - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/render-deploy.yml'

@@ -16,6 +16,9 @@ export function RevenueAutopilotCard() {
     staleTime: 30_000,
     refetchInterval: 120_000,
   });
+  const b2b = trpc.growthNetwork.b2bOverview.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
+  const learning = trpc.growthNetwork.influencerLearning.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
+  const learningLoop = trpc.growthNetwork.learningLoopStatus.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 15_000, refetchInterval: 60_000 });
   const run = trpc.controlCenterAutopilot.runNow.useMutation();
   const utils = trpc.useUtils();
 
@@ -57,7 +60,27 @@ export function RevenueAutopilotCard() {
             <Metric label="MRR" value={data.snapshot.mrrEur === null ? "—" : `${data.snapshot.mrrEur.toLocaleString("de-DE", { maximumFractionDigits: 0 })} €`} />
             <Metric label="Aktive Abos" value={data.snapshot.activeSubscriptions ?? "—"} />
             <Metric label="Prioritäten" value={data.opportunities.length} />
+            <Metric label="B2B Health" value={b2b.data ? `${b2b.data.health.healthScore}/100` : "—"} />
+            <Metric label="B2B Beziehungen" value={b2b.data?.counts.edges ?? "—"} />
+            <Metric label="KI Personas" value={learning.data?.states.length ?? "—"} />
           </View>
+
+          <View style={styles.learningStrip}>
+            <StatusChip
+              label={learningLoop.data?.enabled ? (learningLoop.data.lastError ? "KI-Lernen gestört" : "KI-Lernen 24/7") : "KI-Lernen aus"}
+              accent={learningLoop.data?.lastError ? "amber" : learningLoop.data?.enabled ? "green" : "red"}
+              live={Boolean(learningLoop.data?.enabled && !learningLoop.data?.lastError)}
+            />
+            <Text style={styles.note}>
+              {learningLoop.data?.lastCompletedAt
+                ? `Letzter Lernlauf ${new Date(learningLoop.data.lastCompletedAt).toLocaleString("de-DE")} · ${learningLoop.data.personasLearned} Personas · ${learningLoop.data.experimentsQueued} Experimente`
+                : "Always-on Learning wartet auf den ersten Messzyklus."}
+            </Text>
+          </View>
+
+          {b2b.data?.health.nextActions?.[0] ? (
+            <Text style={styles.note}>B2B nächster Schritt: {b2b.data.health.nextActions[0]}</Text>
+          ) : null}
 
           <View style={styles.list}>
             {data.opportunities.length === 0 ? (
@@ -101,6 +124,9 @@ export function RevenueAutopilotCard() {
               await Promise.all([
                 utils.controlCenterAutopilot.overview.invalidate(),
                 utils.draftEngine.queue.invalidate(),
+                utils.growthNetwork.b2bOverview.invalidate(),
+                utils.growthNetwork.influencerLearning.invalidate(),
+                utils.growthNetwork.learningLoopStatus.invalidate(),
               ]);
             },
           });
@@ -143,6 +169,7 @@ function createStyles() {
     loadingRow: { alignItems: "center", flexDirection: "row", gap: 10 },
     metrics: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     list: { gap: 8 },
+    learningStrip: { gap: 8, alignItems: "flex-start" },
     opportunity: { alignItems: "flex-start", backgroundColor: `${glassSurface.border}38`, borderColor: glassSurface.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, padding: 11 },
     rank: { alignItems: "center", backgroundColor: `${glassPalette.cyan}18`, borderColor: `${glassPalette.cyan}55`, borderRadius: 10, borderWidth: 1, height: 30, justifyContent: "center", width: 30 },
     rankText: { color: glassPalette.cyan, fontSize: 12, fontWeight: "900" },

@@ -1,21 +1,31 @@
 # Enterprise Readiness Status
 
+_Last verified: 2026-10-28_
+
 ## Implemented and verified
 
-The platform currently provides an Express/tRPC backend, Drizzle ORM with MySQL schema and migrations, local account authentication plus OAuth integration, JWT/session handling, admin-aware RBAC procedures, Stripe Checkout and Billing Portal, signature-verified Stripe webhooks, provider selection with local/cloud status, provider failover, GitHub workspace operations, external-action audit emission, CI validation, PM2 deployment scripts, and mobile account/agent interfaces.
+CyberSarah Control Center uses an Express/tRPC backend, Drizzle ORM on PostgreSQL/Neon, authenticated admin procedures, Stripe Checkout/Billing Portal with signature-verified and idempotent webhooks, a provider router with local/cloud fallbacks, GitHub workspace operations, external-action audit gates, autonomous draft/revenue/control-center loops, a persistent Revenue OS v2 attribution/experiment layer, a B2B relationship graph, and persistent influencer-learning state.
 
-The HTTP entrypoint now uses an explicit CORS allowlist, security response headers, proxy-aware client addressing, and a bounded per-process rate limit. Production origins must be configured through `APP_ALLOWED_ORIGINS`; the default production behavior rejects browser origins when no allowlist is configured.
+Production is deployed through the Render workflow. The app deployment runs TypeScript validation and tests, applies Drizzle migrations against `DATABASE_URL`, updates the Render service, waits for the deploy, and verifies the public health endpoint. Migration-only changes under `drizzle/**` now trigger this workflow as well.
 
-The server-side validator `scripts/validate-production.sh` checks the protected `.env`, the public `/api/health` response, a real MySQL `SELECT 1`, the PM2 process, and the Nginx server block for `app.cybersarah-ki.com`. It must be run on the target server after secrets are installed; it cannot validate a server that is not reachable from the development workspace.
+The server exposes `/api/health` for liveness and `/api/ready` for database/deployment readiness. Readiness also reports the always-on influencer-learning loop without making a first learning cycle a boot blocker. The learning loop is independent from publishing, defaults to a 15-minute interval while the service is awake, and the scheduled Control Center Autopilot provides an additional external execution/verification path.
 
-## Infrastructure not claimed as active
+Revenue and growth automation are evidence-driven: attribution, costs, funnel/retention/LTV signals, experiments, growth-portfolio allocation, B2B scoring and influencer channel/content learning operate on persisted measurements. Unknown costs remain unknown instead of being silently treated as zero. Irreversible external actions remain approval/policy gated.
 
-Redis queues, a distributed event bus, LangGraph runtime, FastAPI service, PostgreSQL deployment, Prometheus/Grafana stack, plugin loading, automated API-key rotation, affiliate/CRM/revenue modules, and production backup orchestration are not present in the repository. They must not be represented as enabled until a concrete provider, deployment topology, data-retention policy, and operational ownership are supplied.
+## Infrastructure boundaries
 
-The current in-process rate limiter is a protective baseline for a single PM2 process. When multiple backend replicas or a queue worker are introduced, it must be replaced or backed by a shared Redis limiter and queue, with retry, dead-letter, idempotency, and shutdown semantics tested before rollout.
+Render Free can sleep when idle; therefore “24/7” means the automation is continuously configured and resumes automatically whenever the service is awake, with scheduled GitHub Actions also exercising the control loop. It must not be represented as a dedicated always-awake compute guarantee.
 
-## Required production decisions
+The repository contains in-process schedulers and persistent PostgreSQL state. Redis/distributed queues, a distributed event bus, Prometheus/Grafana and a multi-replica shared rate limiter are not claimed as active unless a concrete deployment enables them. If horizontal replicas are introduced, timers/leases, rate limits and job claims need shared coordination to prevent duplicate execution.
 
-Before enabling additional enterprise subsystems, define the canonical deployment target, replica count, Redis availability, backup destination and retention, monitoring endpoint exposure, incident owner, and secret rotation procedure. Keep MySQL unless a tested migration plan justifies PostgreSQL; introducing both databases without a migration need would create operational risk.
+CyberSarah remains the single Revenue Control Plane. Agentforge2/VillaForge is an execution plane connected through explicit telemetry/checkpoint contracts; it is not a second source of revenue truth.
 
-The current dependency audit is not clean: the package tree reports transitive high/critical advisories, including `fast-uri` and `tar`, with 140 findings in the current audit output. The application build and tests pass, but this is a release blocker for an enterprise security gate. Remediation requires a controlled dependency upgrade or override plan compatible with the Expo toolchain; do not use an unreviewed force upgrade in production.
+## Security and operational gates
+
+Secrets stay in environment/GitHub/Render secret stores and are never returned by APIs. Gitleaks, TypeScript, lint, deterministic tests/coverage, workspace startup/syntax/build checks and post-deploy live verification are release gates. Publishing, price changes, payments, destructive actions and autonomous spend remain subject to the existing external-action/approval boundaries.
+
+Dependency advisories must be evaluated from the current lockfile/CI output rather than copied from historical audit counts. Major Expo/React Native upgrades remain controlled migrations, not force-upgrade automation.
+
+## Next enterprise thresholds
+
+Before moving to multiple app replicas or materially larger autonomous workloads, add shared distributed job leases/queues, durable dead-letter handling, centralized metrics/alerts, tested backup/restore objectives and explicit incident ownership. These are scaling thresholds, not claims about the current single-service production topology.

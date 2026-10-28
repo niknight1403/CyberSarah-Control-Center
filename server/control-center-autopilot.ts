@@ -2,6 +2,7 @@ import { runDraftEngine, type DraftEngineRunResult } from "./draft-engine";
 import { runRevenueAutopilot, type RevenueAutopilotRunResult } from "./revenue-autopilot";
 import { triggerRevenueScan } from "./revenue-command-service";
 import { deriveUltraAutopilotDecision, type UltraAutopilotDecision } from "../lib/ultra-orchestrator-logic";
+import { b2bNetworkOverview, refreshInfluencerLearning } from "./growth-network-service";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -13,6 +14,13 @@ export type ControlCenterAutopilotResult = {
   };
   drafts: DraftEngineRunResult;
   revenue: RevenueAutopilotRunResult;
+  growth: {
+    influencerPersonasLearned: number;
+    influencerExperimentsQueued: number;
+    b2bNodes: number;
+    b2bQualified: number;
+    b2bPartners: number;
+  };
   realActions: string[];
   deferred: string[];
   blocked: string[];
@@ -24,6 +32,8 @@ export type ControlCenterAutopilotDeps = {
   scan?: typeof triggerRevenueScan;
   revenue?: typeof runRevenueAutopilot;
   drafts?: typeof runDraftEngine;
+  learnInfluencers?: typeof refreshInfluencerLearning;
+  b2bOverview?: typeof b2bNetworkOverview;
 };
 
 async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
@@ -50,10 +60,20 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   const trigger = deps.scan ?? triggerRevenueScan;
   const runRevenue = deps.revenue ?? runRevenueAutopilot;
   const runDrafts = deps.drafts ?? runDraftEngine;
+  const learnInfluencers = deps.learnInfluencers ?? refreshInfluencerLearning;
+  const getB2BOverview = deps.b2bOverview ?? b2bNetworkOverview;
 
   const [hara, expansion] = await Promise.all([scan("hara/scan", trigger), scan("expansion/scan", trigger)]);
   const revenue = await runRevenue(5);
   const drafts = await runDrafts();
+  const [learning, b2b] = await Promise.all([learnInfluencers(), getB2BOverview()]);
+  const growth = {
+    influencerPersonasLearned: learning.evolutions.length,
+    influencerExperimentsQueued: learning.plan.queue.length,
+    b2bNodes: b2b.counts.nodes,
+    b2bQualified: b2b.counts.qualified,
+    b2bPartners: b2b.counts.partners,
+  };
 
   const realActions: string[] = [];
   const deferred: string[] = [];
@@ -64,6 +84,9 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if ((drafts.generated.idea ?? 0) > 0) realActions.push(`${drafts.generated.idea} Produktideen erzeugt`);
   if ((drafts.generated["revenue-loop"] ?? 0) > 0) realActions.push(`${drafts.generated["revenue-loop"]} Revenue-Loop-Entwürfe erzeugt`);
   if (revenue.generated > 0) realActions.push(`${revenue.generated} datenbasierte Revenue-Experimente erzeugt`);
+  if (growth.influencerPersonasLearned > 0) realActions.push(`${growth.influencerPersonasLearned} Influencer-Personas aus Live-Signalen weiterentwickelt`);
+  if (growth.influencerExperimentsQueued > 0) realActions.push(`${growth.influencerExperimentsQueued} Influencer-Lernexperimente priorisiert`);
+  if (growth.b2bQualified > 0) realActions.push(`${growth.b2bQualified} qualifizierte B2B-Beziehungen im Netzwerk bewertet`);
   for (const item of drafts.skipped) {
     const detail = `${item.kind}: ${item.reason}`;
     if (/\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(item.reason)) deferred.push(detail);
@@ -77,6 +100,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     scans: { hara, expansion },
     drafts,
     revenue,
+    growth,
     realActions,
     deferred,
     blocked,
