@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   allocatePersonaBudget, buildOneClickBusinessBrief, decideExperiment, deriveSystemState,
-  evaluateCommercial, planContentFactory, profitGuard, summarizeAttribution,
+  evaluateCommercial, optimizeGrowthPortfolio, planContentFactory, profitGuard, summarizeAttribution,
 } from "../lib/revenue-os-v2-logic";
 import {
   providerCircuitAllows, providerCircuitSnapshot, recordProviderCircuitFailure,
@@ -22,6 +22,23 @@ describe("Revenue Autopilot 2.0 logic",()=>{
     expect(result[0].personaId).toBe("nova");
     expect(result[0].budgetShare).toBeGreaterThan(result[1].budgetShare);
     expect(result[1].budgetShare).toBeGreaterThanOrEqual(0.05);
+  });
+  it("balances winner scaling with exploration and protects known negative-profit channels",()=>{
+    const result=optimizeGrowthPortfolio([
+      {channelKey:"nova:tiktok",impressions:5000,clicks:600,leads:120,conversions:30,revenueCents:90000,costCents:15000},
+      {channelKey:"mira:instagram",impressions:50,clicks:8,leads:2,conversions:0,revenueCents:0,costCents:null},
+      {channelKey:"zara:x",impressions:1200,clicks:40,leads:5,conversions:1,revenueCents:1000,costCents:5000},
+    ]);
+    const winner=result.find(x=>x.channelKey==="nova:tiktok")!;
+    const explorer=result.find(x=>x.channelKey==="mira:instagram")!;
+    const loser=result.find(x=>x.channelKey==="zara:x")!;
+    expect(winner.action).toBe("SCALE");
+    expect(winner.allocationShare).toBeGreaterThan(explorer.allocationShare);
+    expect(winner.roas).toBe(6);
+    expect(explorer.action).toBe("EXPLORE");
+    expect(explorer.allocationShare).toBeGreaterThanOrEqual(0.05);
+    expect(loser.action).toBe("HOLD");
+    expect(loser.netProfitCents).toBeLessThan(0);
   });
   it("caps content factory at 30 real asset slots",()=>{
     expect(planContentFactory(100)).toHaveLength(30);

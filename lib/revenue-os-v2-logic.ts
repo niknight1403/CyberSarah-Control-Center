@@ -2,6 +2,27 @@ export type SystemState = "GREEN" | "DEGRADED" | "BLOCKED";
 export type RevenueSubsystem = { name: string; required: boolean; ok: boolean; deferred?: boolean; detail?: string };
 export type PersonaMetric = { personaId: string; impressions: number; engagements: number; clicks: number; leads: number; conversions: number; revenueCents: number };
 export type BudgetAllocation = PersonaMetric & { affinityScore: number; budgetShare: number };
+export type GrowthChannelMetric = {
+  channelKey: string;
+  impressions: number;
+  clicks: number;
+  leads: number;
+  conversions: number;
+  revenueCents: number;
+  costCents?: number | null;
+};
+export type GrowthPortfolioAllocation = GrowthChannelMetric & {
+  ctrPct: number | null;
+  conversionRatePct: number | null;
+  revenuePerThousandImpressionsCents: number | null;
+  netProfitCents: number | null;
+  roas: number | null;
+  confidence: number;
+  explorationBonus: number;
+  score: number;
+  allocationShare: number;
+  action: "EXPLORE" | "TEST" | "SCALE" | "HOLD";
+};
 export type CommercialInput = { priceCents: number; marginPct: number; conversionProbability: number; effortScore: number; riskScore: number; expectedReach: number };
 export type CommercialScore = CommercialInput & { expectedRevenueCents: number; expectedProfitCents: number; score: number };
 export type ProfitSnapshot = { revenueCents: number; variableCostCents: number; apiCostCents: number; refundsCents: number; customers: number; leads: number };
@@ -43,6 +64,65 @@ export function allocatePersonaBudget(metrics: PersonaMetric[]): BudgetAllocatio
   const flexible=Math.max(0,1-floor*scored.length);
   return scored.map((x,i)=>({...x,budgetShare:Number((floor+flexible*(weights[i]/sum)).toFixed(4))}))
     .sort((a,b)=>b.budgetShare-a.budgetShare);
+}
+
+export function optimizeGrowthPortfolio(metrics: GrowthChannelMetric[]): GrowthPortfolioAllocation[] {
+  if (!metrics.length) return [];
+  const totalImpressions = metrics.reduce((sum, item) => sum + Math.max(0, item.impressions), 0);
+  const floor = Math.min(0.05, 1 / metrics.length);
+  const scored = metrics.map((item) => {
+    const impressions = Math.max(0, item.impressions);
+    const clicks = Math.max(0, item.clicks);
+    const leads = Math.max(0, item.leads);
+    const conversions = Math.max(0, item.conversions);
+    const revenueCents = Math.max(0, item.revenueCents);
+    const costKnown = item.costCents !== null && item.costCents !== undefined;
+    const costCents = costKnown ? Math.max(0, item.costCents ?? 0) : null;
+    const ctr = ratio(clicks, impressions);
+    const conversionRate = ratio(conversions, Math.max(clicks, leads));
+    const rpm = ratio(revenueCents * 1000, impressions);
+    const netProfitCents = costCents === null ? null : revenueCents - costCents;
+    const roas = costCents !== null && costCents > 0 ? revenueCents / costCents : null;
+    const confidence = Math.min(1, Math.log10(impressions + 1) / 3);
+    const explorationBonus = Math.sqrt((2 * Math.log(totalImpressions + metrics.length + 1)) / (impressions + 1));
+    const reachSignal = (ctr ?? 0) * 100 * 0.25;
+    const conversionSignal = (conversionRate ?? 0) * 100 * 0.35;
+    const valueSignal = rpm === null ? 0 : Math.min(45, Math.log10(1 + Math.max(0, rpm) / 100) * 18);
+    const profitSignal = netProfitCents === null ? 0 : netProfitCents < 0 ? -25 : Math.min(15, Math.log10(1 + netProfitCents / 100) * 5);
+    const score = Math.round(clamp((reachSignal + conversionSignal + valueSignal + profitSignal) * (0.35 + 0.65 * confidence) + Math.min(20, explorationBonus * 8)));
+    const action: GrowthPortfolioAllocation["action"] =
+      impressions < 100 ? "EXPLORE" :
+      netProfitCents !== null && netProfitCents < 0 ? "HOLD" :
+      conversions > 0 && score >= 45 ? "SCALE" : "TEST";
+    return {
+      ...item,
+      impressions,
+      clicks,
+      leads,
+      conversions,
+      revenueCents,
+      costCents,
+      ctrPct: ctr === null ? null : Number((ctr * 100).toFixed(2)),
+      conversionRatePct: conversionRate === null ? null : Number((conversionRate * 100).toFixed(2)),
+      revenuePerThousandImpressionsCents: rpm === null ? null : Math.round(rpm),
+      netProfitCents,
+      roas: roas === null ? null : Number(roas.toFixed(2)),
+      confidence: Number(confidence.toFixed(4)),
+      explorationBonus: Number(explorationBonus.toFixed(4)),
+      score,
+      allocationShare: 0,
+      action,
+    };
+  });
+  const weights = scored.map((item) => Math.max(1, item.action === "HOLD" ? item.score * 0.2 : item.score));
+  const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
+  const flexible = Math.max(0, 1 - floor * scored.length);
+  return scored
+    .map((item, index) => ({
+      ...item,
+      allocationShare: Number((floor + flexible * (weights[index] / weightSum)).toFixed(4)),
+    }))
+    .sort((a, b) => b.allocationShare - a.allocationShare);
 }
 
 export function evaluateCommercial(input: CommercialInput): CommercialScore {

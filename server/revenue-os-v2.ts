@@ -8,7 +8,7 @@ import { draftQueue, revenueAttributionEvents, revenueCostEvents, revenueExperim
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import { providerCircuitSnapshot } from "../lib/provider-circuit-breaker-logic";
 import {
-  allocatePersonaBudget, buildOneClickBusinessBrief, decideExperiment, deriveSystemState, evaluateCommercial, planContentFactory,
+  allocatePersonaBudget, buildOneClickBusinessBrief, decideExperiment, deriveSystemState, evaluateCommercial, optimizeGrowthPortfolio, planContentFactory,
   profitGuard, summarizeAttribution, type AttributionEvent, type PersonaMetric,
 } from "../lib/revenue-os-v2-logic";
 
@@ -50,6 +50,29 @@ export async function revenueOsV2Overview(){
     return {personaId:p.id,impressions:own.filter(e=>e.eventType==="impression").length,engagements:0,clicks:own.filter(e=>e.eventType==="click").length,leads:own.filter(e=>e.eventType==="lead").length,conversions:own.filter(e=>e.eventType==="purchase").length,revenueCents:own.reduce((s,e)=>s+(e.eventType==="purchase"?(e.valueCents??0):e.eventType==="refund"?-(e.valueCents??0):0),0)};
   });
   const budget=allocatePersonaBudget(personaMetrics);
+  const channelKeys=[...new Set(attrEvents.map(e=>`${e.personaId}:${e.platform}`))];
+  const growthPortfolio=optimizeGrowthPortfolio(channelKeys.map(channelKey=>{
+    const [personaId,platform]=channelKey.split(":",2);
+    const own=attrEvents.filter(e=>e.personaId===personaId&&e.platform===platform);
+    const matchedCosts=costs.filter(costEvent=>{
+      const metadata=costEvent.metadata;
+      if(!metadata||typeof metadata!=="object"||Array.isArray(metadata)) return false;
+      const record=metadata as Record<string,unknown>;
+      return record.personaId===personaId&&record.platform===platform;
+    });
+    const costCents=matchedCosts.length
+      ? matchedCosts.reduce((sum,costEvent)=>sum+Math.max(0,costEvent.amountCents),0)
+      : null;
+    return {
+      channelKey,
+      impressions:own.filter(e=>e.eventType==="impression").length,
+      clicks:own.filter(e=>e.eventType==="click").length,
+      leads:own.filter(e=>e.eventType==="lead").length,
+      conversions:own.filter(e=>e.eventType==="purchase").length,
+      revenueCents:own.reduce((sum,e)=>sum+(e.eventType==="purchase"?(e.valueCents??0):e.eventType==="refund"?-(e.valueCents??0):0),0),
+      costCents,
+    };
+  }));
   const activeOffers=offers.filter(o=>o.status==="active");
   const blockedJobs=jobs.filter(j=>j.status==="blocked");
   const deferredJobs=jobs.filter(j=>j.status==="deferred");
@@ -65,7 +88,7 @@ export async function revenueOsV2Overview(){
   const revenueCents=attribution.revenueCents+Math.round((snapshot.mrrEur??0)*100);
   const cost=(category:string)=>costs.filter(e=>e.category===category).reduce((sum,e)=>sum+Math.max(0,e.amountCents),0);
   const guard=profitGuard({revenueCents,variableCostCents:cost("variable")+cost("ads"),apiCostCents:cost("api"),refundsCents:Math.abs(attrEvents.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0))+cost("refund"),customers:attribution.purchases,leads:attribution.leads});
-  return {system,snapshot,attribution,budget,providerCircuits:circuits,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
+  return {system,snapshot,attribution,budget,growthPortfolio,providerCircuits:circuits,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
 }
 
 export async function recordRevenueAttribution(input:{eventKey:string;personaId:string;contentId:string;platform:string;eventType:AttributionEvent["eventType"];valueCents?:number}){
