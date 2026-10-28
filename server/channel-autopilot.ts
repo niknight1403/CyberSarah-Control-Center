@@ -12,21 +12,30 @@ let busy=false;
 export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAutopilotSnapshot>{
   const db=await getDb(); if(!db) throw new Error("Datenbank nicht verfügbar.");
   const since=new Date(Date.now()-Math.min(90,Math.max(1,days))*86_400_000);
-  const [events,jobs,experiments,pending]=await Promise.all([
-    db.select().from(revenueAttributionEvents).where(and(eq(revenueAttributionEvents.personaId,PERSONA),gte(revenueAttributionEvents.occurredAt,since))).limit(20000),
+  const [eventRows,jobs,experiments,pending]=await Promise.all([
+    db.select({
+      impressions:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='impression')`,
+      views:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='view')`,
+      clicks:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='click')`,
+      leads:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='lead')`,
+      purchases:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='purchase')`,
+      refunds:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='refund')`,
+      purchaseCents:sql<number>`coalesce(sum(case when ${revenueAttributionEvents.eventType}='purchase' then ${revenueAttributionEvents.valueCents} else 0 end),0)`,
+      refundCents:sql<number>`coalesce(sum(case when ${revenueAttributionEvents.eventType}='refund' then ${revenueAttributionEvents.valueCents} else 0 end),0)`,
+    }).from(revenueAttributionEvents).where(and(eq(revenueAttributionEvents.personaId,PERSONA),gte(revenueAttributionEvents.occurredAt,since))),
     db.select().from(publishingJobs).where(and(eq(publishingJobs.persona,PERSONA),gte(publishingJobs.createdAt,since))).orderBy(desc(publishingJobs.createdAt)).limit(5000),
     db.select().from(revenueExperiments).where(eq(revenueExperiments.status,"learning")).limit(100),
     db.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue).where(eq(draftQueue.status,"pending")).limit(500),
   ]);
-  const count=(type:string)=>events.filter(e=>e.eventType===type).length;
-  const purchaseCents=events.filter(e=>e.eventType==="purchase").reduce((s,e)=>s+(e.valueCents??0),0);
-  const refundCents=events.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0);
+  const events=eventRows[0]??{impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,purchaseCents:0,refundCents:0};
+  const purchaseCents=Number(events.purchaseCents??0);
+  const refundCents=Number(events.refundCents??0);
   const insightImpressions=jobs.reduce((s,j)=>s+Number(j.insights?.impressions??j.insights?.reach??0),0);
   const insightViews=jobs.reduce((s,j)=>s+Number(j.insights?.views??j.insights?.plays??j.insights?.video_views??0),0);
   return {
-    impressions:Math.max(count("impression"),insightImpressions),
-    views:Math.max(events.filter(e=>e.eventType==="view").length,insightViews),
-    clicks:count("click"),leads:count("lead"),purchases:count("purchase"),refunds:count("refund"),
+    impressions:Math.max(Number(events.impressions??0),insightImpressions),
+    views:Math.max(Number(events.views??0),insightViews),
+    clicks:Number(events.clicks??0),leads:Number(events.leads??0),purchases:Number(events.purchases??0),refunds:Number(events.refunds??0),
     confirmedRevenueCents:purchaseCents-refundCents,
     published:jobs.filter(j=>j.status==="veroeffentlicht").length,
     failed:jobs.filter(j=>j.status==="fehlgeschlagen").length,
