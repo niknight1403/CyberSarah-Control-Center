@@ -51,7 +51,7 @@ try{
     console.log("[db-migrate] Drizzle-Migrationen erfolgreich angewendet.");
   }catch(error){
     const {cause}=errorDetails(error);
-    const permissionDenied=cause?.code==="42501"&&(/schema\\s+"?drizzle"?/i).test(String(cause?.schema??cause?.message??""));
+    const permissionDenied=cause?.code==="42501"&&(cause?.schema==="drizzle"||String(cause?.message??"").toLowerCase().includes("permission denied for schema drizzle"));
     if(!permissionDenied) throw error;
     console.warn("[db-migrate] Historisches drizzle-Journal ist fuer den Deploy-User nicht beschreibbar; wechsle kontrolliert auf public.");
     await bootstrapPublicJournalIfVerified();
