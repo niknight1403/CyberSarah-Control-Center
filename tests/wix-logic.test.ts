@@ -14,6 +14,7 @@ import {
   normalizeWixOrders,
   normalizeWixSiteProperties,
   normalizeWixSites,
+  selectWixSite,
 } from "../lib/wix-logic";
 
 const ACCOUNT_ID = "ae403255-f2e1-48b9-91ab-36840f6609fa";
@@ -231,5 +232,24 @@ describe("Sprint 187: Maskierung + UUID-Prüfung", () => {
     expect(isWixUuidFormat(ACCOUNT_ID)).toBe(true);
     expect(isWixUuidFormat("84e957e4079c412dbf5a816aa2f0722d")).toBe(false);
     expect(isWixUuidFormat("")).toBe(false);
+  });
+});
+
+describe("selectWixSite (automatische Site-Erkennung)", () => {
+  it("uebernimmt die einzige vorhandene Site", () => {
+    const r = selectWixSite([{ id: "b1f0c0de-1111-4222-8333-444455556666", name: "Shop" }]);
+    expect(r.status).toBe("found");
+    if (r.status === "found") expect(r.site.id).toBe("b1f0c0de-1111-4222-8333-444455556666");
+  });
+
+  it("bietet bei mehreren Sites eine Auswahl an", () => {
+    const r = selectWixSite([{ id: "a1111111-1111-4111-8111-111111111111" }, { id: "b2222222-2222-4222-8222-222222222222" }]);
+    expect(r.status).toBe("ambiguous");
+    if (r.status === "ambiguous") expect(r.candidates).toHaveLength(2);
+  });
+
+  it("meldet ein Konto ohne Sites (Fall META_SITE_NOT_FOUND)", () => {
+    expect(selectWixSite([]).status).toBe("empty");
+    expect(selectWixSite([{ name: "ohne id" }]).status).toBe("empty");
   });
 });

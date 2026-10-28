@@ -25,6 +25,7 @@ import {
   normalizeWixOrders,
   normalizeWixSiteProperties,
   normalizeWixSites,
+  selectWixSite,
   type WixFailure,
   type WixOrderSummary,
   type WixSitePropertiesSummary,
@@ -251,4 +252,67 @@ export async function fetchWixOrders(input?: {
     body: { query: { paging: { limit } } },
   });
   return normalizeWixOrders(body);
+}
+
+/** Ergebnis der automatischen Site-Erkennung. */
+export type WixSiteResolution =
+  | { status: "found"; siteId: string; source: "kv" | "env" | "auto"; name: string | null }
+  | { status: "ambiguous"; candidates: WixSiteSummary[] }
+  | { status: "empty" }
+  | { status: "error"; message: string };
+
+/**
+ * Loest die Site-ID auf: erst gesetzt (KV/Env), sonst ueber die
+ * Site-List-API des Keys. Genau eine Site wird automatisch uebernommen.
+ */
+export async function resolveWixSiteIdAuto(): Promise<WixSiteResolution> {
+  const configured = await resolveWixSiteId();
+  if (configured) return { status: "found", siteId: configured, source: "kv", name: null };
+  let sites: WixSiteSummary[] = [];
+  try {
+    sites = await fetchWixSites();
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : String(error) };
+  }
+  const selection = selectWixSite(sites);
+  if (selection.status === "empty") return { status: "empty" };
+  if (selection.status === "ambiguous") return { status: "ambiguous", candidates: selection.candidates };
+  const only = selection.site;
+  await setWixSiteId(only.id);
+  return { status: "found", siteId: only.id, source: "auto", name: only.displayName ?? only.name ?? only.domain ?? null };
+}
+
+/** Diagnose fuer die Admin-Karte: Konto, Token-Quelle, Sites, naechster Schritt. */
+export async function diagnoseWix(): Promise<{
+  accountId: string | null;
+  tokenSource: WixTokenSource;
+  configuredSiteId: string | null;
+  resolution: WixSiteResolution;
+  sites: WixSiteSummary[];
+  nextStep: string;
+}> {
+  const token = await resolveWixToken();
+  const tokenSource = await resolveWixTokenSource();
+  const accountId = resolveWixAccountId();
+  const configuredSiteId = await resolveWixSiteId();
+  const resolution = await resolveWixSiteIdAuto();
+  let sites: WixSiteSummary[] = [];
+  try {
+    sites = token ? await fetchWixSites() : [];
+  } catch {
+    sites = [];
+  }
+  let nextStep: string;
+  if (!token) {
+    nextStep = "API-Key im Wix-Dashboard des Site-Kontos erstellen (Einstellungen → API-Keys, Rolle: Wix APIs lesen) und in der Admin-Karte eintragen.";
+  } else if (resolution.status === "empty") {
+    nextStep = `Der Key gehoert zu Konto ${accountId ?? "unbekannt"}, das KEINE Sites enthaelt. Key in dem Konto erstellen, in dem die Site liegt.`;
+  } else if (resolution.status === "ambiguous") {
+    nextStep = "Der Key sieht mehrere Sites. In der Admin-Karte eine Site auswaehlen (wird dann gespeichert).";
+  } else if (resolution.status === "found") {
+    nextStep = `Aktiv: Site ${resolution.siteId}${resolution.name ? " (" + resolution.name + ")" : ""}. Properties und Orders koennen abgerufen werden.`;
+  } else {
+    nextStep = "Site-List-Abfrage fehlgeschlagen: " + (resolution as { message: string }).message;
+  }
+  return { accountId, tokenSource, configuredSiteId, resolution, sites, nextStep };
 }
