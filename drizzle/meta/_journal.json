@@ -120,6 +120,13 @@
       "when": 1793157000000,
       "tag": "0016_revenue_autopilot_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793160000000,
+      "tag": "0017_agentforge_mesh",
+      "breakpoints": true
     }
   ]
 }

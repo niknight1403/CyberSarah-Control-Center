@@ -497,3 +497,35 @@ export type RevenueJobRow = typeof revenueJobs.$inferSelect;
 export type RevenueOfferRow = typeof revenueOffers.$inferSelect;
 export type RevenueExperimentRow = typeof revenueExperiments.$inferSelect;
 export type RevenueAttributionEventRow = typeof revenueAttributionEvents.$inferSelect;
+
+/** Agentforge event ledger: metadata only; prompts and model reasoning are excluded. */
+export const agentforgeEvents = pgTable("agentforge_events", {
+  id: serial("id").primaryKey(),
+  eventId: varchar("event_id", { length: 120 }).notNull().unique(),
+  eventType: varchar("event_type", { length: 48 }).notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+}, (table) => [index("agentforge_events_type_idx").on(table.eventType, table.id)]);
+
+export const agentforgeTaskStates = pgTable("agentforge_task_states", {
+  taskId: varchar("task_id", { length: 120 }).primaryKey(),
+  state: varchar("state", { length: 32 }).notNull(),
+  agentId: varchar("agent_id", { length: 120 }),
+  lastEventId: varchar("last_event_id", { length: 120 }).notNull(),
+  errorCode: varchar("error_code", { length: 80 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("agentforge_tasks_state_idx").on(table.state, table.updatedAt)]);
+
+export const agentforgeCheckpoints = pgTable("agentforge_checkpoints", {
+  checkpointId: varchar("checkpoint_id", { length: 64 }).primaryKey(),
+  taskId: varchar("task_id", { length: 120 }).notNull(),
+  agentId: varchar("agent_id", { length: 120 }).notNull(),
+  sequence: integer("sequence").notNull(),
+  parentId: varchar("parent_id", { length: 64 }),
+  state: jsonb("state").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("agentforge_checkpoint_sequence_idx").on(table.taskId, table.agentId, table.sequence),
+  index("agentforge_checkpoints_task_idx").on(table.taskId, table.agentId, table.sequence),
+]);

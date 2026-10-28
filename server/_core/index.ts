@@ -57,6 +57,7 @@ import {
 } from "../runtime-logger";
 import { agenticLoopTelemetryBus } from "../agentic-loop-telemetry";
 import { isValidLoopSessionId } from "../../lib/agentic-loop-telemetry-logic";
+import { registerAgentforgeTelemetryRoutes } from "../agentforge-telemetry";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
   try {
