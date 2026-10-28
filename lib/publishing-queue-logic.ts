@@ -4,25 +4,25 @@
  * Datenfluss:
  *   Ein Kampagnenplan (lib/influencer-reach-logic.ts) wird in geplante
  *   Publishing-Jobs ueberfuehrt. Der Autopilot prueft, welche Jobs faellig
- *   sind, loest den Modus auf (live mit Credentials, sonst ehrlich Sandbox)
+ *   sind, loest den Modus auf (live mit Credentials, sonst blockiert)
  *   und berechnet Retry-Zeiten mit exponentiellem Backoff.
  *
  * Ehrlichkeits-Grenzen:
- *   - "sandbox_veroeffentlicht" ist KEINE echte Veroeffentlichung — der
+ *   - "blocked_veroeffentlicht" ist KEINE echte Veroeffentlichung — der
  *     Modus steht in jedem Job und wird nie als Live-Erfolg ausgegeben.
  *   - Live-Publishing braucht Nutzer-Credentials in Env-Variablen; ohne
  *     sie wird nicht getan, als waeren sie da.
  *   - Instagram (Graph-API, 2-Schritt: Container -> media_publish) und TikTok
  *     (Content-Posting-API, PULL_FROM_URL) sind vollstaendig implementiert und
  *     gehen live, wenn Token + Asset-URL vorliegen; ohne Asset bleibt es
- *     ehrlicher Sandbox-Modus mit klar benanntem Grund.
+ *     ehrlicher Blockiermodus mit klar benanntem Grund.
  */
 
 import type { CampaignPlan, InfluencerGoal } from "./influencer-reach-logic";
 
 export const PUBLISHING_STATUSES = [
   "geplant",
-  "sandbox_veroeffentlicht",
+  "blocked_veroeffentlicht",
   "veroeffentlicht",
   "fehlgeschlagen",
   "abgebrochen",
@@ -90,7 +90,7 @@ export function nextRetryAt(attempts: number, from = new Date()): Date | null {
   return new Date(from.getTime() + minutes * 60_000);
 }
 
-export type PublishingMode = "live" | "sandbox";
+export type PublishingMode = "live" | "blocked";
 
 export type ModeResolution = {
   mode: PublishingMode;
@@ -103,7 +103,7 @@ export type ModeResolution = {
  * live nur mit vollstaendigen Credentials. Text-Plattformen (X, LinkedIn,
  * Threads) brauchen nur den Token; Medien-Plattformen (Instagram, TikTok)
  * brauchen zusaetzlich ein Asset (Bild-URL bzw. gehostetes Video), sonst
- * Sandbox mit klar benanntem Grund — kein Live ohne Asset.
+ * Blockade mit klar benanntem Grund — kein Live ohne Asset.
  */
 export function resolvePublishingMode(
   platform: string,
@@ -115,52 +115,52 @@ export function resolvePublishingMode(
   const isText = (TEXT_PLATFORMS as readonly string[]).includes(platform);
 
   if (!isMedia && !isText) {
-    return { mode: "sandbox", platform, reason: `Unbekannte Plattform "${platform}" — Sandbox statt Blindflug.` };
+    return { mode: "blocked", platform, reason: `Unbekannte Plattform "${platform}" — Blockade statt Blindflug.` };
   }
   if (!cred?.token) {
     const envName = isMedia
       ? `${platform === "instagram" ? "INSTAGRAM" : "TIKTOK"}_PUBLISH_TOKEN`
       : `${platform.toUpperCase()}_PUBLISH_TOKEN`;
     return {
-      mode: "sandbox",
+      mode: "blocked",
       platform,
-      reason: `Kein ${platform}-Token in der Umgebung (Env ${envName}) — Sandbox statt Vortaeuschung.`,
+      reason: `Kein ${platform}-Token in der Umgebung (Env ${envName}) — Blockade statt Vortaeuschung.`,
     };
   }
   if (platform === "linkedin" && !cred.endpointUserId) {
     return {
-      mode: "sandbox",
+      mode: "blocked",
       platform,
-      reason: "LinkedIn braucht neben dem Token die Autorisierungs-Person (Env LINKEDIN_PUBLISH_USER_URN) — Sandbox.",
+      reason: "LinkedIn braucht neben dem Token die Autorisierungs-Person (Env LINKEDIN_PUBLISH_USER_URN) — Blockade.",
     };
   }
   if (platform === "bluesky" && !cred.endpointUserId) {
     return {
-      mode: "sandbox",
+      mode: "blocked",
       platform,
-      reason: "Bluesky braucht neben dem App-Passwort den Handle (Env BLUESKY_IDENTIFIER) — Sandbox.",
+      reason: "Bluesky braucht neben dem App-Passwort den Handle (Env BLUESKY_IDENTIFIER) — Blockade.",
     };
   }
   if (platform === "threads" && !cred.endpointUserId) {
     return {
-      mode: "sandbox",
+      mode: "blocked",
       platform,
-      reason: "Threads braucht neben dem Token die User-ID (Env THREADS_PUBLISH_USER_ID) — Sandbox.",
+      reason: "Threads braucht neben dem Token die User-ID (Env THREADS_PUBLISH_USER_ID) — Blockade.",
     };
   }
   if (isMedia && !cred.endpointUserId && platform === "instagram") {
     return {
-      mode: "sandbox",
+      mode: "blocked",
       platform,
-      reason: "Instagram braucht neben dem Token die IG-User-ID (Env INSTAGRAM_PUBLISH_USER_ID) — Sandbox.",
+      reason: "Instagram braucht neben dem Token die IG-User-ID (Env INSTAGRAM_PUBLISH_USER_ID) — Blockade.",
     };
   }
   if (isMedia) {
     if (!options.hasAsset) {
       return {
-        mode: "sandbox",
+        mode: "blocked",
         platform,
-        reason: `${platform} ist ein Medien-Post ohne Asset-URL — Sandbox statt Blind-Post; Asset per enqueueCampaign oder Job-Update setzen.`,
+        reason: `${platform} ist ein Medien-Post ohne Asset-URL — Blockade statt Blind-Post; Asset per enqueueCampaign oder Job-Update setzen.`,
       };
     }
     return { mode: "live", platform, reason: `Credentials und Asset vorhanden — Live-Publishing auf ${platform}.` };
