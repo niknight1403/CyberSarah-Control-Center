@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { deployPgPoolConfig, maskSecrets } from "../lib/render-deploy-logic.mjs";
+import { deployPgPoolConfig, isRestrictedDrizzleJournalError, maskSecrets } from "../lib/render-deploy-logic.mjs";
 
 const raw=(process.env.DATABASE_URL??"").trim();
 if(!/^postgres(?:ql)?:\/\//i.test(raw)){
@@ -50,8 +50,7 @@ try{
     await migrate(db,{migrationsFolder:"drizzle"});
     console.log("[db-migrate] Drizzle-Migrationen erfolgreich angewendet.");
   }catch(error){
-    const {cause}=errorDetails(error);
-    const permissionDenied=cause?.code==="42501"&&cause?.schema==="drizzle";
+    const permissionDenied=isRestrictedDrizzleJournalError(error);
     if(!permissionDenied) throw error;
     console.warn("[db-migrate] Historisches drizzle-Journal ist fuer den Deploy-User nicht beschreibbar; wechsle kontrolliert auf public.");
     await bootstrapPublicJournalIfVerified();
