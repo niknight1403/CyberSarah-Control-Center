@@ -27,7 +27,8 @@ export const REVENUE_HUBS: readonly RevenueHub[] = ["hara", "saas", "loop", "tra
 /** Maximale offene (pending) Entwuerfe pro Art — danach pausiert die Engine. */
 export const DRAFT_MAX_PENDING_PER_KIND = 6;
 export const DRAFT_MAX_PENDING_BY_KIND: Readonly<Record<DraftKind, number>> = {
-  // 6 Personas × 4 offene Varianten: genug Material fuer A/B-Tests, ohne die Queue zu fluten.\n  content: 24,
+  // 6 Personas × 4 offene Varianten: genug Material fuer A/B-Tests, ohne die Queue zu fluten.
+  content: 24,
   "revenue-loop": REVENUE_HUBS.length,
   idea: 12,
 };
