@@ -7,7 +7,7 @@ import { fetchTrendSignals } from "./trend-revenue-bridge";
 import { draftQueue, revenueAttributionEvents, revenueCostEvents, revenueExperiments, revenueJobs, revenueOffers } from "../drizzle/schema";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import {
-  allocatePersonaBudget, buildOneClickBusinessBrief, deriveSystemState, planContentFactory,
+  allocatePersonaBudget, buildOneClickBusinessBrief, decideExperiment, deriveSystemState, evaluateCommercial, planContentFactory,
   profitGuard, summarizeAttribution, type AttributionEvent, type PersonaMetric,
 } from "../lib/revenue-os-v2-logic";
 
@@ -150,4 +150,18 @@ export async function recordRevenueCost(input:{eventKey:string;category:"api"|"a
   const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
   const [row]=await db.insert(revenueCostEvents).values({...input,metadata:input.metadata??{}}).onConflictDoNothing({target:revenueCostEvents.eventKey}).returning();
   return {stored:Boolean(row),id:row?.id??null};
+}
+
+
+export async function evaluateRevenueExperiment(input:{id:number;metrics:Array<{variantId:string;exposures:number;conversions:number;revenueCents:number}>}){
+  const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
+  const decision=decideExperiment(input.metrics);
+  const status=decision.action==="SCALE"?"scale":decision.action==="KILL"?"killed":"learning";
+  const [row]=await db.update(revenueExperiments).set({decision:{...decision,metrics:input.metrics,evaluatedAt:new Date().toISOString()},status,updatedAt:new Date()}).where(eq(revenueExperiments.id,input.id)).returning();
+  if(!row)throw new Error("Experiment nicht gefunden.");
+  return {experiment:row,decision};
+}
+
+export function commercialEvaluation(input:{priceCents:number;marginPct:number;conversionProbability:number;effortScore:number;riskScore:number;expectedReach:number}){
+  return evaluateCommercial(input);
 }
