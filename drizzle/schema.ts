@@ -269,11 +269,14 @@ export const draftQueue = pgTable("draftQueue", {
   payload: jsonb("payload").notNull(),
   status: draftStatus("status").notNull().default("pending"),
   createdBy: varchar("createdBy", { length: 64 }).notNull().default("draft-engine"),
+  /** Optional idempotency key for producers that can be invoked concurrently. */
+  dedupeKey: varchar("dedupeKey", { length: 220 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   decidedBy: varchar("decidedBy", { length: 64 }),
 }, (table) => [
   index("draftQueue_status_kind_idx").on(table.status, table.kind),
+  uniqueIndex("draftQueue_dedupe_idx").on(table.dedupeKey),
 ]);
 
 export type DraftQueueRow = typeof draftQueue.$inferSelect;
