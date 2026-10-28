@@ -12,7 +12,7 @@ describe("influencer persona logic", () => {
     expect(INFLUENCER_PERSONAS).toHaveLength(6);
     expect(new Set(INFLUENCER_PERSONAS.map((persona) => persona.id)).size).toBe(6);
     expect(INFLUENCER_PERSONAS.map((persona) => persona.name)).toEqual([
-      "Nova", "Mira", "Juno", "Lina", "Kaya", "Zara", "Orion", "Ava", "Rio", "Nala",
+      "Nova", "Mira", "Juno", "Lina", "Kaya", "Zara",
     ]);
   });
 
@@ -29,7 +29,7 @@ describe("influencer persona logic", () => {
   });
 
   it("validates topics and resolves personas", () => {
-    expect(getInfluencerPersona("kaya")?.niche).toBe("Finance Education");
+    expect(getInfluencerPersona("kaya")?.niche).toBe("Finanzbildung");
     expect(validateInfluencerInput("  Testthema  ")).toBe("Testthema");
     expect(() => validateInfluencerInput("x")).toThrow();
   });
