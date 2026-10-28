@@ -34,6 +34,7 @@ import type { IdeaItem } from "../lib/idea-inbox-logic";
 import {
   DRAFT_KINDS,
   DRAFT_MAX_PENDING_PER_KIND,
+  DRAFT_MAX_PENDING_BY_KIND,
   planDraftRun,
   validateDraftPayload,
   type ContentDraftPayload,
@@ -256,7 +257,9 @@ describe("Sprint 374 — Kritische Pfade & Test-Lücken (Serie J)", () => {
       expect(DRAFT_KINDS).toContain("content");
       expect(DRAFT_KINDS).toContain("revenue-loop");
       expect(DRAFT_KINDS).toContain("idea");
-      expect(DRAFT_MAX_PENDING_PER_KIND).toBe(3);
+      expect(DRAFT_MAX_PENDING_PER_KIND).toBe(6);
+      expect(DRAFT_MAX_PENDING_BY_KIND.content).toBe(12);
+      expect(DRAFT_MAX_PENDING_BY_KIND.idea).toBe(6);
     });
 
     it("validateDraftPayload prüft ContentDraftPayload valide", () => {
@@ -291,7 +294,7 @@ describe("Sprint 374 — Kritische Pfade & Test-Lücken (Serie J)", () => {
 
     it("planDraftRun pausiert Arten, deren Pending-Kapazität erreicht ist", () => {
       const currentCounts = {
-        content: DRAFT_MAX_PENDING_PER_KIND,
+        content: DRAFT_MAX_PENDING_BY_KIND.content,
         "revenue-loop": 1,
         idea: 0,
       };
@@ -307,7 +310,7 @@ describe("Sprint 374 — Kritische Pfade & Test-Lücken (Serie J)", () => {
       expect(revPlan?.slots).toBe(3);
       expect(revPlan?.reason).toBe("quota");
 
-      expect(ideaPlan?.slots).toBe(3);
+      expect(ideaPlan?.slots).toBe(6);
       expect(ideaPlan?.reason).toBe("quota");
     });
   });
