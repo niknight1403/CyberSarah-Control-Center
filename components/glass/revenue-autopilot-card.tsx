@@ -10,13 +10,13 @@ export function RevenueAutopilotCard() {
   const [runFeedback, setRunFeedback] = useState<string | null>(null);
   const me = trpc.auth.me.useQuery(undefined, { staleTime: 60_000 });
   const isAdmin = me.data?.role === "admin";
-  const overview = trpc.revenueAutopilot.overview.useQuery(undefined, {
+  const overview = trpc.controlCenterAutopilot.overview.useQuery(undefined, {
     enabled: isAdmin,
     retry: false,
     staleTime: 30_000,
     refetchInterval: 120_000,
   });
-  const run = trpc.revenueAutopilot.runNow.useMutation();
+  const run = trpc.controlCenterAutopilot.runNow.useMutation();
   const utils = trpc.useUtils();
 
   if (!isAdmin) return null;
@@ -35,10 +35,10 @@ export function RevenueAutopilotCard() {
     <GlassCard accent="cyan" glow={2} style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>REVENUE AUTOPILOT</Text>
-          <Text style={styles.title}>Selbstoptimierende Umsatzschleife</Text>
+          <Text style={styles.eyebrow}>CONTROL CENTER AUTOPILOT</Text>
+          <Text style={styles.title}>Autonome Analyse, Reichweite & Revenue</Text>
           <Text style={styles.subtitle}>
-            Misst echte Funnel- und Revenue-Signale, priorisiert Lücken und erzeugt daraus deduplizierte Experimente.
+            Startet echte Revenue-Scans, bewertet Live-Signale und erzeugt Creator-, Ideen- und Revenue-Entwürfe über reale LLM-Routen.
           </Text>
         </View>
         <StatusChip label={statusLabel} accent={statusAccent} live />
@@ -85,19 +85,19 @@ export function RevenueAutopilotCard() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Revenue Autopilot jetzt ausführen"
+        accessibilityLabel="Control Center Autopilot jetzt ausführen"
         disabled={run.isPending || overview.isLoading}
         onPress={() => {
           setRunFeedback(null);
           run.mutate(undefined, {
             onSuccess: async (result) => {
-              setRunFeedback(result.generated > 0
-                ? `${result.generated} neue${result.generated === 1 ? "r" : ""} Entwurf${result.generated === 1 ? "" : "e"} erstellt. Bitte vor Veröffentlichung prüfen.`
-                : result.skipped.length > 0
-                  ? `Keine neuen Entwürfe: ${result.skipped.join(" · ")}`
-                  : "Keine neuen Entwürfe. Es liegen derzeit keine priorisierten Chancen vor.");
+              setRunFeedback(result.realActions.length > 0
+                ? `Ausgeführt: ${result.realActions.join(" · ")}${result.blocked.length ? ` · Blockiert: ${result.blocked.join(" · ")}` : ""}`
+                : result.blocked.length > 0
+                  ? `Keine Aktion abgeschlossen: ${result.blocked.join(" · ")}`
+                  : "Autopilot-Lauf abgeschlossen; aktuell war keine neue Aktion erforderlich.");
               await Promise.all([
-                utils.revenueAutopilot.overview.invalidate(),
+                utils.controlCenterAutopilot.overview.invalidate(),
                 utils.draftEngine.queue.invalidate(),
               ]);
             },
@@ -109,7 +109,7 @@ export function RevenueAutopilotCard() {
       </Pressable>
 
       <Text style={styles.disclaimer}>
-        Automatisiert werden Analyse, Priorisierung und Entwurfserstellung. Preisänderungen, Veröffentlichungen und andere irreversible Umsatzaktionen bleiben freigabepflichtig.
+        Autonom laufen Analyse, HARA/Expansion-Scans, Priorisierung und Entwurfserstellung. Veröffentlichungen, Preisänderungen und Geldaktionen bleiben als irreversible externe Schritte freigabepflichtig.
       </Text>
     </GlassCard>
   );
