@@ -1,0 +1,33 @@
+name: Diagnose Digistore24 API
+on:
+  push:
+    branches: [diag/provider-health-2026-10-28]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read-only listCommissions probe
+        env:
+          D24_API_KEY: ${{ secrets.DIGISTORE24_API_KEY }}
+        run: |
+          test -n "$D24_API_KEY" || { echo "DIGISTORE24_API=MISSING"; exit 1; }
+          CODE=$(curl -sS -m 30 -o /tmp/d24.json -w "%{http_code}" \
+            -G "https://www.digistore24.com/api/call/listCommissions" \
+            -H "X-DS-API-KEY: $D24_API_KEY" -H "Accept: application/json" \
+            --data-urlencode "from=-1d" --data-urlencode "to=now" \
+            --data-urlencode "page_no=1" --data-urlencode "page_size=1" \
+            --data-urlencode "transaction_type=payment")
+          RESULT=$(python3 - <<'PY'
+          import json
+          try:
+              d=json.load(open("/tmp/d24.json"))
+              print(d.get("result","unknown"))
+          except Exception:
+              print("invalid-json")
+          PY
+          )
+          echo "DIGISTORE24_API_HTTP=$CODE"
+          echo "DIGISTORE24_API_RESULT=$RESULT"
+          test "$CODE" = "200" && test "$RESULT" = "success"
