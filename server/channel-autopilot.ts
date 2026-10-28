@@ -3,6 +3,7 @@ import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments }
 import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
 import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
+import { materializeProductionSystem } from "./faceless-multichannel-service";
 
 const PERSONA="automationsklar-editorial";
 const INTERVAL_MS=15*60_000;
@@ -92,6 +93,7 @@ export function startChannelAutopilot(){
   if(timer)return;
   if(String(process.env.CHANNEL_AUTOPILOT??"on").toLowerCase()==="off"){console.log("[Channel-Autopilot] Deaktiviert via CHANNEL_AUTOPILOT=off.");return;}
   console.log("[Channel-Autopilot] Aktiv — 15-Minuten Observe→Diagnose→Draft→Learn Loop.");
+  void materializeProductionSystem().catch(error=>console.error("[Channel-Autopilot] Produktionssystem konnte nicht materialisiert werden:",error instanceof Error?error.message:error));
   void tick();
   timer=setInterval(()=>void tick(),INTERVAL_MS);
 }
