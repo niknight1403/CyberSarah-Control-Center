@@ -133,7 +133,7 @@ jobs:
           PUBLIC_APP_ORIGIN: ${{ secrets.PUBLIC_APP_ORIGIN }}
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
-        run: node scripts/render-deploy.mjs
+        run: node scripts/render-deploy.mjs --migrate
 
       - name: Workspace-Service auf Render deployen (Port 8787)
         if: inputs.target == 'workspace'
