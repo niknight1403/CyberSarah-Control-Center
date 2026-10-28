@@ -8,7 +8,7 @@ import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
 import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
 import { startPublishingAutopilot, getPublishingJobCard } from "../publishing-service";
-import { startInfluencerLearningLoop } from "../influencer-learning-loop";
+import { getInfluencerLearningLoopStatus, startInfluencerLearningLoop } from "../influencer-learning-loop";
 import { buildPublishingCardPng, type IgRatioKey } from "../../lib/asset-card-logic";
 import {
   isWebFallbackCandidate,
@@ -293,9 +293,16 @@ async function startServer() {
   app.get("/api/ready", async (_req, res) => {
     const database = await checkDatabaseHealth();
     const deployment = resolveDeploymentInfo();
+    const influencerLearning = getInfluencerLearningLoopStatus();
     res.status(database ? 200 : 503).json({
       ok: database,
-      checks: { database },
+      checks: {
+        database,
+        influencerLearningEnabled: influencerLearning.enabled,
+        influencerLearningRunning: influencerLearning.running,
+        influencerLearningLastCompletedAt: influencerLearning.lastCompletedAt,
+        influencerLearningLastError: influencerLearning.lastError,
+      },
       gitCommitSha: deployment.gitCommitSha,
       gitCommitShaReason: deployment.gitCommitShaReason,
       deployedAt: deployment.deployedAt,
