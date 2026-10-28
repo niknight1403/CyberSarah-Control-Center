@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import pg from "pg";
+import { readFile } from "node:fs/promises";\nimport pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { deployPgPoolConfig, maskSecrets } from "../lib/render-deploy-logic.mjs";
@@ -11,7 +11,7 @@ if(!/^postgres(?:ql)?:\/\//i.test(raw)){
 }
 
 const { Pool }=pg;
-const pool=new Pool({...deployPgPoolConfig(raw),max:1,connectionTimeoutMillis:10_000});
+const pool=new Pool({...deployPgPoolConfig(raw),max:1,connectionTimeoutMillis:10_000});\n\nasync function verifiedJournalPermissionFallback(){\n  const journal=JSON.parse(await readFile(new URL("../drizzle/meta/_journal.json",import.meta.url),"utf8"));\n  const latest=journal.entries?.at(-1)?.tag??"";\n  // Fail closed when a future migration is added.\n  if(latest!=="0020_draft_queue_dedupe") return false;\n  const tables=["revenue_jobs","revenue_offers","revenue_experiments","revenue_attribution_events","revenue_cost_events","b2b_network_nodes","b2b_network_edges","influencer_learning_states"];\n  const tableRows=await pool.query("select relname from pg_class where relkind in ($r$,$p$) and relname = any($1::text[])",[tables]);\n  const present=new Set(tableRows.rows.map(row=>String(row.relname)));\n  if(tables.some(name=>!present.has(name))) return false;\n  const column=await pool.query("select 1 from information_schema.columns where table_schema=current_schema() and table_name=$1 and column_name=$2 limit 1",["draftQueue","dedupeKey"]);\n  const index=await pool.query("select 1 from pg_indexes where schemaname=current_schema() and indexname=$1 limit 1",["draftQueue_dedupe_idx"]);\n  return Boolean(column.rowCount&&index.rowCount);\n}
 try{
   const db=drizzle(pool);
   await migrate(db,{migrationsFolder:"drizzle"});
