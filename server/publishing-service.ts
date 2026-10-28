@@ -45,10 +45,13 @@ import {
 import { getDb } from "./db";
 import { resolveXToken } from "./x-token-service";
 import { invokeLLM } from "./_core/llm";
+import { refreshInfluencerLearning } from "./growth-network-service";
 
 const PUBLISHING_HTTP_TIMEOUT_MS = 15_000;
 const AUTOPILOT_INTERVAL_MS = 60_000;
 const AUTOPILOT_BATCH = 10;
+const INFLUENCER_LEARNING_INTERVAL_MS = 15 * 60_000;
+let lastInfluencerLearningAt = 0;
 
 let autopilotTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -676,6 +679,20 @@ async function autopilotTick(): Promise<void> {
         console.log(
           `[Publishing-Autopilot] Nutzer-Jobs verarbeitet: ${outcome.processed} (live ${outcome.live}, sandbox ${outcome.sandbox}, fehlgeschlagen ${outcome.failed})`,
         );
+      }
+    }
+    // Always-on learning is independent from due publishing jobs. It only
+    // updates evidence-derived weights; identity/disclosure and external-action
+    // gates are never mutated by the learner.
+    if (Date.now() - lastInfluencerLearningAt >= INFLUENCER_LEARNING_INTERVAL_MS) {
+      try {
+        const learned = await refreshInfluencerLearning();
+        lastInfluencerLearningAt = Date.now();
+        if (learned.evolutions.length) {
+          console.log(`[Influencer-Learning] ${learned.evolutions.length} Personas aus realen 30-Tage-Signalen aktualisiert.`);
+        }
+      } catch (learningError) {
+        console.warn("[Influencer-Learning] Lernlauf übersprungen:", learningError instanceof Error ? learningError.message : learningError);
       }
     }
   } catch (error) {
