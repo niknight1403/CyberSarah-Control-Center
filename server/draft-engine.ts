@@ -125,7 +125,7 @@ export type DraftEngineRunResult = {
 };
 
 function isRetryableProviderLimit(reason: string): boolean {
-  return /\b429\b|quota|rate.?limit|resource_exhausted|too many requests/i.test(reason);
+  return /\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(reason);
 }
 
 export type DraftEngineDeps = {
