@@ -1,7 +1,7 @@
 import {readFileSync} from "node:fs";
 import {describe,expect,it} from "vitest";
-// @ts-ignore Runtime helper is intentionally plain ESM because the deploy runner is .mjs.
-import {isDrizzleSchemaPermissionError} from "../lib/migration-permission-logic.mjs";
+// @ts-ignore Runtime deploy logic is intentionally plain ESM.
+import {isRestrictedDrizzleJournalError} from "../lib/render-deploy-logic.mjs";
 
 describe("production migration journal fallback",()=>{
  const migrator=readFileSync("scripts/run-drizzle-migrations.mjs","utf8");
@@ -18,14 +18,14 @@ describe("production migration journal fallback",()=>{
   const messageError=Object.assign(new Error("migration failed"),{cause:{code:"42501",message:"permission denied for schema drizzle"}});
   const schemaError=Object.assign(new Error("migration failed"),{cause:{code:"42501",schema:"drizzle",message:"permission denied"}});
   const otherSchema=Object.assign(new Error("migration failed"),{cause:{code:"42501",message:"permission denied for schema private"}});
-  expect(isDrizzleSchemaPermissionError(messageError)).toBe(true);
-  expect(isDrizzleSchemaPermissionError(schemaError)).toBe(true);
-  expect(isDrizzleSchemaPermissionError(otherSchema)).toBe(false);
-  expect(isDrizzleSchemaPermissionError(Object.assign(new Error("permission denied for schema drizzle"),{cause:{code:"42P01"}}))).toBe(false);
+  expect(isRestrictedDrizzleJournalError(messageError)).toBe(true);
+  expect(isRestrictedDrizzleJournalError(schemaError)).toBe(true);
+  expect(isRestrictedDrizzleJournalError(otherSchema)).toBe(false);
+  expect(isRestrictedDrizzleJournalError(Object.assign(new Error("permission denied for schema drizzle"),{cause:{code:"42P01"}}))).toBe(false);
  });
  it("uses public only for the scoped migration journal fallback",()=>{
   expect(migrator).toContain('migrationsSchema:"public"');
-  expect(migrator).toContain("isDrizzleSchemaPermissionError(error)");
+  expect(migrator).toContain("isRestrictedDrizzleJournalError(error)");
   expect(migrator).toContain("public.__drizzle_migrations");
  });
  it("keeps the latest draft queue repair idempotent",()=>{
