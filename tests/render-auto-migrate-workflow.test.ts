@@ -9,6 +9,12 @@ describe("Render app deployment migration gate",()=>{
     expect(workflow).toContain("- 'drizzle/**'");
   });
 
+  it("normalizes DATABASE_URL before the mandatory schema preflight",()=>{
+    const script=readFileSync("scripts/production-schema-preflight.mjs","utf8");
+    expect(script).toContain("validateDatabaseUrl(process.env.DATABASE_URL");
+    expect(script).toContain("const url=dbCheck.url");
+  });
+
   it("ships an idempotent repair migration for production growth relations",()=>{
     const repair=readFileSync("drizzle/0019_repair_growth_schema.sql","utf8");
     const journal=readFileSync("drizzle/meta/_journal.json","utf8");
