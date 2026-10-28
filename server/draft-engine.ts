@@ -172,15 +172,15 @@ export async function insertPendingDraft(kind: DraftKind, title: string, payload
 }
 
 async function generateContentDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const persona = INFLUENCER_PERSONAS[(Math.floor(nowMs / 86_400_000) + slotOffset) % INFLUENCER_PERSONAS.length];
-  const platform = CONTENT_PLATFORMS[slotOffset % CONTENT_PLATFORMS.length];
+  const persona = INFLUENCER_PERSONAS[slotOffset % INFLUENCER_PERSONAS.length];
+  const platformRound = Math.floor(slotOffset / INFLUENCER_PERSONAS.length);
+  const platform = CONTENT_PLATFORMS[(slotOffset + platformRound) % CONTENT_PLATFORMS.length];
   const topic = CONTENT_TOPIC_SEEDS[seedIndexForDay(nowMs, slotOffset)];
   const prompt = [
     buildInfluencerPrompt(persona, topic, platform),
     "Der Content muss den KI-Charakter transparent halten und darf keine erfundenen persoenlichen Erlebnisse enthalten.",
     'Antworte NUR mit einem JSON-Objekt: {"personaId": "' + persona.id + '", "platform": "' + platform + '", "topic": "<Thema>", "content": "<fertiger Content>"}',
-  ].join("
-");
+  ].join("\\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
   if (!parsed) return { ok: false, reason: "Content-LLM lieferte kein auswertbares JSON." };
@@ -210,8 +210,7 @@ async function generateRevenueLoopDraft(
     "Vollstaendig ehrlich: keine erfundenen Zahlen, keine garantierten Einnahmen.",
     "Der Entwurf bleibt bis zur Freigabe rein planerisch.",
     "Antworte NUR mit einem JSON-Objekt: {\"hub\": \"" + hub + "\", \"name\": \"<Kurzname>\", \"hypothesis\": \"<1-2 Saetze Hypothese>\", \"stages\": [\"<Stufe 1>\", \"<Stufe 2>\", \"<Stufe 3>\"], \"experiment\": \"<konkreter Test, mindestens 10 Zeichen>\", \"metric\": \"<Erfolgsmetrik>\", \"unit\": \"<Einheit>\", \"targetValue\": <positive Zahl>, \"currentValue\": 0}",
-  ].join("
-");
+  ].join("\\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
   if (!parsed) return { ok: false, reason: "Revenue-Loop-LLM lieferte kein auswertbares JSON." };
@@ -230,8 +229,7 @@ async function generateIdeaDraft(llm: (messages: Message[]) => Promise<string>, 
     "Du bist der Ideen-Scout des CyberSarah Control Centers (KI-Assistent-App mit Chat, Superagenten, Revenue-OS und Ideen-Inbox).",
     "Schlage EINE konkrete Produkt- oder Feature-Idee vor, die in unter 2 Wochen umsetzbar waere.",
     "Antworte NUR mit einem JSON-Objekt: {\"note\": \"<Idee in einem Satz>\", \"rationale\": \"<Warum diese Idee jetzt: 1-2 Saetze>\"}",
-  ].join("
-");
+  ].join("\\n");
   const text = await llm([{ role: "system", content: prompt }]);
   const parsed = parseLlmJson(text);
   if (!parsed) return { ok: false, reason: "Ideen-LLM lieferte kein auswertbares JSON." };
