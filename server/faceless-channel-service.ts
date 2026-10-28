@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { draftQueue } from "../drizzle/schema";
 import {
   LEAD_MAGNET,
@@ -16,17 +16,19 @@ const CREATED_BY="faceless-channel-engine";
 async function insertDraftOnce(title:string,payload:Record<string,unknown>){
   const db=await getDb();
   if(!db) throw new Error("Datenbank nicht verfügbar.");
-  const [existing]=await db.select({id:draftQueue.id}).from(draftQueue)
-    .where(and(eq(draftQueue.createdBy,CREATED_BY),eq(draftQueue.title,title))).limit(1);
-  if(existing) return {inserted:false,id:existing.id};
+  const dedupeKey=`faceless-channel:${title}`;
   const [row]=await db.insert(draftQueue).values({
     kind:"content",
     title,
     payload,
     status:"pending",
     createdBy:CREATED_BY,
-  }).returning({id:draftQueue.id});
-  return {inserted:true,id:row.id};
+    dedupeKey,
+  }).onConflictDoNothing({target:draftQueue.dedupeKey}).returning({id:draftQueue.id});
+  if(row) return {inserted:true,id:row.id};
+  const [existing]=await db.select({id:draftQueue.id}).from(draftQueue).where(eq(draftQueue.dedupeKey,dedupeKey)).limit(1);
+  if(!existing) throw new Error("Draft-Deduplizierung konnte nicht aufgelöst werden.");
+  return {inserted:false,id:existing.id};
 }
 
 /**
