@@ -8,6 +8,8 @@ name: Diagnose Admin-Rollen
 #                  Live-API ein und prueft die Berechtigungs-Kette
 #                  (login -> account.me -> admin-geschuetzter Endpoint).
 on:
+  push:
+    branches: [diag/provider-health-2026-10-28]
   workflow_dispatch:
     inputs:
       mode:
@@ -80,7 +82,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: node scripts/sprint373-e2e-live.mjs
       - name: Sprint 379 Staging-Smoke + Revenue-Maschinerie live (keine echten Zahlungen)
-        if: ${{ inputs.mode == 'sprint379-smoke-live' }}
+        if: ${{ github.event_name == 'push' || inputs.mode == 'sprint379-smoke-live' }}
         env:
           LIVE_API_BASE_URL: ${{ secrets.RENDER_PUBLIC_URL || 'https://cybersarah-control-center-hmlc.onrender.com' }}
           ADMIN_EMAIL: niko.oeben@gmail.com
