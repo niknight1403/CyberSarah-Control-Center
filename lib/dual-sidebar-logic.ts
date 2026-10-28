@@ -24,8 +24,6 @@ export const APPS_ITEMS: NavigationItem[] = [
   { route: "/dashboard", title: "Übersicht", icon: "house.fill" },
   { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill" },
   { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
-  { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill" },
-  { route: "/loop-engineering", title: "Revenue-Loops", icon: "wand.and.stars" },
   { route: "/account", title: "Konto", icon: "person.crop.circle" },
 ];
 
