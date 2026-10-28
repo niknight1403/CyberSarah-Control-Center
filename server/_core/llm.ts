@@ -616,10 +616,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // limitierte Provider (429/Quota) fuer 60s in Quarantaene; die Kette
   // rotiert sofort auf den naechsten Endpoint. Sind ALLE in Quarantaene,
   // wird trotzdem Best-Effort weitergearbeitet (Service bleibt nie stumm).
-  const notQuarantined = ordered.filter((endpoint) => !isProviderQuarantined(endpoint.source) && providerCircuitAllows(endpoint.source));
-  if (notQuarantined.length > 0) {
-    ordered = notQuarantined;
+  const notQuarantined = ordered.filter((endpoint) => !isProviderQuarantined(endpoint.source));
+  if (notQuarantined.length > 0) ordered = notQuarantined;
+  const circuitEligible = ordered.filter((endpoint) => providerCircuitAllows(endpoint.source));
+  if (circuitEligible.length === 0) {
+    throw new Error("LLM routes temporarily deferred: all provider circuit breakers are open.");
   }
+  ordered = circuitEligible;
 
   // Sprint 196 — Autonomer Rotations-Agent: Die agentenseitig gewaehlte
   // gesunde Gratis-Route (bzw. die vom Administrator erzwungene) fuehrt die
