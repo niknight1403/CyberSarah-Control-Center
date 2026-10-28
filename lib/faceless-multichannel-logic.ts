@@ -4,6 +4,17 @@ export type PortfolioChannel={key:string;name:string;niche:string;audience:strin
 const clamp=(n:number)=>Math.min(100,Math.max(0,Number.isFinite(n)?n:0));
 const round=(n:number,d=1)=>Number(n.toFixed(d));
 
+export const FACELESS_MULTI_CHANNEL_SYSTEM_PROMPT=[
+ "ROLE: Faceless Multi-Channel Revenue Architect.",
+ "MISSION: Baue ein qualitätsorientiertes Netzwerk aus YouTube Longform/Shorts, TikTok und Instagram Reels, das Reichweite, qualifizierten Intent und bestätigten Umsatz verbessert.",
+ "PRIORITY: Qualität und wiederverwendbare Produktionsbausteine vor Masse. Optimiere den frühesten messbaren Engpass und ändere pro Experiment möglichst nur eine Variable.",
+ "CHANNEL #1: Automationsklar bleibt Proof-Kanal, bis Script → Voice → Visuals → Schnitt mindestens 80% standardisiert sind, Qualität >=85%, mindestens drei veröffentlichte Proofs vorliegen und Reused-Content-Risiko <=20% ist.",
+ "CHANNEL #2: Erst nach bestandenem Gate eine angrenzende Nische vorbereiten. Research/Module dürfen geteilt werden; finale Hooks, Voice, Visual Grammar, Beispiele, Thumbnails und Plattform-Cuts müssen eigenständig sein.",
+ "MONETIZATION: Priorisiere bestätigten Umsatz, Leads, Contribution und Revenue/Production-Hour; CPM, Affiliate und Sponsoring bleiben Annahmen bis echte Attribution/Verträge vorliegen.",
+ "AUTONOMY: Messen, analysieren, planen, Vorlagen und Pending-Drafts erzeugen, QA und Lernschleifen autonom. Externes Publishing, Spend, Preisänderungen, Konto-/Affiliate-Anmeldungen und Partnerschaftsbehauptungen bleiben freigabepflichtig.",
+ "OUTPUT: CHANNEL PORTFOLIO | PRODUCTION PIPELINE | MONETIZATION MATRIX | RISK MANAGEMENT.",
+].join("\n");
+
 export const FACELESS_PORTFOLIO:PortfolioChannel[]=[
  {key:"automationsklar",name:"Automationsklar",niche:"KI-Software, Automatisierung und B2B-Workflows für DACH-KMU",audience:"Solo-Selbstständige, Agenturen, Beratungen und kleine Teams",primaryPlatform:"YouTube",status:"PROOF",identity:{voice:"ruhig, präzise, kritisch; keine Hype-Sprache",visual:"Navy/Mint, reale Screen-Demos, Workflow-Nodes, Vorher/Nachher-Messung",editorial:"Problem → Demo → Fehlerfall → Human Gate → messbares Ergebnis"},monetization:["qualifizierte Affiliate-Empfehlungen","eigene Workflow-Templates","Lead-Generierung für B2B-Angebote","Sponsoring nach belegter Reichweite","Ad-Revenue nur als Zusatz"]},
  {key:"toolklar",name:"ToolKlar",niche:"ROI-orientierte KI- und SaaS-Tooltests für kleine Unternehmen",audience:"Kaufbereite Entscheider in kleinen und mittleren Unternehmen",primaryPlatform:"YouTube",adjacentTo:"automationsklar",status:"LOCKED",identity:{voice:"analytisch, vergleichend, zahlenorientiert",visual:"Graphit/Amber, Scorecards, Preis-/Zeit-Matrizen, Testprotokolle",editorial:"Use Case → Testkriterien → Messung → Kosten/Risiko → Entscheidung"},monetization:["Affiliate nur bei bestätigter Partnerschaft","B2B-Leads","Vergleichs-Templates","Sponsoring mit Kennzeichnung","Ad-Revenue als Zusatz"]},
