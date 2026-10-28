@@ -92,6 +92,19 @@ async function main() {
     `http=${webhookRes.status}`
   );
 
+  // Digistore24-IPN: ohne sha_sign muss ein konfigurierter Live-Handler 401 liefern.
+  // Kein gueltiges Event, keine Conversion und keine Zahlung wird erzeugt.
+  const digistoreUnsigned = await fetch(`${API_BASE}/api/v1/webhooks/digistore24`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ order_id: "smoke-unsigned-do-not-record", event: "test" }),
+  });
+  record(
+    "A9 Digistore24-IPN weist unsigniertes Event ab (401)",
+    digistoreUnsigned.status === 401,
+    `http=${digistoreUnsigned.status}`
+  );
+
   // --- B) Authentifizierte Checks (Admin-Session, echte Credentials) ----
   const loginResp = await trpcCall("account.login", { email, password });
   const login = unwrap(loginResp.payload);
