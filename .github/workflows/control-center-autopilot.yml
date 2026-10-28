@@ -1,6 +1,9 @@
 name: control-center-autopilot
 
 on:
+  workflow_run:
+    workflows: ["Render Deploy"]
+    types: [completed]
   schedule:
     - cron: "17 */4 * * *"
   workflow_dispatch: {}
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   run:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     name: Echter Autopilot-Lauf
     runs-on: ubuntu-latest
     timeout-minutes: 8
