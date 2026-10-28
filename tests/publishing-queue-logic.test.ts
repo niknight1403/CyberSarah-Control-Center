@@ -50,45 +50,45 @@ describe("publishing queue logic (Sprint 365)", () => {
     expect(nextRetryAt(MAX_PUBLISH_ATTEMPTS, from)).toBeNull();
   });
 
-  it("loest den Modus ehrlich auf: live nur mit Credentials, Sandbox mit Grund", () => {
+  it("loest den Modus ehrlich auf: live nur mit Credentials, Blockade mit Grund", () => {
     const live = resolvePublishingMode("x", { x: { token: "tok" } });
     expect(live.mode).toBe("live");
 
-    const sandbox = resolvePublishingMode("x", {});
-    expect(sandbox.mode).toBe("sandbox");
-    expect(sandbox.reason).toContain("Kein x-Token");
+    const blocked = resolvePublishingMode("x", {});
+    expect(blocked.mode).toBe("blocked");
+    expect(blocked.reason).toContain("Kein x-Token");
 
     const li = resolvePublishingMode("linkedin", { linkedin: { token: "tok" } });
-    expect(li.mode).toBe("sandbox");
+    expect(li.mode).toBe("blocked");
     expect(li.reason).toContain("LinkedIn");
 
     // Sprint 372: Bluesky (AT Protocol, kostenlos) als X-Alternative
   const bsFull = { bluesky: { token: "app-password", endpointUserId: "handle.bsky.social" } };
   expect(resolvePublishingMode("bluesky", bsFull).mode).toBe("live");
-  expect(resolvePublishingMode("bluesky", {}).mode).toBe("sandbox");
+  expect(resolvePublishingMode("bluesky", {}).mode).toBe("blocked");
   expect(resolvePublishingMode("bluesky", {}).reason).toContain("BLUESKY");
   const bsNoHandle = resolvePublishingMode("bluesky", { bluesky: { token: "app-password" } });
-  expect(bsNoHandle.mode).toBe("sandbox");
+  expect(bsNoHandle.mode).toBe("blocked");
   expect(bsNoHandle.reason).toContain("BLUESKY_IDENTIFIER");
 
   const th = resolvePublishingMode("threads", { threads: { token: "tok" } });
-    expect(th.mode).toBe("sandbox");
+    expect(th.mode).toBe("blocked");
     expect(th.reason).toContain("Threads");
   });
 
   it("Medien-Plattformen (Sprint 366): live nur mit Token UND Asset", () => {
     const igCred = { instagram: { token: "tok", endpointUserId: "1789001" } };
-    expect(resolvePublishingMode("instagram", igCred).mode).toBe("sandbox"); // ohne Asset
+    expect(resolvePublishingMode("instagram", igCred).mode).toBe("blocked"); // ohne Asset
     expect(resolvePublishingMode("instagram", igCred, { hasAsset: true }).mode).toBe("live");
     expect(resolvePublishingMode("instagram", igCred).reason).toContain("Asset-URL");
 
     const igNoUser = resolvePublishingMode("instagram", { instagram: { token: "tok" } }, { hasAsset: true });
-    expect(igNoUser.mode).toBe("sandbox");
+    expect(igNoUser.mode).toBe("blocked");
     expect(igNoUser.reason).toContain("IG-User-ID");
 
     const ttCred = { tiktok: { token: "tok" } };
     expect(resolvePublishingMode("tiktok", ttCred, { hasAsset: true }).mode).toBe("live");
-    expect(resolvePublishingMode("tiktok", ttCred).mode).toBe("sandbox");
+    expect(resolvePublishingMode("tiktok", ttCred).mode).toBe("blocked");
     expect(resolvePublishingMode("tiktok", {}).reason).toContain("TIKTOK_PUBLISH_TOKEN");
   });
 
@@ -99,7 +99,7 @@ describe("publishing queue logic (Sprint 365)", () => {
   });
 
   it("baut stabile Dedupe-Keys unabhaengig von Gross-/Kleinschreibung", () => {
-    expect(buildDedupeKey("  Fitness-APP ", "ava", "instagram", 1)).toBe(buildDedupeKey("fitness-app", "ava", "instagram", 1));
-    expect(buildDedupeKey("A", "ava", "instagram", 1)).not.toBe(buildDedupeKey("A", "ava", "instagram", 2));
+    expect(buildDedupeKey("  Fitness-APP ", "lina", "instagram", 1)).toBe(buildDedupeKey("fitness-app", "lina", "instagram", 1));
+    expect(buildDedupeKey("A", "lina", "instagram", 1)).not.toBe(buildDedupeKey("A", "lina", "instagram", 2));
   });
 });
