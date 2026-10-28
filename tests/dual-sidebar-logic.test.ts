@@ -32,6 +32,8 @@ describe("dual sidebar logic (Sprint 200)", () => {
     const appsRoutes = getSidebarItems("apps").map((item) => item.route);
     expect(appsRoutes).toContain("/account");
     expect(getSidebarItems("apps")).not.toBe(APPS_ITEMS);
+    expect(appsRoutes).not.toContain("/loop-engineering");
+    expect(appsRoutes).not.toContain("/micro-trading");
     expect(getSidebarItems("superagent")[0]?.route).toBe("/superagent");
   });
 
