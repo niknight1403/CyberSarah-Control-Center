@@ -92,10 +92,12 @@ export function RevenueAutopilotCard() {
           run.mutate(undefined, {
             onSuccess: async (result) => {
               setRunFeedback(result.realActions.length > 0
-                ? `Ausgeführt: ${result.realActions.join(" · ")}${result.blocked.length ? ` · Blockiert: ${result.blocked.join(" · ")}` : ""}`
-                : result.blocked.length > 0
-                  ? `Keine Aktion abgeschlossen: ${result.blocked.join(" · ")}`
-                  : "Autopilot-Lauf abgeschlossen; aktuell war keine neue Aktion erforderlich.");
+                ? `Ausgeführt: ${result.realActions.join(" · ")}${result.deferred.length ? ` · Verschoben: ${result.deferred.length} wegen Provider-Limit` : result.blocked.length ? ` · Blockiert: ${result.blocked.join(" · ")}` : ""}`
+                : result.deferred.length > 0
+                  ? `Provider-Limit erreicht: ${result.deferred.length} Aufgabe(n) werden im nächsten Zyklus fortgesetzt.`
+                  : result.blocked.length > 0
+                    ? `Keine Aktion abgeschlossen: ${result.blocked.join(" · ")}`
+                    : "Autopilot-Lauf abgeschlossen; aktuell war keine neue Aktion erforderlich.");
               await Promise.all([
                 utils.controlCenterAutopilot.overview.invalidate(),
                 utils.draftEngine.queue.invalidate(),
