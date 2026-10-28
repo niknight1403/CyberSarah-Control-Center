@@ -67,7 +67,7 @@ const requiredModules: { file: string; label: string }[] = [
   { file: "lib/vector-memory-logic.ts", label: "Vector Memory" },
   { file: "server/vector-memory-store.ts", label: "Vector Memory Store-Adapter (Drizzle)" },
   { file: "server/repo-chat-service.ts", label: "Repo-Chat-Service (Tarball-Index, GitHub)" },
-  { file: "lib/influencer-reach-logic.ts", label: "Influencer-Reichweiten-Engine (10 Personas)" },
+  { file: "lib/influencer-reach-logic.ts", label: "Influencer-Reichweiten-Engine (6 KI-Creator)" },
   { file: "lib/bot-villa-logic.ts", label: "Bot-Villa (Kern-Team + Pool bis 5000)" },
   { file: "lib/project-superagent-factory-logic.ts", label: "Projekt-Superagenten-Fabrik" },
   { file: "server/project-superagent-factory.ts", label: "Projekt-Superagenten-Service (tRPC)" },
