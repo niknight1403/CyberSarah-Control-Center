@@ -22,7 +22,7 @@ export function RevenueAutopilotCard() {
   if (!isAdmin) return null;
 
   const data = overview.data;
-  const statusAccent = overview.isError ? "red" : overview.isLoading ? "cyan" : data?.status === "healthy" ? "green" : data?.status === "instrument" ? "amber" : "cyan";
+  const statusAccent = overview.isError ? "red" : overview.isLoading || !data ? "cyan" : data.status === "healthy" ? "green" : "amber";
   const statusLabel = overview.isError ? "Fehler beim Laden" : overview.isLoading ? "Lädt" : data?.status === "healthy"
     ? "stabil"
     : data?.status === "instrument"
@@ -41,7 +41,7 @@ export function RevenueAutopilotCard() {
             Startet echte Revenue-Scans, bewertet Live-Signale und erzeugt Creator-, Ideen- und Revenue-Entwürfe über reale LLM-Routen.
           </Text>
         </View>
-        <StatusChip label={statusLabel} accent={statusAccent} live />
+        <StatusChip label={statusLabel} accent={statusAccent} live={Boolean(data && !overview.isError && data.status === "healthy")} />
       </View>
 
       {overview.isLoading ? (
@@ -86,7 +86,7 @@ export function RevenueAutopilotCard() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Control Center Autopilot jetzt ausführen"
-        disabled={run.isPending || overview.isLoading}
+        disabled={run.isPending || overview.isLoading || overview.isError || !data}
         onPress={() => {
           setRunFeedback(null);
           run.mutate(undefined, {
@@ -105,7 +105,7 @@ export function RevenueAutopilotCard() {
             },
           });
         }}
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, run.isPending && styles.buttonDisabled]}
+        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, (run.isPending || overview.isLoading || overview.isError || !data) && styles.buttonDisabled]}
       >
         <Text style={styles.buttonText}>{run.isPending ? "Autopilot optimiert …" : "Autopilot jetzt neu bewerten"}</Text>
       </Pressable>
@@ -129,7 +129,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 const metricStyles = StyleSheet.create({
   metric: { backgroundColor: `${glassSurface.border}44`, borderRadius: 12, flex: 1, minWidth: 90, padding: 10 },
   value: { color: glassSurface.textPrimary, fontSize: 16, fontWeight: "900" },
-  label: { color: glassSurface.textMuted, fontSize: 9, fontWeight: "700", marginTop: 3 },
+  label: { color: glassSurface.textMuted, fontSize: 11, fontWeight: "700", marginTop: 3 },
 });
 
 function createStyles() {
@@ -153,10 +153,10 @@ function createStyles() {
     note: { color: glassSurface.textSecondary, fontSize: 11, lineHeight: 16 },
     error: { color: glassPalette.amber, fontSize: 11, lineHeight: 16 },
     feedback: { color: glassPalette.green, fontSize: 11, lineHeight: 17 },
-    button: { alignItems: "center", backgroundColor: `${glassPalette.cyan}18`, borderColor: `${glassPalette.cyan}88`, borderRadius: 14, borderWidth: 1, paddingVertical: 12 },
+    button: { alignItems: "center", justifyContent: "center", minHeight: 48, backgroundColor: `${glassPalette.cyan}18`, borderColor: `${glassPalette.cyan}88`, borderRadius: 14, borderWidth: 1, paddingVertical: 12 },
     buttonPressed: { opacity: 0.75 },
     buttonDisabled: { opacity: 0.5 },
     buttonText: { color: glassPalette.cyan, fontSize: 12, fontWeight: "900" },
-    disclaimer: { color: glassSurface.textMuted, fontSize: 9, lineHeight: 14 },
+    disclaimer: { color: glassSurface.textMuted, fontSize: 11, lineHeight: 17 },
   });
 }
