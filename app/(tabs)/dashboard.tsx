@@ -16,7 +16,7 @@
  * Superagenten. Alle Daten bleiben echt (useDashboardData) — kein Mock.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Linking, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -65,6 +65,7 @@ export default function DashboardScreen() {
   const glass = useGlassTheme();
   const { vm, state, hasAlerts, isAdmin, retry, serverUptimeText } = useDashboardData();
   const hub = useHubStatus();
+  const [showDetails, setShowDetails] = useState(false);
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
   const styles = useMemo(() => createStyles(glass, wide), [glass, wide]);
@@ -110,8 +111,8 @@ export default function DashboardScreen() {
           <GlassHeader name={vm.user.name} roleBadge={roleBadge} online={vm.user.online} hasAlerts={hasAlerts} />
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionEyebrow}>LIVE TELEMETRY</Text>
-            <Text style={styles.sectionTitle}>System in Echtzeit</Text>
+            <Text style={styles.sectionEyebrow}>ÜBERSICHT</Text>
+            <Text style={styles.sectionTitle}>Dein Control Center</Text>
           </View>
 
           <View style={styles.metricRow}>
@@ -139,7 +140,7 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionEyebrow}>CONTROL MODULES</Text>
+            <Text style={styles.sectionEyebrow}>SCHNELLZUGRIFF</Text>
             <Text style={styles.sectionTitle}>Steuerung & Verbindungen</Text>
           </View>
 
@@ -194,14 +195,23 @@ export default function DashboardScreen() {
             />
           </View>
 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={showDetails ? "Erweiterte Dashboard-Details ausblenden" : "Erweiterte Dashboard-Details anzeigen"}
+            onPress={() => setShowDetails((previous) => !previous)}
+            style={styles.detailsToggle}
+          >
+            <Text style={styles.detailsToggleText}>{showDetails ? "Weniger anzeigen −" : "Weitere Details anzeigen +"}</Text>
+          </Pressable>
+          {showDetails && <>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionEyebrow}>ACTIVITY</Text>
+            <Text style={styles.sectionEyebrow}>AKTIVITÄT</Text>
             <Text style={styles.sectionTitle}>Aktivität & Entwicklung</Text>
           </View>
           <HoloActivityCard count={vm.activity.count} changePercent={vm.activity.changePercent} points={vm.activity.points} />
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionEyebrow}>AI CORE</Text>
+            <Text style={styles.sectionEyebrow}>KI-ZENTRALE</Text>
             <Text style={styles.sectionTitle}>Autonome Intelligenz</Text>
           </View>
           <SuperagentHeroCard status={vm.superAgent.status} name={vm.superAgent.name} detail={vm.superAgent.detail} onRetry={retry} />
@@ -213,7 +223,8 @@ export default function DashboardScreen() {
             testID="dashboard-open-business"
             onPress={() => router.push("/business" as never)}
           />
-          <Text style={styles.footnote}>Alle Werte stammen live aus dem Backend — ohne Platzhalterdaten.</Text>
+          <Text style={styles.footnote}>Statuswerte werden vom Backend geladen; nicht erreichbare Dienste werden entsprechend gekennzeichnet.</Text>
+          </>}
         </ScrollView>
       </ScreenContainer>
     </GlassBackdrop>
@@ -236,6 +247,8 @@ function createStyles(glass: RuntimeGlassTheme, wide: boolean) {
     sectionTitle: { ...glass.glassType.title, color: glass.glassSurface.textPrimary, fontSize: wide ? 17 : 15 },
     metricRow: { flexDirection: "row", flexWrap: "wrap", gap: glass.glassSpacing.sm },
     moduleRow: wide ? { flexDirection: "row", gap: glass.glassSpacing.md } : { flexDirection: "column", gap: glass.glassSpacing.md },
+    detailsToggle: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 14, borderWidth: 1, borderColor: glass.glassSurface.border, backgroundColor: glass.glassSurface.card },
+    detailsToggleText: { color: glass.glassPalette.cyan, fontSize: 13, fontWeight: "700" },
     footnote: { fontSize: 11, color: glass.glassSurface.textMuted, textAlign: "center", paddingTop: 4 },
   });
 }
