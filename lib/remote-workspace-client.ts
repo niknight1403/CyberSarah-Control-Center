@@ -198,6 +198,11 @@ export class RemoteWorkspaceClient {
           "Der Workspace-Service antwortet nicht. Prüfe die Service-URL und die Netzwerkverbindung.",
         );
       }
+      if (error instanceof TypeError) {
+        throw new Error(
+          "Workspace-Service nicht erreichbar (Netzwerk/CORS/TLS). Die URL ist möglicherweise syntaktisch gültig, aber keine Verbindung bestätigt. Prüfe Render-Service, HTTPS, erlaubte Web-Origin und Internetverbindung.",
+        );
+      }
       throw error;
     } finally {
       clearTimeout(timeout);

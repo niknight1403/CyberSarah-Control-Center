@@ -225,8 +225,8 @@ function createStyles(glass: RuntimeGlassTheme, wide: boolean) {
     transparent: { backgroundColor: "transparent" },
     content: {
       gap: glass.glassSpacing.lg,
-      paddingHorizontal: glass.glassSpacing.lg,
-      paddingBottom: 120,
+      paddingHorizontal: wide ? glass.glassSpacing.lg : 12,
+      paddingBottom: 96,
       maxWidth: 1280,
       width: "100%",
       alignSelf: "center" as const,
@@ -234,7 +234,7 @@ function createStyles(glass: RuntimeGlassTheme, wide: boolean) {
     sectionHeader: { gap: 2, marginTop: glass.glassSpacing.xs, paddingHorizontal: 2 },
     sectionEyebrow: { ...glass.glassType.label, color: glass.glassPalette.cyan },
     sectionTitle: { ...glass.glassType.title, color: glass.glassSurface.textPrimary, fontSize: wide ? 17 : 15 },
-    metricRow: wide ? { flexDirection: "row", gap: glass.glassSpacing.md } : { flexDirection: "column", gap: glass.glassSpacing.sm },
+    metricRow: { flexDirection: "row", flexWrap: "wrap", gap: glass.glassSpacing.sm },
     moduleRow: wide ? { flexDirection: "row", gap: glass.glassSpacing.md } : { flexDirection: "column", gap: glass.glassSpacing.md },
     footnote: { fontSize: 11, color: glass.glassSurface.textMuted, textAlign: "center", paddingTop: 4 },
   });
