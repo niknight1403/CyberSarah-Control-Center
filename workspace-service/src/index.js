@@ -593,6 +593,22 @@ async function invokeProvider(request, messages) {
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
+// Public, read-only health endpoint must work from any browser origin.
+// Keep authorization and strict ALLOWED_ORIGIN for all other endpoints.
+app.options("/api/v1/health", cors({ origin: "*", methods: ["GET", "OPTIONS"] }));
+app.use("/api/v1/health", cors({ origin: "*", methods: ["GET", "OPTIONS"] }));
+// Health-Check bewusst oeffentlich (keine Secrets in der Antwort):
+// Platform-Health-Checks (z. B. Koyeb) senden keinen Bearer-Token.
+app.get("/api/v1/health", (_request, response) => {
+  // storage (Sprint 85): Modus-Meldung fuer die App-Diagnose — ohne Pfade/Secrets.
+  response.json({
+    status: "ready",
+    version: "1.0.0",
+    storage: { mode: storageStatus.mode, persistent: storageStatus.persistent },
+    previewUrl: publicBaseUrl || undefined,
+  });
+});
+
 app.use(
   cors({
     origin(origin, callback) {
@@ -610,17 +626,6 @@ app.use(
   }),
 );
 
-// Health-Check bewusst oeffentlich (keine Secrets in der Antwort):
-// Platform-Health-Checks (z. B. Koyeb) senden keinen Bearer-Token.
-app.get("/api/v1/health", (_request, response) => {
-  // storage (Sprint 85): Modus-Meldung fuer die App-Diagnose — ohne Pfade/Secrets.
-  response.json({
-    status: "ready",
-    version: "1.0.0",
-    storage: { mode: storageStatus.mode, persistent: storageStatus.persistent },
-    previewUrl: publicBaseUrl || undefined,
-  });
-});
 
 app.post("/api/v1/providers/cloud/test", requireServiceAuthorization, async (request, response, next) => {
   try {
