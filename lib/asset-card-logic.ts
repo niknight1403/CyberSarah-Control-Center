@@ -30,10 +30,6 @@ const PERSONA_PALETTE: Record<string, { primary: [number, number, number]; accen
   lina: { primary: [69, 26, 3], accent: [251, 191, 36] },
   kaya: { primary: [12, 34, 24], accent: [45, 212, 191] },
   zara: { primary: [50, 8, 40], accent: [244, 114, 182] },
-  orion: { primary: [23, 12, 50], accent: [129, 140, 248] },
-  ava: { primary: [40, 16, 8], accent: [251, 146, 60] },
-  rio: { primary: [8, 28, 35], accent: [34, 211, 238] },
-  nala: { primary: [35, 20, 12], accent: [250, 204, 21] },
 };
 
 export function personaColors(personaId: string): { primary: [number, number, number]; accent: [number, number, number] } {
