@@ -68,6 +68,11 @@ export function verifyAgentforgeCheckpoint(input: unknown) {
   return normalizeCheckpoint(input);
 }
 
+function exceedsBodyLimit(req: Request, maximumBytes: number): boolean {
+  try { return Buffer.byteLength(JSON.stringify(req.body ?? null)) > maximumBytes; }
+  catch { return true; }
+}
+
 function hasValidServiceToken(req: Request): boolean {
   const configured = process.env.AGENTFORGE_TELEMETRY_TOKEN ?? "";
   const supplied = req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7).trim() : "";
@@ -85,6 +90,7 @@ const writeSse = (res: Response, event: { id: number; event: string; data: unkno
 export function registerAgentforgeTelemetryRoutes(app: Express) {
   app.post("/api/agentforge/events", async (req, res) => {
     if (!hasValidServiceToken(req)) { res.status(process.env.AGENTFORGE_TELEMETRY_TOKEN ? 401 : 503).json({ error: "telemetry_auth_failed" }); return; }
+    if (exceedsBodyLimit(req, 32 * 1024)) { res.status(413).json({ error: "event_too_large" }); return; }
     const event = normalizeAgentforgeEvent(req.body);
     if (!event) { res.status(400).json({ error: "invalid_event" }); return; }
     const db = await getDb();
@@ -121,6 +127,7 @@ export function registerAgentforgeTelemetryRoutes(app: Express) {
 
   app.post("/api/agentforge/checkpoints", async (req, res) => {
     if (!hasValidServiceToken(req)) { res.status(process.env.AGENTFORGE_TELEMETRY_TOKEN ? 401 : 503).json({ error: "telemetry_auth_failed" }); return; }
+    if (exceedsBodyLimit(req, 96 * 1024)) { res.status(413).json({ error: "checkpoint_too_large" }); return; }
     const checkpoint = verifyAgentforgeCheckpoint(req.body);
     if (!checkpoint) { res.status(400).json({ error: "invalid_checkpoint" }); return; }
     const db = await getDb();
