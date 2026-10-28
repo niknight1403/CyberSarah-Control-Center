@@ -53,6 +53,8 @@ describe("provider circuit breaker",()=>{
   beforeEach(()=>resetProviderCircuits());
   it("opens on rate limits and half-opens after cooldown",()=>{
     recordProviderCircuitFailure("gemini",429,120,1000);
+    recordProviderCircuitFailure("gemini",429,120,1000);
+    recordProviderCircuitFailure("gemini",429,120,1000);
     expect(providerCircuitAllows("gemini",1001)).toBe(false);
     expect(providerCircuitAllows("gemini",1000+CIRCUIT_OPEN_MS+1)).toBe(true);
     expect(providerCircuitSnapshot()[0].state).toBe("HALF_OPEN");
