@@ -20,7 +20,7 @@ try{
   const sql=await readFile(new URL("../drizzle/0019_repair_growth_schema.sql",import.meta.url),"utf8");
   // The repair migration is intentionally idempotent. Running it as a preflight
   // makes production resilient to a stale/mis-recorded Drizzle migration journal.
-  await pool.query(sql.replaceAll("--> statement-breakpoint",""));
+  await pool.query(sql.replaceAll("--> statement-breakpoint",""));\n  // Migration 0020 is safe to repair outside the Drizzle journal.\n  await pool.query(`ALTER TABLE "draftQueue" ADD COLUMN IF NOT EXISTS "dedupeKey" varchar(220)`);\n  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "draftQueue_dedupe_idx" ON "draftQueue" ("dedupeKey")`);
   const result=await pool.query(
     "select relname from pg_class where relkind in ('r','p') and relname = any($1::text[])",
     [required],
@@ -31,7 +31,7 @@ try{
     console.error(`[schema-preflight] Kritische Tabellen fehlen nach Repair: ${missing.join(", ")}`);
     process.exitCode=1;
   }else{
-    console.log(`[schema-preflight] OK: ${required.length} kritische Revenue/Growth-Tabellen vorhanden.`);
+    console.log(`[schema-preflight] OK: ${required.length} kritische Revenue/Growth-Tabellen + Draft-Dedupe-Schema vorhanden.`);
   }
 }finally{
   await pool.end();
