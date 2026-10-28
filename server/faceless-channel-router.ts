@@ -6,7 +6,7 @@ import {
 } from "../lib/faceless-channel-logic";
 import { facelessChannelOverview, materializeFacelessChannelLaunch } from "./faceless-channel-service";
 import { channelAutopilotOverview, runChannelAutopilot } from "./channel-autopilot";
-import { auditCrossChannelReuse, multiChannelStrategy, rankChannelPortfolio } from "../lib/faceless-multichannel-logic";
+import { FACELESS_MULTI_CHANNEL_SYSTEM_PROMPT, auditCrossChannelReuse, multiChannelStrategy, rankChannelPortfolio } from "../lib/faceless-multichannel-logic";
 import { materializeProductionSystem, planChannelExpansion } from "./faceless-multichannel-service";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 
@@ -28,6 +28,7 @@ export const facelessChannelRouter=router({
   runAutopilot:adminProcedure.mutation(()=>runChannelAutopilot()),
 
 
+  architectPrompt:adminProcedure.query(()=>({prompt:FACELESS_MULTI_CHANNEL_SYSTEM_PROMPT})),
   multiChannelStrategy:protectedProcedure.input(z.object({
     script:z.number().min(0).max(100),voice:z.number().min(0).max(100),visuals:z.number().min(0).max(100),edit:z.number().min(0).max(100),
     qualityScore:z.number().min(0).max(100),publishedProofs:z.number().int().min(0),reuseRisk:z.number().min(0).max(100),
