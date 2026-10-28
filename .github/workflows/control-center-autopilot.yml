@@ -37,5 +37,5 @@ jobs:
           cat "$body_file"
           echo
           test "$http_code" = "200"
-          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0' "$body_file" >/dev/null
+          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
           echo "Control-Center-Autopilot vollständig bestätigt."
