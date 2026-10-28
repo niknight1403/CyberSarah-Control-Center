@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { normalizeAgentforgeEvent, verifyAgentforgeCheckpoint } from "../../server/agentforge-telemetry";
 
@@ -8,14 +9,10 @@ describe("Agentforge telemetry safety boundary", () => {
     expect(normalizeAgentforgeEvent({ id: "event-12345", type: "thought", at: Date.now() })).toBeNull();
   });
 
-  it("validates a hash-linked checkpoint and rejects sensitive fields", () => {
-    expect(verifyAgentforgeCheckpoint({
-      taskId: 12, agentId: 3, sequence: 1, parentId: null, checkpointId: "0".repeat(64),
-      state: { status: "running", step: 2 },
-    })).toBeNull();
-    expect(verifyAgentforgeCheckpoint({
-      taskId: 12, agentId: 3, sequence: 1, parentId: null, checkpointId: "a".repeat(64),
-      state: { promptText: "must not persist" },
-    })).toBeNull();
+  it("accepts an authentic hash-linked checkpoint and rejects forged or sensitive state", () => {
+    const state = { status: "running", step: 2 };
+    const checkpointId = createHash("sha256").update(["12", "3", "1", "", JSON.stringify(state)].join("\\0")).digest("hex");
+    expect(verifyAgentforgeCheckpoint({ taskId: 12, agentId: 3, sequence: 1, parentId: null, checkpointId, state })).toMatchObject({ checkpointId, taskId: "12", agentId: "3" });
+    expect(verifyAgentforgeCheckpoint({ taskId: 12, agentId: 3, sequence: 1, parentId: null, checkpointId: "a".repeat(64), state: { promptText: "must not persist" } })).toBeNull();
   });
 });

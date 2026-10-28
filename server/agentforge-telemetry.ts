@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { sdk } from "./_core/sdk";
 
-const EVENT_TYPES = new Set(["task.created", "task.updated", "agent.step.started", "agent.failed", "tool.executed", "checkpoint.saved", "llm.completed"]);
+const EVENT_TYPES = new Set(["task.created", "task.updated", "agent.step.started", "agent.failed", "tool.executed", "checkpoint.saved", "llm.completed", "llm.failed"]);
 const SAFE_KEYS = new Set(["villaId", "taskId", "agentId", "status", "tool", "blocked", "code", "durationMs", "latencyMs", "tokensUsed", "costUsd", "provider", "model", "route", "checkpointId", "step", "processed", "open", "verification"]);
 const FORBIDDEN = /thought|reasoning|prompt|secret|token|password|credential|authorization|content|arguments|answer/i;
 type SafeEvent = { id: string; type: string; at: number; metadata: Record<string, string | number | boolean> };
@@ -49,7 +49,7 @@ function normalizeCheckpoint(value: unknown) {
 function normalizeSafeState(input: unknown, depth = 0): Record<string, unknown> | null {
   if (!input || typeof input !== "object" || Array.isArray(input) || depth > 16) return null;
   const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(input as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [key, value] of Object.entries(input as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     if (FORBIDDEN.test(key)) return null;
     if (value === null || typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) out[key] = value;
     else if (Array.isArray(value)) {
@@ -154,7 +154,7 @@ export function registerAgentforgeTelemetryRoutes(app: Express) {
       for (const row of rows) {
         const id = Number(row.id);
         if (id <= client.lastId) continue;
-        writeSse(res, { id, event: String(row.event_type), data: { id: row.event_id, type: row.event_type, at: new Date(String(row.occurred_at)).getTime(), ...(row.metadata as object ?? {}) } });
+        writeSse(res, { id, event: String(row.event_type), data: { id: row.event_id, type: row.event_type, at: new Date(String(row.occurred_at)).getTime(), ...((row.metadata && typeof row.metadata === "object") ? row.metadata as Record<string, unknown> : {}) } });
         client.lastId = id;
       }
       client.pending.sort((a, b) => a.id - b.id);

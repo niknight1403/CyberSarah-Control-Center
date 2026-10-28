@@ -20,6 +20,7 @@ import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { trpc } from "@/lib/trpc";
+import { useAgentforgeTelemetry } from "@/hooks/use-agentforge-telemetry";
 
 /**
  * Sprint 126 — Cyber-Dashboard: Live-Widgets fuer Systemstatus,
@@ -89,6 +90,7 @@ export default function CyberDashboardScreen() {
   });
   const account = trpc.monetization.account.useQuery();
   const me = trpc.auth.me.useQuery();
+  const mesh = useAgentforgeTelemetry(me.data?.role === "admin");
   const taskLedger = trpc.orchestrator.tasks.useQuery(
     { limit: 10 },
     { enabled: me.data?.role === "admin" },
@@ -179,6 +181,24 @@ export default function CyberDashboardScreen() {
             <Text style={styles.emptyText}>
               Autonomes Backend offline — Terminal zeigt Studio-Logs, Ledger nutzt Orchestrator-Daten.
             </Text>
+          )}
+        </LiveWidget>
+
+        <LiveWidget title="Agentforge Mesh" badge={mesh.connectionState.toUpperCase()} accent={mesh.connectionState === "connected" ? glassPalette.green : glassPalette.cyan}>
+          {mesh.events.length === 0 ? (
+            <Text style={styles.emptyText}>Warte auf Agentforge-Ereignisse. Der Stream enthält Laufzeit-Metadaten, keine Prompts oder Gedanken.</Text>
+          ) : (
+            mesh.events.slice(-4).reverse().map((event) => (
+              <View key={event.id} style={styles.taskRow}>
+                <View style={TASK_DOT_STYLE(event.type === "agent.failed" || event.type === "llm.failed" ? "failed" : "running")} />
+                <View style={styles.taskTextContainer}>
+                  <Text style={styles.taskTitle} numberOfLines={1}>{event.type}</Text>
+                  <Text style={styles.taskMeta} numberOfLines={1}>
+                    {String(event.metadata.status ?? event.metadata.code ?? event.metadata.route ?? "aktiv")} · {new Date(event.at).toLocaleTimeString("de-DE")}
+                  </Text>
+                </View>
+              </View>
+            ))
           )}
         </LiveWidget>
 
