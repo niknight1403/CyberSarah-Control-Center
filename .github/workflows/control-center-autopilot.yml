@@ -1,0 +1,37 @@
+name: control-center-autopilot
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-center-autopilot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Echter Autopilot-Lauf
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Analyse, Revenue-Scans und Entwurfsproduktion ausführen
+        env:
+          BASE_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          TOKEN: ${{ secrets.METRICS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_URL"
+          test -n "$TOKEN"
+          case "$BASE_URL" in https://*) ;; *) echo "::error::RENDER_PUBLIC_URL muss HTTPS sein"; exit 1;; esac
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+          http_code="$(curl --silent --show-error --retry 2 --retry-delay 2 --max-time 180             --output "$body_file" --write-out '%{http_code}' --request POST             --header "Authorization: Bearer $TOKEN"             "${BASE_URL%/}/api/cron/control-center-autopilot")"
+          cat "$body_file"
+          echo
+          test "$http_code" = "200"
+          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true' "$body_file" >/dev/null
+          echo "Control-Center-Autopilot vollständig bestätigt."
