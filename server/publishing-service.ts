@@ -1,7 +1,7 @@
 /**
  * Sprint 365 — Publishing-Service: autonome Kampagnen-Warteschlange.
  *
- * Verbindet Reichweiten-Engine, 10 Influencer-Personas und die Publishing-
+ * Verbindet Reichweiten-Engine, 6 transparente KI-Creator und die Publishing-
  * Tabelle. Der Autopilot (startPublishingAutopilot) verarbeitet faellige
  * Jobs im Minutentakt, generiert den Inhalt zur Veroeffentlichungszeit mit
  * der LLM (Persona-Prompt) und veroeffentlicht:
