@@ -5,8 +5,8 @@ import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 describe("DRAWER_ITEMS", () => {
   it("zeigt fokussierte Revenue-Navigation ohne Designer/Utility-Tabs", () => {
     expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
-      "Übersicht", "Revenue OS", "Business & Analytics", "Micro Trading",
-      "Revenue-Loops", "Fokus & Rückblick", "Ideen-Inbox", "Entscheidungs-Journal",
+      "Übersicht", "Revenue OS", "Business & Analytics",
+      "Fokus & Rückblick", "Ideen-Inbox", "Entscheidungs-Journal",
       "Chat", "Workflows", "Konto",
     ]);
     expect(DRAWER_ITEMS.map(item => item.route)).not.toContain("/designer");
@@ -21,8 +21,8 @@ describe("resolveActiveDrawerItem", () => {
   it("findet exakte Treffer", () => {
     expect(resolveActiveDrawerItem("/account")?.title).toBe("Konto");
     expect(resolveActiveDrawerItem("/revenue-os")?.title).toBe("Revenue OS");
-    expect(resolveActiveDrawerItem("/micro-trading")?.title).toBe("Micro Trading");
-    expect(resolveActiveDrawerItem("/loop-engineering")?.title).toBe("Revenue-Loops");
+    expect(resolveActiveDrawerItem("/micro-trading")).toBeNull();
+    expect(resolveActiveDrawerItem("/loop-engineering")).toBeNull();
   });
 
   it("findet Praefix-Treffer fuer verschachtelte Routen", () => {
