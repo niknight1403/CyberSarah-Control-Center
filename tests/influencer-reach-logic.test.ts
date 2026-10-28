@@ -15,7 +15,7 @@ import {
 describe("influencer reach engine (Sprint 364)", () => {
   it("bewertet jede Persona gegen ein Produkt deterministisch", () => {
     expect(scorePersonaForProduct("juno", "B2B-SaaS-Plattform fuer Start-ups")).toBeGreaterThan(0);
-    expect(scorePersonaForProduct("rio", "B2B-SaaS-Plattform fuer Start-ups")).toBe(0);
+    expect(scorePersonaForProduct("lina", "B2B-SaaS-Plattform fuer Start-ups")).toBe(0);
     expect(scorePersonaForProduct("juno", "B2B-SaaS-Plattform fuer Start-ups")).toBe(
       scorePersonaForProduct("juno", "B2B-SaaS-Plattform fuer Start-ups")
     );
@@ -23,7 +23,7 @@ describe("influencer reach engine (Sprint 364)", () => {
 
   it("kombiniert Match, Plattform und Ziel im Kampagnen-Score", () => {
     const saasScore = scoreCampaignFit("juno", "linkedin", "CRM-Software fuer B2B-SaaS", "umsatz");
-    const lowScore = scoreCampaignFit("rio", "linkedin", "CRM-Software fuer B2B-SaaS", "umsatz");
+    const lowScore = scoreCampaignFit("lina", "linkedin", "CRM-Software fuer B2B-SaaS", "umsatz");
     expect(saasScore).toBeGreaterThan(lowScore);
     expect(saasScore).toBeLessThanOrEqual(100);
   });
@@ -53,7 +53,7 @@ describe("influencer reach engine (Sprint 364)", () => {
     expect(() => planInfluencerCampaign("x".repeat(501), "umsatz")).toThrow();
   });
 
-  it("kennt Plattform-Faktoren fuer alle 10 Personas", () => {
+  it("kennt Plattform-Faktoren fuer alle sechs Personas", () => {
     for (const persona of INFLUENCER_PERSONAS) {
       const id = persona.id as InfluencerPersonaId;
       expect(scoreCampaignFit(id, "instagram", "Produkt", "aufmerksamkeit")).toBeGreaterThanOrEqual(0);

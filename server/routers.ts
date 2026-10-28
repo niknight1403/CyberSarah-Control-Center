@@ -41,6 +41,7 @@ import { trendRevenueRouter } from "./trend-revenue-bridge";
 import { pillarsRouter } from "./pillars-router";
 import { haraRouter, saasRouter, crossSellRouter, expansionRouter, subscriptionManagementRouter, revenueTradingRouter } from "./revenue-command-router";
 import { revenueAutopilotRouter } from "./revenue-autopilot-router";
+import { controlCenterAutopilotRouter } from "./control-center-autopilot-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -92,6 +93,7 @@ export const appRouter = router({
   subscriptionManagement: subscriptionManagementRouter,
   revenueTrading: revenueTradingRouter,
   revenueAutopilot: revenueAutopilotRouter,
+  controlCenterAutopilot: controlCenterAutopilotRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.

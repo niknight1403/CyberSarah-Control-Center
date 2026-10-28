@@ -44,6 +44,7 @@ import { restoreRouterState } from "../model-router";
 import { restoreRouteRotationState } from "../route-rotation-agent";
 import { runDraftEngine } from "../draft-engine";
 import { runRevenueAutopilot } from "../revenue-autopilot";
+import { runControlCenterAutopilot } from "../control-center-autopilot";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -398,6 +399,28 @@ async function startServer() {
     }
   });
 
+
+  // Zentraler Autopilot: echte Revenue-Scans + datenbasierte Optimierung +
+  // Creator-/Ideen-Entwuerfe in einem idempotenten, authentifizierten Lauf.
+  app.post("/api/cron/control-center-autopilot", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runControlCenterAutopilot();
+      console.info("[Control-Center-Autopilot] Lauf abgeschlossen:", JSON.stringify({
+        ok: result.ok,
+        realActions: result.realActions,
+        blocked: result.blocked,
+      }));
+      res.status(result.ok ? 200 : 207).json({ ok: result.ok, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Control-Center-Autopilot] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
 
   // Sprint 66 — Live-Runtime-Endpunkte fuer das Preview-Panel (auth-pflichtig).
   installRuntimeLogger();

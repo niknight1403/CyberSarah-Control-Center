@@ -1,17 +1,17 @@
 /**
  * Sprint 365 — Publishing-Service: autonome Kampagnen-Warteschlange.
  *
- * Verbindet Reichweiten-Engine, 10 Influencer-Personas und die Publishing-
+ * Verbindet Reichweiten-Engine, 6 transparente KI-Creator und die Publishing-
  * Tabelle. Der Autopilot (startPublishingAutopilot) verarbeitet faellige
  * Jobs im Minutentakt, generiert den Inhalt zur Veroeffentlichungszeit mit
  * der LLM (Persona-Prompt) und veroeffentlicht:
  *   - live, wenn die Plattform-Credentials in der Umgebung liegen
  *     (X_PUBLISH_TOKEN, LINKEDIN_PUBLISH_TOKEN + LINKEDIN_PUBLISH_USER_URN,
  *     THREADS_PUBLISH_TOKEN + THREADS_PUBLISH_USER_ID) — nur Text-Plattformen
- *   - sonst ehrlich im Sandbox-Modus (Status sandbox_veroeffentlicht,
- *     niemals als Live-Erfolg ausgegeben)
- * Instagram/TikTok brauchen mehrstufige Medien-Uploads und bleiben im
- * Sandbox-Modus, bis die Asset-Pipeline konfiguriert ist.
+ *   - ohne vollständige Live-Credentials oder Medien-Assets wird NICHT
+ *     simuliert: der Job bleibt mit echtem Fehlergrund im Retry-/Fehlerpfad.
+ * Instagram/TikTok nutzen die implementierte Live-Medienpipeline; ohne
+ * erforderliches Asset wird die Veröffentlichung blockiert.
  *
  * Tokens bootstrappen aus Env-Variablen; Sprint 370 persistiert die ROTIERTEN
  * X-Tokens (Access+Refresh, X invalidiert alte Sets bei jedem Refresh) in der
@@ -399,7 +399,7 @@ async function publishLive(
     if (!publishId) throw new Error("TikTok-Publish konnte nicht initialisiert werden — keine publish_id.");
     return { externalId: String(publishId) };
   }
-  throw new Error(`Kein Live-Adapter fuer "${platform}" — Plattform unterstuetzt nur Sandbox.`);
+  throw new Error(`Kein Live-Adapter fuer "${platform}" — Veröffentlichung blockiert.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -565,38 +565,25 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
 
     try {
       const content = await generateJobContent(job);
-      if (resolution.mode === "live") {
-        const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls, {
-          onXUnauthorized: () => resolveXToken({ now, force: true }).then((resolution) => resolution.token),
-        });
-        await db
-          .update(publishingJobs)
-          .set({
-            status: "veroeffentlicht",
-            mode: "live",
-            externalId,
-            publishedAt: new Date(),
-            attempts: job.attempts + 1,
-            lastError: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(publishingJobs.id, job.id));
-        outcome.live += 1;
-      } else {
-        await db
-          .update(publishingJobs)
-          .set({
-            status: "sandbox_veroeffentlicht",
-            mode: "sandbox",
-            externalId: `sandbox-${job.id}`,
-            publishedAt: new Date(),
-            attempts: job.attempts + 1,
-            lastError: resolution.reason,
-            updatedAt: new Date(),
-          })
-          .where(eq(publishingJobs.id, job.id));
-        outcome.sandbox += 1;
+      if (resolution.mode !== "live") {
+        throw new Error(resolution.reason);
       }
+      const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls, {
+        onXUnauthorized: () => resolveXToken({ now, force: true }).then((resolution) => resolution.token),
+      });
+      await db
+        .update(publishingJobs)
+        .set({
+          status: "veroeffentlicht",
+          mode: "live",
+          externalId,
+          publishedAt: new Date(),
+          attempts: job.attempts + 1,
+          lastError: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(publishingJobs.id, job.id));
+      outcome.live += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unbekannter Publishing-Fehler";
       const attempts = job.attempts + 1;

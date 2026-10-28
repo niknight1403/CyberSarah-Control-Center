@@ -1,5 +1,5 @@
 /**
- * Sprint 364 — Reichweiten- & Revenue-Engine fuer die 10 KI-Influencer-
+ * Sprint 364 — Reichweiten- & Revenue-Engine fuer die 6 KI-Influencer-
  * Personas (rein, deterministisch, keine Netzwerk- oder LLM-Calls).
  *
  * Datenfluss:
@@ -29,16 +29,12 @@ export const MAX_SUPPORTING_PERSONAS = 3;
 
 /** Plattform-Faktor: 10 = sehr wirksam in der Nische, 1 = schwach. */
 export const PLATFORM_EFFECTIVENESS: Record<InfluencerPersonaId, Record<InfluencerPlatform, number>> = {
-  nova: { instagram: 8, tiktok: 7, linkedin: 9, x: 9, threads: 7 },
-  mira: { instagram: 9, tiktok: 8, linkedin: 6, x: 5, threads: 8 },
-  juno: { instagram: 6, tiktok: 5, linkedin: 10, x: 8, threads: 5 },
-  lina: { instagram: 10, tiktok: 9, linkedin: 4, x: 4, threads: 7 },
-  kaya: { instagram: 7, tiktok: 8, linkedin: 9, x: 8, threads: 5 },
-  zara: { instagram: 9, tiktok: 10, linkedin: 5, x: 7, threads: 8 },
-  orion: { instagram: 7, tiktok: 9, linkedin: 8, x: 9, threads: 6 },
-  ava: { instagram: 10, tiktok: 9, linkedin: 4, x: 4, threads: 6 },
-  rio: { instagram: 10, tiktok: 8, linkedin: 3, x: 4, threads: 7 },
-  nala: { instagram: 9, tiktok: 9, linkedin: 5, x: 5, threads: 8 },
+  nova: { instagram: 8, tiktok: 7, linkedin: 9, x: 9, threads: 7, bluesky: 8 },
+  mira: { instagram: 9, tiktok: 8, linkedin: 6, x: 5, threads: 8, bluesky: 6 },
+  juno: { instagram: 6, tiktok: 5, linkedin: 10, x: 8, threads: 5, bluesky: 6 },
+  lina: { instagram: 10, tiktok: 9, linkedin: 4, x: 4, threads: 7, bluesky: 5 },
+  kaya: { instagram: 7, tiktok: 8, linkedin: 9, x: 8, threads: 5, bluesky: 6 },
+  zara: { instagram: 9, tiktok: 10, linkedin: 5, x: 7, threads: 8, bluesky: 7 },
 };
 
 /** Zielgewichte je Kanalziel (Aufmerksamkeit vs. Umsatz). */
@@ -56,10 +52,6 @@ const NICHE_KEYWORDS: Record<InfluencerPersonaId, string[]> = {
   lina: ["produktivität", "organisation", "alltag", "lifestyle", "planer", "routine"],
   kaya: ["finanz", "investier", "geld", "sparen", "etf", "budget", "wirtschaft"],
   zara: ["creator", "content", "publikum", "community", "monetarisier", "aufmerksamkeit", "social media"],
-  orion: ["gadget", "hardware", "smartphone", "app", "tool", "review", "technik", "gerät", "iot"],
-  ava: ["gesundheit", "fitness", "sport", "ernaehrung", "ernaehrung", "wellness", "workout", "schlaf"],
-  rio: ["food", "rezept", "koch", "kulinarisch", "restaurant", "essen", "genuss", "café"],
-  nala: ["reise", "travel", "nomade", "urlaub", "destination", "remote work", "auswandern", "abenteuer"],
 };
 
 /** Zielnischen mit besonderer Kauafkafft (Conversion-Vorsprung). */
@@ -67,7 +59,6 @@ const CONVERSION_NICHES: Partial<Record<InfluencerPersonaId, boolean>> = {
   juno: true,
   kaya: true,
   zara: true,
-  orion: true,
 };
 
 /** Match-Score einer Persona fuer ein Produkt (0..100, deterministisch). */
@@ -80,9 +71,13 @@ export function scorePersonaForProduct(personaId: InfluencerPersonaId, product: 
   }
   const persona = INFLUENCER_PERSONAS.find((entry) => entry.id === personaId);
   if (!persona) return 0;
+  const pillarHits = persona.contentPillars.filter((pillar) => haystack.includes(pillar.toLowerCase())).length;
+  const audienceTerms = persona.audience.toLowerCase().split(/[ ,.-]+/).filter((term) => term.length >= 5);
+  const audienceHits = audienceTerms.filter((term) => haystack.includes(term)).length;
   const base = hits * 25;
   const nicheBonus = haystack.includes(persona.niche.toLowerCase().split(" ")[0]) ? 15 : 0;
-  return Math.min(100, base + nicheBonus);
+  const affinityBonus = Math.min(20, pillarHits * 8 + audienceHits * 4);
+  return Math.min(100, base + nicheBonus + affinityBonus);
 }
 
 /** Kombiniertern Kampagnen-Score: Match x Plattform x Zielgewicht (0..100). */
@@ -115,6 +110,7 @@ export type CampaignPlan = {
   platformMix: InfluencerPlatform[];
   slots: CampaignSlot[];
   projectedReachIndex: number;
+  audienceAffinityIndex: number;
   guardrails: string[];
 };
 
@@ -208,6 +204,9 @@ export function planInfluencerCampaign(
   const projectedReachIndex = Math.round(
     (slots.reduce((sum, slot) => sum + slot.score, 0) / Math.max(slots.length, 1)) * (days / 7)
   );
+  const audienceAffinityIndex = Math.round(
+    cast.reduce((sum, personaId) => sum + scorePersonaForProduct(personaId, trimmed), 0) / Math.max(cast.length, 1)
+  );
 
   return {
     product: trimmed,
@@ -217,6 +216,7 @@ export function planInfluencerCampaign(
     platformMix,
     slots,
     projectedReachIndex,
+    audienceAffinityIndex,
     guardrails: [
       `Maximal ${MAX_POSTS_PER_PERSONA_PER_DAY} Posts pro Persona und Tag.`,
       "Keine Einnahme- oder Renditeversprechen; KI-Transparenz bleibt Pflicht.",

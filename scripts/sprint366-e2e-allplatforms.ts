@@ -2,7 +2,7 @@
  * Sprint 366 — E2E: VOLLSTAENDIGE Automatisierung ueber ALLE 5 Plattformen.
  * Lokale Mock-APIs (X, LinkedIn, Threads, Instagram 2-Schritt, TikTok
  * PULL_FROM_URL) stehen als echte HTTP-Endpunkte — der Autopilot durchlaeuft
- * den kompletten Live-Pfad inkl. Asset-Anforderung und Sandbox-Ehrlichkeit.
+ * den kompletten Live-Pfad inkl. Asset-Anforderung und Fail-Closed-Verhalten.
  */
 import { createServer } from "node:http";
 import { eq } from "drizzle-orm";
@@ -111,13 +111,13 @@ async function main() {
     { platform: "x", persona: "nova" },
     { platform: "linkedin", persona: "juno" },
     { platform: "threads", persona: "mira" },
-    { platform: "instagram", persona: "ava", assetUrl: "https://cdn.example.com/ava.jpg" },
-    { platform: "tiktok", persona: "orion", assetUrl: "https://cdn.example.com/orion.mp4" },
+    { platform: "instagram", persona: "lina", assetUrl: "https://cdn.example.com/lina.jpg" },
+    { platform: "tiktok", persona: "zara", assetUrl: "https://cdn.example.com/zara.mp4" },
   ];
   for (const job of jobs) {
     await insertDirectJob({ ...job, dedupeKey: `s366|${job.persona}|${job.platform}|1` });
   }
-  // Ehrlichkeits-Job: Instagram ohne Asset -> muss Sandbox bleiben
+  // Ehrlichkeits-Job: Instagram ohne Asset -> darf niemals simuliert publiziert werden
   await insertDirectJob({ platform: "instagram", persona: "kaya", dedupeKey: "s366|kaya|instagram|1" });
 
   const outcome = await processDueJobsForUser(USER);
@@ -131,11 +131,11 @@ async function main() {
   }
 
   const liveOk = final.filter((job) => job.status === "veroeffentlicht" && job.mode === "live").length;
-  const sandboxHonest = final.find((job) => job.platform === "instagram" && job.persona === "kaya");
+  const blockedHonest = final.find((job) => job.platform === "instagram" && job.persona === "kaya");
   console.log("Live veroeffentlicht:", liveOk, "von 5 erwartet");
-  console.log("IG-ohne-Asset ehrlich:", sandboxHonest?.status, "| Grund:", (sandboxHonest?.lastError ?? "").slice(0, 60));
+  console.log("IG-ohne-Asset ehrlich:", blockedHonest?.status, "| Grund:", (blockedHonest?.lastError ?? "").slice(0, 60));
   console.log("IG-Container-2-Schritt aufgerufen:", igContainerCalls, "x (Container), Publish folgte:", final.some((j) => j.externalId === "ig-publish-42"));
-  process.exit(liveOk === 5 && sandboxHonest?.status === "sandbox_veroeffentlicht" ? 0 : 1);
+  process.exit(liveOk === 5 && blockedHonest?.status === "geplant" ? 0 : 1);
 }
 
 main().catch((error) => {

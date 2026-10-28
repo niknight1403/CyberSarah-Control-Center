@@ -83,9 +83,9 @@ export const influencerRouter = router({
         audience: input.audience,
         persona: {
           referenceId: `cybersarah-${persona.id}`,
-          age: 45,
-          presentation: persona.tonality,
-          signatureLook: `${persona.niche}, konsistentes CyberSarah-Branding`,
+          age: persona.avatarAge,
+          presentation: `${persona.tonality}; klar als KI-Persönlichkeit gekennzeichnet`,
+          signatureLook: persona.visualIdentity,
         },
         platforms: input.platforms,
         trends: input.trends,
