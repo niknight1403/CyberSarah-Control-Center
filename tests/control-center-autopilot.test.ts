@@ -20,6 +20,7 @@ describe("control center autopilot", () => {
     expect(result.deferred).toEqual([]);
     expect(result.realActions.join(" ")).toContain("Creator-Content");
     expect(result.realActions.join(" ")).toContain("Revenue");
+    expect(result.decision.action).toBe("VERIFY");
   });
 
   it("behandelt Provider-Quota ehrlich als verschobene Arbeit", async () => {
@@ -29,6 +30,7 @@ describe("control center autopilot", () => {
     expect(result.ok).toBe(false);
     expect(result.deferred.join(" ")).toContain("429");
     expect(result.blocked).toEqual([]);
+    expect(result.decision.action).toBe("RETRY");
   });
 
   it("meldet reale Blockaden statt sie als Erfolg zu simulieren", async () => {
@@ -38,5 +40,6 @@ describe("control center autopilot", () => {
     const result = await runControlCenterAutopilot({ scan, revenue, drafts });
     expect(result.ok).toBe(false);
     expect(result.blocked.join(" ")).toContain("Relay offline");
+    expect(result.decision.action).toBe("HEAL");
   });
 });
