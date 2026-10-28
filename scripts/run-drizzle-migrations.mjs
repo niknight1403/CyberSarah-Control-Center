@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { deployPgPoolConfig, maskSecrets } from "../lib/render-deploy-logic.mjs";
+import { deployPgPoolConfig, isRestrictedDrizzleJournalError, maskSecrets } from "../lib/render-deploy-logic.mjs";
 
 const raw=(process.env.DATABASE_URL??"").trim();
 if(!/^postgres(?:ql)?:\/\//i.test(raw)){
