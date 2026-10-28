@@ -8,10 +8,10 @@
  *   - live, wenn die Plattform-Credentials in der Umgebung liegen
  *     (X_PUBLISH_TOKEN, LINKEDIN_PUBLISH_TOKEN + LINKEDIN_PUBLISH_USER_URN,
  *     THREADS_PUBLISH_TOKEN + THREADS_PUBLISH_USER_ID) — nur Text-Plattformen
- *   - sonst ehrlich im Sandbox-Modus (Status sandbox_veroeffentlicht,
- *     niemals als Live-Erfolg ausgegeben)
- * Instagram/TikTok brauchen mehrstufige Medien-Uploads und bleiben im
- * Sandbox-Modus, bis die Asset-Pipeline konfiguriert ist.
+ *   - ohne vollständige Live-Credentials oder Medien-Assets wird NICHT
+ *     simuliert: der Job bleibt mit echtem Fehlergrund im Retry-/Fehlerpfad.
+ * Instagram/TikTok nutzen die implementierte Live-Medienpipeline; ohne
+ * erforderliches Asset wird die Veröffentlichung blockiert.
  *
  * Tokens bootstrappen aus Env-Variablen; Sprint 370 persistiert die ROTIERTEN
  * X-Tokens (Access+Refresh, X invalidiert alte Sets bei jedem Refresh) in der
