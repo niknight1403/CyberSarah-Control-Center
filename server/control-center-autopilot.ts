@@ -1,0 +1,65 @@
+import { runDraftEngine, type DraftEngineRunResult } from "./draft-engine";
+import { runRevenueAutopilot, type RevenueAutopilotRunResult } from "./revenue-autopilot";
+import { triggerRevenueScan } from "./revenue-command-service";
+
+export type ControlCenterAutopilotResult = {
+  ok: boolean;
+  startedAt: string;
+  finishedAt: string;
+  scans: {
+    hara: { ok: boolean; detail: string };
+    expansion: { ok: boolean; detail: string };
+  };
+  drafts: DraftEngineRunResult;
+  revenue: RevenueAutopilotRunResult;
+  realActions: string[];
+  blocked: string[];
+};
+
+async function scan(path: "hara/scan" | "expansion/scan") {
+  try {
+    const result = await triggerRevenueScan(path);
+    return {
+      ok: result.accepted === true,
+      detail: result.background ? "vom echten Revenue-Worker angenommen" : result.completed ? "vom echten Revenue-Worker abgeschlossen" : "angenommen",
+    };
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : "Scan fehlgeschlagen" };
+  }
+}
+
+/**
+ * Ein echter Control-Center-Autopilot-Lauf.
+ * Keine Mock-/Sandbox-Ergebnisse: HARA/Expansion treffen den konfigurierten
+ * Revenue-Worker, Revenue-Optimierung nutzt Live-Signale und die Draft-Engine
+ * nutzt nur echte konfigurierte LLM-Routen. Externe Veröffentlichungen und
+ * Preis-/Geldaktionen bleiben bewusst außerhalb dieses reversiblen Loops.
+ */
+export async function runControlCenterAutopilot(): Promise<ControlCenterAutopilotResult> {
+  const startedAt = new Date().toISOString();
+
+  const [hara, expansion] = await Promise.all([scan("hara/scan"), scan("expansion/scan")]);
+  const revenue = await runRevenueAutopilot(5);
+  const drafts = await runDraftEngine();
+
+  const realActions: string[] = [];
+  const blocked: string[] = [];
+  if (hara.ok) realActions.push("HARA-Live-Scan gestartet"); else blocked.push(`HARA: ${hara.detail}`);
+  if (expansion.ok) realActions.push("Expansion-Live-Scan gestartet"); else blocked.push(`Expansion: ${expansion.detail}`);
+  if ((drafts.generated.content ?? 0) > 0) realActions.push(`${drafts.generated.content} Creator-Content-Entwürfe erzeugt`);
+  if ((drafts.generated.idea ?? 0) > 0) realActions.push(`${drafts.generated.idea} Produktideen erzeugt`);
+  if ((drafts.generated["revenue-loop"] ?? 0) > 0) realActions.push(`${drafts.generated["revenue-loop"]} Revenue-Loop-Entwürfe erzeugt`);
+  if (revenue.generated > 0) realActions.push(`${revenue.generated} datenbasierte Revenue-Experimente erzeugt`);
+  blocked.push(...drafts.skipped.map((item) => `${item.kind}: ${item.reason}`));
+
+  return {
+    ok: hara.ok && expansion.ok && drafts.skipped.length === 0,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    scans: { hara, expansion },
+    drafts,
+    revenue,
+    realActions,
+    blocked,
+  };
+}
