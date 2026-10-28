@@ -5,6 +5,7 @@ import {
   revenueScenario,
 } from "../lib/faceless-channel-logic";
 import { facelessChannelOverview, materializeFacelessChannelLaunch } from "./faceless-channel-service";
+import { channelAutopilotOverview, runChannelAutopilot } from "./channel-autopilot";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 
 const weekly=z.object({
@@ -21,6 +22,8 @@ const weekly=z.object({
 
 export const facelessChannelRouter=router({
   overview:protectedProcedure.query(()=>facelessChannelOverview()),
+  autopilot:protectedProcedure.query(()=>channelAutopilotOverview()),
+  runAutopilot:adminProcedure.mutation(()=>runChannelAutopilot()),
 
   /** Safe autonomous preparation: creates pending drafts only. */
   materializeLaunch:adminProcedure.mutation(()=>materializeFacelessChannelLaunch()),
