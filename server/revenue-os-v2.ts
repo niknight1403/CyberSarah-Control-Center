@@ -109,8 +109,11 @@ export async function runRevenueMission(input:{command:string;dedupeKey?:string}
   if(job.status==="completed")return {job,reused:true};
   try{
     const autopilot=await runControlCenterAutopilot();
+    const campaign=/kampagne|funnel|business|angebot/i.test(command)
+      ? await createOneClickBusiness({idea:command,goal:"Messbare Kampagne aus dem Mission-Control-Command"})
+      : null;
     const status=autopilot.ok?"completed":autopilot.deferred.length&&!autopilot.blocked.length?"deferred":"blocked";
-    const result={command,autopilot,executedAt:new Date().toISOString()};
+    const result={command,autopilot,...(campaign?{campaign}:{}),executedAt:new Date().toISOString()};
     await finishJob(job.id,status,result,status==="blocked"?autopilot.blocked.join("; "):undefined);
     return {job:{...job,status,result},reused:false};
   }catch(error){
