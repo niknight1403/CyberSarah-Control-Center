@@ -6,6 +6,7 @@ import { runControlCenterAutopilot } from "./control-center-autopilot";
 import { fetchTrendSignals } from "./trend-revenue-bridge";
 import { draftQueue, revenueAttributionEvents, revenueCostEvents, revenueExperiments, revenueJobs, revenueOffers } from "../drizzle/schema";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
+import { providerCircuitSnapshot } from "../lib/provider-circuit-breaker-logic";
 import {
   allocatePersonaBudget, buildOneClickBusinessBrief, decideExperiment, deriveSystemState, evaluateCommercial, planContentFactory,
   profitGuard, summarizeAttribution, type AttributionEvent, type PersonaMetric,
@@ -52,16 +53,19 @@ export async function revenueOsV2Overview(){
   const activeOffers=offers.filter(o=>o.status==="active");
   const blockedJobs=jobs.filter(j=>j.status==="blocked");
   const deferredJobs=jobs.filter(j=>j.status==="deferred");
+  const circuits=providerCircuitSnapshot();
+  const measurable=Object.values(snapshot).some(value=>value!==null);
+  const allCircuitsOpen=circuits.length>0&&circuits.every(item=>item.state==="OPEN");
   const system=deriveSystemState([
     {name:"database",required:true,ok:true},
-    {name:"revenue-data",required:true,ok:true},
+    {name:"revenue-data",required:true,ok:measurable,detail:measurable?undefined:"Keine messbare Revenue-Datenquelle erreichbar"},
     {name:"autopilot-jobs",required:true,ok:blockedJobs.length===0,detail:blockedJobs[0]?.lastError??undefined},
-    {name:"provider-capacity",required:true,ok:deferredJobs.length===0,deferred:deferredJobs.length>0,detail:deferredJobs.length?"Provider-Limit aktiv":undefined},
+    {name:"provider-capacity",required:true,ok:deferredJobs.length===0&&!allCircuitsOpen,deferred:deferredJobs.length>0||allCircuitsOpen,detail:allCircuitsOpen?"Alle Provider-Circuits offen":deferredJobs.length?"Provider-Limit aktiv":undefined},
   ]);
   const revenueCents=attribution.revenueCents+Math.round((snapshot.mrrEur??0)*100);
   const cost=(category:string)=>costs.filter(e=>e.category===category).reduce((sum,e)=>sum+Math.max(0,e.amountCents),0);
   const guard=profitGuard({revenueCents,variableCostCents:cost("variable")+cost("ads"),apiCostCents:cost("api"),refundsCents:Math.abs(attrEvents.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0))+cost("refund"),customers:attribution.purchases,leads:attribution.leads});
-  return {system,snapshot,attribution,budget,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
+  return {system,snapshot,attribution,budget,providerCircuits:circuits,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
 }
 
 export async function recordRevenueAttribution(input:{eventKey:string;personaId:string;contentId:string;platform:string;eventType:AttributionEvent["eventType"];valueCents?:number}){
