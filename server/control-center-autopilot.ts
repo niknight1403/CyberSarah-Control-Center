@@ -13,6 +13,7 @@ export type ControlCenterAutopilotResult = {
   drafts: DraftEngineRunResult;
   revenue: RevenueAutopilotRunResult;
   realActions: string[];
+  deferred: string[];
   blocked: string[];
 };
 
@@ -52,6 +53,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   const drafts = await runDrafts();
 
   const realActions: string[] = [];
+  const deferred: string[] = [];
   const blocked: string[] = [];
   if (hara.ok) realActions.push("HARA-Live-Scan gestartet"); else blocked.push(`HARA: ${hara.detail}`);
   if (expansion.ok) realActions.push("Expansion-Live-Scan gestartet"); else blocked.push(`Expansion: ${expansion.detail}`);
@@ -59,16 +61,21 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if ((drafts.generated.idea ?? 0) > 0) realActions.push(`${drafts.generated.idea} Produktideen erzeugt`);
   if ((drafts.generated["revenue-loop"] ?? 0) > 0) realActions.push(`${drafts.generated["revenue-loop"]} Revenue-Loop-Entwürfe erzeugt`);
   if (revenue.generated > 0) realActions.push(`${revenue.generated} datenbasierte Revenue-Experimente erzeugt`);
-  blocked.push(...drafts.skipped.map((item) => `${item.kind}: ${item.reason}`));
+  for (const item of drafts.skipped) {
+    const detail = `${item.kind}: ${item.reason}`;
+    if (/\b429\b|quota|rate.?limit|resource_exhausted|too many requests/i.test(item.reason)) deferred.push(detail);
+    else blocked.push(detail);
+  }
 
   return {
-    ok: hara.ok && expansion.ok && drafts.skipped.length === 0,
+    ok: hara.ok && expansion.ok && blocked.length === 0,
     startedAt,
     finishedAt: new Date().toISOString(),
     scans: { hara, expansion },
     drafts,
     revenue,
     realActions,
+    deferred,
     blocked,
   };
 }
