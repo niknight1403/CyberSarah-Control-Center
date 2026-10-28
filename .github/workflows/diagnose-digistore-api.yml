@@ -29,5 +29,15 @@ jobs:
           PY
           )
           echo "DIGISTORE24_API_HTTP=$CODE"
+          SAFE=$(python3 - <<'PY'
+          import json
+          try:
+              d=json.load(open("/tmp/d24.json"))
+              print("code="+str(d.get("code","n/a"))+" message="+str(d.get("message","n/a")).replace("\n"," ")[:300])
+          except Exception:
+              print("code=n/a message=invalid-json")
+          PY
+          )
           echo "DIGISTORE24_API_RESULT=$RESULT"
+          echo "DIGISTORE24_API_DIAG=$SAFE"
           test "$CODE" = "200" && test "$RESULT" = "success"
