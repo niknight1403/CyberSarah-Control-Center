@@ -44,6 +44,7 @@ function MissionControl() {
   const q = trpc.revenueOsV2.overview.useQuery(undefined, { retry: false, refetchInterval: 60_000 });
   const [command, setCommand] = useState("");
   const run = trpc.revenueOsV2.command.useMutation({ onSuccess: () => { setCommand(""); void q.refetch(); } });
+  const business = trpc.revenueOsV2.oneClickBusiness.useMutation({ onSuccess: (result) => setCommand(`Business-Funnel als Entwurf #${result.draftId} erstellt.`) });
   const data = q.data;
   const revenueCents = (data?.attribution.revenueCents ?? 0) + Math.round((data?.snapshot.mrrEur ?? 0) * 100);
   const commands = ["Finde Wachstumschancen", "Optimiere Umsatz", "Erzeuge profitable Content-Experimente"];
@@ -60,8 +61,8 @@ function MissionControl() {
     {data?.system.reasons?.length ? <Text style={styles.warningText}>{data.system.reasons.join(" · ")}</Text> : null}
     <View style={styles.commandChips}>{commands.map(item => <Pressable key={item} onPress={() => setCommand(item)} style={styles.commandChip}><Text style={styles.commandChipText}>{item}</Text></Pressable>)}</View>
     <TextInput value={command} onChangeText={setCommand} placeholder="z. B. Finde die drei besten Wachstumschancen und priorisiere nach Netto-Profit" placeholderTextColor={glassSurface.textMuted} multiline maxLength={600} style={styles.commandInput} accessibilityLabel="AI Revenue Command" />
-    {run.error ? <Text style={styles.errorText}>{run.error.message}</Text> : null}
-    <GlowButton label={run.isPending ? "Autopilot arbeitet …" : "Command an Revenue Brain"} accent="cyan" onPress={() => run.mutate({ command: command.trim() })} disabled={run.isPending || command.trim().length < 4} />
+    {run.error ? <Text style={styles.errorText}>{run.error.message}</Text> : null}{business.error ? <Text style={styles.errorText}>{business.error.message}</Text> : null}
+    <GlowButton label={run.isPending ? "Autopilot arbeitet …" : "Command an Revenue Brain"} accent="cyan" onPress={() => run.mutate({ command: command.trim() })} disabled={run.isPending || command.trim().length < 4} /><GlowButton label={business.isPending ? "Business-Funnel wird erstellt …" : "One-Click Business aus Eingabe"} accent="purple" variant="secondary" onPress={() => business.mutate({ idea: command.trim() })} disabled={business.isPending || command.trim().length < 5} />
     <Text style={styles.resultNote}>Analyse, Entwürfe und reversible Optimierung laufen autonom. Veröffentlichungen, Preisänderungen und irreversible externe Aktionen bleiben freigabepflichtig.</Text>
   </GlassCard>;
 }
