@@ -48,15 +48,19 @@ function normalizeWeights(values:Map<string,number>):Record<string,number>{
   return Object.fromEntries(positive.map(([k,v])=>[k,Number((v/total).toFixed(4))]));
 }
 
+const LEARNING_PLATFORMS=["instagram","tiktok","linkedin","x","threads","bluesky"] as const;
+
 export function evolveInfluencerFromEvidence(signals:InfluencerLearningSignal[]):InfluencerEvolution[]{
   const personas=[...new Set(signals.map(s=>s.personaId))];
   return personas.map(personaId=>{
     const own=signals.filter(s=>s.personaId===personaId);
-    const platform=new Map<string,number>(),pillar=new Map<string,number>();
+    const platform=new Map<string,number>(LEARNING_PLATFORMS.map(p=>[p,.01])),pillar=new Map<string,number>();
+    const platformObservations=new Map<string,number>(LEARNING_PLATFORMS.map(p=>[p,0]));
     let observations=0,totalScore=0;
     for(const s of own){
       const impressions=Math.max(0,s.impressions),clicks=Math.max(0,s.clicks),leads=Math.max(0,s.leads),conversions=Math.max(0,s.conversions);
       observations+=impressions;
+      platformObservations.set(s.platform,(platformObservations.get(s.platform)??0)+impressions);
       const ctr=impressions?clicks/impressions:0, leadRate=clicks?leads/clicks:0, conversion=leads?conversions/leads:clicks?conversions/clicks:0;
       const revenuePerK=impressions?Math.max(0,s.revenueCents)/impressions*1000:0;
       const reliability=s.published+s.failed>0?s.published/(s.published+s.failed):.5;
@@ -71,6 +75,8 @@ export function evolveInfluencerFromEvidence(signals:InfluencerLearningSignal[])
     const bestPillar=Object.entries(pillarWeights).sort((a,b)=>b[1]-a[1])[0];
     const nextExperiments:Array<{dimension:"platform"|"pillar";value:string;reason:string}>=[];
     if(bestPlatform)nextExperiments.push({dimension:"platform",value:bestPlatform[0],reason:"Highest evidence-weighted performance"});
+    const explorer=[...platformObservations.entries()].filter(([p])=>p!==bestPlatform?.[0]).sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0]))[0];
+    if(explorer)nextExperiments.push({dimension:"platform",value:explorer[0],reason:"Exploration floor: least-observed platform"});
     if(bestPillar)nextExperiments.push({dimension:"pillar",value:bestPillar[0],reason:"Highest evidence-weighted content performance"});
     return {
       personaId,observations,score:Number((totalScore/Math.max(1,own.length)).toFixed(2)),platformWeights,pillarWeights,nextExperiments,
@@ -78,6 +84,7 @@ export function evolveInfluencerFromEvidence(signals:InfluencerLearningSignal[])
         "Core identity, disclosure and safety boundaries are immutable.",
         "Weights learn only from measured performance; no fabricated audience facts.",
         "New variants retain exploration capacity; external publishing remains policy-gated.",
+        "At least one least-observed platform is kept in the experiment queue to prevent local-optimum lock-in.",
       ],
     };
   }).sort((a,b)=>b.score-a.score||a.personaId.localeCompare(b.personaId));
