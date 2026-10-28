@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildFacelessChannelDraftSpecs } from "../server/faceless-channel-service";
 import {
   AFFILIATE_CANDIDATES, STARTER_VIDEOS, auditContentQuality, automationOpportunityScore,
   build30DayPlan, buildDisclosureChecklist, buildShortPlan, decideWeeklyOptimization,
@@ -57,6 +58,16 @@ describe("faceless channel 10-sprint engine",()=>{
     const result=decideWeeklyOptimization({impressions:5000,views:200,ctrPct:4,averageViewSeconds:250,averageVideoSeconds:500,returningViewers:20,qualifiedClicks:10,emailSignups:3,confirmedRevenueCents:0},history);
     expect(result.action).toBe("PACKAGING");
     expect(result.changeOneVariable).toBe(true);
+  });
+  it("preserves the existing content draft UI payload contract",()=>{
+    const drafts=buildFacelessChannelDraftSpecs();
+    expect(drafts).toHaveLength(16);
+    for(const draft of drafts){
+      expect(typeof draft.payload.personaId).toBe("string");
+      expect(typeof draft.payload.platform).toBe("string");
+      expect(typeof draft.payload.content).toBe("string");
+      expect(String(draft.payload.content).length).toBeGreaterThan(20);
+    }
   });
   it("exposes the whole launch system without enabling external actions",()=>{
     const ready=launchReadiness();
