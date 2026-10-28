@@ -16,6 +16,7 @@ Neu in diesem Sprint:
 - `lib/ultra-orchestrator-logic.ts`: reine, testbare Entscheidungspolitik.
 - `server/control-center-autopilot.ts`: jeder reale Autopilot-Lauf liefert die naechste sichere Aktion `HEAL | RETRY | VERIFY | OBSERVE`.
 - Tests erzwingen Prioritaet: echte Blockade vor Rate-Limit vor Verifikation.
+- Revenue-Autopilot-Chancen werden als direkt messbare Loop-Experimente mit `experiment`, `unit`, `targetValue` und `currentValue` persistiert; damit sind autonome Entwuerfe nicht nur Textvorschlaege, sondern vollstaendige, in Loop Engineering uebernehmbare Messplaene.
 
 Agentforge2 bleibt getrennt, weil es Villa-Lifecycle, Worker, Projekt-Workspace und Ausfuehrung besitzt. CyberSarah empfaengt bereits metadata-only Events/Checkpoints und bleibt Control Plane.
 
