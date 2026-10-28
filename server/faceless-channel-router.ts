@@ -6,6 +6,8 @@ import {
 } from "../lib/faceless-channel-logic";
 import { facelessChannelOverview, materializeFacelessChannelLaunch } from "./faceless-channel-service";
 import { channelAutopilotOverview, runChannelAutopilot } from "./channel-autopilot";
+import { auditCrossChannelReuse, multiChannelStrategy, rankChannelPortfolio } from "../lib/faceless-multichannel-logic";
+import { materializeProductionSystem, planChannelExpansion } from "./faceless-multichannel-service";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 
 const weekly=z.object({
@@ -24,6 +26,25 @@ export const facelessChannelRouter=router({
   overview:protectedProcedure.query(()=>facelessChannelOverview()),
   autopilot:adminProcedure.query(()=>channelAutopilotOverview()),
   runAutopilot:adminProcedure.mutation(()=>runChannelAutopilot()),
+
+
+  multiChannelStrategy:protectedProcedure.input(z.object({
+    script:z.number().min(0).max(100),voice:z.number().min(0).max(100),visuals:z.number().min(0).max(100),edit:z.number().min(0).max(100),
+    qualityScore:z.number().min(0).max(100),publishedProofs:z.number().int().min(0),reuseRisk:z.number().min(0).max(100),
+  })).query(({input})=>multiChannelStrategy(input)),
+  materializeProductionSystem:adminProcedure.mutation(()=>materializeProductionSystem()),
+  planExpansion:adminProcedure.input(z.object({
+    script:z.number().min(0).max(100),voice:z.number().min(0).max(100),visuals:z.number().min(0).max(100),edit:z.number().min(0).max(100),
+    qualityScore:z.number().min(0).max(100),publishedProofs:z.number().int().min(0),reuseRisk:z.number().min(0).max(100),
+  })).mutation(({input})=>planChannelExpansion(input)),
+  auditCrossChannelReuse:protectedProcedure.input(z.object({
+    a:z.object({channelKey:z.string().min(1),hookPattern:z.string(),voiceStyle:z.string(),visualGrammar:z.string(),ctaStyle:z.string(),exampleDomain:z.string()}),
+    b:z.object({channelKey:z.string().min(1),hookPattern:z.string(),voiceStyle:z.string(),visualGrammar:z.string(),ctaStyle:z.string(),exampleDomain:z.string()}),
+  })).mutation(({input})=>auditCrossChannelReuse(input.a,input.b)),
+  rankPortfolio:adminProcedure.input(z.array(z.object({
+    key:z.string().min(1),qualifiedViews:z.number().int().min(0),leads:z.number().int().min(0),confirmedRevenueCents:z.number().int().min(0),
+    variableCostCents:z.number().int().min(0),productionHours:z.number().min(0),qualityScore:z.number().min(0).max(100),reuseRisk:z.number().min(0).max(100),
+  })).max(50)).mutation(({input})=>rankChannelPortfolio(input)),
 
   /** Safe autonomous preparation: creates pending drafts only. */
   materializeLaunch:adminProcedure.mutation(()=>materializeFacelessChannelLaunch()),
