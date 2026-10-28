@@ -89,3 +89,33 @@ export function buildAlwaysOnInfluencerPlan(evolutions:InfluencerEvolution[], ma
     .slice(0,Math.max(1,Math.min(50,maxExperiments)));
   return {mode:"24/7-learning" as const,queue,learningDimensions:["platform","pillar","hook","cta"],identityMutationAllowed:false,externalActionRequiresGate:true};
 }
+
+
+export type B2BEdgeSignal={stage:string;strength:number};
+export function buildB2BNetworkHealth(nodes:B2BNode[],edges:B2BEdgeSignal[]){
+  const active=nodes.filter(n=>!n.optedOut);
+  const stale=active.filter(n=>n.lastActivityDays!=null&&n.lastActivityDays>=30).length;
+  const qualified=edges.filter(e=>e.stage==="qualified").length;
+  const engaged=edges.filter(e=>e.stage==="engaged").length;
+  const customers=edges.filter(e=>e.stage==="customer").length;
+  const partners=edges.filter(e=>e.stage==="partner").length;
+  const pipeline=Math.max(1,qualified+engaged+customers);
+  const avgTrust=active.length?active.reduce((s,n)=>s+clamp(n.trust),0)/active.length:0;
+  const avgStrength=edges.length?edges.reduce((s,e)=>s+clamp(e.strength),0)/edges.length:0;
+  const customerConversion=customers/pipeline;
+  const relationshipCoverage=active.length?Math.min(1,edges.length/active.length):0;
+  const healthScore=Math.round(clamp(
+    avgTrust*.25+avgStrength*.2+customerConversion*100*.25+relationshipCoverage*100*.2+(1-stale/Math.max(1,active.length))*100*.1
+  ));
+  const nextActions:string[]=[];
+  if(stale>0)nextActions.push(`${stale} aktive Beziehungen seit >=30 Tagen ohne Signal: Re-Qualifizierung vorbereiten`);
+  if(relationshipCoverage<.75)nextActions.push("Netzwerkabdeckung erhöhen: qualifizierte Beziehungen zwischen passenden Nodes ergänzen");
+  if(qualified>0&&customers===0)nextActions.push("Qualified→Customer ist der größte messbare B2B-Engpass");
+  if(partners===0&&active.some(n=>n.kind==="partner"))nextActions.push("Partner-Kandidaten mit hoher Trust/Fit-Evidenz in eine messbare Partner-Pipeline überführen");
+  if(nextActions.length===0)nextActions.push("Netzwerk stabil: neue Segmente kontrolliert explorieren");
+  return {
+    healthScore,activeNodes:active.length,staleNodes:stale,relationshipCoverage:Number(relationshipCoverage.toFixed(3)),
+    customerConversion:Number(customerConversion.toFixed(3)),avgTrust:Number(avgTrust.toFixed(1)),avgRelationshipStrength:Number(avgStrength.toFixed(1)),
+    stages:{qualified,engaged,customers,partners},nextActions,
+  };
+}
