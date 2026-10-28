@@ -529,3 +529,59 @@ export const agentforgeCheckpoints = pgTable("agentforge_checkpoints", {
   uniqueIndex("agentforge_checkpoint_sequence_idx").on(table.taskId, table.agentId, table.sequence),
   index("agentforge_checkpoints_task_idx").on(table.taskId, table.agentId, table.sequence),
 ]);
+
+
+/* ==================== B2B Growth Network + Influencer Learning ==================== */
+export const b2bNetworkNodes = pgTable("b2b_network_nodes", {
+  id: serial("id").primaryKey(),
+  nodeKey: varchar("node_key", { length: 180 }).notNull().unique(),
+  kind: varchar("kind", { length: 24 }).notNull(),
+  name: varchar("name", { length: 220 }).notNull(),
+  domain: varchar("domain", { length: 255 }),
+  fit: integer("fit").notNull().default(0),
+  intent: integer("intent").notNull().default(0),
+  trust: integer("trust").notNull().default(0),
+  relationshipStrength: integer("relationship_strength").notNull().default(0),
+  estimatedValueCents: integer("estimated_value_cents"),
+  optedOut: boolean("opted_out").notNull().default(false),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("b2b_network_kind_idx").on(table.kind, table.updatedAt),
+  index("b2b_network_activity_idx").on(table.lastActivityAt),
+]);
+
+export const b2bNetworkEdges = pgTable("b2b_network_edges", {
+  id: serial("id").primaryKey(),
+  edgeKey: varchar("edge_key", { length: 220 }).notNull().unique(),
+  fromNodeKey: varchar("from_node_key", { length: 180 }).notNull(),
+  toNodeKey: varchar("to_node_key", { length: 180 }).notNull(),
+  relation: varchar("relation", { length: 40 }).notNull(),
+  stage: varchar("stage", { length: 32 }).notNull().default("discovered"),
+  strength: integer("strength").notNull().default(0),
+  evidence: jsonb("evidence").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("b2b_edges_from_idx").on(table.fromNodeKey, table.stage),
+  index("b2b_edges_to_idx").on(table.toNodeKey, table.stage),
+]);
+
+export const influencerLearningStates = pgTable("influencer_learning_states", {
+  id: serial("id").primaryKey(),
+  personaId: varchar("persona_id", { length: 40 }).notNull().unique(),
+  version: integer("version").notNull().default(1),
+  observations: integer("observations").notNull().default(0),
+  score: integer("score").notNull().default(0),
+  platformWeights: jsonb("platform_weights").$type<Record<string, number>>().default({}).notNull(),
+  pillarWeights: jsonb("pillar_weights").$type<Record<string, number>>().default({}).notNull(),
+  nextExperiments: jsonb("next_experiments").$type<Array<Record<string, unknown>>>().default([]).notNull(),
+  learnedAt: timestamp("learned_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("influencer_learning_score_idx").on(table.score, table.updatedAt)]);
+
+export type B2BNetworkNodeRow = typeof b2bNetworkNodes.$inferSelect;
+export type B2BNetworkEdgeRow = typeof b2bNetworkEdges.$inferSelect;
+export type InfluencerLearningStateRow = typeof influencerLearningStates.$inferSelect;
