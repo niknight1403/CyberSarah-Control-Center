@@ -118,6 +118,10 @@ export type DraftEngineRunResult = {
   skipped: { kind: DraftKind; reason: string }[];
 };
 
+function isRetryableProviderLimit(reason: string): boolean {
+  return /\b429\b|quota|rate.?limit|resource_exhausted|too many requests/i.test(reason);
+}
+
 export type DraftEngineDeps = {
   /** LLM-Aufruf — im Test injizierbar, produktiv invokeLLM. */
   llm?: (messages: Message[]) => Promise<string>;
@@ -251,6 +255,7 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
   }
 
   result.plan = planDraftRun(coverage.counts, DRAFT_MAX_PENDING_BY_KIND);
+  let providerDeferred = false;
   for (const entry of result.plan) {
     if (entry.slots <= 0) continue;
     let okCount = 0;
@@ -270,12 +275,24 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
               ? await generateRevenueLoopDraft(llm, nowMs, slot, missingRevenueHubs[slot])
               : await generateIdeaDraft(llm, nowMs, slot);
         if (outcome.ok) okCount++;
-        else result.skipped.push({ kind: entry.kind, reason: outcome.reason });
+        else {
+          result.skipped.push({ kind: entry.kind, reason: outcome.reason });
+          if (isRetryableProviderLimit(outcome.reason)) {
+            providerDeferred = true;
+            break;
+          }
+        }
       } catch (error) {
-        result.skipped.push({ kind: entry.kind, reason: error instanceof Error ? error.message : "unbekannter Fehler" });
+        const reason = error instanceof Error ? error.message : "unbekannter Fehler";
+        result.skipped.push({ kind: entry.kind, reason });
+        if (isRetryableProviderLimit(reason)) {
+          providerDeferred = true;
+          break;
+        }
       }
     }
     if (okCount > 0) result.generated[entry.kind] = okCount;
+    if (providerDeferred) break;
   }
   return result;
 }
