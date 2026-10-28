@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import pg from "pg";
+import { deployPgPoolConfig } from "../lib/render-deploy-logic.mjs";
 
 const { Pool } = pg;
 const url=(process.env.DATABASE_URL??"").trim();
@@ -14,7 +15,7 @@ const required=[
   "b2b_network_nodes","b2b_network_edges","influencer_learning_states",
 ];
 
-const pool=new Pool({connectionString:url,max:1,connectionTimeoutMillis:10_000});
+const pool=new Pool({...deployPgPoolConfig(url),max:1,connectionTimeoutMillis:10_000});
 try{
   const sql=await readFile(new URL("../drizzle/0019_repair_growth_schema.sql",import.meta.url),"utf8");
   // The repair migration is intentionally idempotent. Running it as a preflight

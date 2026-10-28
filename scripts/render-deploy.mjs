@@ -29,6 +29,7 @@ import {
   renderApiError,
   validateDatabaseUrl,
   validateRenderApiKey,
+  normalizePgCliSslSemantics,
 } from "../lib/render-deploy-logic.mjs";
 
 const API = "https://api.render.com/v1";
@@ -360,7 +361,7 @@ async function deployApp() {
     log("Fuehre Drizzle-Migrationen gegen DATABASE_URL aus …");
     const result = spawnSync("npx", ["drizzle-kit", "migrate"], {
       encoding: "utf8",
-      env: { ...process.env, DATABASE_URL: dbCheck.url },
+      env: { ...process.env, DATABASE_URL: normalizePgCliSslSemantics(dbCheck.url) },
     });
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.status !== 0) {
