@@ -20,7 +20,7 @@ const safe=(n:number)=>Math.max(0,Number.isFinite(n)?n:0);
 export function decideChannelAutopilot(s:ChannelAutopilotSnapshot):ChannelAutopilotDecision{
   const impressions=safe(s.impressions),views=safe(s.views),clicks=safe(s.clicks),leads=safe(s.leads);
   const purchases=safe(s.purchases),published=safe(s.published),failed=safe(s.failed);
-  const viewRate=pct(views,impressions),clickRate=pct(clicks,Math.max(views,impressions)),leadRate=pct(leads,clicks),buyRate=pct(purchases,leads);
+  const viewRate=pct(views,impressions),clickRate=pct(clicks,views||impressions),leadRate=pct(leads,clicks),buyRate=pct(purchases,leads);
   const reliability=pct(published,published+failed);
   const evidence=Math.min(1,(impressions/5000)*0.45+(clicks/100)*0.25+(leads/30)*0.2+(purchases/10)*0.1);
   const common={requiresApproval:true,autonomousActions:["Metriken lesen","Engpass diagnostizieren","Experiment entwerfen","Pending-Draft erzeugen","Lernhistorie aktualisieren"],blockedActions:["ungeprüft veröffentlichen","Budget ausgeben","Preis ändern","Affiliate-Partnerschaft behaupten"]};
