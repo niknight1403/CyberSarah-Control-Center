@@ -85,16 +85,16 @@ async function defaultDraftLlm(messages: Message[]): Promise<string> {
 }
 
 /** Taeglich rotierende Themen-Samen — deterministisch, kein Zufall. */
-const CONTENT_TOPIC_SEEDS = [
+export const CONTENT_TOPIC_SEEDS = [
   "KI-Agenten im Alltag: was heute schon funktioniert",
   "Wie kleine Teams mit Automatisierung Zeit gewinnen",
   "Ehrliche Einblicke in den Aufbau eines digitalen Produkts",
   "Produktivität ohne Burnout: Systeme statt Disziplin",
   "Geld verstehen: Risiken zuerst denken",
-  "Creator-Wirtschaft: Aufmerksamkeit planbar machen",
+  "Creator-Wirtschaft: Aufmerksamkeit planbar machen",\n  "Community-Aufbau: aus Zuschauern aktive Teilnehmer machen",\n  "Short-Video-Hooks: Neugier ohne Clickbait erzeugen",\n  "Vertrauen durch transparente KI-Kommunikation aufbauen",\n  "Social SEO: Inhalte fuer Suche und Empfehlungen strukturieren",\n  "Content-Serien: Wiedererkennung und Bindung systematisch steigern",\n  "Audience Affinity: Themen enger an echte Zielgruppenprobleme koppeln",
 ] as const;
 
-const CONTENT_PLATFORMS = ["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"] as const;
+export const CONTENT_PLATFORMS = ["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"] as const;
 
 function seedIndexForDay(nowMs: number, offset: number): number {
   return Math.floor(nowMs / 86_400_000 + offset) % CONTENT_TOPIC_SEEDS.length;
@@ -262,7 +262,7 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
     const missingRevenueHubs = entry.kind === "revenue-loop"
       ? REVENUE_HUBS.filter((hub) => !coverage!.revenueHubs.has(hub))
       : [];
-    const perRunLimit = entry.kind === "content" ? INFLUENCER_PERSONAS.length : entry.kind === "idea" ? 2 : missingRevenueHubs.length;
+    const perRunLimit = entry.kind === "content" ? INFLUENCER_PERSONAS.length * 2 : entry.kind === "idea" ? 4 : missingRevenueHubs.length;
     const slots = entry.kind === "revenue-loop"
       ? Math.min(entry.slots, missingRevenueHubs.length)
       : Math.min(entry.slots, perRunLimit);
