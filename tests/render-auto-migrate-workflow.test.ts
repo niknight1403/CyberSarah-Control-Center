@@ -17,4 +17,4 @@ describe("Render app deployment migration gate",()=>{
     }
     expect(journal).toContain('"tag": "0019_repair_growth_schema"');
   });
-});
+});\n  it("keeps the journal-permission fallback pinned to the verified latest migration",()=>{\n    const migrate=readFileSync("scripts/run-drizzle-migrations.mjs","utf8");\n    const preflight=readFileSync("scripts/production-schema-preflight.mjs","utf8");\n    expect(migrate).toContain(`latest!=="0020_draft_queue_dedupe"`);\n    expect(migrate).toContain("journalPermissionDenied");\n    expect(migrate).toContain("draftQueue_dedupe_idx");\n    expect(preflight).toContain(`ADD COLUMN IF NOT EXISTS "dedupeKey"`);\n    expect(preflight).toContain(`CREATE UNIQUE INDEX IF NOT EXISTS "draftQueue_dedupe_idx"`);\n  });
