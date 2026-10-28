@@ -41,15 +41,31 @@ export async function materializeFacelessChannelLaunch(){
 
   drafts.push({
     title:"Automationsklar — Lead Magnet: 15-Minuten-Automations-Check",
-    payload:{channel:"Automationsklar",format:"lead-magnet",leadMagnet:LEAD_MAGNET,calendar,externalAction:"approval-required"},
+    payload:{
+      personaId:"automationsklar-editorial",
+      platform:"youtube",
+      topic:LEAD_MAGNET.name,
+      content:`${LEAD_MAGNET.purpose}\n\nFelder: ${LEAD_MAGNET.fields.join(" · ")}\n\nVersprechen: ${LEAD_MAGNET.promise}\n\nExterne Aktion: ${LEAD_MAGNET.externalAction}`,
+      assets:[],
+      assetCount:0,
+      disclosure:"Lead-Magnet; Double-opt-in/Versand erst nach Freigabe und vorhandener Infrastruktur.",
+      channel:"Automationsklar",format:"lead-magnet",leadMagnet:LEAD_MAGNET,calendar,externalAction:"approval-required",
+    },
   });
 
   for(const video of longforms){
     drafts.push({
       title:`Automationsklar — Longform: ${video.recommendedTitle}`,
       payload:{
+        personaId:"automationsklar-editorial",
+        platform:"youtube",
+        topic:video.problem,
+        content:`${video.hook}\n\nBeispiel: ${video.example}\n\nErgebnis: ${video.result}\n\nCTA: ${video.cta}`,
+        assets:video.scenes.map((scene,index)=>({format:"scene",variant:index+1,title:scene,content:scene})),
+        assetCount:video.scenes.length,
+        disclosure:"Keine Affiliate-Partnerschaft behaupten; Quellen/Assets vor Veröffentlichung prüfen; externe Veröffentlichung freigabepflichtig.",
         channel:"Automationsklar",format:"youtube-longform",video,
-        disclosure:buildDisclosureChecklist({affiliate:false,sponsored:false,realisticSynthetic:false}),
+        compliance:buildDisclosureChecklist({affiliate:false,sponsored:false,realisticSynthetic:false}),
         publishing:"approval-required",
       },
     });
@@ -58,8 +74,19 @@ export async function materializeFacelessChannelLaunch(){
     drafts.push({
       title:`Automationsklar — Short: ${short.hook}`,
       payload:{
+        personaId:"automationsklar-editorial",
+        platform:"youtube-short/instagram-reel/tiktok",
+        topic:short.hook,
+        content:`${short.hook}\n\nYouTube Short: ${short.youtubeShort.style}\nInstagram Reel: ${short.instagramReel.style}\nTikTok: ${short.tiktok.style}`,
+        assets:[
+          {format:"youtube-short",variant:1,content:short.youtubeShort.style,cta:short.youtubeShort.cta},
+          {format:"instagram-reel",variant:1,content:short.instagramReel.style,cta:short.instagramReel.cta},
+          {format:"tiktok",variant:1,content:short.tiktok.style,cta:short.tiktok.cta},
+        ],
+        assetCount:3,
+        disclosure:"Plattformspezifisch neu schneiden; keine unveränderte Massen-Duplizierung; externe Veröffentlichung freigabepflichtig.",
         channel:"Automationsklar",format:"short-repurpose",short,
-        disclosure:buildDisclosureChecklist({affiliate:false,sponsored:false,realisticSynthetic:false}),
+        compliance:buildDisclosureChecklist({affiliate:false,sponsored:false,realisticSynthetic:false}),
         publishing:"approval-required",
       },
     });
