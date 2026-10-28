@@ -5,6 +5,7 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { deployPgPoolConfig, maskSecrets } from "../lib/render-deploy-logic.mjs";
+import { isDrizzleSchemaPermissionError } from "../lib/migration-permission-logic.mjs";
 
 const raw=(process.env.DATABASE_URL??"").trim();
 if(!/^postgres(?:ql)?:\/\//i.test(raw)){
