@@ -92,7 +92,7 @@ export function RevenueAutopilotCard() {
           run.mutate(undefined, {
             onSuccess: async (result) => {
               setRunFeedback(result.realActions.length > 0
-                ? `Ausgeführt: ${result.realActions.join(" · ")}${result.blocked.length ? ` · Blockiert: ${result.blocked.join(" · ")}` : ""}`
+                ? `Ausgeführt: ${result.realActions.join(" · ")}${result.deferred.length ? ` · Verschoben: ${result.deferred.length} wegen Provider-Limit` : result.blocked.length ? ` · Blockiert: ${result.blocked.join(" · ")}` : ""}`
                 : result.blocked.length > 0
                   ? `Keine Aktion abgeschlossen: ${result.blocked.join(" · ")}`
                   : "Autopilot-Lauf abgeschlossen; aktuell war keine neue Aktion erforderlich.");
