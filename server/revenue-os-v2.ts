@@ -4,7 +4,7 @@ import { invokeLLM } from "./_core/llm";
 import { collectRevenueAutopilotSnapshot } from "./revenue-autopilot";
 import { runControlCenterAutopilot } from "./control-center-autopilot";
 import { fetchTrendSignals } from "./trend-revenue-bridge";
-import { draftQueue, revenueAttributionEvents, revenueExperiments, revenueJobs, revenueOffers } from "../drizzle/schema";
+import { draftQueue, revenueAttributionEvents, revenueCostEvents, revenueExperiments, revenueJobs, revenueOffers } from "../drizzle/schema";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import {
   allocatePersonaBudget, buildOneClickBusinessBrief, deriveSystemState, planContentFactory,
@@ -30,13 +30,14 @@ export async function revenueOsV2Overview(){
   const db=await getDb();
   if(!db) throw new Error("Datenbank nicht verfügbar.");
   const since=new Date(Date.now()-30*86_400_000);
-  const [snapshot,jobs,offers,experiments,events,trends]=await Promise.all([
+  const [snapshot,jobs,offers,experiments,events,trends,costs]=await Promise.all([
     collectRevenueAutopilotSnapshot(),
     db.select().from(revenueJobs).orderBy(desc(revenueJobs.createdAt)).limit(20),
     db.select().from(revenueOffers).orderBy(desc(revenueOffers.updatedAt)).limit(100),
     db.select().from(revenueExperiments).orderBy(desc(revenueExperiments.updatedAt)).limit(30),
     db.select().from(revenueAttributionEvents).where(gte(revenueAttributionEvents.occurredAt,since)).limit(5000),
     fetchTrendSignals(),
+    db.select().from(revenueCostEvents).where(gte(revenueCostEvents.occurredAt,since)).limit(5000),
   ]);
   const attrEvents:AttributionEvent[]=events.flatMap(e=>{
     if(!["impression","click","lead","purchase","refund"].includes(e.eventType)) return [];
@@ -58,7 +59,8 @@ export async function revenueOsV2Overview(){
     {name:"provider-capacity",required:true,ok:deferredJobs.length===0,deferred:deferredJobs.length>0,detail:deferredJobs.length?"Provider-Limit aktiv":undefined},
   ]);
   const revenueCents=attribution.revenueCents+Math.round((snapshot.mrrEur??0)*100);
-  const guard=profitGuard({revenueCents,variableCostCents:0,apiCostCents:0,refundsCents:Math.abs(attrEvents.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0)),customers:attribution.purchases,leads:attribution.leads});
+  const cost=(category:string)=>costs.filter(e=>e.category===category).reduce((sum,e)=>sum+Math.max(0,e.amountCents),0);
+  const guard=profitGuard({revenueCents,variableCostCents:cost("variable")+cost("ads"),apiCostCents:cost("api"),refundsCents:Math.abs(attrEvents.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0))+cost("refund"),customers:attribution.purchases,leads:attribution.leads});
   return {system,snapshot,attribution,budget,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
 }
 
@@ -141,4 +143,11 @@ export async function createContentFactory(input:{personaId:string;topic:string;
   const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
   const [row]=await db.insert(draftQueue).values({kind:"content",title:input.topic.trim().slice(0,120),payload:{personaId:persona.id,platform:"multi-format",topic:input.topic.trim(),content:String(assets[0].content),assets,assetCount:assets.length,disclosure:persona.disclosure},status:"pending",createdBy:"content-factory-v2"}).returning();
   return {draftId:row.id,personaId:persona.id,assets,status:"pending"};
+}
+
+
+export async function recordRevenueCost(input:{eventKey:string;category:"api"|"ads"|"variable"|"refund";amountCents:number;metadata?:Record<string,unknown>}){
+  const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
+  const [row]=await db.insert(revenueCostEvents).values({...input,metadata:input.metadata??{}}).onConflictDoNothing({target:revenueCostEvents.eventKey}).returning();
+  return {stored:Boolean(row),id:row?.id??null};
 }
