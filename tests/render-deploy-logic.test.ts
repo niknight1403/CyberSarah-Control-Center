@@ -10,7 +10,7 @@ import {
   publicServiceUrl,
   renderApiError,
   validateDatabaseUrl,
-  validateRenderApiKey,,
+  validateRenderApiKey,
   normalizePgCliSslSemantics,
   deployPgPoolConfig,
 } from "../lib/render-deploy-logic.mjs";
