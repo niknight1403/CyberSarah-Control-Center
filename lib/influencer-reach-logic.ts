@@ -71,9 +71,13 @@ export function scorePersonaForProduct(personaId: InfluencerPersonaId, product: 
   }
   const persona = INFLUENCER_PERSONAS.find((entry) => entry.id === personaId);
   if (!persona) return 0;
+  const pillarHits = persona.contentPillars.filter((pillar) => haystack.includes(pillar.toLowerCase())).length;
+  const audienceTerms = persona.audience.toLowerCase().split(/[ ,.-]+/).filter((term) => term.length >= 5);
+  const audienceHits = audienceTerms.filter((term) => haystack.includes(term)).length;
   const base = hits * 25;
   const nicheBonus = haystack.includes(persona.niche.toLowerCase().split(" ")[0]) ? 15 : 0;
-  return Math.min(100, base + nicheBonus);
+  const affinityBonus = Math.min(20, pillarHits * 8 + audienceHits * 4);
+  return Math.min(100, base + nicheBonus + affinityBonus);
 }
 
 /** Kombiniertern Kampagnen-Score: Match x Plattform x Zielgewicht (0..100). */
@@ -106,6 +110,7 @@ export type CampaignPlan = {
   platformMix: InfluencerPlatform[];
   slots: CampaignSlot[];
   projectedReachIndex: number;
+  audienceAffinityIndex: number;
   guardrails: string[];
 };
 
@@ -199,6 +204,9 @@ export function planInfluencerCampaign(
   const projectedReachIndex = Math.round(
     (slots.reduce((sum, slot) => sum + slot.score, 0) / Math.max(slots.length, 1)) * (days / 7)
   );
+  const audienceAffinityIndex = Math.round(
+    cast.reduce((sum, personaId) => sum + scorePersonaForProduct(personaId, trimmed), 0) / Math.max(cast.length, 1)
+  );
 
   return {
     product: trimmed,
@@ -208,6 +216,7 @@ export function planInfluencerCampaign(
     platformMix,
     slots,
     projectedReachIndex,
+    audienceAffinityIndex,
     guardrails: [
       `Maximal ${MAX_POSTS_PER_PERSONA_PER_DAY} Posts pro Persona und Tag.`,
       "Keine Einnahme- oder Renditeversprechen; KI-Transparenz bleibt Pflicht.",
