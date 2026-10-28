@@ -29,8 +29,8 @@ import {
   type RevenueLoopDraftPayload,
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS, buildInfluencerPrompt } from "../lib/influencer-persona-logic";
-import type { Message } from "./_core/llm";
-import { isFreeManagedSource, managedLlmEnvFromProcess, openAiCompatibleChatUrl, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
+import { invokeLLM, type Message } from "./_core/llm";
+import { openAiCompatibleChatUrl } from "../lib/managed-llm-fallback-logic";
 
 async function callDraftChatEndpoint(
   url: string,
@@ -66,17 +66,15 @@ async function defaultDraftLlm(messages: Message[]): Promise<string> {
       messages,
     );
   } catch {
-    const endpoint = resolveManagedLlmEndpoint(managedLlmEnvFromProcess(process.env));
-    if (!endpoint || !isFreeManagedSource(endpoint.source)) {
-      throw new Error("Lokales Ollama nicht erreichbar und keine kostenlose Cloud-Fallback-Route konfiguriert.");
+    // Derselbe zentrale Router wie der KI-Chat: kostenlose Provider-Kette,
+    // Health-/Quota-Rotation und Modell-Fallback. Kein zweiter URL-Pfad mehr,
+    // der von der produktiven Router-Konfiguration abweichen kann.
+    const result = await invokeLLM({ messages, maxTokens: 700 });
+    const content = result.choices[0]?.message?.content;
+    if (typeof content !== "string" || !content.trim()) {
+      throw new Error("Zentraler LLM-Router lieferte keinen Text.");
     }
-    return callDraftChatEndpoint(
-      endpoint.url,
-      process.env.MANAGED_DRAFT_MODEL ?? "llama-3.1-8b-instant",
-      messages,
-      endpoint.headers ?? {},
-      endpoint.apiKey,
-    );
+    return content.trim();
   }
 }
 
