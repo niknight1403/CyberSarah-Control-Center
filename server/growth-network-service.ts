@@ -1,7 +1,7 @@
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { b2bNetworkEdges,b2bNetworkNodes,influencerLearningStates,publishingJobs,revenueAttributionEvents } from "../drizzle/schema";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
-import { buildAlwaysOnInfluencerPlan,evolveInfluencerFromEvidence,prioritizeB2BNetwork } from "../lib/b2b-influencer-network-logic";
+import { buildAlwaysOnInfluencerPlan,buildB2BNetworkHealth,evolveInfluencerFromEvidence,prioritizeB2BNetwork } from "../lib/b2b-influencer-network-logic";
 import { getDb } from "./db";
 
 const clamp=(n:number)=>Math.max(0,Math.min(100,Math.round(Number.isFinite(n)?n:0)));
@@ -29,8 +29,13 @@ export async function b2bNetworkOverview(){
   ]);
   const now=Date.now();
   const priorities=prioritizeB2BNetwork(nodes.map(n=>({key:n.nodeKey,kind:n.kind as "lead"|"customer"|"partner"|"creator"|"company",fit:n.fit,intent:n.intent,trust:n.trust,relationshipStrength:n.relationshipStrength,estimatedValueCents:n.estimatedValueCents,lastActivityDays:n.lastActivityAt?Math.max(0,(now-n.lastActivityAt.getTime())/86_400_000):null,optedOut:n.optedOut})));
+  const health=buildB2BNetworkHealth(
+    nodes.map(n=>({key:n.nodeKey,kind:n.kind as "lead"|"customer"|"partner"|"creator"|"company",fit:n.fit,intent:n.intent,trust:n.trust,relationshipStrength:n.relationshipStrength,estimatedValueCents:n.estimatedValueCents,lastActivityDays:n.lastActivityAt?Math.max(0,(now-n.lastActivityAt.getTime())/86_400_000):null,optedOut:n.optedOut})),
+    edges.map(e=>({stage:e.stage,strength:e.strength})),
+  );
   return {
     counts:{nodes:nodes.length,edges:edges.length,qualified:edges.filter(e=>e.stage==="qualified").length,customers:nodes.filter(n=>n.kind==="customer").length,partners:nodes.filter(n=>n.kind==="partner").length,optedOut:nodes.filter(n=>n.optedOut).length},
+    health,
     priorities:priorities.slice(0,50),edges:edges.slice(0,100),
     autonomy:{discoveryAndScoring:true,unsolicitedOutreach:false,externalSendRequiresApproval:true},
   };
