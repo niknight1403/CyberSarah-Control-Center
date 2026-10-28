@@ -426,3 +426,74 @@ export const revenueDailyStats = pgTable("revenue_daily_stats", {
   revenueCents: integer("revenueCents").default(0).notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
+
+
+/* Revenue Autopilot 2.0 — persistent, auditable operating state. */
+export const revenueJobs = pgTable("revenue_jobs", {
+  id: serial("id").primaryKey(),
+  dedupeKey: varchar("dedupe_key", { length: 180 }).notNull().unique(),
+  kind: varchar("kind", { length: 64 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("queued"),
+  payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+  result: jsonb("result").$type<Record<string, unknown>>(),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  deferredUntil: timestamp("deferred_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("revenue_jobs_status_idx").on(table.status, table.createdAt)]);
+
+export const revenueOffers = pgTable("revenue_offers", {
+  id: serial("id").primaryKey(),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  name: varchar("name", { length: 220 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("draft"),
+  priceCents: integer("price_cents"),
+  marginPct: integer("margin_pct"),
+  targetUrl: varchar("target_url", { length: 800 }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("revenue_offers_status_idx").on(table.status, table.kind)]);
+
+export const revenueExperiments = pgTable("revenue_experiments", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 220 }).notNull(),
+  dimension: varchar("dimension", { length: 32 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("learning"),
+  variants: jsonb("variants").$type<Array<Record<string, unknown>>>().notNull(),
+  decision: jsonb("decision").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const revenueAttributionEvents = pgTable("revenue_attribution_events", {
+  id: serial("id").primaryKey(),
+  eventKey: varchar("event_key", { length: 200 }).notNull().unique(),
+  personaId: varchar("persona_id", { length: 40 }).notNull(),
+  contentId: varchar("content_id", { length: 120 }).notNull(),
+  platform: varchar("platform", { length: 40 }).notNull(),
+  eventType: varchar("event_type", { length: 24 }).notNull(),
+  valueCents: integer("value_cents").notNull().default(0),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("revenue_attr_content_idx").on(table.contentId, table.eventType),
+  index("revenue_attr_persona_idx").on(table.personaId, table.occurredAt),
+]);
+
+
+export const revenueCostEvents = pgTable("revenue_cost_events", {
+  id: serial("id").primaryKey(),
+  eventKey: varchar("event_key", { length: 200 }).notNull().unique(),
+  category: varchar("category", { length: 32 }).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("revenue_cost_category_idx").on(table.category, table.occurredAt)]);
+
+export type RevenueCostEventRow = typeof revenueCostEvents.$inferSelect;
+
+export type RevenueJobRow = typeof revenueJobs.$inferSelect;
+export type RevenueOfferRow = typeof revenueOffers.$inferSelect;
+export type RevenueExperimentRow = typeof revenueExperiments.$inferSelect;
+export type RevenueAttributionEventRow = typeof revenueAttributionEvents.$inferSelect;

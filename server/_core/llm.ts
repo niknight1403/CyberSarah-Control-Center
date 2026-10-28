@@ -24,6 +24,7 @@ import { evaluateAndNotifyQuotaWarnings, recordProviderCall, recordProviderFailo
 import { diagnoseLlmPoolFailure, type LlmEndpointAttempt } from "../../lib/llm-failure-diagnostics";
 import { sendOpsDiscordAlert } from "../ops-alerts";
 import { notifyTelegram } from "./telegram";
+import { providerCircuitAllows, recordProviderCircuitFailure, recordProviderCircuitSuccess, resetProviderCircuits } from "../../lib/provider-circuit-breaker-logic";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -408,6 +409,7 @@ const recordPoolObservation = (source: string, observation: KeyObservation): voi
 export function resetManagedKeyPoolForTests(): void {
   managedEndpoints.clear();
   managedPool.clear();
+  resetProviderCircuits();
 };
 
 /** Sprint 115: Quota-Warnschwelle hoechstens einmal pro Minute pruefen (Hot-Pfad-Schutz). */
@@ -516,7 +518,7 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
 
   for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(20_000) });
       if (response.ok || attempt === RETRY_MAX_RETRIES) {
         return response;
       }
@@ -616,9 +618,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // rotiert sofort auf den naechsten Endpoint. Sind ALLE in Quarantaene,
   // wird trotzdem Best-Effort weitergearbeitet (Service bleibt nie stumm).
   const notQuarantined = ordered.filter((endpoint) => !isProviderQuarantined(endpoint.source));
-  if (notQuarantined.length > 0) {
-    ordered = notQuarantined;
+  if (notQuarantined.length > 0) ordered = notQuarantined;
+  const circuitEligible = ordered.filter((endpoint) => providerCircuitAllows(endpoint.source));
+  if (circuitEligible.length === 0) {
+    throw new Error("LLM routes temporarily deferred: all provider circuit breakers are open.");
   }
+  ordered = circuitEligible;
 
   // Sprint 196 — Autonomer Rotations-Agent: Die agentenseitig gewaehlte
   // gesunde Gratis-Route (bzw. die vom Administrator erzwungene) fuehrt die
@@ -699,6 +704,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         const errorText = await response.text();
         lastError = new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
         attempts.push({ source: endpoint.source, httpStatus: response.status, message: errorText });
+        recordProviderCircuitFailure(endpoint.source, response.status, latencyMs);
         // Sprint 115: Aufruf ins Metering-Ledger (429/Auth/sonstige).
         recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
         runQuotaWarningCheck();
@@ -729,12 +735,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         break;
       }
       recordPoolObservation(endpoint.source, { latencyMs });
+      recordProviderCircuitSuccess(endpoint.source, latencyMs);
       recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
       runQuotaWarningCheck();
       return (await response.json()) as InvokeResult;
       } catch (error) {
         lastError = error;
         attempts.push({ source: endpoint.source, httpStatus: null, message: error instanceof Error ? error.message : String(error) });
+        recordProviderCircuitFailure(endpoint.source, null, Date.now() - startedAt);
         recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
         recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
         break;
