@@ -24,7 +24,7 @@ import { evaluateAndNotifyQuotaWarnings, recordProviderCall, recordProviderFailo
 import { diagnoseLlmPoolFailure, type LlmEndpointAttempt } from "../../lib/llm-failure-diagnostics";
 import { sendOpsDiscordAlert } from "../ops-alerts";
 import { notifyTelegram } from "./telegram";
-import { providerCircuitAllows, recordProviderCircuitFailure, recordProviderCircuitSuccess } from "../../lib/provider-circuit-breaker-logic";
+import { providerCircuitAllows, recordProviderCircuitFailure, recordProviderCircuitSuccess, resetProviderCircuits } from "../../lib/provider-circuit-breaker-logic";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -409,6 +409,7 @@ const recordPoolObservation = (source: string, observation: KeyObservation): voi
 export function resetManagedKeyPoolForTests(): void {
   managedEndpoints.clear();
   managedPool.clear();
+  resetProviderCircuits();
 };
 
 /** Sprint 115: Quota-Warnschwelle hoechstens einmal pro Minute pruefen (Hot-Pfad-Schutz). */
