@@ -154,7 +154,15 @@ export function prioritizeGrowthSignals(signals:GrowthSignal[]):GrowthPriority[]
     const score=Math.round(clamp((impact*(0.35+0.65*confidence)*100/effort)-(risk*0.2)));
     return {...signal,impact,confidence,effort,risk,score,rank:0,action:"QUEUE" as GrowthPriority["action"]};
   }).sort((a,b)=>b.score-a.score||a.key.localeCompare(b.key));
-  return ranked.map((item,index)=>({...item,rank:index+1,action:item.risk>=80?"HOLD":item.confidence<0.25?"LEARN":index===0?"DO_NEXT":"QUEUE"}));
+  let nextAssigned=false;
+  return ranked.map((item,index)=>{
+    let action:GrowthPriority["action"];
+    if(item.risk>=80) action="HOLD";
+    else if(item.confidence<0.25) action="LEARN";
+    else if(!nextAssigned){action="DO_NEXT";nextAssigned=true;}
+    else action="QUEUE";
+    return {...item,rank:index+1,action};
+  });
 }
 
 export function compoundGrowthHealth(input:{netProfitCents:number;retentionRatePct:number|null;incrementalLiftPct:number|null;funnelHealthPct:number|null;organicSharePct:number|null}){
