@@ -55,9 +55,9 @@ export async function runChannelAutopilot(){
   const db=await getDb(); if(!db) throw new Error("Datenbank nicht verfügbar.");
   const snapshot=await collectChannelAutopilotSnapshot();
   const decision=decideChannelAutopilot(snapshot);
-  const experiment=buildChannelExperimentDraft(decision);
-  const content=buildChannelContentDraft(decision);
   const cooldownBucket=Math.floor(Date.now()/(6*60*60_000));
+  const experiment=buildChannelExperimentDraft(decision,String(cooldownBucket));
+  const content=buildChannelContentDraft(decision);
   const result=await db.transaction(async tx=>{
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cybersarah-channel-autopilot'))`);
     const pending=await tx.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue).where(eq(draftQueue.status,"pending"));
