@@ -68,7 +68,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   }
 
   return {
-    ok: hara.ok && expansion.ok && blocked.length === 0,
+    ok: hara.ok && expansion.ok && blocked.length === 0 && deferred.length === 0,
     startedAt,
     finishedAt: new Date().toISOString(),
     scans: { hara, expansion },
