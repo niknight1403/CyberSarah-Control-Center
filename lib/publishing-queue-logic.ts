@@ -8,8 +8,7 @@
  *   und berechnet Retry-Zeiten mit exponentiellem Backoff.
  *
  * Ehrlichkeits-Grenzen:
- *   - "blocked_veroeffentlicht" ist KEINE echte Veroeffentlichung — der
- *     Modus steht in jedem Job und wird nie als Live-Erfolg ausgegeben.
+ *   - Legacy-Zeilen mit "sandbox_veroeffentlicht" bleiben lesbar, neue Läufe erzeugen diesen Status nicht mehr.
  *   - Live-Publishing braucht Nutzer-Credentials in Env-Variablen; ohne
  *     sie wird nicht getan, als waeren sie da.
  *   - Instagram (Graph-API, 2-Schritt: Container -> media_publish) und TikTok
@@ -22,7 +21,7 @@ import type { CampaignPlan, InfluencerGoal } from "./influencer-reach-logic";
 
 export const PUBLISHING_STATUSES = [
   "geplant",
-  "blocked_veroeffentlicht",
+  "sandbox_veroeffentlicht",
   "veroeffentlicht",
   "fehlgeschlagen",
   "abgebrochen",
