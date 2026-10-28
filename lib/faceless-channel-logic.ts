@@ -56,10 +56,9 @@ export const NICHE_CANDIDATES:NicheCandidate[]=[
   {key:"cybersecurity-smb",name:"Cybersicherheit für KMU",demand:85,differentiation:78,productFit:68,productionFit:62,monetization:66,legalSafety:60,evidence:["BSI KMU guidance","persistent security need","higher expertise/liability burden"]},
 ];
 
-export function scoreNiches(candidates=NICHЕ_SAFE()):Array<NicheCandidate & {score:number}>{
+export function scoreNiches(candidates:NicheCandidate[]=NICHE_CANDIDATES):Array<NicheCandidate & {score:number}>{
   return candidates.map(item=>({...item,score:round((item.demand+item.differentiation+item.productFit+item.productionFit+item.monetization+item.legalSafety)/6,1)})).sort((a,b)=>b.score-a.score);
 }
-function NICHЕ_SAFE(){ return NICHE_CANDIDATES; }
 
 export const FACELESS_CHANNEL_BRAND={
   workingName:"Automationsklar",
