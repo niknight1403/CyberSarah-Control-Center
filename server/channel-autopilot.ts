@@ -22,9 +22,10 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
   const purchaseCents=events.filter(e=>e.eventType==="purchase").reduce((s,e)=>s+(e.valueCents??0),0);
   const refundCents=events.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0);
   const insightImpressions=jobs.reduce((s,j)=>s+Number(j.insights?.impressions??j.insights?.reach??0),0);
+  const insightViews=jobs.reduce((s,j)=>s+Number(j.insights?.views??j.insights?.plays??j.insights?.video_views??0),0);
   return {
     impressions:Math.max(count("impression"),insightImpressions),
-    views:events.filter(e=>e.eventType==="view").length,
+    views:Math.max(events.filter(e=>e.eventType==="view").length,insightViews),
     clicks:count("click"),leads:count("lead"),purchases:count("purchase"),refunds:count("refund"),
     confirmedRevenueCents:purchaseCents-refundCents,
     published:jobs.filter(j=>j.status==="veroeffentlicht").length,
