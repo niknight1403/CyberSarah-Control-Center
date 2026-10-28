@@ -358,10 +358,21 @@ async function deployApp() {
   log("DATABASE_URL-Format gueltig (Fail-Fast-Check).");
 
   if (migrate) {
+    log("Verifiziere/repairiere Produktionsschema vor Drizzle-Migration …");
+    const preflight = spawnSync("node", ["scripts/production-schema-preflight.mjs"], {
+      encoding: "utf8",
+      env: { ...process.env, DATABASE_URL: dbCheck.url },
+    });
+    if (preflight.stdout) process.stdout.write(preflight.stdout);
+    if (preflight.status !== 0) {
+      console.error("[render-deploy] Schema-Preflight fehlgeschlagen.");
+      if (preflight.stderr) console.error(maskSecrets(preflight.stderr));
+      process.exit(1);
+    }
     log("Fuehre Drizzle-Migrationen gegen DATABASE_URL aus …");
     const result = spawnSync("node", ["scripts/run-drizzle-migrations.mjs"], {
       encoding: "utf8",
-      env: { ...process.env, DATABASE_URL: dbCheck.url },
+      env: { ...process.env, DATABASE_URL: dbCheck.url, MIGRATION_PREFLIGHT_VERIFIED: "1" },
     });
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.status !== 0) {
