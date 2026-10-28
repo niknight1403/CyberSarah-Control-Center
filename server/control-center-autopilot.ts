@@ -16,9 +16,15 @@ export type ControlCenterAutopilotResult = {
   blocked: string[];
 };
 
-async function scan(path: "hara/scan" | "expansion/scan") {
+export type ControlCenterAutopilotDeps = {
+  scan?: typeof triggerRevenueScan;
+  revenue?: typeof runRevenueAutopilot;
+  drafts?: typeof runDraftEngine;
+};
+
+async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
   try {
-    const result = await triggerRevenueScan(path);
+    const result = await trigger(path);
     return {
       ok: result.accepted === true,
       detail: result.background ? "vom echten Revenue-Worker angenommen" : result.completed ? "vom echten Revenue-Worker abgeschlossen" : "angenommen",
@@ -35,12 +41,15 @@ async function scan(path: "hara/scan" | "expansion/scan") {
  * nutzt nur echte konfigurierte LLM-Routen. Externe Veröffentlichungen und
  * Preis-/Geldaktionen bleiben bewusst außerhalb dieses reversiblen Loops.
  */
-export async function runControlCenterAutopilot(): Promise<ControlCenterAutopilotResult> {
+export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps = {}): Promise<ControlCenterAutopilotResult> {
   const startedAt = new Date().toISOString();
+  const trigger = deps.scan ?? triggerRevenueScan;
+  const runRevenue = deps.revenue ?? runRevenueAutopilot;
+  const runDrafts = deps.drafts ?? runDraftEngine;
 
-  const [hara, expansion] = await Promise.all([scan("hara/scan"), scan("expansion/scan")]);
-  const revenue = await runRevenueAutopilot(5);
-  const drafts = await runDraftEngine();
+  const [hara, expansion] = await Promise.all([scan("hara/scan", trigger), scan("expansion/scan", trigger)]);
+  const revenue = await runRevenue(5);
+  const drafts = await runDrafts();
 
   const realActions: string[] = [];
   const blocked: string[] = [];
