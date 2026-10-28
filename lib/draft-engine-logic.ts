@@ -25,11 +25,11 @@ export type RevenueHub = "hara" | "saas" | "loop" | "trading";
 export const REVENUE_HUBS: readonly RevenueHub[] = ["hara", "saas", "loop", "trading"] as const;
 
 /** Maximale offene (pending) Entwuerfe pro Art — danach pausiert die Engine. */
-export const DRAFT_MAX_PENDING_PER_KIND = 3;
+export const DRAFT_MAX_PENDING_PER_KIND = 6;
 export const DRAFT_MAX_PENDING_BY_KIND: Readonly<Record<DraftKind, number>> = {
-  content: 3,
+  content: 12,
   "revenue-loop": REVENUE_HUBS.length,
-  idea: 3,
+  idea: 6,
 };
 
 /** Wie viele Tage ein unbeantworteter Entwurf maximal in der Queue bleibt. */
