@@ -12,6 +12,8 @@
 name: Diagnose LLM-Provider (Zero-Cost-Router)
 
 on:
+  push:
+    branches: [diag/provider-health-2026-10-28]
   workflow_dispatch:
   schedule:
     # Taeglich 07:00 UTC (09:00 Berlin) — kontinuierliche Health-Checks
