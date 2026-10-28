@@ -28,7 +28,7 @@ import {
   type RevenueHub,
   type RevenueLoopDraftPayload,
 } from "../lib/draft-engine-logic";
-import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
+import { INFLUENCER_PERSONAS, buildInfluencerPrompt } from "../lib/influencer-persona-logic";
 import type { Message } from "./_core/llm";
 import { isFreeManagedSource, managedLlmEnvFromProcess, openAiCompatibleChatUrl, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
 
@@ -162,9 +162,8 @@ async function generateContentDraft(llm: (messages: Message[]) => Promise<string
   const platform = CONTENT_PLATFORMS[slotOffset % CONTENT_PLATFORMS.length];
   const topic = CONTENT_TOPIC_SEEDS[seedIndexForDay(nowMs, slotOffset)];
   const prompt = [
-    `Du bist ${persona.name}, eine transparente KI-Influencer-Persona fuer ${persona.niche} (Tonalitaet: ${persona.tonality}).`,
-    `Erstelle Content fuer ${platform} zum Thema: ${topic}.`,
-    "Keine falschen Versprechen, keine garantierten Einnahmen, keine Darstellung als menschliche Person.",
+    buildInfluencerPrompt(persona, topic, platform),
+    "Der Content muss den KI-Charakter transparent halten und darf keine erfundenen persoenlichen Erlebnisse enthalten.",
     'Antworte NUR mit einem JSON-Objekt: {"personaId": "' + persona.id + '", "platform": "' + platform + '", "topic": "<Thema>", "content": "<fertiger Content>"}',
   ].join("\n");
   const text = await llm([{ role: "system", content: prompt }]);
