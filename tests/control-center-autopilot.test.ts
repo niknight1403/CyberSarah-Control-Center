@@ -17,8 +17,18 @@ describe("control center autopilot", () => {
     expect(revenue).toHaveBeenCalledWith(5);
     expect(drafts).toHaveBeenCalledTimes(1);
     expect(result.ok).toBe(true);
+    expect(result.deferred).toEqual([]);
     expect(result.realActions.join(" ")).toContain("Creator-Content");
     expect(result.realActions.join(" ")).toContain("Revenue");
+  });
+
+  it("behandelt Provider-Quota ehrlich als verschobene Arbeit", async () => {
+    const limitedDrafts = vi.fn(async () => ({ plan: [], generated: {}, skipped: [{ kind: "content" as const, reason: "LLM 429 Too Many Requests quota exceeded" }] }));
+    const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts: limitedDrafts });
+    expect(result.ok).toBe(true);
+    expect(result.deferred.join(" ")).toContain("429");
+    expect(result.blocked).toEqual([]);
   });
 
   it("meldet reale Blockaden statt sie als Erfolg zu simulieren", async () => {
