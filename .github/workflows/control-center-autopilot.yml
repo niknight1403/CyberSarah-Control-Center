@@ -5,7 +5,7 @@ on:
     workflows: ["Render Deploy"]
     types: [completed]
   schedule:
-    - cron: "17 */4 * * *"
+    - cron: "17 */2 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -37,5 +37,5 @@ jobs:
           cat "$body_file"
           echo
           test "$http_code" = "200"
-          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true' "$body_file" >/dev/null
+          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0' "$body_file" >/dev/null
           echo "Control-Center-Autopilot vollständig bestätigt."
