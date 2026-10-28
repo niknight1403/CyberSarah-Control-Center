@@ -43,6 +43,7 @@ import { haraRouter, saasRouter, crossSellRouter, expansionRouter, subscriptionM
 import { revenueAutopilotRouter } from "./revenue-autopilot-router";
 import { controlCenterAutopilotRouter } from "./control-center-autopilot-router";
 import { revenueOsV2Router } from "./revenue-os-v2-router";
+import { growthNetworkRouter } from "./growth-network-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -96,6 +97,7 @@ export const appRouter = router({
   revenueAutopilot: revenueAutopilotRouter,
   controlCenterAutopilot: controlCenterAutopilotRouter,
   revenueOsV2: revenueOsV2Router,
+  growthNetwork: growthNetworkRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.
