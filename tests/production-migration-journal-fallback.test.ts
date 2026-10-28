@@ -13,7 +13,7 @@ describe("production migration journal fallback",()=>{
   expect(deploy).toContain("production-schema-preflight.mjs");
  });
  it("uses public only for the migration journal fallback",()=>{
-  expect(migrator).toContain('migrationsSchema:"public"');
+  expect(migrator).toContain('migrationsSchema:"public"');\n  expect(migrator).toContain('cause?.code==="42501"');\n  expect(migrator).toContain('schema\\\\s+"');
   expect(migrator).toContain("public.__drizzle_migrations");
  });
  it("keeps the latest draft queue repair idempotent",()=>{
