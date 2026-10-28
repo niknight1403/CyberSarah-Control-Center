@@ -46,7 +46,7 @@ export function MetricTile({ icon, label, value, accent = "cyan", statusNote, on
 }
 
 const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
-  card: { flex: 1, gap: 6, paddingVertical: glass.glassSpacing.md, paddingHorizontal: glass.glassSpacing.md, minHeight: 92 },
+  card: { flexGrow: 1, flexShrink: 1, flexBasis: 100, minWidth: 96, gap: 5, paddingVertical: 12, paddingHorizontal: 12, minHeight: 100 },
   iconWrap: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   wash: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   value: { ...glass.glassType.headline, color: glass.glassSurface.textPrimary, fontSize: 20 },
