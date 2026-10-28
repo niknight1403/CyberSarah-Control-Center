@@ -481,6 +481,18 @@ export const revenueAttributionEvents = pgTable("revenue_attribution_events", {
   index("revenue_attr_persona_idx").on(table.personaId, table.occurredAt),
 ]);
 
+
+export const revenueCostEvents = pgTable("revenue_cost_events", {
+  id: serial("id").primaryKey(),
+  eventKey: varchar("event_key", { length: 200 }).notNull().unique(),
+  category: varchar("category", { length: 32 }).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("revenue_cost_category_idx").on(table.category, table.occurredAt)]);
+
+export type RevenueCostEventRow = typeof revenueCostEvents.$inferSelect;
+
 export type RevenueJobRow = typeof revenueJobs.$inferSelect;
 export type RevenueOfferRow = typeof revenueOffers.$inferSelect;
 export type RevenueExperimentRow = typeof revenueExperiments.$inferSelect;
