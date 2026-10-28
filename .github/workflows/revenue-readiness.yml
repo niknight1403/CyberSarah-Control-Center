@@ -16,7 +16,7 @@ on:
       - 'scripts/revenue-readiness.mjs'
       - '.github/workflows/revenue-readiness.yml'
   push:
-    branches: [main, integration/revenue-os-live-data]
+    branches: [main, integration/revenue-os-live-data, diag/provider-health-2026-10-28]
     paths:
       - 'server/revenue-command-*'
       - 'scripts/revenue-readiness.mjs'
