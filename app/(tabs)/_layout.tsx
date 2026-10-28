@@ -11,6 +11,7 @@ import { GlassTabIcon } from "@/components/glass/glass-tab-icon";
 import { Platform, View, useWindowDimensions } from "react-native";
 import { isWideViewport } from "@/lib/viewport-logic";
 import { useGlassTheme } from "@/lib/design/future-glass-runtime";
+import { CYBERSARAH_ASSET_PACK } from "@/lib/design/cybersarah-asset-pack";
 
 /**
  * Die Routen bleiben als Expo-Router-Segmente erhalten, aber die mobile
@@ -55,7 +56,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="dashboard"
           options={{
-            title: "Start",
+            title: CYBERSARAH_ASSET_PACK.navigation[0].label,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="cyan"><IconSymbol size={22} name="house.fill" color={color} /></GlassTabIcon>
             ),
@@ -74,7 +75,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="revenue-os"
           options={{
-            title: "Automatik",
+            title: CYBERSARAH_ASSET_PACK.navigation[1].label,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="green"><IconSymbol size={22} name="chart.bar.fill" color={color} /></GlassTabIcon>
             ),
@@ -103,7 +104,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="media-studio"
           options={{
-            title: "Studio",
+            title: CYBERSARAH_ASSET_PACK.navigation[2].label,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="purple"><IconSymbol size={22} name="video.fill" color={color} /></GlassTabIcon>
             ),
@@ -184,7 +185,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="agent"
           options={{
-            title: "Agenten",
+            title: CYBERSARAH_ASSET_PACK.navigation[3].label,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="sparkles" color={color} /></GlassTabIcon>
             ),
@@ -225,7 +226,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="account"
           options={{
-            title: "Mehr",
+            title: CYBERSARAH_ASSET_PACK.navigation[4].label,
             tabBarIcon: ({ color, focused }) => (
               <GlassTabIcon focused={focused} accent="cyan"><IconSymbol size={22} name="person.crop.circle" color={color} /></GlassTabIcon>
             ),
