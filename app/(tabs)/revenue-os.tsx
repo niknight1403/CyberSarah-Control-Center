@@ -74,6 +74,9 @@ function InfluencerSection() {
   const generateMutation = trpc.influencer.generate.useMutation({
     onSuccess: (result) => setGeneratedContent(result.content),
   });
+  const factoryMutation = trpc.revenueOsV2.contentFactory.useMutation({
+    onSuccess: (result) => setGeneratedContent(`Content Factory: ${result.assets.length} validierte Assets als Entwurf #${result.draftId} gespeichert.`),
+  });
   const selected = INFLUENCER_PERSONAS.find((persona) => persona.id === selectedId) ?? INFLUENCER_PERSONAS[0];
   const accent = PERSONA_ACCENTS[selected.id];
 
@@ -94,8 +97,8 @@ function InfluencerSection() {
       <TextInput value={topic} onChangeText={setTopic} placeholder="z. B. 3 Wege, wie KI kleine Teams produktiver macht" placeholderTextColor={glassSurface.textMuted} multiline maxLength={500} style={styles.topicInput} accessibilityLabel="Thema für Content-Generierung" />
       <Text style={styles.inputLabel}>Plattform</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.platformRow}>{PLATFORMS.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: item.value === platform }} onPress={() => setPlatform(item.value)} style={[styles.platformPill, item.value === platform && { borderColor: glassPalette[accent], backgroundColor: `${glassPalette[accent]}22` }]}><Text style={[styles.platformText, item.value === platform && { color: glassPalette[accent] }]}>{item.label}</Text></Pressable>)}</ScrollView>
-      {generateMutation.error ? <Text style={styles.errorText}>{generateMutation.error.message}</Text> : null}
-      <GlowButton label={generateMutation.isPending ? "Generierung läuft …" : `${selected.name}-Content generieren`} accent={accent} onPress={() => { if (topic.trim().length >= 3) generateMutation.mutate({ personaId: selected.id, topic: topic.trim(), platform }); }} disabled={generateMutation.isPending || topic.trim().length < 3} />
+      {generateMutation.error ? <Text style={styles.errorText}>{generateMutation.error.message}</Text> : null}{factoryMutation.error ? <Text style={styles.errorText}>{factoryMutation.error.message}</Text> : null}
+      <GlowButton label={generateMutation.isPending ? "Generierung läuft …" : `${selected.name}-Content generieren`} accent={accent} onPress={() => { if (topic.trim().length >= 3) generateMutation.mutate({ personaId: selected.id, topic: topic.trim(), platform }); }} disabled={generateMutation.isPending || topic.trim().length < 3} /><GlowButton label={factoryMutation.isPending ? "Content Factory arbeitet …" : "Multi-Format Factory · bis 30 Assets"} accent="cyan" variant="secondary" onPress={() => { if (topic.trim().length >= 3) factoryMutation.mutate({ personaId: selected.id, topic: topic.trim(), maxAssets: 30 }); }} disabled={factoryMutation.isPending || topic.trim().length < 3} />
       {generatedContent ? <View style={styles.resultBox}><View style={styles.resultHeader}><Text style={styles.resultTitle}>Generierter Entwurf</Text><StatusChip label="Entwurf" accent="green" /></View><Text selectable style={styles.resultText}>{generatedContent}</Text><Text style={styles.resultNote}>Noch nicht veröffentlicht. Veröffentlichung bleibt ein separater Freigabeschritt.</Text></View> : null}
     </GlassCard>
     <AutonomousDraftsCard kinds={["content"]} accent="cyan" />
