@@ -49,10 +49,10 @@ export function channelAutopilotHealth(s:ChannelAutopilotSnapshot){
   };
 }
 
-export function buildChannelExperimentDraft(decision:ChannelAutopilotDecision){
+export function buildChannelExperimentDraft(decision:ChannelAutopilotDecision,runId?:string){
   return {
     hub:"loop" as const,
-    name:`CHANNEL AUTO · ${decision.lever}`,
+    name:`CHANNEL AUTO · ${decision.lever}${runId?` · ${runId}`:""}`,
     hypothesis:decision.reason,
     stages:["Observe","Diagnose","Draft","Human Gate","Measure","Learn"],
     metric:decision.metric,
