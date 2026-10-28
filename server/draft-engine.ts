@@ -75,7 +75,7 @@ async function defaultDraftLlm(messages: Message[]): Promise<string> {
     // Derselbe zentrale Router wie der KI-Chat: kostenlose Provider-Kette,
     // Health-/Quota-Rotation und Modell-Fallback. Kein zweiter URL-Pfad mehr,
     // der von der produktiven Router-Konfiguration abweichen kann.
-    const result = await invokeLLM({ messages: routedMessages, maxTokens: 700 });
+    const result = await invokeLLM({ messages: routedMessages, maxTokens: 700, responseFormat: { type: "json_object" } });
     const content = result.choices[0]?.message?.content;
     if (typeof content !== "string" || !content.trim()) {
       throw new Error("Zentraler LLM-Router lieferte keinen Text.");
@@ -181,9 +181,16 @@ async function generateContentDraft(llm: (messages: Message[]) => Promise<string
     "Der Content muss den KI-Charakter transparent halten und darf keine erfundenen persoenlichen Erlebnisse enthalten.",
     'Antworte NUR mit einem JSON-Objekt: {"personaId": "' + persona.id + '", "platform": "' + platform + '", "topic": "<Thema>", "content": "<fertiger Content>"}',
   ].join("\\n");
-  const text = await llm([{ role: "system", content: prompt }]);
-  const parsed = parseLlmJson(text);
-  if (!parsed) return { ok: false, reason: "Content-LLM lieferte kein auswertbares JSON." };
+  let text = await llm([{ role: "system", content: prompt }]);
+  let parsed = parseLlmJson(text);
+  if (!parsed) {
+    text = await llm([
+      { role: "system", content: prompt },
+      { role: "user", content: "Die vorige Ausgabe war kein gueltiges JSON. Antworte jetzt ausschliesslich mit dem geforderten JSON-Objekt, ohne Markdown." },
+    ]);
+    parsed = parseLlmJson(text);
+  }
+  if (!parsed) return { ok: false, reason: "Content-LLM lieferte nach Reparaturversuch kein auswertbares JSON." };
   const validated = validateDraftPayload("content", parsed);
   if (!validated.valid) return { ok: false, reason: validated.reason };
   await insertPendingDraft("content", validated.title, validated.payload, "draft-engine");
