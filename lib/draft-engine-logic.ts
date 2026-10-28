@@ -36,11 +36,15 @@ export const DRAFT_MAX_PENDING_BY_KIND: Readonly<Record<DraftKind, number>> = {
 /** Wie viele Tage ein unbeantworteter Entwurf maximal in der Queue bleibt. */
 export const DRAFT_PENDING_STALE_DAYS = 14;
 
+export type ContentDraftAsset = { format: string; variant: number; title?: string; content: string; cta?: string; qualityReason?: string };
 export type ContentDraftPayload = {
   personaId: string;
   platform: string;
   topic: string;
   content: string;
+  assets?: ContentDraftAsset[];
+  assetCount?: number;
+  disclosure?: string;
 };
 
 export type RevenueLoopDraftPayload = {
@@ -127,7 +131,20 @@ export function validateDraftPayload(
     if (!personaId || !platform || !topic || !content) {
       return { valid: false, reason: "Content-Entwurf unvollstaendig (Persona/Plattform/Thema/Text)." };
     }
-    return { valid: true, payload: { personaId, platform, topic, content }, title: topic.slice(0, 120) };
+    const assets = Array.isArray(raw.assets) ? raw.assets.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const asset = item as Record<string, unknown>;
+      const assetContent = nonEmpty(asset.content, 12000);
+      const format = nonEmpty(asset.format, 40);
+      const variant = typeof asset.variant === "number" && Number.isFinite(asset.variant) ? Math.max(1, Math.floor(asset.variant)) : 1;
+      if (!assetContent || !format) return [];
+      const title = nonEmpty(asset.title, 200) ?? undefined;
+      const cta = nonEmpty(asset.cta, 500) ?? undefined;
+      const qualityReason = nonEmpty(asset.qualityReason, 500) ?? undefined;
+      return [{ format, variant, content: assetContent, ...(title ? { title } : {}), ...(cta ? { cta } : {}), ...(qualityReason ? { qualityReason } : {}) }];
+    }).slice(0, 30) : undefined;
+    const disclosure = nonEmpty(raw.disclosure, 600) ?? undefined;
+    return { valid: true, payload: { personaId, platform, topic, content, ...(assets?.length ? { assets, assetCount: assets.length } : {}), ...(disclosure ? { disclosure } : {}) }, title: topic.slice(0, 120) };
   }
   if (kind === "revenue-loop") {
     const rawHub = nonEmpty(raw.hub, 40);
