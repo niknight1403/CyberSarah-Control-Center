@@ -1,6 +1,7 @@
 import { runDraftEngine, type DraftEngineRunResult } from "./draft-engine";
 import { runRevenueAutopilot, type RevenueAutopilotRunResult } from "./revenue-autopilot";
 import { triggerRevenueScan } from "./revenue-command-service";
+import { deriveUltraAutopilotDecision, type UltraAutopilotDecision } from "../lib/ultra-orchestrator-logic";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -15,6 +16,8 @@ export type ControlCenterAutopilotResult = {
   realActions: string[];
   deferred: string[];
   blocked: string[];
+  /** Agentforge2/AGI-Agenten adoption: next safe control-loop action. */
+  decision: UltraAutopilotDecision;
 };
 
 export type ControlCenterAutopilotDeps = {
@@ -77,5 +80,6 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     realActions,
     deferred,
     blocked,
+    decision: deriveUltraAutopilotDecision({ blocked, deferred, realActions }),
   };
 }
