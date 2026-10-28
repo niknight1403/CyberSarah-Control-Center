@@ -30,18 +30,18 @@ describe("planDraftRun", () => {
   it("fuellt freie Slots bis zum Limit", () => {
     const plan = planDraftRun({ content: 1, "revenue-loop": 3, idea: 0 });
     expect(plan).toEqual([
-      { kind: "content", slots: 11, reason: "quota" },
+      { kind: "content", slots: 23, reason: "quota" },
       { kind: "revenue-loop", slots: 1, reason: "quota" },
-      { kind: "idea", slots: 6, reason: "quota" },
+      { kind: "idea", slots: 12, reason: "quota" },
     ]);
   });
 
   it("negatives/negatives-fehlendes Pending wird als 0 gelesen", () => {
     const plan = planDraftRun({} as never);
     expect(plan).toEqual([
-      { kind: "content", slots: 12, reason: "quota" },
+      { kind: "content", slots: 24, reason: "quota" },
       { kind: "revenue-loop", slots: 4, reason: "quota" },
-      { kind: "idea", slots: 6, reason: "quota" },
+      { kind: "idea", slots: 12, reason: "quota" },
     ]);
   });
 });
