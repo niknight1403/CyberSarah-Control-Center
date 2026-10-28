@@ -285,6 +285,10 @@ function makeAppEnvBuilder(databaseUrl) {
     "PERPLEXITY_API_KEY",
     "ELEVENLABS_API_KEY",
     "TIKTOK_SYMPHONY_API_KEY",
+    "DIGISTORE24_API_KEY",
+    "DIGISTORE24_IPN_SECRET",
+    "DIGISTORE24_IPN_PASSPHRASE",
+    "DIGISTORE24_AFFILIATE_ID",
     // Sprint 372 — Revenue-OS-Anbindung (VM-Spiegel-DB + Scan-Relay) und
     // Rate-Limit-Tuning; nur gesetzt, wenn das zugehoerige Secret existiert.
     "REVENUE_OS_DATABASE_URL",
