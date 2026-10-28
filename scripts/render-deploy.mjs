@@ -359,13 +359,20 @@ async function deployApp() {
   if (migrate) {
     log("Fuehre Drizzle-Migrationen gegen DATABASE_URL aus …");
     const result = spawnSync("npx", ["drizzle-kit", "migrate"], {
-      stdio: "inherit",
+      encoding: "utf8",
       env: { ...process.env, DATABASE_URL: dbCheck.url },
     });
+    if (result.stdout) process.stdout.write(result.stdout);
     if (result.status !== 0) {
       console.error("[render-deploy] Migrationen fehlgeschlagen.");
+      if (result.stderr) {
+        // Drizzle/pg errors contain schema/query diagnostics; mask any accidental env values.
+        console.error(maskSecrets(result.stderr));
+      }
+      if (result.error) console.error(maskSecrets(String(result.error)));
       process.exit(1);
     }
+    if (result.stderr) process.stderr.write(maskSecrets(result.stderr));
   }
 
   const serviceName = env("RENDER_SERVICE_NAME", "cybersarah-control-center");
