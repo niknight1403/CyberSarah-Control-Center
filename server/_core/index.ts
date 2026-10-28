@@ -8,6 +8,7 @@ import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
 import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
 import { startPublishingAutopilot, getPublishingJobCard } from "../publishing-service";
+import { startInfluencerLearningLoop } from "../influencer-learning-loop";
 import { buildPublishingCardPng, type IgRatioKey } from "../../lib/asset-card-logic";
 import {
   isWebFallbackCandidate,
@@ -612,6 +613,7 @@ async function startServer() {
     console.log(`[api] server listening on port ${port}`);
     startOptimizerLoop();
     startPublishingAutopilot();
+    startInfluencerLearningLoop();
     if (process.env.DIGISTORE24_API_KEY?.trim()) {
       const pullOnce = async (reason: string) => {
         const r = await syncDigistore24Commissions(30);
