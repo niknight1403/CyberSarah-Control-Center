@@ -161,7 +161,7 @@ export function registerAgentforgeTelemetryRoutes(app: Express) {
       for (const row of rows) {
         const id = Number(row.id);
         if (id <= client.lastId) continue;
-        writeSse(res, { id, event: String(row.event_type), data: { id: row.event_id, type: row.event_type, at: new Date(String(row.occurred_at)).getTime(), ...((row.metadata && typeof row.metadata === "object") ? row.metadata as Record<string, unknown> : {}) } });
+        writeSse(res, { id, event: String(row.event_type), data: { id: row.event_id, type: row.event_type, at: new Date(String(row.occurred_at)).getTime(), metadata: (row.metadata && typeof row.metadata === "object") ? row.metadata as Record<string, unknown> : {} } });
         client.lastId = id;
       }
       client.pending.sort((a, b) => a.id - b.id);
