@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
 import { b2bNetworkOverview,influencerLearningOverview,refreshInfluencerLearning,upsertB2BEdge,upsertB2BNode } from "./growth-network-service";
+import { getInfluencerLearningLoopStatus, runInfluencerLearningTick } from "./influencer-learning-loop";
 
 export const growthNetworkRouter=router({
   b2bOverview:adminProcedure.query(b2bNetworkOverview),
@@ -16,5 +17,6 @@ export const growthNetworkRouter=router({
     evidence:z.record(z.string(),z.unknown()).optional(),
   })).mutation(({input})=>upsertB2BEdge(input)),
   influencerLearning:adminProcedure.query(influencerLearningOverview),
-  learnNow:adminProcedure.mutation(refreshInfluencerLearning),
+  learningLoopStatus:adminProcedure.query(getInfluencerLearningLoopStatus),
+  learnNow:adminProcedure.mutation(runInfluencerLearningTick),
 });
