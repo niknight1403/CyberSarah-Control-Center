@@ -9,22 +9,30 @@ describe("Render app deployment migration gate",()=>{
     expect(workflow).toContain("- 'drizzle/**'");
   });
 
-  it("ships an idempotent repair migration for production growth relations",()=>{
+  it("ships idempotent production repairs",()=>{
     const repair=readFileSync("drizzle/0019_repair_growth_schema.sql","utf8");
+    const dedupe=readFileSync("drizzle/0020_draft_queue_dedupe.sql","utf8");
     const journal=readFileSync("drizzle/meta/_journal.json","utf8");
     for(const table of ["revenue_attribution_events","revenue_cost_events","b2b_network_nodes","b2b_network_edges","influencer_learning_states"]){
       expect(repair).toContain('CREATE TABLE IF NOT EXISTS "'+table+'"');
     }
-    expect(journal).toContain('"tag": "0019_repair_growth_schema"');
+    expect(dedupe).toContain('ADD COLUMN IF NOT EXISTS "dedupeKey"');
+    expect(dedupe).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "draftQueue_dedupe_idx"');
+    expect(journal).toContain('"tag": "0020_draft_queue_dedupe"');
   });
 
-  it("keeps the journal-permission fallback pinned to the verified latest migration",()=>{
+  it("fails closed unless the full current migration schema and unique index are verified",()=>{
     const migrate=readFileSync("scripts/run-drizzle-migrations.mjs","utf8");
     const preflight=readFileSync("scripts/production-schema-preflight.mjs","utf8");
     expect(migrate).toContain('latest!=="0020_draft_queue_dedupe"');
     expect(migrate).toContain("journalPermissionDenied");
-    expect(migrate).toContain("draftQueue_dedupe_idx");
+    expect(migrate).toContain("expectedRuntimeObjects");
+    expect(migrate).toContain("expected.tables.some");
+    expect(migrate).toContain("expected.columns");
+    expect(migrate).toContain("i.indisunique");
+    expect(migrate).toContain("i.indisvalid");
     expect(preflight).toContain('ADD COLUMN IF NOT EXISTS "dedupeKey"');
-    expect(preflight).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "draftQueue_dedupe_idx"');
+    expect(preflight).toContain("i.indisunique");
+    expect(preflight).toContain("i.indisvalid");
   });
 });
