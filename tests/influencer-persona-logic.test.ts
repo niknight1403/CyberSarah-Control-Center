@@ -8,9 +8,9 @@ import {
 } from "@/lib/influencer-persona-logic";
 
 describe("influencer persona logic", () => {
-  it("contains ten unique selectable personas (Sprint 364)", () => {
-    expect(INFLUENCER_PERSONAS).toHaveLength(10);
-    expect(new Set(INFLUENCER_PERSONAS.map((persona) => persona.id)).size).toBe(10);
+  it("contains six production-ready transparent AI personas", () => {
+    expect(INFLUENCER_PERSONAS).toHaveLength(6);
+    expect(new Set(INFLUENCER_PERSONAS.map((persona) => persona.id)).size).toBe(6);
     expect(INFLUENCER_PERSONAS.map((persona) => persona.name)).toEqual([
       "Nova", "Mira", "Juno", "Lina", "Kaya", "Zara", "Orion", "Ava", "Rio", "Nala",
     ]);
@@ -23,6 +23,8 @@ describe("influencer persona logic", () => {
       expect(prompt).toContain(persona.niche);
       expect(prompt).toContain("KI für kleine Teams");
       expect(prompt).toContain("LinkedIn");
+      expect(prompt).toContain(persona.disclosure);
+      expect(persona.audience.length).toBeGreaterThan(10);
     }
   });
 
