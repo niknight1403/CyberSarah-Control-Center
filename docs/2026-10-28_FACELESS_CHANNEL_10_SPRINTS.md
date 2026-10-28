@@ -34,3 +34,8 @@ Ziel: Den recherchierten deutschsprachigen Faceless-Kanal **Automationsklar** al
 - Make affiliate: https://help.make.com/affiliate-program
 
 Diese Quellen sind Verifikationsanker; Affiliate-Teilnahme ist damit nicht behauptet.
+
+
+## Channel Autopilot — 24/7 Wachstumsschicht
+
+Der Server betreibt zusätzlich einen 15-Minuten-Regelkreis: `Observe → Diagnose → Draft → Human Gate → Measure → Learn`. Er liest reale Attribution-Events und Publishing-Insights, priorisiert den frühesten messbaren Engpass (Reliability → Discovery → Packaging → CTA → Landing → Monetization → Compound) und erzeugt deduplizierte Pending-Drafts. Bestätigter Umsatz bleibt von Modellwerten getrennt. Ein 6-Stunden-Cooldown verhindert Optimierungsflattern. Externes Publishing, Ausgaben, Preisänderungen und Affiliate-Behauptungen bleiben freigabepflichtig.

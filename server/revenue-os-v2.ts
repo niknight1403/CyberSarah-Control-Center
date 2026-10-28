@@ -121,7 +121,7 @@ export async function revenueOsV2Overview(){
 
 export async function recordRevenueAttribution(input:{eventKey:string;personaId:string;contentId:string;platform:string;eventType:AttributionEvent["eventType"];valueCents?:number}){
   const db=await getDb(); if(!db) throw new Error("Datenbank nicht verfügbar.");
-  if(!INFLUENCER_PERSONAS.some(p=>p.id===input.personaId)) throw new Error("Unbekannte Persona.");
+  if(input.personaId!=="automationsklar-editorial"&&!INFLUENCER_PERSONAS.some(p=>p.id===input.personaId)) throw new Error("Unbekannte Persona.");
   const [row]=await db.insert(revenueAttributionEvents).values({...input,valueCents:Math.max(0,input.valueCents??0)}).onConflictDoNothing({target:revenueAttributionEvents.eventKey}).returning();
   return {stored:Boolean(row),id:row?.id??null};
 }
