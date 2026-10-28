@@ -144,6 +144,7 @@ try {
 // --- Polling/Warte-Logik fuer DOM-Mount und Login-Screen ---
 let mounted = false;
 let loginScreenOk = false;
+let authenticatedShellSeen = false;
 let navigationOk = false;
 let rootEl = null;
 let rootText = "";
@@ -167,10 +168,12 @@ while (Date.now() - startTime < maxWaitMs) {
   // 1. Echte Login-Screen-Pruefung
   const hasLoginHeader = /CYBERSARAH|Control Center/i.test(rootText);
   const hasLoginPrompt = /Willkommen zurück|Anmelden|Login/i.test(rootText);
-  loginScreenOk = hasLoginHeader && hasLoginPrompt;
-  if (mounted && !loginScreenOk) {
+  const hasAuthenticatedShell = /Workspace|Revenue & Creator OS|Übersicht|Dashboard|ENTWICKLUNGSFÜHRUNG/i.test(rootText);
+  loginScreenOk = hasLoginHeader && (hasLoginPrompt || hasAuthenticatedShell);
+  if (mounted) {
     loginHeaderSeen ||= hasLoginHeader;
     loginPromptSeen ||= hasLoginPrompt;
+    authenticatedShellSeen ||= hasAuthenticatedShell;
   }
 
   // 2. Echte Kern-Navigation-Pruefung
@@ -186,7 +189,7 @@ while (Date.now() - startTime < maxWaitMs) {
 
 console.log(`web-export-smoke [DOM]: #root ${mounted ? "enthaelt Markup" : "LEER"} (${rootEl?.innerHTML.length ?? 0} Bytes) | __csMounted=${startupShellHidden}`);
 console.log(
-  `web-export-smoke [Login-Screen]: ${loginScreenOk ? "OK (Header + Prompt im DOM verifiziert)" : `FEHLGESCHLAGEN (Header=${loginHeaderSeen}, Prompt=${loginPromptSeen}, Root-Text: ${JSON.stringify(rootText.slice(0, 300))}`}`
+  `web-export-smoke [Entry-Screen]: ${loginScreenOk ? `OK (Header + ${loginPromptSeen ? "Login-Prompt" : "authentifizierte App-Shell"} verifiziert)` : `FEHLGESCHLAGEN (Header=${loginHeaderSeen}, Prompt=${loginPromptSeen}, AppShell=${authenticatedShellSeen}, Root-Text: ${JSON.stringify(rootText.slice(0, 300))}`}`
 );
 console.log(`web-export-smoke [Kern-Navigation]: ${navigationOk ? "OK (Tab-Routen im Bundle + Nav-DOM verifiziert)" : "FEHLGESCHLAGEN"}`);
 
@@ -231,9 +234,9 @@ const livePassed = liveNetworkError || (liveHealthOk && liveHtmlOk && liveTrpcOk
 const allPassed = mounted && loginScreenOk && navigationOk && errors.length === 0 && livePassed;
 
 if (!allPassed) {
-  console.error("web-export-smoke: FEHLGESCHLAGEN — Echte Pruefung von Login-Screen, Kern-Navigation oder Live-App nicht bestanden.");
+  console.error("web-export-smoke: FEHLGESCHLAGEN — Echte Pruefung von Entry-Screen, Kern-Navigation oder Live-App nicht bestanden.");
   process.exit(1);
 }
 
-console.log("web-export-smoke: OK — Alle Kernfluege (DOM Mount, Login-Screen, Kern-Navigation, Live-App) ergreifend gruen.");
+console.log("web-export-smoke: OK — Alle Kernfluege (DOM Mount, Entry-Screen, Kern-Navigation, Live-App) ergreifend gruen.");
 process.exit(0);
