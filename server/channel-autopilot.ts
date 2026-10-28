@@ -48,6 +48,7 @@ export async function runChannelAutopilot(){
   const decision=decideChannelAutopilot(snapshot);
   const experiment=buildChannelExperimentDraft(decision);
   const content=buildChannelContentDraft(decision);
+  const cooldownBucket=Math.floor(Date.now()/(6*60*60_000));
   const result=await db.transaction(async tx=>{
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cybersarah-channel-autopilot'))`);
     const pending=await tx.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue).where(eq(draftQueue.status,"pending"));
@@ -57,11 +58,11 @@ export async function runChannelAutopilot(){
     const contentKeys=new Set([...pending,...recent].filter(x=>x.kind==="content").map(x=>(x.payload as {autopilotKey?:string}).autopilotKey).filter(Boolean));
     let generated=0;
     if(!revenueKeys.has(experiment.autopilotKey)&&pending.filter(x=>x.kind==="revenue-loop").length<DRAFT_MAX_PENDING_BY_KIND["revenue-loop"]){
-      await tx.insert(draftQueue).values({kind:"revenue-loop",title:experiment.name,payload:experiment,status:"pending",createdBy:"channel-autopilot"});
+      await tx.insert(draftQueue).values({kind:"revenue-loop",title:experiment.name,payload:experiment,status:"pending",createdBy:"channel-autopilot",dedupeKey:`channel-autopilot:revenue:${decision.lever}:${cooldownBucket}`}).onConflictDoNothing({target:draftQueue.dedupeKey});
       generated++;
     }
     if(!contentKeys.has(content.autopilotKey)&&pending.filter(x=>x.kind==="content").length<DRAFT_MAX_PENDING_BY_KIND.content){
-      await tx.insert(draftQueue).values({kind:"content",title:`Channel Autopilot · ${decision.lever}`,payload:content,status:"pending",createdBy:"channel-autopilot"});
+      await tx.insert(draftQueue).values({kind:"content",title:`Channel Autopilot · ${decision.lever}`,payload:content,status:"pending",createdBy:"channel-autopilot",dedupeKey:`channel-autopilot:content:${decision.lever}:${cooldownBucket}`}).onConflictDoNothing({target:draftQueue.dedupeKey});
       generated++;
     }
     return {generated};
