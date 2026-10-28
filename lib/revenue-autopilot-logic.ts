@@ -58,6 +58,11 @@ export type RevenueOpportunity = {
   target: string;
   rationale: string;
   stages: string[];
+  /** Vollstaendiger, direkt in Loop Engineering uebernehmbarer Experimentplan. */
+  experiment: string;
+  unit: string;
+  targetValue: number;
+  currentValue: number;
 };
 
 function pct(part: number | null, whole: number | null): number | null {
@@ -106,6 +111,10 @@ function addRateOpportunity(args: {
     target: `${args.target.toFixed(1)} % internes Optimierungsziel`,
     rationale: args.rationale,
     stages: args.stages,
+    experiment: `Kontrollierte Variante testen und ${args.metric} im gleichen Messfenster gegen die Baseline vergleichen.`,
+    unit: "%",
+    targetValue: args.target,
+    currentValue: args.current,
   });
 }
 
@@ -238,6 +247,10 @@ export function buildRevenueOpportunities(
       target: "mindestens 1 validierte Chance",
       rationale: "Aktuell ist keine validierte Expansion-Chance sichtbar. Discovery ist sinnvoll, aber noch kein Umsatzbeweis.",
       stages: ["Expansion-Scan ausfuehren", "Chancen nach Datenbelegen priorisieren", "Nur eine belegte Chance als Experiment freigeben"],
+      experiment: "Expansion-Scan ausfuehren und genau eine datenbelegte Chance bis zur Validierungsentscheidung pruefen.",
+      unit: "Chancen",
+      targetValue: 1,
+      currentValue: 0,
     });
   }
 
@@ -253,6 +266,10 @@ export function buildRevenueOpportunities(
       target: "messbare Tages-Buckets vorhanden",
       rationale: "Ohne Funnel-Ereignisse kann der Autopilot keine Conversion-Luecken datenbasiert optimieren.",
       stages: ["Event-Tracking auf Kernseiten verifizieren", "Landing/Signup/Checkout-Endpunkte testen", "Erst danach Conversion-Experimente priorisieren"],
+      experiment: "Kern-Events Ende-zu-Ende ausloesen und einen vollstaendigen Tages-Bucket fuer Landing, Signup und Checkout verifizieren.",
+      unit: "Event-Buckets",
+      targetValue: 1,
+      currentValue: 0,
     });
   }
 
