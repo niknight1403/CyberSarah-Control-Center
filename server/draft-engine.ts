@@ -58,18 +58,24 @@ async function callDraftChatEndpoint(
 
 /** Local-first, danach ausschliesslich konfigurierte kostenlose Cloud-Route. */
 async function defaultDraftLlm(messages: Message[]): Promise<string> {
+  // Gemini/OpenAI-kompatible Gateways brauchen mindestens eine echte User-
+  // Nachricht. Reine System-Prompts funktionieren bei manchen Providern,
+  // fuehren bei Gemini aber zu "contents is not specified".
+  const routedMessages: Message[] = messages.some((message) => message.role !== "system")
+    ? messages
+    : [...messages, { role: "user", content: "Erstelle die angeforderte Ausgabe jetzt exakt im geforderten JSON-Format." }];
   const ollamaBase = (process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434").replace(/\/+$/, "");
   try {
     return await callDraftChatEndpoint(
       openAiCompatibleChatUrl(ollamaBase),
       process.env.AI_OLLAMA_MODEL ?? process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b",
-      messages,
+      routedMessages,
     );
   } catch {
     // Derselbe zentrale Router wie der KI-Chat: kostenlose Provider-Kette,
     // Health-/Quota-Rotation und Modell-Fallback. Kein zweiter URL-Pfad mehr,
     // der von der produktiven Router-Konfiguration abweichen kann.
-    const result = await invokeLLM({ messages, maxTokens: 700 });
+    const result = await invokeLLM({ messages: routedMessages, maxTokens: 700 });
     const content = result.choices[0]?.message?.content;
     if (typeof content !== "string" || !content.trim()) {
       throw new Error("Zentraler LLM-Router lieferte keinen Text.");
@@ -251,7 +257,10 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
     const missingRevenueHubs = entry.kind === "revenue-loop"
       ? REVENUE_HUBS.filter((hub) => !coverage!.revenueHubs.has(hub))
       : [];
-    const slots = entry.kind === "revenue-loop" ? Math.min(entry.slots, missingRevenueHubs.length) : entry.slots;
+    const perRunLimit = entry.kind === "content" ? INFLUENCER_PERSONAS.length : entry.kind === "idea" ? 2 : missingRevenueHubs.length;
+    const slots = entry.kind === "revenue-loop"
+      ? Math.min(entry.slots, missingRevenueHubs.length)
+      : Math.min(entry.slots, perRunLimit);
     for (let slot = 0; slot < slots; slot++) {
       try {
         const outcome =
