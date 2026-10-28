@@ -63,7 +63,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (revenue.generated > 0) realActions.push(`${revenue.generated} datenbasierte Revenue-Experimente erzeugt`);
   for (const item of drafts.skipped) {
     const detail = `${item.kind}: ${item.reason}`;
-    if (/\b429\b|quota|rate.?limit|resource_exhausted|too many requests/i.test(item.reason)) deferred.push(detail);
+    if (/\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(item.reason)) deferred.push(detail);
     else blocked.push(detail);
   }
 
