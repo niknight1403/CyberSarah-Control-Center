@@ -33,7 +33,7 @@ async function insertDraftOnce(title:string,payload:Record<string,unknown>){
  * Sprint 482 — materialize the launch system into the existing human-approval queue.
  * No publish API, affiliate signup, payment or external send is invoked here.
  */
-export async function materializeFacelessChannelLaunch(){
+export function buildFacelessChannelDraftSpecs(){
   const longforms=STARTER_VIDEOS.map(buildVideoPackage);
   const shorts=buildShortPlan();
   const calendar=build30DayPlan();
@@ -92,6 +92,11 @@ export async function materializeFacelessChannelLaunch(){
     });
   }
 
+  return drafts;
+}
+
+export async function materializeFacelessChannelLaunch(){
+  const drafts=buildFacelessChannelDraftSpecs();
   const results=[];
   for(const draft of drafts) results.push(await insertDraftOnce(draft.title,draft.payload));
   return {
