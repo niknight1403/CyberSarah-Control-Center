@@ -58,8 +58,6 @@ export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill" },
   { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill" },
   { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
-  { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill", badge: "Read-only" },
-  { route: "/loop-engineering", title: "Revenue-Loops", icon: "wand.and.stars" },
   { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", badge: "Neu" },
   { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", badge: "Neu" },
   { route: "/decisions", title: "Entscheidungs-Journal", icon: "tablecells.fill" },
