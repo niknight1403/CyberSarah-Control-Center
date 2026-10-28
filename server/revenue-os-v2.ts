@@ -3,6 +3,7 @@ import { getDb } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { collectRevenueAutopilotSnapshot } from "./revenue-autopilot";
 import { runControlCenterAutopilot } from "./control-center-autopilot";
+import { fetchTrendSignals } from "./trend-revenue-bridge";
 import { draftQueue, revenueAttributionEvents, revenueExperiments, revenueJobs, revenueOffers } from "../drizzle/schema";
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import {
@@ -29,12 +30,13 @@ export async function revenueOsV2Overview(){
   const db=await getDb();
   if(!db) throw new Error("Datenbank nicht verfügbar.");
   const since=new Date(Date.now()-30*86_400_000);
-  const [snapshot,jobs,offers,experiments,events]=await Promise.all([
+  const [snapshot,jobs,offers,experiments,events,trends]=await Promise.all([
     collectRevenueAutopilotSnapshot(),
     db.select().from(revenueJobs).orderBy(desc(revenueJobs.createdAt)).limit(20),
     db.select().from(revenueOffers).orderBy(desc(revenueOffers.updatedAt)).limit(100),
     db.select().from(revenueExperiments).orderBy(desc(revenueExperiments.updatedAt)).limit(30),
     db.select().from(revenueAttributionEvents).where(gte(revenueAttributionEvents.occurredAt,since)).limit(5000),
+    fetchTrendSignals(),
   ]);
   const attrEvents:AttributionEvent[]=events.flatMap(e=>{
     if(!["impression","click","lead","purchase","refund"].includes(e.eventType)) return [];
@@ -57,7 +59,7 @@ export async function revenueOsV2Overview(){
   ]);
   const revenueCents=attribution.revenueCents+Math.round((snapshot.mrrEur??0)*100);
   const guard=profitGuard({revenueCents,variableCostCents:0,apiCostCents:0,refundsCents:Math.abs(attrEvents.filter(e=>e.eventType==="refund").reduce((s,e)=>s+(e.valueCents??0),0)),customers:attribution.purchases,leads:attribution.leads});
-  return {system,snapshot,attribution,budget,profitGuard:guard,offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
+  return {system,snapshot,attribution,budget,profitGuard:guard,opportunityRadar:{ok:trends.ok,detail:trends.detail,trends:trends.trends.slice(0,10)},offers:{total:offers.length,active:activeOffers.length,items:offers},experiments:{total:experiments.length,active:experiments.filter(e=>e.status==="learning").length,items:experiments},jobs};
 }
 
 export async function recordRevenueAttribution(input:{eventKey:string;personaId:string;contentId:string;platform:string;eventType:AttributionEvent["eventType"];valueCents?:number}){
