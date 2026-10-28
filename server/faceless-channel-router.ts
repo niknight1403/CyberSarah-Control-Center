@@ -22,7 +22,7 @@ const weekly=z.object({
 
 export const facelessChannelRouter=router({
   overview:protectedProcedure.query(()=>facelessChannelOverview()),
-  autopilot:protectedProcedure.query(()=>channelAutopilotOverview()),
+  autopilot:adminProcedure.query(()=>channelAutopilotOverview()),
   runAutopilot:adminProcedure.mutation(()=>runChannelAutopilot()),
 
   /** Safe autonomous preparation: creates pending drafts only. */
