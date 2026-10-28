@@ -38,7 +38,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="$(node --experimental-strip-types scripts/next-release-version.mjs "${{ github.event.inputs.version_name || '' }}")"
+          REQUESTED_VERSION="${{ github.event.inputs.version_name || '' }}"
+          if [ -z "$REQUESTED_VERSION" ] && [ -f .github/release-requests/version.txt ]; then
+            REQUESTED_VERSION="$(tr -d '\\r\\n ' < .github/release-requests/version.txt)"
+          fi
+          VERSION="$(node --experimental-strip-types scripts/next-release-version.mjs "$REQUESTED_VERSION")"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Naechste APK-Version: $VERSION"
 
