@@ -26,7 +26,7 @@ describe("control center autopilot", () => {
     const limitedDrafts = vi.fn(async () => ({ plan: [], generated: {}, skipped: [{ kind: "content" as const, reason: "LLM 429 Too Many Requests quota exceeded" }] }));
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
     const result = await runControlCenterAutopilot({ scan, revenue, drafts: limitedDrafts });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
     expect(result.deferred.join(" ")).toContain("429");
     expect(result.blocked).toEqual([]);
   });

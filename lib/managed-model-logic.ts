@@ -39,12 +39,11 @@ export type ManagedModelSource =
  * (tools/free-llm-changer/changer-status.json).
  */
 export const OPENROUTER_FREE_MODEL_CANDIDATES = [
-  "qwen/qwen3.8-27b:free",
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "inclusionai/ling-3.0-flash-sante:free",
-  "liquid/lfm-2.5-2.6b:free",
+  "openrouter/free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
   "nvidia/nemotron-3.5-lightning:free",
+  "recursive/flint:free",
+  "liquid/lfm-2.5-2.6b:free",
 ] as const;
 
 export const GROQ_MODEL_CANDIDATES = [
