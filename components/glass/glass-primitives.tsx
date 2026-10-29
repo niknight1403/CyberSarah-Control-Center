@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { type GlassAccent } from "@/lib/design/future-glass";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 
 // ---------------------------------------------------------------------------
 // GlassCard — Basis-Flaeche des gesamten Systems.
@@ -40,11 +41,11 @@ export function GlassCard({ children, accent, glow = 0, elevated = false, onPres
   const scale = useAnimatedValue(1);
 
   const pressIn = () => {
-    if (!onPress) return;
+    if (!onPress || !decorativeMotionEnabled()) return;
     Animated.timing(scale, { toValue: glass.glassMotion.pressScale, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
   };
   const pressOut = () => {
-    if (!onPress) return;
+    if (!onPress || !decorativeMotionEnabled()) return;
     Animated.timing(scale, { toValue: 1, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
   };
 
@@ -123,8 +124,8 @@ export function GlowButton({ label, onPress, accent = "purple", variant = "prima
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const scale = useAnimatedValue(1);
-  const pressIn = () => Animated.timing(scale, { toValue: glass.glassMotion.pressScale, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
-  const pressOut = () => Animated.timing(scale, { toValue: 1, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
+  const pressIn = () => { if (!decorativeMotionEnabled()) return; Animated.timing(scale, { toValue: glass.glassMotion.pressScale, duration: glass.glassMotion.fast, useNativeDriver: true }).start(); };
+  const pressOut = () => { if (!decorativeMotionEnabled()) return; Animated.timing(scale, { toValue: 1, duration: glass.glassMotion.fast, useNativeDriver: true }).start(); };
 
   const isPrimary = variant === "primary";
   const isSecondary = variant === "secondary";
@@ -190,8 +191,9 @@ export function StatusChip({ label, accent = "green", live = false }: StatusChip
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const pulse = useAnimatedValue(0.5);
+  const animateLive = live && decorativeMotionEnabled();
   React.useEffect(() => {
-    if (!live) return;
+    if (!animateLive) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: glass.glassMotion.orbPulse / 2, useNativeDriver: true }),
@@ -200,7 +202,7 @@ export function StatusChip({ label, accent = "green", live = false }: StatusChip
     );
     loop.start();
     return () => loop.stop();
-  }, [glass.glassMotion.orbPulse, live, pulse]);
+  }, [glass.glassMotion.orbPulse, animateLive, pulse]);
 
   return (
     <View style={[styles.chip, { backgroundColor: glass.accentAlpha(accent, 0.14), borderColor: glass.accentAlpha(accent, 0.4) }]}>
@@ -209,10 +211,10 @@ export function StatusChip({ label, accent = "green", live = false }: StatusChip
           styles.chipDot,
           {
             backgroundColor: glass.glassPalette[accent],
-            opacity: live ? pulse : 1,
+            opacity: animateLive ? pulse : 1,
             shadowColor: glass.glassPalette[accent],
-            shadowOpacity: live ? 0.8 : 0,
-            shadowRadius: live ? 6 : 0,
+            shadowOpacity: animateLive ? 0.8 : 0,
+            shadowRadius: animateLive ? 6 : 0,
             shadowOffset: { width: 0, height: 0 },
           },
         ]}
