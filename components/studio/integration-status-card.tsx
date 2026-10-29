@@ -4,11 +4,12 @@
  * Tool-Proxy-Queue-Auslastung auf einen Blick. Server-gated ueber den
  * admin-geschuetzten appStatus.integrationStatus-Endpunkt.
  */
-import { Text, StyleSheet, View } from "react-native";
+import { Pressable, Text, StyleSheet, View } from "react-native";
 
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 import { accentAlpha, glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { classifyIntegrationCardHealth } from "@/lib/integration-status-view-logic";
 
 type IntegrationStatus = {
   llm: {
@@ -57,10 +58,10 @@ function MetricRow({ label, value, tone }: { label: string; value: string; tone:
     tone === "ok" ? accentAlpha("green", 0.4) : tone === "warn" ? glassPalette.amber : colors.muted;
   return (
     <View style={styles.metricRow}>
-      <Text style={[styles.metricLabel, { color: colors.muted }]} numberOfLines={1}>
+      <Text style={[styles.metricLabel, { color: colors.muted }]}>
         {label}
       </Text>
-      <Text style={[styles.metricValue, { color: toneColor }]} numberOfLines={1}>
+      <Text style={[styles.metricValue, { color: toneColor }]}>
         {value}
       </Text>
     </View>
@@ -72,18 +73,59 @@ export function IntegrationStatusCard({ isAdmin }: { isAdmin: boolean }) {
   const statusQuery = trpc.appStatus.integrationStatus.useQuery(undefined, {
     enabled: isAdmin,
     retry: false,
+    refetchInterval: isAdmin ? 30_000 : false,
   });
   const status = statusQuery.data as IntegrationStatus | undefined;
+  const health = status
+    ? classifyIntegrationCardHealth({
+        llmHealthy: status.llm.healthy,
+        routeHealthy: status.routeRotation.healthy,
+        routeConfigured: status.routeRotation.configured,
+        queueFailed: status.queue.failed,
+      })
+    : null;
+  const healthTone = health?.state === "healthy" ? "ok" : health?.state === "offline" ? "warn" : "warn";
 
   return (
     <View style={[styles.card, { backgroundColor: glassDepth.glass, borderColor: glassSurface.border }]}>
-      <Text style={[styles.cardTitle, { color: colors.text }]}>Integrations-Status</Text>
+      <View style={styles.headerRow}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>Integrations-Status</Text>
+        {health ? (
+          <View
+            style={[
+              styles.healthBadge,
+              {
+                borderColor: healthTone === "ok" ? accentAlpha("green", 0.4) : glassPalette.amber,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.healthBadgeText,
+                { color: healthTone === "ok" ? accentAlpha("green", 0.4) : glassPalette.amber },
+              ]}
+            >
+              {health.label}
+            </Text>
+          </View>
+        ) : null}
+      </View>
       {!isAdmin ? (
         <Text style={[styles.cardHint, { color: colors.muted }]}>Nur für Administratoren sichtbar.</Text>
       ) : statusQuery.isLoading ? (
         <Text style={[styles.cardHint, { color: colors.muted }]}>Status wird geladen…</Text>
       ) : statusQuery.isError || !status ? (
-        <Text style={[styles.cardHint, { color: colors.muted }]}>Status nicht verfügbar.</Text>
+        <View style={styles.errorState}>
+          <Text style={[styles.cardHint, { color: colors.muted }]}>Status nicht verfügbar.</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Integrationsstatus erneut prüfen"
+            onPress={() => void statusQuery.refetch()}
+            style={[styles.retryButton, { borderColor: glassSurface.border }]}
+          >
+            <Text style={[styles.retryText, { color: colors.text }]}>Erneut prüfen</Text>
+          </Pressable>
+        </View>
       ) : (
         <View style={{ gap: 10 }}>
           <View style={styles.group}>
@@ -188,12 +230,18 @@ export function IntegrationStatusCard({ isAdmin }: { isAdmin: boolean }) {
 
 const styles = StyleSheet.create({
   card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" },
   cardTitle: { fontSize: 16, fontWeight: "700" },
+  healthBadge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  healthBadgeText: { fontSize: 11, fontWeight: "700" },
   cardHint: { fontSize: 12, lineHeight: 17 },
-  group: { gap: 4 },
+  errorState: { gap: 10, alignItems: "flex-start" },
+  retryButton: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  retryText: { fontSize: 12, fontWeight: "700" },
+  group: { gap: 5 },
   groupTitle: { fontSize: 13, fontWeight: "700", marginBottom: 2 },
-  metricRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  metricLabel: { fontSize: 12, flexShrink: 1 },
-  metricValue: { fontSize: 12, fontWeight: "600", textAlign: "right", flexShrink: 1 },
-  errorText: { fontSize: 11 },
+  metricRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
+  metricLabel: { fontSize: 12, flex: 1, minWidth: 0 },
+  metricValue: { fontSize: 12, fontWeight: "600", textAlign: "right", flex: 1.2, minWidth: 0 },
+  errorText: { fontSize: 11, lineHeight: 16 },
 });
