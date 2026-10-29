@@ -51,27 +51,28 @@ export type DrawerItem = {
     | "hourglass"
     | "chart.bar.fill";
   badge?: string;
+  keywords?: readonly string[];
   group: "start" | "revenue" | "studio" | "development" | "system";
 };
 
 /** Reihenfolge deckungsgleich mit dem Base44-Vorbild (Chat oben, Settings unten). */
 /** Operatives Menü: Revenue zuerst, Admin- und Utility-Routen bleiben direkt erreichbar. */
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
-  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill", group: "start" },
-  { route: "/chat", title: "KI-Chat", icon: "message.fill", group: "start" },
-  { route: "/superagent", title: "Superagent & Workflows", icon: "wand.and.stars", group: "start" },
-  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", group: "revenue" },
-  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill", group: "revenue" },
-  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "revenue" },
-  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "revenue" },
-  { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "revenue" },
-  { route: "/media-studio", title: "Media Studio", icon: "video.fill", group: "studio" },
-  { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "development" },
-  { route: "/", title: "Workspace", icon: "folder.fill", group: "development" },
-  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill", group: "development" },
-  { route: "/quality", title: "Qualität & Builds", icon: "chart.bar.fill", group: "development" },
-  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right", group: "development" },
-  { route: "/account", title: "Konto & Einstellungen", icon: "gearshape.fill", group: "system" },
+  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill", group: "start", keywords: ["status","gesundheit","betrieb","startseite"] },
+  { route: "/chat", title: "KI-Chat", icon: "message.fill", group: "start", keywords: ["ki","assistent","prompt","fragen"] },
+  { route: "/superagent", title: "Superagent & Workflows", icon: "wand.and.stars", group: "start", keywords: ["autopilot","orchestrierung","workflow"] },
+  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", group: "revenue", keywords: ["umsatz","geld","stripe","monetarisierung"] },
+  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill", group: "revenue", keywords: ["analyse","kunden","statistik"] },
+  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "revenue", keywords: ["prioritaeten","aufgaben"] },
+  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "revenue", keywords: ["ideen","entwurf"] },
+  { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "revenue", keywords: ["entscheidung","protokoll"] },
+  { route: "/media-studio", title: "Media Studio", icon: "video.fill", group: "studio", keywords: ["videos","reels","content","film"] },
+  { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "development", keywords: ["programmierung","automation","entwicklung"] },
+  { route: "/", title: "Workspace", icon: "folder.fill", group: "development", keywords: ["dateien","repository","github","code"] },
+  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill", group: "development", keywords: ["vorschau","website","testen"] },
+  { route: "/quality", title: "Qualität & Builds", icon: "chart.bar.fill", group: "development", keywords: ["apk","android","build","tests","release"] },
+  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right", group: "development", keywords: ["logs","diagnose","terminal"] },
+  { route: "/account", title: "Konto & Einstellungen", icon: "gearshape.fill", group: "system", keywords: ["profil","einstellungen","konto"] },
 ] as const;
 
 /** Aktives Item anhand des Pfades auflösen — "/" nur bei exaktem Root-Treffer,
