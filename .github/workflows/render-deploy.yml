@@ -72,6 +72,43 @@ jobs:
           npm run check
           npm test
 
+      - name: Digistore24-Secrets sicher vorbereiten (ungueltige Keys quarantänisieren)
+        if: github.event_name == 'push' || inputs.target == 'app' || inputs.target == 'domain'
+        env:
+          D24_API_KEY: ${{ secrets.DIGISTORE24_API_KEY }}
+          D24_IPN_SECRET: ${{ secrets.DIGISTORE24_IPN_SECRET || secrets.DIGISTORE24_IPN_PASSPHRASE }}
+          D24_AFFILIATE_ID: ${{ secrets.DIGISTORE24_AFFILIATE_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "$D24_API_KEY" ]; then
+            CODE=$(curl -sS -m 20 -o /tmp/d24-ping.json -w "%{http_code}"               "https://www.digistore24.com/api/call/ping"               -H "X-DS-API-KEY: $D24_API_KEY" -H "Accept: application/json" || true)
+            RESULT=$(python3 - <<'PY'
+          import json
+          try:
+              print(json.load(open("/tmp/d24-ping.json")).get("result","error"))
+          except Exception:
+              print("error")
+          PY
+            )
+            if [ "$CODE" = "200" ] && [ "$RESULT" = "success" ]; then
+              echo "DIGISTORE24_API_KEY=$D24_API_KEY" >> "$GITHUB_ENV"
+              echo "Digistore24 API: HEALTHY — wird an Render weitergereicht."
+            else
+              echo "Digistore24 API: QUARANTINED (HTTP $CODE, result=$RESULT) — ungültiger/externer Key gelangt nicht in Produktion."
+            fi
+          else
+            echo "Digistore24 API: nicht konfiguriert."
+          fi
+          if [ -n "$D24_IPN_SECRET" ]; then
+            echo "DIGISTORE24_IPN_SECRET=$D24_IPN_SECRET" >> "$GITHUB_ENV"
+            echo "Digistore24 IPN-Secret: vorhanden."
+          else
+            echo "Digistore24 IPN-Secret: nicht konfiguriert — IPN bleibt fail-closed."
+          fi
+          if [ -n "$D24_AFFILIATE_ID" ]; then
+            echo "DIGISTORE24_AFFILIATE_ID=$D24_AFFILIATE_ID" >> "$GITHUB_ENV"
+          fi
+
       - name: Auf Render deployen (App, Migrationen + Health-Check)
         if: github.event_name == 'push' || inputs.target == 'app'
         env:

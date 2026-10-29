@@ -20,6 +20,7 @@ import type { Request, Response } from "express";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { affiliateProducts, conversionEvents } from "../drizzle/schema";
+import { resolveDigistore24IpnSecret } from "../lib/digistore24-ipn-config";
 
 function cents(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
@@ -41,9 +42,9 @@ export function buildIpnSignature(fields: Record<string, string>, passphrase: st
 type IpnResult = { status: number; body: Record<string, unknown> };
 
 export async function handleDigistore24Ipn(req: Request, res: Response): Promise<void> {
-  const passphrase = process.env.DIGISTORE24_IPN_PASSPHRASE?.trim();
+  const passphrase = resolveDigistore24IpnSecret();
   if (!passphrase) {
-    res.status(503).json({ ok: false, detail: "IPN-Passphrase nicht konfiguriert (DIGISTORE24_IPN_PASSPHRASE)." });
+    res.status(503).json({ ok: false, detail: "IPN-Secret nicht konfiguriert (DIGISTORE24_IPN_SECRET / DIGISTORE24_IPN_PASSPHRASE)." });
     return;
   }
   const fields: Record<string, string> = {};
