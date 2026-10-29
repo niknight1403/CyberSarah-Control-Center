@@ -15,6 +15,7 @@ import {
 } from "./runtime-logger";
 import { getTelegramStatus } from "./_core/telegram";
 import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
+import { getRouteRotationStatus } from "./route-rotation-agent";
 
 /**
  * Sprint 66 — appStatusRouter: Laufzeit-Status und Konsolen-Logs als
@@ -52,6 +53,9 @@ export const appStatusRouter = router({
     const snapshot = await getRouterSnapshot();
     const telegram = getTelegramStatus();
     const queue = getToolProxyQueueMetrics();
+    const rotation = await getRouteRotationStatus();
+    const configuredRoutes = rotation.routes.filter((route) => route.configured);
+    const healthyRoutes = configuredRoutes.filter((route) => route.healthy);
     return {
       llm: {
         healthy: snapshot.health.filter((provider) => provider.status === "ready").length,
@@ -59,6 +63,16 @@ export const appStatusRouter = router({
         total: snapshot.health.length,
         preferredOrder: snapshot.preferredOrder,
         checkedAt: snapshot.now,
+      },
+      routeRotation: {
+        enabled: rotation.enabled,
+        primary: rotation.primary,
+        forced: rotation.forced,
+        lastTickAt: rotation.lastTickAt,
+        configured: configuredRoutes.length,
+        healthy: healthyRoutes.length,
+        recentAction: rotation.ledger[0]?.action ?? "keep",
+        recentReason: rotation.ledger[0]?.reason ?? null,
       },
       telegram,
       queue,

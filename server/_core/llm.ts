@@ -621,9 +621,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const notQuarantined = ordered.filter((endpoint) => !isProviderQuarantined(endpoint.source));
   if (notQuarantined.length > 0) ordered = notQuarantined;
   const circuitEligible = ordered.filter((endpoint) => providerCircuitAllows(endpoint.source));
-  if (circuitEligible.length === 0) {
-    throw new Error("LLM routes temporarily deferred: all provider circuit breakers are open.");
-  }
+  // Sprint 3/10 — Sind alle Cloud-Circuits offen, den Request nicht sofort
+  // abbrechen: der nachgelagerte lokale/Remote-Ollama-Fallback darf noch
+  // übernehmen. Damit bleibt die Gratis-Kette auch bei kollektivem Cloud-
+  // Cooldown funktionsfähig.
   ordered = circuitEligible;
 
   // Sprint 196 — Autonomer Rotations-Agent: Die agentenseitig gewaehlte
@@ -747,6 +748,53 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
         recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
         break;
+      }
+    }
+  }
+
+  // Sprint 3/10 — Letzte kostenfreie Verteidigungslinie: Nach dem
+  // Ausschöpfen der Cloud-Kette einen erreichbaren Ollama-/LM-Studio-
+  // Endpoint probieren. Das gilt auch dann, wenn Cloud-Circuit-Breaker alle
+  // offen sind. Lokale Quellen werden nicht doppelt versucht, falls der
+  // Aufruf bereits im Zero-Config-Modus direkt lokal gestartet ist.
+  if (!attempts.some((attempt) => attempt.source === "local-ollama" || attempt.source === "local-lmstudio")) {
+    const localEndpoint = await resolveLocalManagedEndpoint();
+    if (localEndpoint) {
+      const localModels = model ? [model] : resolveManagedModelCandidates(localEndpoint.source);
+      for (let modelIdx = 0; modelIdx < localModels.length; modelIdx += 1) {
+        const startedAt = Date.now();
+        try {
+          const response = await fetchWithBackoff(localEndpoint.url, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${localEndpoint.apiKey}`,
+            },
+            body: JSON.stringify({ ...payload, model: localModels[modelIdx] }),
+          });
+          const latencyMs = Date.now() - startedAt;
+          if (response.ok) {
+            recordProviderCall({ source: localEndpoint.source, httpStatus: response.status, networkError: false, latencyMs });
+            return (await response.json()) as InvokeResult;
+          }
+          const errorText = await response.text();
+          lastError = new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+          attempts.push({ source: localEndpoint.source, httpStatus: response.status, message: errorText });
+          recordProviderCall({ source: localEndpoint.source, httpStatus: response.status, networkError: false, latencyMs });
+        } catch (error) {
+          lastError = error;
+          attempts.push({
+            source: localEndpoint.source,
+            httpStatus: null,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          recordProviderCall({
+            source: localEndpoint.source,
+            httpStatus: null,
+            networkError: true,
+            latencyMs: Date.now() - startedAt,
+          });
+        }
       }
     }
   }

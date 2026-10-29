@@ -21,6 +21,7 @@ import {
   getRouteRotationStatus,
   resetRouteRotationAgentForTests,
   runRouteRotationTick,
+  restoreRouteRotationState,
   setRouteRotationEnabled,
 } from "../server/route-rotation-agent";
 
@@ -70,6 +71,18 @@ describe("route-rotation-agent (Laufzeit)", () => {
     delete process.env.AI_GEMINI_API_KEY;
     delete process.env.GEMINI_API_KEY;
     process.env.AI_ROUTE_ROTATION = "true";
+  });
+
+  it("führt beim Restore sofort einen Health-Tick aus und wartet nicht auf das Intervall", async () => {
+    kv.set("routeRotation.primary", "groq");
+    stubProbes({ groq: 503, openrouter: 200 });
+
+    await restoreRouteRotationState();
+
+    expect(getRouteRotationPrimary()).toBe("openrouter");
+    expect(kv.get("routeRotation.primary")).toBe("openrouter");
+    expect(kv.get("routeRotation.lastTickAt")).toBeTruthy();
+    resetRouteRotationAgentForTests();
   });
 
   it("rotiert autonom auf die naechste erreichbare Gratis-Route und persistiert Zustand + Ledger", async () => {
