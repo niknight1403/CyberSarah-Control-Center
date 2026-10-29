@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-const fakeKey=(prefix:string,mode:string,suffix:string)=>[prefix,mode,suffix].join("_");
 import { stripeAdminSettings } from "../lib/stripe-admin-status-logic";
+const fakeKey=(prefix:string,mode:string,suffix:string)=>[prefix,mode,suffix].join("_");
 
 describe("Durable Stripe administrator configuration", () => {
   it("detects valid live and test keys without returning key material", () => {
