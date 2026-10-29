@@ -16,6 +16,17 @@ describe("Render secure persistence for Stripe admin integration",()=>{
     const merged=mergePersistedRenderEnvVars([{key:"STRIPE_SECRET_KEY",value:"sk_live_keep"}],[{key:"STRIPE_SECRET_KEY",value:""}]);
     expect(merged[0]?.value).toBe("sk_live_keep");
   });
+  it("keeps existing Stripe mode when GitHub has no replacement key",()=>{
+    const old=[{key:"STRIPE_SECRET_KEY",value:"sk_test_existing"},{key:"STRIPE_MODE",value:"test"}];
+    const merged=mergePersistedRenderEnvVars(old,[{key:"STRIPE_MODE",value:"live"},{key:"APP_BASE_URL",value:"https://app.example.org"}]);
+    expect(merged.find(x=>x.key==="STRIPE_SECRET_KEY")?.value).toBe("sk_test_existing");
+    expect(merged.find(x=>x.key==="STRIPE_MODE")?.value).toBe("test");
+  });
+  it("allows explicit key rotation and mode switch together",()=>{
+    const old=[{key:"STRIPE_SECRET_KEY",value:"sk_test_existing"},{key:"STRIPE_MODE",value:"test"}];
+    const merged=mergePersistedRenderEnvVars(old,[{key:"STRIPE_SECRET_KEY",value:"sk_live_new"},{key:"STRIPE_MODE",value:"live"}]);
+    expect(merged.find(x=>x.key==="STRIPE_MODE")?.value).toBe("live");
+  });
   it("refuses missing or redacted Render ENV data",()=>{
     expect(()=>mergePersistedRenderEnvVars(null,[])).toThrow();
     expect(()=>mergePersistedRenderEnvVars([{envVar:{key:"STRIPE_SECRET_KEY",value:"********"}}],[])).toThrow();
