@@ -170,6 +170,21 @@ jobs:
           test -x "$APKSIGNER" || { echo "apksigner im Android SDK nicht gefunden"; exit 1; }
           "$APKSIGNER" verify --verbose --print-certs "$APK" | sed -n '1,10p'
 
+      - name: APK-Paketkennung und Version in beiden Varianten prüfen (Sprint 38)
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          AAPT="$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -1)"
+          test -x "$AAPT" || { echo "Android aapt nicht gefunden"; exit 1; }
+          for APK in android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/release/app-release.apk; do
+            BADGING="$("$AAPT" dump badging "$APK")"
+            printf '%s\n' "$BADGING" | grep -Fq "name='com.cybersarah.controlcenter'"
+            printf '%s\n' "$BADGING" | grep -Fq "versionName='$RELEASE_VERSION'"
+            echo "OK — Android Paket und Version: $APK"
+          done
+
       - name: Signiertes Release-AAB bauen (Google Play, = Admin-Variante)
         working-directory: android
         env:
