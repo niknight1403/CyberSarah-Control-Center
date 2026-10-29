@@ -24,7 +24,7 @@ import { resolveDigistore24IpnSecret } from "../lib/digistore24-ipn-config";
 import {
   commissionCents, hashedBuyerEmail, ledgerOrderKey,
   minimalIpnPayload, validSha512Hex,
-  type D24EventKind,
+  netConversionDelta, type D24EventKind,
 } from "../lib/digistore24-ledger-logic";
 
 function sha512(text: string): string {
@@ -66,6 +66,7 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
   const productSlug = String(fields.product_id ?? fields.product_name ?? "")
     .toLowerCase().replace(/[^a-z0-9-]+/g,"-").slice(0,200);
   const orderKey = ledgerOrderKey("ipn", `${orderId}:${eventType}`,kind);
+  const conversionsDelta = netConversionDelta(kind);
   let amountCents: number;
   let commissionAmount: number;
   try {
@@ -100,12 +101,12 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
       }).onConflictDoNothing({target:conversionEvents.orderKey}).returning({id:conversionEvents.id});
       if (!inserted.length) return "duplicate" as const;
       if (productSlug) await tx.execute(sql`
-        UPDATE affiliate_products SET "conversionCount"="conversionCount"+1,
+        UPDATE affiliate_products SET "conversionCount"=GREATEST(0,"conversionCount"+${conversionsDelta}),
           "revenueCents"="revenueCents"+${commissionAmount},"updatedAt"=now() WHERE slug=${productSlug}`);
       await tx.execute(sql`
-        INSERT INTO revenue_daily_stats ("day","conversions","revenueCents") VALUES (${day},1,${commissionAmount})
+        INSERT INTO revenue_daily_stats ("day","conversions","revenueCents") VALUES (${day},${conversionsDelta},${commissionAmount})
         ON CONFLICT ("day") DO UPDATE SET
-        "conversions"=revenue_daily_stats."conversions"+1,
+        "conversions"=revenue_daily_stats."conversions"+${conversionsDelta},
         "revenueCents"=revenue_daily_stats."revenueCents"+${commissionAmount},"updatedAt"=now()`);
       return "recorded" as const;
     });
