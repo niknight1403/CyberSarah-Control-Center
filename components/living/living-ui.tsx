@@ -15,6 +15,7 @@ import { glassOverlay, glassPalette, glassSurface } from "@/lib/design/future-gl
 import { useEffect, useMemo } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 
 import {
   createParticleField,
@@ -35,7 +36,9 @@ export function ParticleField({ seed = 7, count = 24 }: { seed?: number; count?:
   // Ein gemeinsamer Treiber 0->1 mit langer Dauer; jedes Partikel interpoliert
   // seine eigene Drift-Bahn daraus — nur EIN laufender Animated-Loop gesamt.
   const driver = useMemo(() => new Animated.Value(0), []);
+  const motionEnabled = decorativeMotionEnabled();
   useEffect(() => {
+    if (!motionEnabled) return;
     const loop = Animated.loop(
       Animated.timing(driver, {
         toValue: 1,
@@ -46,8 +49,9 @@ export function ParticleField({ seed = 7, count = 24 }: { seed?: number; count?:
     );
     loop.start();
     return () => loop.stop();
-  }, [driver]);
+  }, [driver, motionEnabled]);
 
+  if (!motionEnabled) return null;
   return (
     <View pointerEvents="none" style={styles.particleRoot}>
       {particles.map((particle) => (
@@ -97,7 +101,9 @@ const ORB_PHASE_SEED_MS = Date.now();
 
 export function AiOrb({ state = "idle", size = 24 }: { state?: OrbState; size?: number }) {
   const pulse = useMemo(() => new Animated.Value(0), []);
+  const motionEnabled = decorativeMotionEnabled();
   useEffect(() => {
+    if (!motionEnabled) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -116,7 +122,7 @@ export function AiOrb({ state = "idle", size = 24 }: { state?: OrbState; size?: 
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse, state]);
+  }, [pulse, state, motionEnabled]);
 
   const scale = pulse.interpolate({
     inputRange: [0, 1],
@@ -148,6 +154,7 @@ export function ScanlineOverlay({ intensity = "subtle" as const }: { intensity?:
   const config = resolveScanlines(intensity);
   if (!config) return null;
   const lines = Math.ceil(100 / (config.gap + config.lineHeight));
+  if (!decorativeMotionEnabled()) return null;
   return (
     <View pointerEvents="none" style={styles.scanlineRoot}>
       {Array.from({ length: lines }, (_, index) => (
