@@ -10,6 +10,7 @@
 export type DrawerRoute =
   | "/dashboard"
   | "/business"
+  | "/media-studio"
   | "/account"
   | "/chat"
   | "/revenue-os"
@@ -50,20 +51,27 @@ export type DrawerItem = {
     | "hourglass"
     | "chart.bar.fill";
   badge?: string;
+  group: "start" | "revenue" | "studio" | "development" | "system";
 };
 
 /** Reihenfolge deckungsgleich mit dem Base44-Vorbild (Chat oben, Settings unten). */
 /** Operatives Menü: Revenue zuerst, Admin- und Utility-Routen bleiben direkt erreichbar. */
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
-  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill" },
-  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill" },
-  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
-  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", badge: "Neu" },
-  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", badge: "Neu" },
-  { route: "/decisions", title: "Entscheidungs-Journal", icon: "tablecells.fill" },
-  { route: "/chat", title: "Chat", icon: "message.fill" },
-  { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
-  { route: "/account", title: "Konto", icon: "gearshape.fill" },
+  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill", group: "start" },
+  { route: "/chat", title: "KI-Chat", icon: "message.fill", group: "start" },
+  { route: "/superagent", title: "Superagent & Workflows", icon: "wand.and.stars", group: "start" },
+  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", group: "revenue" },
+  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill", group: "revenue" },
+  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "revenue" },
+  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "revenue" },
+  { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "revenue" },
+  { route: "/media-studio", title: "Media Studio", icon: "video.fill", group: "studio" },
+  { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "development" },
+  { route: "/", title: "Workspace", icon: "folder.fill", group: "development" },
+  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill", group: "development" },
+  { route: "/quality", title: "Qualität & Builds", icon: "chart.bar.fill", group: "development" },
+  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right", group: "development" },
+  { route: "/account", title: "Konto & Einstellungen", icon: "gearshape.fill", group: "system" },
 ] as const;
 
 /** Aktives Item anhand des Pfades auflösen — "/" nur bei exaktem Root-Treffer,
