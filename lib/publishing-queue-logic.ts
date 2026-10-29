@@ -171,3 +171,33 @@ export function resolvePublishingMode(
 export function isAutopilotEnabled(envFlag: string | undefined): boolean {
   return String(envFlag ?? "").toLowerCase() !== "off";
 }
+
+
+export const PUBLISHING_CIRCUIT_MIN_SAMPLE = 5;
+export const PUBLISHING_CIRCUIT_FAILURE_PCT = 50;
+
+/** Sprint 8/10 — Reliability-Circuit-Breaker fuer Live-Publishing.
+ * Eine klare Fehlerwelle pausiert weitere externe Posts, statt einen
+ * reproduzierbaren Defekt auf weitere Plattformen zu vervielfaeltigen.
+ */
+export function evaluatePublishingReliabilityCircuit(input:{
+  published:number;
+  failed:number;
+}):{open:boolean;sample:number;failureRatePct:number|null;reason:string}{
+  const published=Math.max(0,Math.floor(Number.isFinite(input.published)?input.published:0));
+  const failed=Math.max(0,Math.floor(Number.isFinite(input.failed)?input.failed:0));
+  const sample=published+failed;
+  if(sample<PUBLISHING_CIRCUIT_MIN_SAMPLE){
+    return {open:false,sample,failureRatePct:sample>0?Number((failed/sample*100).toFixed(1)):null,reason:"Noch zu wenig aktuelle Publishing-Evidenz fuer einen Circuit-Breaker."};
+  }
+  const failureRatePct=Number((failed/sample*100).toFixed(1));
+  const open=failed>=3&&failureRatePct>=PUBLISHING_CIRCUIT_FAILURE_PCT;
+  return {
+    open,
+    sample,
+    failureRatePct,
+    reason:open
+      ? `Publishing pausiert: ${failed}/${sample} aktuelle Jobs fehlgeschlagen (${failureRatePct}%). Erst Ursache beheben, dann weiterpublizieren.`
+      : `Publishing stabil genug: ${failed}/${sample} Fehler (${failureRatePct}%).`,
+  };
+}
