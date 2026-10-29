@@ -97,7 +97,9 @@ export default function CommerceStudioScreen() {
               const result = await importer.mutateAsync();
               return { generated: result.imported > 0, reason:
                 result.imported + " Produkte als unveroeffentlichte Entwuerfe importiert; " +
-                result.skipped + " bereits vorhanden. " +
+                result.skipped + " uebersprungen/bereits vorhanden. " +
+                (("priceVariantsRead" in result) ? (result.priceVariantsRead + " Preisvarianten gelesen. ") : "") +
+                (("priceCatalogueComplete" in result && !result.priceCatalogueComplete) ? "Preisverzeichnis unvollstaendig. " : "") +
                 (("remainingPages" in result && result.remainingPages) ? "Weitere Produkte folgen in einem spaeteren Import." : "") +
                 (result.status === "not-configured" ? " Stripe nicht konfiguriert." : "") };
             })}
@@ -146,7 +148,7 @@ export default function CommerceStudioScreen() {
                 <View style={styles.metrics}>
                   <View><Text style={styles.value}>{offer.clicks}</Text><Text style={styles.statLabel}>KLICKS</Text></View>
                   <View><Text style={styles.value}>{offer.purchases}</Text><Text style={styles.statLabel}>KÄUFE</Text></View>
-                  <View><Text style={styles.value}>{money(offer.contributionCents)}</Text><Text style={styles.statLabel}>DECKUNGSBEITRAG*</Text></View>
+                  <View><Text style={styles.value}>{money(offer.contributionCents)}</Text><Text style={styles.statLabel}>BEOB. BEITRAG*</Text></View>
                 </View>
                 <Text style={styles.body}>{offer.reason}</Text>
                 <View style={styles.separator} />
@@ -187,7 +189,7 @@ export default function CommerceStudioScreen() {
           </View>
           <AutonomousDraftsCard kinds={["content", "revenue-loop"]} accent="cyan" autoGenerate={false} onPrepareContent={prepareReel} />
           <Text style={styles.footer}>
-            *Nur zugeordnete Transaktionen und erfasste Kosten. Unbekannte Kosten werden nicht als 0 gezählt.
+            *Beobachteter Teilbeitrag, nicht geprüfter Gesamtgewinn: nur zugeordnete Transaktionen und erfasste Kosten. Unbekannte Kosten werden nicht als 0 gezählt.
             Preise sind Simulationen ohne garantierte Conversion-Rate. Bestehende Freigaben: Revenue OS / Entwürfe.
           </Text>
         </ScrollView>
