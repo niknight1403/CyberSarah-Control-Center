@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-const fakeKey=(prefix:string,mode:string,suffix:string)=>[prefix,mode,suffix].join("_");
 import { mergePersistedRenderEnvVars } from "../lib/render-deploy-logic.mjs";
+const fakeKey=(prefix:string,mode:string,suffix:string)=>[prefix,mode,suffix].join("_");
 describe("Render secure persistence for Stripe admin integration",()=>{
   it("preserves Stripe credentials if GitHub sends none",()=>{
     const current=[{envVar:{key:"STRIPE_SECRET_KEY",value:fakeKey("sk","live","example")}},{envVar:{key:"STRIPE_WEBHOOK_SECRET",value:["whsec","existing"].join("_")}},{envVar:{key:"STRIPE_MODE",value:"live"}},{envVar:{key:"DATABASE_URL",value:"postgresql://test"}}];
