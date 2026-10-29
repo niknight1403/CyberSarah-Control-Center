@@ -7,6 +7,7 @@ import { AiCore } from "@/components/glass/ai-core";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
+import { groupDrawerItems } from "@/lib/drawer-sections-logic";
 
 export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pathname = usePathname() ?? "/";
@@ -15,6 +16,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
+  const sections = useMemo(() => groupDrawerItems(DRAWER_ITEMS), []);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -54,10 +56,12 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
           </View>
 
           <View style={styles.divider} />
-          <Text style={styles.sectionLabel}>NAVIGATION</Text>
-
           <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-            {DRAWER_ITEMS.map((item) => {
+            {sections.map((section) => (
+              <View key={section.key} style={styles.sectionBlock}>
+                <Text accessibilityRole="header" style={styles.sectionLabel}>{section.title}</Text>
+                <View style={styles.sectionItems}>
+                {section.items.map((item) => {
               const active = activeItem?.route === item.route;
               return (
                 <Pressable
@@ -75,7 +79,10 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                   {item.badge ? <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View> : null}
                 </Pressable>
               );
-            })}
+                })}
+                </View>
+              </View>
+            ))}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -146,7 +153,9 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 6,
   },
-  list: { gap: 5, paddingHorizontal: 10, paddingBottom: 12 },
+  list: { gap: 12, paddingHorizontal: 10, paddingBottom: 18 },
+  sectionBlock: { gap: 5 },
+  sectionItems: { gap: 5 },
   item: {
     alignItems: "center",
     flexDirection: "row",
