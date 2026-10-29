@@ -19,6 +19,7 @@ export const integrationsRouter = router({
         readinessLabel: readinessLabel(status.readiness),
         missingEnv: status.missingEnv,
         capabilities: status.capabilities,
+        capabilityReadiness: status.capabilityReadiness ?? null,
         executionBoundary: status.executionBoundary,
       })),
     };
@@ -26,6 +27,6 @@ export const integrationsRouter = router({
   get: publicProcedure.input(z.object({ key: z.string() })).query(({ input }) => {
     const status = getIntegrationStatus(input.key as Parameters<typeof getIntegrationStatus>[0]);
     if (!status) return null;
-    return { key: status.key, label: status.label, readiness: status.readiness, readinessLabel: readinessLabel(status.readiness), missingEnv: status.missingEnv, executionBoundary: status.executionBoundary };
+    return { key: status.key, label: status.label, readiness: status.readiness, readinessLabel: readinessLabel(status.readiness), missingEnv: status.missingEnv, capabilityReadiness: status.capabilityReadiness ?? null, executionBoundary: status.executionBoundary };
   }),
 });
