@@ -42,7 +42,7 @@ services:
       - key: AI_OLLAMA_API_KEY
         sync: false # Bearer-Token der Oracle-VM-Route
       - key: AI_OLLAMA_MODEL
-        sync: false # z. B. qwen3.6:27b
+        sync: false # z. B. qwen2.5:7b; veraltete Tags werden automatisch rotiert
       - key: AI_GROQ_API_KEY
         sync: false # Groq (ultraschnelle guenstige Inferenz, openai/gpt-oss-20b)
       - key: AI_OPENROUTER_API_KEY
