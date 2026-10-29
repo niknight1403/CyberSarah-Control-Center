@@ -6,6 +6,7 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import Stripe from "stripe";
+import { mapStripeProductToDraft, readStripeCatalogue } from "../lib/commerce-catalog-logic";
 import { getDb } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { draftQueue, revenueOffers, revenueAttributionEvents, revenueCostEvents } from "../drizzle/schema";
@@ -226,46 +227,45 @@ export function startCommerceStudioAutopilot(): void {
 }
 
 /**
- * One-way import of genuine Stripe catalogue products into local DRAFT offers.
- * Does not create prices, overwrite existing offers or expose payment credentials.
- * This is intentionally a user-triggered action, not a scheduled write.
+ * Explicit admin-triggered, read-only Stripe pagination, draft-only local writes.
+ * Existing offers and prices are not mutated. Advisory lock protects races.
  */
 export async function importStripeProductDrafts() {
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return { imported: 0, skipped: 0, status: "not-configured", details: ["STRIPE_SECRET_KEY fehlt."] };
+  if (!key) {
+    return { imported: 0, skipped: 0, status: "not-configured",
+      details: ["STRIPE_SECRET_KEY fehlt."], remainingPages: false };
+  }
   const stripe = new Stripe(key);
-  const products = await stripe.products.list({ active: true, limit: 30, expand: ["data.default_price"] });
+  const catalogue = await readStripeCatalogue(async cursor => stripe.products.list({
+    active: true, limit: 100, expand: ["data.default_price"],
+    ...(cursor ? { starting_after: cursor } : {}),
+  }), 20);
   const db = await database();
+  const now = new Date().toISOString();
   return db.transaction(async tx => {
     await tx.execute(sql.raw("SELECT pg_advisory_xact_lock(hashtext('cybersarah-commerce-stripe-import'))"));
-    const existing = await tx.select({ metadata: revenueOffers.metadata }).from(revenueOffers).limit(5000);
+    const existing = await tx.select({ metadata: revenueOffers.metadata }).from(revenueOffers);
     const known = new Set(existing.map(row => String(row.metadata.stripeProductId ?? "")).filter(Boolean));
     let imported = 0, skipped = 0;
     const details: string[] = [];
-    for (const product of products.data) {
+    for (const product of catalogue.products) {
       if (known.has(product.id)) { skipped++; continue; }
-      const price = product.default_price;
-      const expanded = typeof price === "object" && price !== null ? price : null;
-      const amount = expanded?.currency === "eur" && expanded.unit_amount != null
-        ? expanded.unit_amount : null;
-      const priceId = typeof price === "string" ? price : expanded?.id ?? null;
-      await tx.insert(revenueOffers).values({
-        name: product.name.slice(0, 220),
-        kind: expanded?.recurring ? "subscription" : "digital",
-        status: "draft",
-        priceCents: amount,
-        marginPct: null,
-        targetUrl: null,
-        metadata: {
-          source: "stripe", stripeProductId: product.id, stripePriceId: priceId,
-          priceCurrency: expanded?.currency ?? "unknown",
-          importedAt: new Date().toISOString(), reviewRequired: true,
-        },
-      });
+      const mapped = mapStripeProductToDraft(product, now);
+      if (!mapped.ok) {
+        skipped++;
+        if (details.length < 12) details.push("Uebersprungen " + mapped.productId + ": " + mapped.reason);
+        continue;
+      }
+      await tx.insert(revenueOffers).values(mapped.offer);
       known.add(product.id);
       imported++;
-      details.push(product.name.slice(0, 80));
+      if (details.length < 12) details.push(mapped.offer.name);
     }
-    return { imported, skipped, status: "draft-only", details, remainingPages: products.has_more };
+    return {
+      imported, skipped, status: "draft-only", details,
+      remainingPages: !catalogue.complete, pagesRead: catalogue.pages,
+      countRead: catalogue.products.length,
+    };
   });
 }
