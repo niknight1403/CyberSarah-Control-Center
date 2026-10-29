@@ -101,7 +101,24 @@ export async function commerceStudioOverview(days = 30) {
   return {
     status: "observe-diagnose-draft-approve",
     mode: "approval-gated",
-    offers: performance,
+    offers: performance.map(offer => {
+      const stored = rows.find(row => row.id === offer.id);
+      const meta = stored?.metadata ?? {};
+      const isStripe = meta.source === "stripe";
+      return {
+        ...offer,
+        catalogue: {
+          source: typeof meta.source === "string" ? meta.source : "manual",
+          variantCount: typeof meta.priceVariantCount === "number" ? meta.priceVariantCount : null,
+          priceInventoryComplete: isStripe ? meta.priceInventoryComplete === true : null,
+          requiresCurrencyReview: meta.priceCurrencyReviewRequired === true ||
+            meta.currencyReviewRequired === true,
+          requiresProductTypeReview: meta.productTypeReviewRequired === true,
+          requiresMediaRightsReview: meta.mediaUsageApprovalRequired === true,
+          requiresAffiliateReview: meta.affiliateDisclosureReviewRequired === true,
+        },
+      };
+    }),
     pricePlans: offers.map(offer => ({
       offerId: offer.id,
       plan: simulatePricePlan(offer, { measuredPurchases: performance.find(row => row.id === offer.id)?.purchases ?? 0 }),
