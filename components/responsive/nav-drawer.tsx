@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -7,6 +7,8 @@ import { AiCore } from "@/components/glass/ai-core";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
+import { groupDrawerItems } from "@/lib/drawer-sections-logic";
+import { filterDrawerItems } from "@/lib/drawer-search-logic";
 
 export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pathname = usePathname() ?? "/";
@@ -15,27 +17,33 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
+  const [search, setSearch] = useState("");
+  const sections = useMemo(() => groupDrawerItems(filterDrawerItems(search)), [search]);
+  const dismiss = useCallback(() => {
+    setSearch("");
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (!visible) return undefined;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
+      dismiss();
       return true;
     });
     return () => subscription.remove();
-  }, [visible, onClose]);
+  }, [visible, dismiss]);
 
   const select = useCallback(
     (route: string) => {
-      onClose();
+      dismiss();
       if (route !== pathname) router.push(route as never);
     },
-    [onClose, pathname, router],
+    [dismiss, pathname, router],
   );
 
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose} accessibilityLabel="Navigationsmenü">
-      <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={onClose} style={styles.backdrop}>
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={dismiss} accessibilityLabel="Navigationsmenü">
+      <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={dismiss} style={styles.backdrop}>
         <Pressable
           accessibilityRole="none"
           onPress={(event) => event.stopPropagation()}
@@ -48,22 +56,40 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
               <Text style={styles.brandTitle}>Cyber<Text style={{ color: glass.glassPalette.cyan }}>Sarah</Text></Text>
               <Text style={styles.brandSubtitle}>Autonomous Operations</Text>
             </View>
-            <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={onClose} style={styles.closeButton}>
+            <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={dismiss} hitSlop={8} style={styles.closeButton}>
               <IconSymbol name="xmark" size={18} color={glass.glassSurface.textSecondary} />
             </Pressable>
           </View>
 
           <View style={styles.divider} />
-          <Text style={styles.sectionLabel}>NAVIGATION</Text>
-
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-            {DRAWER_ITEMS.map((item) => {
+          <TextInput
+            accessibilityLabel="Menüpunkte durchsuchen"
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            placeholder="Bereich suchen …"
+            placeholderTextColor={glass.glassSurface.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            style={styles.searchInput}
+          />
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {sections.length === 0 ? (
+              <Text accessibilityRole="text" style={styles.emptyMessage}>Keine Bereiche gefunden. Andere Suche versuchen.</Text>
+            ) : null}
+            {sections.map((section) => (
+              <View key={section.key} style={styles.sectionBlock}>
+                <Text accessibilityRole="header" style={styles.sectionLabel}>{section.title}</Text>
+                <View style={styles.sectionItems}>
+                {section.items.map((item) => {
               const active = activeItem?.route === item.route;
               return (
                 <Pressable
                   key={item.route}
                   accessibilityLabel={`${item.title} öffnen`}
                   accessibilityRole="link"
+                  accessibilityState={{ selected: active }}
                   onPress={() => select(item.route)}
                   style={({ pressed }) => [styles.item, active && styles.itemActive, pressed && styles.itemPressed]}
                 >
@@ -75,7 +101,10 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                   {item.badge ? <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View> : null}
                 </Pressable>
               );
-            })}
+                })}
+                </View>
+              </View>
+            ))}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -92,7 +121,7 @@ export function NavDrawerButton({ onPress, tint }: { onPress: () => void; tint?:
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   return (
-    <Pressable accessibilityLabel="Menü öffnen" accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.hamburger, pressed && styles.itemPressed]}>
+    <Pressable accessibilityLabel="Menü öffnen" accessibilityHint="Öffnet die Navigation mit allen App-Bereichen" accessibilityRole="button" onPress={onPress} hitSlop={4} style={({ pressed }) => [styles.hamburger, pressed && styles.itemPressed]}>
       <IconSymbol name="line.3.horizontal" size={21} color={tint ?? glass.glassSurface.textPrimary} />
     </Pressable>
   );
@@ -146,7 +175,22 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 6,
   },
-  list: { gap: 5, paddingHorizontal: 10, paddingBottom: 12 },
+  searchInput: {
+    backgroundColor: glass.glassSurface.card,
+    borderColor: glass.glassSurface.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    color: glass.glassSurface.textPrimary,
+    fontSize: 14,
+    minHeight: 44,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+  },
+  emptyMessage: { color: glass.glassSurface.textSecondary, fontSize: 13, padding: 14, lineHeight: 20 },
+  list: { gap: 12, paddingHorizontal: 10, paddingBottom: 18 },
+  sectionBlock: { gap: 5 },
+  sectionItems: { gap: 5 },
   item: {
     alignItems: "center",
     flexDirection: "row",
@@ -196,8 +240,8 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     borderColor: glass.accentAlpha("cyan", 0.22),
     borderRadius: 13,
     borderWidth: 1,
-    height: 40,
+    minHeight: 44,
     justifyContent: "center",
-    width: 40,
+    minWidth: 44,
   },
 });

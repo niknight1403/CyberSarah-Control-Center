@@ -1,41 +1,40 @@
 import { describe, expect, it } from "vitest";
-
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 
-describe("DRAWER_ITEMS", () => {
-  it("zeigt fokussierte Revenue-Navigation ohne Designer/Utility-Tabs", () => {
-    expect(DRAWER_ITEMS.map((item) => item.title)).toEqual([
-      "Übersicht", "Revenue OS", "Business & Analytics",
-      "Fokus & Rückblick", "Ideen-Inbox", "Entscheidungs-Journal",
-      "Chat", "Workflows", "Konto",
+describe("mobile drawer navigation", () => {
+  it("macht die Kernbereiche und bisher versteckten Entwicklungswerkzeuge erreichbar", () => {
+    const routes = DRAWER_ITEMS.map((item) => item.route);
+    expect(routes).toEqual([
+      "/dashboard", "/chat", "/superagent",
+      "/revenue-os", "/business", "/focus", "/ideas", "/decisions",
+      "/media-studio",
+      "/agent", "/", "/preview", "/quality", "/cyber-terminal",
+      "/account",
     ]);
-    expect(DRAWER_ITEMS.map(item => item.route)).not.toContain("/designer");
-    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/focus");
-    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/ideas");
-    expect(DRAWER_ITEMS.map(item => item.route)).toContain("/decisions");
+    expect(new Set(routes).size).toBe(routes.length);
+    expect(routes).not.toContain("/designer");
   });
 
-});
+  it("weist jedem Menuepunkt eine gueltige Gruppe zu", () => {
+    const groups = new Set(["start", "revenue", "studio", "development", "system"]);
+    expect(DRAWER_ITEMS.every((item) => groups.has(item.group))).toBe(true);
+    expect(DRAWER_ITEMS[0].group).toBe("start");
+    expect(DRAWER_ITEMS.at(-1)?.group).toBe("system");
+  });
 
-describe("resolveActiveDrawerItem", () => {
-  it("findet exakte Treffer", () => {
-    expect(resolveActiveDrawerItem("/account")?.title).toBe("Konto");
+  it("findet exakte und verschachtelte Routen", () => {
+    expect(resolveActiveDrawerItem("/account")?.title).toBe("Konto & Einstellungen");
     expect(resolveActiveDrawerItem("/revenue-os")?.title).toBe("Revenue OS");
-    expect(resolveActiveDrawerItem("/micro-trading")).toBeNull();
-    expect(resolveActiveDrawerItem("/loop-engineering")).toBeNull();
+    expect(resolveActiveDrawerItem("/chat/session-1")?.title).toBe("KI-Chat");
+    expect(resolveActiveDrawerItem("/media-studio")?.title).toBe("Media Studio");
+    expect(resolveActiveDrawerItem("/quality/build")?.route).toBe("/quality");
   });
 
-  it("findet Praefix-Treffer fuer verschachtelte Routen", () => {
-    expect(resolveActiveDrawerItem("/chat/session-1")?.title).toBe("Chat");
-  });
-
-  it("behandelt den Root-Pfad nicht als Praefix fuer andere Routen", () => {
+  it("behandelt Root nur als exakten Treffer und laesst unbekannte Routen in Ruhe", () => {
+    expect(resolveActiveDrawerItem("")?.route).toBe("/");
+    expect(resolveActiveDrawerItem("/")?.route).toBe("/");
     expect(resolveActiveDrawerItem("/plugins")).toBeNull();
-    expect(resolveActiveDrawerItem("")).toBeNull();
-    expect(resolveActiveDrawerItem("/")).toBeNull();
-  });
-
-  it("liefert null bei unbekannter Route", () => {
-    expect(resolveActiveDrawerItem("/unbekannt")).toBeNull();
+    expect(resolveActiveDrawerItem("/micro-trading")).toBeNull();
+    expect(resolveActiveDrawerItem("/not-found")).toBeNull();
   });
 });

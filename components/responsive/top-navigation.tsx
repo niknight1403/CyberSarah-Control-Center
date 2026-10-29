@@ -18,6 +18,11 @@ const routes: Record<string, { title: string; subtitle: string }> = {
   "/agent": { title: "Entwicklung", subtitle: "Agenten, Builds & Automatisierung" },
   "/preview": { title: "Vorschau", subtitle: "App-Erlebnis prüfen" },
   "/quality": { title: "Qualität", subtitle: "CI, Sicherheit & Release-Status" },
+  "/focus": { title: "Fokus", subtitle: "Prioritäten & Rückblick" },
+  "/ideas": { title: "Ideen-Inbox", subtitle: "Ideen prüfen und entwickeln" },
+  "/decisions": { title: "Entscheidungen", subtitle: "Entscheidungsverlauf & Nachweise" },
+  "/cyber-terminal": { title: "Terminal", subtitle: "Entwicklung & Diagnose" },
+  "/loop-engineering": { title: "Loop Engineering", subtitle: "Autonome Entwicklungszyklen" },
 };
 
 export function TopNavigation() {
@@ -40,9 +45,8 @@ export function TopNavigation() {
             <Text style={styles.title} numberOfLines={1}>{route.title}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>{route.subtitle}</Text>
           </View>
-          <View style={styles.livePill} accessibilityLabel="Systemstatus live">
-            <View style={styles.statusDot} />
-            <Text style={styles.liveText}>LIVE</Text>
+          <View style={styles.contextPill} accessibilityLabel="CyberSarah App">
+            <Text style={styles.contextText}>APP</Text>
           </View>
         </View>
       </View>
@@ -104,31 +108,20 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     fontWeight: "600",
     marginTop: 2,
   },
-  livePill: {
+  contextPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
     borderRadius: glass.glassRadii.pill,
     paddingHorizontal: 10,
     paddingVertical: 7,
-    backgroundColor: glass.accentAlpha("green", 0.08),
+    backgroundColor: glass.accentAlpha("cyan", 0.08),
     borderWidth: 1,
-    borderColor: glass.accentAlpha("green", 0.26),
+    borderColor: glass.accentAlpha("cyan", 0.26),
   },
-  liveText: {
-    color: glass.glassPalette.green,
+  contextText: {
+    color: glass.glassPalette.cyan,
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 1,
-  },
-  statusDot: {
-    backgroundColor: glass.glassPalette.green,
-    borderRadius: 5,
-    height: 8,
-    width: 8,
-    shadowColor: glass.glassPalette.green,
-    shadowOpacity: 0.9,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 0 },
   },
 });
