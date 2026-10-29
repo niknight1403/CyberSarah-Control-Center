@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   GROQ_MODEL_CANDIDATES,
   OPENROUTER_FREE_MODEL_CANDIDATES,
+  prioritizeDiscoveredLocalModels,
   resolveManagedModel,
   resolveManagedModelCandidates,
 } from "../lib/managed-model-logic";
@@ -59,6 +60,24 @@ describe("resolveManagedModel (Sprint 85)", () => {
     expect(resolveManagedModelCandidates("gemini", { AI_GEMINI_MODEL: "gemini-2.5-pro" })).toEqual(["gemini-2.5-pro"]);
     expect(resolveManagedModelCandidates("openai", { AI_MANAGED_MODEL: "managed-a" })).toEqual(["managed-a"]);
     expect(resolveManagedModelCandidates("openai", {})).toEqual(["gpt-4o-mini"]);
+  });
+
+
+  it("priorisiert nur tatsaechlich installierte lokale Modelle, sobald Discovery-Daten vorliegen", () => {
+    expect(
+      prioritizeDiscoveredLocalModels(
+        ["qwen3.6:27b", "qwen2.5:1.5b", "qwen2.5:3b"],
+        ["qwen2.5:3b", "llama3.2:3b"],
+      ),
+    ).toEqual(["qwen2.5:3b", "llama3.2:3b"]);
+    expect(prioritizeDiscoveredLocalModels(["qwen3.6:27b"], [])).toEqual(["qwen3.6:27b"]);
+  });
+
+  it("liefert fuer Ollama nach einem Override weiterhin lokale Fallback-Kandidaten", () => {
+    const candidates = resolveManagedModelCandidates("local-ollama", { AI_OLLAMA_MODEL: "qwen3.6:27b" });
+    expect(candidates[0]).toBe("qwen3.6:27b");
+    expect(candidates).toContain("qwen2.5:1.5b");
+    expect(new Set(candidates).size).toBe(candidates.length);
   });
 
   it("liefert gpt-4o-mini, wenn weder Anforderung noch ENV ein Modell liefern", () => {

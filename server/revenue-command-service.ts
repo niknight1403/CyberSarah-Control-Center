@@ -7,34 +7,71 @@ import { fetchTradingSnapshot } from "./data-hub";
 
 let pool: Pool | undefined;
 let poolUrl: string | undefined;
+
+export function isRevenuePoolConnectionFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : "";
+  return (
+    ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "57P01", "57P02", "57P03"].includes(code) ||
+    /connection terminated unexpectedly|connection terminated|server closed the connection|socket hang up|read econnreset/i.test(message)
+  );
+}
+
+function retireRevenuePool(active: Pool | undefined): void {
+  if (!active) return;
+  void active.end().catch(() => undefined);
+  if (pool === active) {
+    pool = undefined;
+    poolUrl = undefined;
+  }
+}
+
 function database(): Pool {
   const url = process.env.REVENUE_OS_DATABASE_URL;
   if (!url) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "REVENUE_OS_DATABASE_URL ist nicht konfiguriert." });
   if (!pool || poolUrl !== url) {
-    if (pool) void pool.end();
+    if (pool) retireRevenuePool(pool);
     // Sprint 372 — entfernte Revenue-DBs (VM-Route via nginx-SNI) erhalten TLS
     // ohne Hostnamenpruefung; sslmode wird aus der URL gestriffen, damit pg's
     // interne Auswertung das explizite ssl-Objekt nicht ueberschreibt.
-    pool = new Pool({
+    const createdPool = new Pool({
       connectionString: stripSslModeParam(url),
       ssl: url.includes("localhost") || url.includes("127.0.0.1") ? undefined : { rejectUnauthorized: false },
       max: 4,
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 10000,
       statement_timeout: 5000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
     });
+    createdPool.on("error", (error) => {
+      console.warn(
+        "[Revenue-DB] Idle-Client-Verbindung verloren; Pool wird beim naechsten Zugriff neu aufgebaut:",
+        error instanceof Error ? error.message : String(error),
+      );
+      retireRevenuePool(createdPool);
+    });
+    pool = createdPool;
     poolUrl = url;
   }
   return pool;
 }
 
 export async function revenueRows<T extends QueryResultRow>(sql: string): Promise<T[]> {
+  let activePool: Pool | undefined;
   try {
     // SQL darf ausschliesslich aus serverseitigen SELECT-Konstanten stammen.
     if (!/^\s*SELECT\b/i.test(sql)) throw new Error("Nur lesende Revenue-Abfragen erlaubt.");
-    return (await database().query<T>(sql)).rows;
+    activePool = database();
+    return (await activePool.query<T>(sql)).rows;
   } catch (error) {
     if (error instanceof TRPCError) throw error;
+    if (isRevenuePoolConnectionFailure(error)) {
+      retireRevenuePool(activePool);
+    }
     console.warn("Revenue-Datenabfrage fehlgeschlagen", error instanceof Error ? error.name : "unbekannt");
     throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Revenue-Datenquelle ist nicht erreichbar oder ihr Schema fehlt." });
   }
