@@ -12,7 +12,7 @@ import {
 // kein Import-Zyklus zum Agenten selbst.
 import { getRouteRotationPrimary } from "./route-rotation-state";
 import { isProviderQuarantined } from "../../lib/live-fix-logic";
-import { resolveManagedModel, resolveManagedModelCandidates } from "../../lib/managed-model-logic";
+import { prioritizeDiscoveredLocalModels, resolveManagedModel, resolveManagedModelCandidates } from "../../lib/managed-model-logic";
 import {
   createKeyPoolEntry,
   recordKeyObservation,
@@ -342,6 +342,23 @@ async function probeLocalLlmEndpoint(baseUrl: string, apiKey?: string): Promise<
     return false;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** Modell-IDs eines OpenAI-kompatiblen lokalen Endpoints lesen. */
+async function listLocalLlmModelIds(baseUrl: string, apiKey?: string): Promise<string[]> {
+  try {
+    const response = await fetch(`${baseUrl}/models`, {
+      signal: AbortSignal.timeout(4_000),
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+    });
+    if (!response.ok) return [];
+    const payload = (await response.json()) as { data?: { id?: unknown }[] };
+    return Array.isArray(payload.data)
+      ? payload.data.map((entry) => (typeof entry?.id === "string" ? entry.id.trim() : "")).filter(Boolean)
+      : [];
+  } catch {
+    return [];
   }
 }
 
@@ -760,7 +777,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (!attempts.some((attempt) => attempt.source === "local-ollama" || attempt.source === "local-lmstudio")) {
     const localEndpoint = await resolveLocalManagedEndpoint();
     if (localEndpoint) {
-      const localModels = model ? [model] : resolveManagedModelCandidates(localEndpoint.source);
+      const configuredLocalModels = model ? [model] : resolveManagedModelCandidates(localEndpoint.source);
+      const discoveredLocalModels = model
+        ? []
+        : await listLocalLlmModelIds(localEndpoint.url.replace(/\/chat\/completions$/, ""), localEndpoint.apiKey);
+      const localModels = model
+        ? configuredLocalModels
+        : prioritizeDiscoveredLocalModels(configuredLocalModels, discoveredLocalModels);
       for (let modelIdx = 0; modelIdx < localModels.length; modelIdx += 1) {
         const startedAt = Date.now();
         try {
