@@ -9,6 +9,7 @@ import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 import { groupDrawerItems } from "@/lib/drawer-sections-logic";
 import { filterDrawerItems } from "@/lib/drawer-search-logic";
+import { isDrawerSectionCollapsed, toggleDrawerSection, type DrawerCollapseState } from "@/lib/drawer-collapse-logic";
 
 export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pathname = usePathname() ?? "/";
@@ -18,6 +19,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const styles = useMemo(() => createStyles(glass), [glass]);
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
   const [search, setSearch] = useState("");
+  const [collapsedSections, setCollapsedSections] = useState<DrawerCollapseState>({});
   const sections = useMemo(() => groupDrawerItems(filterDrawerItems(search)), [search]);
   const dismiss = useCallback(() => {
     setSearch("");
@@ -80,7 +82,19 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
             ) : null}
             {sections.map((section) => (
               <View key={section.key} style={styles.sectionBlock}>
-                <Text accessibilityRole="header" style={styles.sectionLabel}>{section.title}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${section.title} ${isDrawerSectionCollapsed(collapsedSections, section.key, search) ? "aufklappen" : "einklappen"}`}
+                  accessibilityState={{ expanded: !isDrawerSectionCollapsed(collapsedSections, section.key, search) }}
+                  disabled={Boolean(search.trim())}
+                  onPress={() => setCollapsedSections((current) => toggleDrawerSection(current, section.key))}
+                  style={styles.sectionHeader}
+                >
+                  <Text style={styles.sectionLabel}>{section.title}</Text>
+                  <IconSymbol name="chevron.right" size={18} color={glass.glassSurface.textMuted}
+                    style={{ transform: [{ rotate: isDrawerSectionCollapsed(collapsedSections, section.key, search) ? "0deg" : "90deg" }] }} />
+                </Pressable>
+                {!isDrawerSectionCollapsed(collapsedSections, section.key, search) ? (
                 <View style={styles.sectionItems}>
                 {section.items.map((item) => {
               const active = activeItem?.route === item.route;
@@ -103,6 +117,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
               );
                 })}
                 </View>
+                ) : null}
               </View>
             ))}
           </ScrollView>
@@ -190,6 +205,7 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   emptyMessage: { color: glass.glassSurface.textSecondary, fontSize: 13, padding: 14, lineHeight: 20 },
   list: { gap: 12, paddingHorizontal: 10, paddingBottom: 18 },
   sectionBlock: { gap: 5 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44, paddingRight: 12 },
   sectionItems: { gap: 5 },
   item: {
     alignItems: "center",
