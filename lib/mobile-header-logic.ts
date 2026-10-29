@@ -9,6 +9,7 @@ export const MOBILE_HEADER_ROUTES: Readonly<Record<string, MobileHeader>> = {
   "/business": { title: "Business", subtitle: "Revenue, Trading & Operations" },
   "/revenue-os": { title: "Revenue OS", subtitle: "Wachstum & Monetarisierung" },
   "/media-studio": { title: "Media Studio", subtitle: "Content & Kampagnen" },
+  "/commerce-studio": { title: "Commerce Studio", subtitle: "Produkte, Content & Gewinnoptimierung" },
   "/account": { title: "Konto", subtitle: "Profil, Plan & Einstellungen" },
   "/agent": { title: "Entwicklung", subtitle: "Agenten, Builds & Automatisierung" },
   "/preview": { title: "Vorschau", subtitle: "App-Erlebnis prüfen" },
