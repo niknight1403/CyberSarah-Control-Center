@@ -1,6 +1,7 @@
 /** Admin-only Commerce Studio APIs. Never performs external publishing or pricing writes. */
 import { z } from "zod";
 import { evaluatePriceTest } from "../lib/commerce-studio-autopilot-logic";
+import { getStripeAdministratorStatus, syncStripeCatalogOnce } from "./stripe-admin-integration";
 import { adminProcedure, router } from "./_core/trpc";
 import {
   commerceStudioOverview, createCommerceBundleDraft,
@@ -8,6 +9,9 @@ import {
 } from "./commerce-studio-autopilot";
 
 export const commerceStudioAutopilotRouter = router({
+  stripeAdminStatus: adminProcedure.query(() => getStripeAdministratorStatus()),
+  stripeVerifyNow: adminProcedure.mutation(() => getStripeAdministratorStatus(true)),
+  stripeSyncNow: adminProcedure.mutation(() => syncStripeCatalogOnce()),
   overview: adminProcedure
     .input(z.object({ days: z.number().int().min(1).max(90).default(30) }).optional())
     .query(({ input }) => commerceStudioOverview(input?.days ?? 30)),
