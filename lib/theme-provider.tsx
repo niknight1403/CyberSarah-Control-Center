@@ -17,6 +17,7 @@ import {
   resolveDesignRuntimePalette,
 } from "@/lib/_core/design-theme-palettes";
 import { normalizeThemePreference, resolveThemePreference, THEME_PREFERENCE_STORAGE_KEY, type ThemePreference } from "@/lib/theme-preference-logic";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 
 type ThemeContextValue = {
   colorScheme: ColorScheme;
@@ -46,6 +47,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeLoaded, setThemeLoaded] = useState(false);
   const colorScheme = resolveThemePreference(themePreference, systemScheme);
   const palette = useMemo(() => resolveDesignRuntimePalette(designTheme, colorScheme), [designTheme, colorScheme]);
+
+  // Mark WebView GPU safe mode for CSS effects as well as React animations.
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-cs-graphics-safe", decorativeMotionEnabled() ? "false" : "true");
+    }
+  }, []);
 
   const applyTheme = useCallback((scheme: ColorScheme, theme: DesignTheme) => {
     nativewindColorScheme.set(scheme);
