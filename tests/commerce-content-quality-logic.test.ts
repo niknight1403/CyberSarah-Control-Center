@@ -5,6 +5,11 @@ const valid = {
   reelScript: "Szene 1: Problem. Szene 2: Lösung. Szene 3: Ehrliches Beispiel. Jetzt prüfen.",
   landingCopy: "Headline: Mehr Überblick. FAQ: Wie funktioniert es? Details müssen geprüft werden.",
   hookVariants: ["Du möchtest mehr Überblick?", "Drei Hinweise für deinen Start", "Womit beginnst du heute?"],
+  scenePlan: [
+      { startSec: 0, endSec: 6, voiceover: "Willkommen bei CyberSarah", onScreenText: "KI fuer alle", visualPrompt: "Introszene mit Smartphone" },
+      { startSec: 6, endSec: 13, voiceover: "Produktvorteile transparent erklaeren", onScreenText: "Transparenz", visualPrompt: "Einfache Grafiken fuer Vorteile" },
+      { startSec: 13, endSec: 22, voiceover: "Fakten pruefen und mehr erfahren", onScreenText: "Mehr erfahren", visualPrompt: "Abschluss mit Produktkarte" },
+    ],
   cta: "Entdecke die Produktdetails",
   disclosure: "Werbung | KI-generierter Entwurf",
 };
@@ -30,6 +35,13 @@ describe("Commerce Content Quality Gate", () => {
   it("rejects duplicate hooks or only two hooks", () => {
     expect(auditCommerceDraft({ ...valid, hookVariants: ["first", "first", "third"] }, input).passed).toBe(false);
     expect(auditCommerceDraft({ ...valid, hookVariants: ["first", "second"] }, input).passed).toBe(false);
+  });
+  it("blocks gapped scene timings and invalid reel duration", () => {
+    const wrong = { ...valid, scenePlan: valid.scenePlan.map((scene, index) =>
+      index === 1 ? { ...scene, startSec: 8 } : scene) };
+    const audit = auditCommerceDraft(wrong, input);
+    expect(audit.passed).toBe(false);
+    expect(audit.blockers.some(v => v.includes("Timing"))).toBe(true);
   });
   it("adds explicit link and rights review requirements, not silent execution", () => {
     const result = auditCommerceDraft({ ...valid, reelScript: "Link: https://unknown.example/sale" }, input);
