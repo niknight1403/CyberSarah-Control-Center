@@ -52,7 +52,26 @@ export const GROQ_MODEL_CANDIDATES = [
   "qwen/qwen3.8-27b",
 ] as const;
 
-/** Geordnete Kandidaten je Source; ENV-Override fuehrt als einziger Kandidat. */
+/**
+ * Ordnet bevorzugte lokale Modelle gegen die tatsaechlich vom Endpoint
+ * gemeldete /models-Liste. Sobald Discovery-Daten vorhanden sind, werden
+ * nicht installierte Overrides verworfen statt wiederholt 404 zu produzieren.
+ * Alle zusaetzlich entdeckten Modelle bleiben als letzter Best-Effort-Fallback.
+ */
+export function prioritizeDiscoveredLocalModels(
+  preferred: readonly string[],
+  discovered: readonly string[],
+): string[] {
+  const cleanPreferred = [...new Set(preferred.map((value) => value.trim()).filter(Boolean))];
+  const cleanDiscovered = [...new Set(discovered.map((value) => value.trim()).filter(Boolean))];
+  if (cleanDiscovered.length === 0) return cleanPreferred;
+  const available = new Set(cleanDiscovered);
+  const preferredAvailable = cleanPreferred.filter((model) => available.has(model));
+  const discoveredRemainder = cleanDiscovered.filter((model) => !preferredAvailable.includes(model));
+  return [...preferredAvailable, ...discoveredRemainder];
+}
+
+/** Geordnete Kandidaten je Source; Cloud-ENV-Override fuehrt als einziger Kandidat. */
 export function resolveManagedModelCandidates(
   source: ManagedModelSource,
   env: Record<string, string | undefined> = process.env,
@@ -67,6 +86,15 @@ export function resolveManagedModelCandidates(
           : undefined;
   if (override) return [override];
   switch (source) {
+    case "local-ollama": {
+      const preferred = env.AI_OLLAMA_MODEL?.trim();
+      const defaults = [pickQwenForTask("chat", QWEN_LADDER) ?? "qwen2.5:1.5b", ...QWEN_LADDER];
+      return [...new Set([preferred, ...defaults].filter((value): value is string => Boolean(value)))];
+    }
+    case "local-lmstudio": {
+      const preferred = env.AI_LMSTUDIO_MODEL?.trim();
+      return [...new Set([preferred, "local-model"].filter((value): value is string => Boolean(value)))];
+    }
     case "openrouter":
       return [...OPENROUTER_FREE_MODEL_CANDIDATES];
     case "groq":
