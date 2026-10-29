@@ -142,7 +142,8 @@ export async function createCommerceBundleDraft(offerId: number, audience = "deu
     .where(eq(draftQueue.dedupeKey, key)).limit(1);
   if (existing.length) return { generated: false, reason: "Paket heute bereits vorhanden." };
   const bundle = await generateBundle(offer, audience);
-  const audit = auditCommerceDraft(bundle, { priceCents: offer.priceCents, productUrl: offer.targetUrl });
+  const audit = auditCommerceDraft(bundle, { priceCents: offer.priceCents, productUrl: offer.targetUrl,
+    requiresAffiliateDisclosure: offer.kind === "affiliate" });
   if (!audit.passed) return { generated: false, reason: "Qualitaetspruefung: " + audit.blockers.join(" ") };
   const payload = { ...buildContentAssets(offer, bundle), qualityWarnings: audit.warnings };
   const inserted = await db.transaction(async tx => {
