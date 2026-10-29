@@ -18,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { type GlassAccent } from "@/lib/design/future-glass";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 import {
   buildAurora,
   buildGridMesh,
@@ -37,11 +38,13 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const { width, height } = useWindowDimensions();
+  const motionEnabled = decorativeMotionEnabled();
+  const activeAtmosphere = atmosphere && motionEnabled;
 
   // --- Aurora-Drift: langsame, sanfte Pendelbewegung (ein Loop, Native Driver) ---
   const auroraDrift = useMemo(() => new Animated.Value(0), []);
   useEffect(() => {
-    if (!atmosphere) return;
+    if (!activeAtmosphere) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(auroraDrift, {
@@ -60,7 +63,7 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
     );
     loop.start();
     return () => loop.stop();
-  }, [atmosphere, auroraDrift, accent, glass.glassPalette]);
+  }, [activeAtmosphere, auroraDrift, accent, glass.glassPalette]);
   const aurora = buildAurora(glass.glassPalette[accent]);
   const auroraShift = auroraDrift.interpolate({
     inputRange: [0, 1],
@@ -68,13 +71,13 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
   });
 
   // --- Deterministische Partikel (kein Math.random im Render) ---
-  const particles = useMemo(() => buildParticleField(192, atmosphere ? 5 : 0), [atmosphere]);
+  const particles = useMemo(() => buildParticleField(192, activeAtmosphere ? 5 : 0), [activeAtmosphere]);
   const particleLoops = useMemo(
     () => particles.map(() => new Animated.Value(0)),
     [particles],
   );
   useEffect(() => {
-    if (!atmosphere) return;
+    if (!activeAtmosphere) return;
     const loops = particles.map((particle, index) =>
       Animated.loop(
         Animated.timing(particleLoops[index], {
@@ -87,12 +90,13 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
     );
     loops.forEach((loop) => loop.start());
     return () => loops.forEach((loop) => loop.stop());
-  }, [atmosphere, particles, particleLoops]);
+  }, [activeAtmosphere, particles, particleLoops]);
 
   const grid = useMemo(() => buildGridMesh(width, height, 120), [width, height]);
 
   return (
     <View style={[styles.root, { backgroundColor: glass.glassDepth.void }]}>
+      {motionEnabled ? (<>
       {/* Lichtwolke oben rechts — Akzentfarbe */}
       <LinearGradient
         colors={[glass.accentAlpha(accent, 0.16), "transparent"]}
@@ -119,7 +123,8 @@ export function GlassBackdrop({ children, accent = "purple", atmosphere = true }
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      {atmosphere ? (
+      </>) : null}
+      {activeAtmosphere ? (
         <>
           {/* Aurora-Schleier — driftender vertikaler Akzent-Verlauf */}
           <Animated.View
