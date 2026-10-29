@@ -21,7 +21,7 @@ Stand: 2026-10-29; Entwicklungsbranch feat/commerce-studio-autopilot-20261029; P
 | 3 | Produktbilder und Nutzungsrechte dokumentieren | PARTIAL |
 | 4 | Währung, Steuern und Bruttopreise korrekt trennen | PARTIAL |
 | 5 | Digitale und physische Produkte sauber unterscheiden | PARTIAL |
-| 6 | Produktvarianten und Abonnementintervalle modellieren | PARTIAL |
+| 6 | Produktvarianten und Abonnementintervalle modellieren | CODE |
 | 7 | Affiliate-Angebote mit Disclosure-Status importieren | OPEN |
 | 8 | Produktvalidierung mit Pflichtfeld-Check implementieren | CODE |
 | 9 | Quelle und Änderungszeit jedes Produktdatensatzes speichern | CODE |
@@ -123,3 +123,12 @@ Stand: 2026-10-29; Entwicklungsbranch feat/commerce-studio-autopilot-20261029; P
 2. Fuer alle OPEN-Punkte eigene Implementierung mit Audit, Tests und/oder reale Integration benoetigt.
 3. Kein Merge, Deploy und keine APK-Fertigmeldung vor den notwendigen Qualitaets- und Geraetepruefungen.
 4. Ohne echte Auftragnehmer-/Provider-Freigabe weder Live-Preiswechsel noch Publishing, Ad-Spend oder Stripe-Write.
+
+## Neue Implementierung im Anschluss (29.10.2026)
+
+- Katalog: echte Stripe-Preisvarianten in paginierten Read-only-Aufrufen, mit Intervall, Steuerverhalten und Waehrungskennzeichnung. Vollstaendigkeit wird explizit ausgewiesen.
+- Medienrechte: Asset-Owner-Claim aus Stripe wird niemals als verifizierter Rechte-Nachweis gewertet. Affiliate-Disclosure wird zur manuellen Pruefung markiert.
+- Revenue: beobachteter Teilbeitrag ist keine verifizierte Gesamtrentabilitaet; bei unvollstaendiger Kostenabdeckung erfolgt keine Scale-Empfehlung.
+- Neue Tests: tests/commerce-price-catalog-logic.test.ts und erweiterte Catalog-/Revenue-Regressionstests.
+- Betriebshinweise und kontrollierter Rollback: docs/commerce-stripe-import-runbook.md.
+- Reale Stripe-Testmode-Abnahme, Preis- und Publishing-E2E sowie APK/Web-Release bleiben offen. Nur nach GRUENEM CI-Lauf gelten neue Dateien als technisch validiert.
