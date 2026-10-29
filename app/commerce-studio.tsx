@@ -145,6 +145,24 @@ export default function CommerceStudioScreen() {
                   <Text style={styles.price}>{money(offer.priceCents)}</Text>
                 </View>
                 <Text style={styles.meta}>#{offer.id} · {offer.status.toUpperCase()} · Evidenz: {offer.evidence}</Text>
+                {offer.catalogue.source === "stripe" ? (
+                  <Text style={styles.meta}>
+                    Stripe · {offer.catalogue.variantCount ?? "—"} Preisvarianten
+                    {offer.catalogue.priceInventoryComplete === false ? " · Unvollstaendiger Katalog" : ""}
+                  </Text>
+                ) : null}
+                {(offer.catalogue.requiresCurrencyReview ||
+                  offer.catalogue.requiresProductTypeReview ||
+                  offer.catalogue.requiresMediaRightsReview ||
+                  offer.catalogue.requiresAffiliateReview) ? (
+                  <Text style={styles.note}>
+                    Vor Freigabe pruefen:
+                    {offer.catalogue.requiresCurrencyReview ? " Waehrung/Steuern ·" : ""}
+                    {offer.catalogue.requiresProductTypeReview ? " Produktart ·" : ""}
+                    {offer.catalogue.requiresMediaRightsReview ? " Medienrechte ·" : ""}
+                    {offer.catalogue.requiresAffiliateReview ? " Affiliate-Kennzeichnung" : ""}
+                  </Text>
+                ) : null}
                 <View style={styles.metrics}>
                   <View><Text style={styles.value}>{offer.clicks}</Text><Text style={styles.statLabel}>KLICKS</Text></View>
                   <View><Text style={styles.value}>{offer.purchases}</Text><Text style={styles.statLabel}>KÄUFE</Text></View>
