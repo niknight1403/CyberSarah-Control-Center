@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildContentAssets, commerceKey, evaluateOffers, simulatePricePlan, taggedOfferId,
+  buildContentAssets, commerceKey, evaluateOffers, simulatePricePlan, taggedOfferId, evaluatePriceTest,
   type CommerceOffer,
 } from "../lib/commerce-studio-autopilot-logic";
 
@@ -85,4 +85,31 @@ describe("Commerce Studio Autopilot: Sicherheit und Umsatzintelligenz", () => {
     expect(commerceKey(7, "2026-10-29", "price")).toBe("commerce-studio:price:7:2026-10-29");
     expect(() => commerceKey(0, "2026-10-29", "content")).toThrow();
   });
+  it("stellt sicher, dass ohne zugeordnete Kosten kein Preisgewinner ausgerufen wird", () => {
+    const evidence = evaluatePriceTest([
+      { name: "A", priceCents: 7900, visitors: 500, purchases: 25, refundsCents: 0, knownCostsCents: 0, completeCostAttribution: false },
+      { name: "B", priceCents: 8900, visitors: 500, purchases: 40, refundsCents: 0, knownCostsCents: 0, completeCostAttribution: false },
+    ], "A");
+    expect(evidence.status).toBe("NOT_READY");
+    expect(evidence.proposedWinner).toBeNull();
+    expect(evidence.applied).toBe(false);
+  });
+  it("verlangt vor Preisentscheidung mindestens 200 Beobachtungen und 10 Kauefe pro Arm", () => {
+    const evidence = evaluatePriceTest([
+      { name: "A", priceCents: 7900, visitors: 100, purchases: 9, refundsCents: 0, knownCostsCents: 0, completeCostAttribution: true },
+      { name: "B", priceCents: 8900, visitors: 100, purchases: 12, refundsCents: 0, knownCostsCents: 0, completeCostAttribution: true },
+    ], "A");
+    expect(evidence.status).toBe("NOT_READY");
+  });
+  it("schlaegt einen Preisgewinner nur mit starken konservativen Evidenzen zur Freigabe vor", () => {
+    const evidence = evaluatePriceTest([
+      { name: "A", priceCents: 7900, visitors: 1000, purchases: 50, refundsCents: 0, knownCostsCents: 0, completeCostAttribution: true },
+      { name: "B", priceCents: 8900, visitors: 1000, purchases: 150, refundsCents: 0, knownCostsCents: 0, completeCostAttribution: true },
+    ], "A");
+    expect(evidence.status).toBe("REVIEW_WINNER");
+    expect(evidence.proposedWinner).toBe("B");
+    expect(evidence.requiresHumanApproval).toBe(true);
+    expect(evidence.applied).toBe(false);
+  });
+
 });
