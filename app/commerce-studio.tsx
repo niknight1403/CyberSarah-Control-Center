@@ -20,6 +20,7 @@ export default function CommerceStudioScreen() {
   const bundle = trpc.commerceStudio.createBundle.useMutation();
   const price = trpc.commerceStudio.proposePriceTest.useMutation();
   const run = trpc.commerceStudio.runNow.useMutation();
+  const importer = trpc.commerceStudio.importStripe.useMutation();
   const data = dashboard.data;
   async function execute(key: string, action: () => Promise<{ generated?: boolean; reason?: string }>) {
     setBusyKey(key);
@@ -71,6 +72,21 @@ export default function CommerceStudioScreen() {
                 <Text style={styles.primaryButtonText}>✦  AUTOPILOT JETZT STARTEN</Text>}
             </Pressable>
           </GlassCard>
+          <Pressable
+            accessibilityRole="button"
+            disabled={busyKey !== null}
+            style={[styles.outlineButton, busyKey !== null && styles.disabled]}
+            onPress={() => void execute("import", async () => {
+              const result = await importer.mutateAsync();
+              return { generated: result.imported > 0, reason:
+                result.imported + " Produkte als unveroeffentlichte Entwuerfe importiert; " +
+                result.skipped + " bereits vorhanden. " +
+                (result.remainingPages ? "Weitere Produkte folgen in einem spaeteren Import." : "") +
+                (result.status === "not-configured" ? " Stripe nicht konfiguriert." : "") };
+            })}
+          >
+            <Text style={styles.outlineText}>↧  STRIPE-PRODUKTE ALS ENTWURF IMPORTIEREN</Text>
+          </Pressable>
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statValue}>{data?.offers.length ?? "—"}</Text>
