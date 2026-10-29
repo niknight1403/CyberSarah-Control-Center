@@ -8,6 +8,7 @@ import { z } from "zod";
 import { auditCommerceDraft } from "../lib/commerce-content-quality-logic";
 import Stripe from "stripe";
 import { mapStripeProductToDraft, readStripeCatalogue } from "../lib/commerce-catalog-logic";
+import { readStripePrices, groupStripePriceVariants, priceVariantsReview } from "../lib/commerce-price-catalog-logic";
 import { getDb } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { draftQueue, revenueOffers, revenueAttributionEvents, revenueCostEvents } from "../drizzle/schema";
@@ -251,6 +252,12 @@ export async function importStripeProductDrafts() {
     active: true, limit: 100, expand: ["data.default_price"],
     ...(cursor ? { starting_after: cursor } : {}),
   }), 20);
+  // Collect all active price variants independently of the default product price.
+  // This is still read-only Stripe access; any partial catalogue is labelled.
+  const priceCatalogue = await readStripePrices(async cursor => stripe.prices.list({
+    active: true, limit: 100, ...(cursor ? { starting_after: cursor } : {}),
+  }), 20);
+  const priceByProduct = groupStripePriceVariants(priceCatalogue.prices);
   const db = await database();
   const now = new Date().toISOString();
   return db.transaction(async tx => {
@@ -267,7 +274,13 @@ export async function importStripeProductDrafts() {
         if (details.length < 12) details.push("Uebersprungen " + mapped.productId + ": " + mapped.reason);
         continue;
       }
-      await tx.insert(revenueOffers).values(mapped.offer);
+      const priceInfo = priceVariantsReview(
+        priceByProduct.get(product.id) ?? [], priceCatalogue.complete,
+      );
+      await tx.insert(revenueOffers).values({
+        ...mapped.offer,
+        metadata: { ...mapped.offer.metadata, ...priceInfo },
+      });
       known.add(product.id);
       imported++;
       if (details.length < 12) details.push(mapped.offer.name);
@@ -276,6 +289,8 @@ export async function importStripeProductDrafts() {
       imported, skipped, status: "draft-only", details,
       remainingPages: !catalogue.complete, pagesRead: catalogue.pages,
       countRead: catalogue.products.length,
+      priceVariantsRead: priceCatalogue.prices.length,
+      priceCatalogueComplete: priceCatalogue.complete,
     };
   });
 }
