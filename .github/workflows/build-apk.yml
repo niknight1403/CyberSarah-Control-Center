@@ -54,6 +54,16 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.VERSION }}
         run: node scripts/set-release-version.mjs "$VERSION_NAME"
 
+      - name: Android Release Preflight — Identity, Version und Signing (Sprint 35)
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.VERSION }}
+          ANDROID_RELEASE_REQUIRE_SIGNING: "1"
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: npx tsx scripts/android-release-preflight.ts "$VERSION_NAME"
+
       - name: Quality Gate — TypeScript, Tests und Modulpruefung
         run: npm run verify:system
 
@@ -104,6 +114,14 @@ jobs:
           test -s "$APK" || { echo "Entwicklungs-APK fehlt: $APK"; exit 1; }
           ls -lh "$APK"
 
+      - name: Debug-APK vor Signing-Gate als Build-Artefakt sichern (Sprint 36)
+        uses: actions/upload-artifact@v7
+        with:
+          name: CyberSarah-ControlCenter-dev-apk-${{ steps.version.outputs.VERSION }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
       # ─────────────────────────────────────────────────────────────
       # Variante 2: ADMIN (Produktion, Release-signiert, ohne
       # Entwicklungsanzeigen — voller Funktionsumfang)
@@ -148,7 +166,24 @@ jobs:
           ls -lh "$APK"
           SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
           APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort | tail -1)"
-          "$APKSIGNER" verify --print-certs "$APK" | head -3
+          set -euo pipefail
+          test -x "$APKSIGNER" || { echo "apksigner im Android SDK nicht gefunden"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | sed -n '1,10p'
+
+      - name: APK-Paketkennung und Version in beiden Varianten prüfen (Sprint 38)
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          AAPT="$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -1)"
+          test -x "$AAPT" || { echo "Android aapt nicht gefunden"; exit 1; }
+          for APK in android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/release/app-release.apk; do
+            BADGING="$("$AAPT" dump badging "$APK")"
+            printf '%s\n' "$BADGING" | grep -Fq "name='com.cybersarah.controlcenter'"
+            printf '%s\n' "$BADGING" | grep -Fq "versionName='$RELEASE_VERSION'"
+            echo "OK — Android Paket und Version: $APK"
+          done
 
       - name: Signiertes Release-AAB bauen (Google Play, = Admin-Variante)
         working-directory: android
@@ -164,7 +199,8 @@ jobs:
           AAB="android/app/build/outputs/bundle/release/app-release.aab"
           test -s "$AAB" || { echo "Release-AAB fehlt: $AAB"; exit 1; }
           ls -lh "$AAB"
-          jarsigner -verify "$AAB" 2>&1 | head -5
+          set -euo pipefail
+          jarsigner -verify "$AAB" 2>&1 | sed -n '1,8p'
           rm -f "$RUNNER_TEMP/cybersarah-release.keystore"
 
       - name: AAB als Workflow-Artefakt hochladen
@@ -185,6 +221,12 @@ jobs:
             "CyberSarah-ControlCenter-v${VERSION}-admin.apk"
           cp android/app/build/outputs/bundle/release/app-release.aab \
             "CyberSarah-ControlCenter-v${VERSION}-release.aab"
+          sha256sum \
+            "CyberSarah-ControlCenter-v${VERSION}-dev.apk" \
+            "CyberSarah-ControlCenter-v${VERSION}-admin.apk" \
+            "CyberSarah-ControlCenter-v${VERSION}-release.aab" \
+            > "CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
+          sha256sum --check "CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
           TAG="v${VERSION}-apk"
           NOTES="Automatisierter Capacitor-Build aus Commit ${GITHUB_SHA::7}.
           Zwei Varianten aus einem Codestand (Sprint 107-Erweiterung):
@@ -199,7 +241,7 @@ jobs:
           Play-Store-Upload: das signierte AAB (jarsigner-verifiziert, Admin-
           Variante) direkt in der Play Console hochladen — siehe
           docs/PLAY_STORE_SUBMISSION_GUIDE.md und docs/APK_VARIANTEN.md."
-          RELEASE_FILES="CyberSarah-ControlCenter-v${VERSION}-dev.apk CyberSarah-ControlCenter-v${VERSION}-admin.apk CyberSarah-ControlCenter-v${VERSION}-release.aab"
+          RELEASE_FILES="CyberSarah-ControlCenter-v${VERSION}-dev.apk CyberSarah-ControlCenter-v${VERSION}-admin.apk CyberSarah-ControlCenter-v${VERSION}-release.aab CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" $RELEASE_FILES --clobber
           else
