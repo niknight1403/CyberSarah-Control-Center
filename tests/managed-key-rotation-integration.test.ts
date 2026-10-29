@@ -81,6 +81,8 @@ describe(
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.AI_GROQ_API_KEY;
     delete process.env.AI_OPENROUTER_API_KEY;
+    delete process.env.AI_OLLAMA_BASE_URL;
+    delete process.env.AI_OLLAMA_MODEL;
     // Telegram-Env wiederherstellen, damit andere Suites/Host-Prozesse
     // unbeeinflusst bleiben.
     if (savedTelegramEnv.botToken !== undefined) {
@@ -168,6 +170,47 @@ describe(
     expect(calls[1].url).toContain("openrouter.ai");
     expect(calls[1].body.model).toBe("openrouter/free"); // dynamischer Free-Router waehlt ein aktuell verfuegbares kompatibles Modell
     expect(calls.every((call) => !call.url.includes("api.openai.com"))).toBe(true);
+  });
+
+  it("faellt nach erschöpften Cloud-Free-Routen auf erreichbares Ollama zurück", async () => {
+    const calls: string[] = [];
+    delete process.env.AI_ALLOW_PAID_LLM_FALLBACK;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.AI_OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    process.env.AI_GROQ_API_KEY = "groq-cloud-exhausted";
+    process.env.AI_OLLAMA_BASE_URL = "http://ollama.test/v1";
+    process.env.AI_OLLAMA_MODEL = "qwen2.5:1.5b";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls.push(String(url));
+        if (String(url).includes("api.groq.com")) {
+          return fakeResponse(429, { error: { message: "quota exhausted" } });
+        }
+        if (String(url).endsWith("/models")) {
+          return fakeResponse(200, { data: [{ id: "qwen2.5:1.5b" }] });
+        }
+        if (String(url).includes("ollama.test")) {
+          return fakeResponse(200, {
+            model: "qwen2.5:1.5b",
+            choices: [{ index: 0, message: { role: "assistant", content: "lokal ok" }, finish_reason: "stop" }],
+          });
+        }
+        return fakeResponse(500, { error: "unexpected" });
+      }),
+    );
+
+    const result = await invokeLLM({ messages: [{ role: "user", content: "hi" }] });
+
+    expect(result).toMatchObject({ model: "qwen2.5:1.5b" });
+    expect(calls.some((url) => url.includes("api.groq.com"))).toBe(true);
+    expect(calls.some((url) => url === "http://ollama.test/v1/models")).toBe(true);
+    expect(calls.some((url) => url === "http://ollama.test/v1/chat/completions")).toBe(true);
+
+    delete process.env.AI_OLLAMA_BASE_URL;
+    delete process.env.AI_OLLAMA_MODEL;
   });
 
   it("wirft den letzten Fehler, wenn alle Keys der Kette scheitern", async () => {
