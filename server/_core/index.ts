@@ -10,6 +10,7 @@ import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
 import { startPublishingAutopilot, getPublishingJobCard } from "../publishing-service";
 import { startChannelAutopilot } from "../channel-autopilot";
 import { startCommerceStudioAutopilot } from "../commerce-studio-autopilot";
+import { startStripeAdministratorSync } from "../stripe-admin-integration";
 import { getInfluencerLearningLoopStatus, startInfluencerLearningLoop } from "../influencer-learning-loop";
 import { buildPublishingCardPng, type IgRatioKey } from "../../lib/asset-card-logic";
 import {
@@ -628,6 +629,7 @@ async function startServer() {
     startPublishingAutopilot();
     startChannelAutopilot();
     startCommerceStudioAutopilot();
+    startStripeAdministratorSync();
     startInfluencerLearningLoop();
     if (process.env.DIGISTORE24_API_KEY?.trim()) {
       const pullOnce = async (reason: string) => {
