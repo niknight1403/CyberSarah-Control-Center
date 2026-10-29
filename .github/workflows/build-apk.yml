@@ -54,6 +54,16 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.VERSION }}
         run: node scripts/set-release-version.mjs "$VERSION_NAME"
 
+      - name: Android Release Preflight — Identity, Version und Signing (Sprint 35)
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.VERSION }}
+          ANDROID_RELEASE_REQUIRE_SIGNING: "1"
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: npx tsx scripts/android-release-preflight.ts "$VERSION_NAME"
+
       - name: Quality Gate — TypeScript, Tests und Modulpruefung
         run: npm run verify:system
 
