@@ -73,10 +73,15 @@ describe("Commerce Studio Autopilot: Sicherheit und Umsatzintelligenz", () => {
       reelScript: "Skript mit Hook und CTA",
       landingCopy: "Landingpage mit Nutzen und FAQ",
       hookVariants: ["Hook A", "Hook B", "Hook C"],
+    scenePlan: [
+      { startSec: 0, endSec: 6, voiceover: "Willkommen bei CyberSarah", onScreenText: "KI fuer alle", visualPrompt: "Introszene mit Smartphone" },
+      { startSec: 6, endSec: 13, voiceover: "Produktvorteile transparent erklaeren", onScreenText: "Transparenz", visualPrompt: "Einfache Grafiken fuer Vorteile" },
+      { startSec: 13, endSec: 22, voiceover: "Fakten pruefen und mehr erfahren", onScreenText: "Mehr erfahren", visualPrompt: "Abschluss mit Produktkarte" },
+    ],
       cta: "Mehr erfahren", disclosure: "Werbung, falls erforderlich",
     });
     expect(payload.assets.map(a => a.format)).toEqual([
-      "product-card", "reel-script", "reel-hook", "landing-copy",
+      "product-card", "reel-script", "reel-hook", "reel-shotlist", "reel-subtitles", "landing-copy",
     ]);
     expect(payload.approvalRequired).toBe(true);
     expect(payload.attributionContentId).toBe("offer:7:commerce");
