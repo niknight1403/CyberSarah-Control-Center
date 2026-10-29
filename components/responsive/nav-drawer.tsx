@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -8,6 +8,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 import { groupDrawerItems } from "@/lib/drawer-sections-logic";
+import { filterDrawerItems } from "@/lib/drawer-search-logic";
 
 export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pathname = usePathname() ?? "/";
@@ -16,7 +17,8 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
-  const sections = useMemo(() => groupDrawerItems(DRAWER_ITEMS), []);
+  const [search, setSearch] = useState("");
+  const sections = useMemo(() => groupDrawerItems(filterDrawerItems(search)), [search]);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -56,7 +58,22 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
           </View>
 
           <View style={styles.divider} />
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <TextInput
+            accessibilityLabel="Menüpunkte durchsuchen"
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            placeholder="Bereich suchen …"
+            placeholderTextColor={glass.glassSurface.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            style={styles.searchInput}
+          />
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {sections.length === 0 ? (
+              <Text accessibilityRole="text" style={styles.emptyMessage}>Keine Bereiche gefunden. Andere Suche versuchen.</Text>
+            ) : null}
             {sections.map((section) => (
               <View key={section.key} style={styles.sectionBlock}>
                 <Text accessibilityRole="header" style={styles.sectionLabel}>{section.title}</Text>
@@ -153,6 +170,19 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 6,
   },
+  searchInput: {
+    backgroundColor: glass.glassSurface.card,
+    borderColor: glass.glassSurface.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    color: glass.glassSurface.textPrimary,
+    fontSize: 14,
+    minHeight: 44,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+  },
+  emptyMessage: { color: glass.glassSurface.textSecondary, fontSize: 13, padding: 14, lineHeight: 20 },
   list: { gap: 12, paddingHorizontal: 10, paddingBottom: 18 },
   sectionBlock: { gap: 5 },
   sectionItems: { gap: 5 },
