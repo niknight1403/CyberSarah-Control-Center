@@ -5,6 +5,7 @@ import { StyleSheet, View } from "react-native";
 import { ParticleField, ScanlineOverlay } from "@/components/living/living-ui";
 import { glassDepth, glassPalette } from "@/lib/design/future-glass";
 import { withAlpha } from "@/lib/theme-color-utils";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 
 /**
  * Sprint 49 — Premium-Hintergrund für den Chatbereich.
@@ -19,6 +20,7 @@ import { withAlpha } from "@/lib/theme-color-utils";
  * Design-Systems (glassPalette = "Licht, nicht Flaeche").
  */
 export function ChatBackground({ children }: { children: ReactNode }) {
+  const motionEnabled = decorativeMotionEnabled();
   return (
     <View style={styles.root}>
       <LinearGradient colors={[glassDepth.void, glassDepth.deep, glassDepth.abyss]} locations={[0, 0.55, 1]} style={styles.gradient}>
@@ -27,8 +29,8 @@ export function ChatBackground({ children }: { children: ReactNode }) {
         {/* Sprint 89 — Living Layer: langsam driftende Partikel + dezente
             Hologramm-Scanlines. Beide pointerEvents="none" und hinter dem
             Inhalt (zIndex 0/1), damit Interaktionen unberuehrt bleiben. */}
-        <ParticleField seed={7} count={22} />
-        <ScanlineOverlay intensity="subtle" />
+        {motionEnabled ? <ParticleField seed={7} count={22} /> : null}
+        {motionEnabled ? <ScanlineOverlay intensity="subtle" /> : null}
         {children}
       </LinearGradient>
     </View>
