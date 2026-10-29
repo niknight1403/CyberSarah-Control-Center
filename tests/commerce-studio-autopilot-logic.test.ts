@@ -34,6 +34,26 @@ describe("Commerce Studio Autopilot: Sicherheit und Umsatzintelligenz", () => {
     expect(result[0]?.contributionCents).toBe(4900);
     expect(result[0]?.refunds).toBe(1);
   });
+  it("verwechselt einen beobachteten Teilbeitrag nicht mit belegtem Profit fuer Skalierung", () => {
+    const events = [
+      ...Array.from({ length: 240 }, () => ({
+        contentId: "offer:7:reel", eventType: "impression", valueCents: 0,
+      })),
+      ...Array.from({ length: 25 }, () => ({
+        contentId: "offer:7:reel", eventType: "click", valueCents: 0,
+      })),
+      ...Array.from({ length: 5 }, () => ({
+        contentId: "offer:7:reel", eventType: "purchase", valueCents: 7900,
+      })),
+    ];
+    const analysis = evaluateOffers([offer], events, [
+      { amountCents: 1000, metadata: { offerId: 7, category: "api" } },
+    ])[0]!;
+    expect(analysis.contributionCents).toBeGreaterThan(0);
+    expect(analysis.costCoverage).toBe("partially-recorded");
+    expect(analysis.nextAction).toBe("MEASURE");
+    expect(analysis.reason).toContain("Kostenabdeckung");
+  });
   it("empfiehlt bei guter Reichweite ohne Klicks einen Hook-Test statt Preiserhoehung", () => {
     const events = Array.from({ length: 120 }, () => ({
       contentId: "offer:7:reel", eventType: "impression", valueCents: 0,
