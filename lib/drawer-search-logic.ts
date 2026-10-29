@@ -8,7 +8,7 @@ export function normalizeDrawerSearch(value: string): string {
     .replace(/ß/g, "ss")
     .toLocaleLowerCase("de")
     .trim()
-    .replace(/\s+/g, " ");
+    .replace(/[\s_/-]+/g, " ");
 }
 
 /**
@@ -24,7 +24,7 @@ export function filterDrawerItems(
   const words = query.split(" ");
   return items.filter((item) => {
     const haystack = normalizeDrawerSearch(
-      [item.title, item.route, item.group, item.badge ?? ""].join(" "),
+      [item.title, item.route, item.group, item.badge ?? "", ...(item.keywords ?? [])].join(" "),
     );
     return words.every((word) => haystack.includes(word));
   });
