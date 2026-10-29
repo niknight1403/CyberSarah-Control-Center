@@ -98,4 +98,26 @@ describe("Stripe Commerce catalogue import mapping", () => {
     }, "2026-10-29T20:00:00Z");
     expect(suspended.ok).toBe(false);
   });
+  it("does not trust merchant-declared owner_verified as proof of media rights", () => {
+    const product = makeProduct(21);
+    product.metadata.asset_rights = "owner_verified";
+    product.images = ["https://cdn.example.org/claimed-image.jpg"];
+    const mapped = mapStripeProductToDraft(product,"2026-10-29T22:00:00Z");
+    if (!mapped.ok) throw new Error(mapped.reason);
+    expect(mapped.offer.metadata.assetRightsClaimed).toBe(true);
+    expect(mapped.offer.metadata.assetRightsVerified).toBe(false);
+    expect(mapped.offer.metadata.mediaUsageApprovalRequired).toBe(true);
+  });
+  it("preserves affiliate disclosures without automatically authorizing publications", () => {
+    const product = makeProduct(22);
+    product.metadata.product_type = "affiliate";
+    product.metadata.affiliate_disclosure = "Werbung / Affiliate-Link";
+    const mapped = mapStripeProductToDraft(product,"2026-10-29T22:00:00Z");
+    if (!mapped.ok) throw new Error(mapped.reason);
+    expect(mapped.offer.kind).toBe("affiliate");
+    expect(mapped.offer.metadata.affiliateDisclosure).toBe("Werbung / Affiliate-Link");
+    expect(mapped.offer.metadata.affiliateDisclosureReviewRequired).toBe(true);
+    expect(mapped.offer.status).toBe("draft");
+  });
+
 });
