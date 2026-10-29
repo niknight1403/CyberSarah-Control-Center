@@ -7,6 +7,7 @@ export type StripeProductInput = {
   id: string;
   name: string;
   active: boolean;
+  created?: number;
   metadata: Record<string, string>;
   images: string[];
   default_price?: string | null | {
@@ -56,7 +57,9 @@ export function mapStripeProductToDraft(input: StripeProductInput, importedAt: s
       return parsed.protocol === "https:" && !parsed.username && !parsed.password;
     } catch { return false; }
   }).slice(0, 10);
-  const explicitlyVerifiedRights = input.metadata.asset_rights === "owner_verified";
+  // Stripe metadata is an unverified merchant claim, not rights evidence.
+  const claimedRights = input.metadata.asset_rights === "owner_verified";
+  const affiliateDisclosure = input.metadata.affiliate_disclosure?.trim().slice(0, 500) || null;
   return {
     ok: true,
     productId: input.id,
@@ -80,8 +83,13 @@ export function mapStripeProductToDraft(input: StripeProductInput, importedAt: s
         declaredProductType: announcedKind || null,
         productTypeReviewRequired: kind === "unclassified",
         assetImageUrls: images,
-        assetRightsVerified: explicitlyVerifiedRights,
-        mediaUsageApprovalRequired: !explicitlyVerifiedRights,
+        assetRightsClaimed: claimedRights,
+        assetRightsVerified: false,
+        mediaUsageApprovalRequired: true,
+        affiliateDisclosure,
+        affiliateDisclosureReviewRequired: kind === "affiliate",
+        sourceCreatedAt: input.created && Number.isSafeInteger(input.created)
+          ? new Date(input.created * 1000).toISOString() : null,
         importedAt,
         reviewRequired: true,
       },
