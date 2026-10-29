@@ -69,6 +69,7 @@ export default function AccountScreen() {
   }, [accountQuery.error, localUser]);
 
   const user = accountQuery.data ?? localUser;
+  const stripeAdminQuery = trpc.appStatus.integrationStatus.useQuery(undefined, { enabled: accountQuery.data?.role === "admin", retry: false, staleTime: 120_000 });
   const busy = registerMutation.isPending || loginMutation.isPending || logoutMutation.isPending;
 
   const persistAccount = async (result: { sessionToken: string; user: NonNullable<typeof user> }) => {
@@ -146,6 +147,20 @@ export default function AccountScreen() {
               {user.role === "admin" ? <Text style={styles.adminCopy}>Alle Skills, Steuerungselemente und Administrationsfunktionen sind für dieses Konto freigeschaltet.</Text> : null}
               {user.role === "admin" ? (
                 <>
+                  <GlassCard accent="cyan" style={styles.billingCard}>
+                    <Text style={styles.billingTitle}>STRIPE · DAUERVERBINDUNG</Text>
+                    <Text style={styles.billingCopy}>
+                      {stripeAdminQuery.data?.stripe?.message ??
+                        (stripeAdminQuery.error ? "Stripe-Status momentan nicht erreichbar." : "Gespeicherte Server-Verbindung wird geprueft.")}
+                    </Text>
+                    <Text style={styles.billingCopy}>
+                      Modus: {stripeAdminQuery.data?.stripe?.mode ?? "—"} · API-Schluessel: {stripeAdminQuery.data?.stripe?.keyConfigured ? "serverseitig gespeichert" : "nicht hinterlegt"}
+                    </Text>
+                    <Text style={styles.billingCopy}>
+                      Katalogzugriff: {stripeAdminQuery.data?.stripe?.catalogReadable ? "verifiziert" : "noch nicht verifiziert"} · Webhook-Secret: {stripeAdminQuery.data?.stripe?.webhookSecretConfigured ? "hinterlegt" : "fehlt"}
+                    </Text>
+                    <GlowButton label="Stripe-Verbindung erneut pruefen" onPress={() => void stripeAdminQuery.refetch()} accent="cyan" variant="secondary" />
+                  </GlassCard>
                   <GlassCard accent="green" style={styles.billingCard}>
                     <Text style={styles.billingTitle}>EXPERT-ZUGANG AKTIV</Text>
                     <Text style={styles.billingCopy}>
