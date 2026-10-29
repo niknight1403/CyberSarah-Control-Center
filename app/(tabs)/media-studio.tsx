@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { router } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AiCore } from "@/components/glass/ai-core";
@@ -21,6 +22,19 @@ export default function MediaStudioScreen() {
   const drawer = useNavDrawer();
   const styles = useMemo(() => createStyles(), []);
   const [text, setText] = useState("");
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    void AsyncStorage.getItem("cybersarah.commerce.media-handoff.v1").then(async script => {
+      if (!script || cancelled) return;
+      if (script.length >= 10 && script.length <= 1200) {
+        setText(script);
+        await AsyncStorage.removeItem("cybersarah.commerce.media-handoff.v1");
+      }
+    }).catch(() => {
+      // Only the optional handoff failed; manual renderer remains available.
+    });
+    return () => { cancelled = true; };
+  }, []));
   const [voice, setVoice] = useState<TtsVoice>("de-DE-KatjaNeural");
   const [approved, setApproved] = useState(false);
 
