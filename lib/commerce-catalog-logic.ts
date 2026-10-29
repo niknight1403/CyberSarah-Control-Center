@@ -9,7 +9,7 @@ export type StripeProductInput = {
   active: boolean;
   metadata: Record<string, string>;
   images: string[];
-  default_price: string | null | {
+  default_price?: string | null | {
     id: string;
     active?: boolean;
     currency: string;
