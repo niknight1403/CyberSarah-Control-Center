@@ -22,6 +22,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { type GlassAccent, type AiCoreState } from "@/lib/design/future-glass";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 
 interface AiCoreProps {
   /** Durchmesser in px (Default 44 — kompakt fuer Header). */
@@ -38,11 +39,12 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
   const styles = useMemo(() => createStyles(glass), [glass]);
   const visual = glass.aiCoreStates[state];
   const accent = glass.glassPalette[visual.accent];
+  const motionEnabled = decorativeMotionEnabled();
 
   // --- Rotation des aeusseren Rings ---
   const rotation = useMemo(() => new Animated.Value(0), []);
   useEffect(() => {
-    if (visual.rotationMs <= 0) return;
+    if (!motionEnabled || visual.rotationMs <= 0) return;
     const loop = Animated.loop(
       Animated.timing(rotation, {
         toValue: 1,
@@ -53,13 +55,13 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
     );
     loop.start();
     return () => loop.stop();
-  }, [rotation, visual.rotationMs]);
+  }, [motionEnabled, rotation, visual.rotationMs]);
   const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   // --- Puls des Kerns ---
   const pulse = useMemo(() => new Animated.Value(0), []);
   useEffect(() => {
-    if (visual.pulseMs <= 0) return;
+    if (!motionEnabled || visual.pulseMs <= 0) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -78,14 +80,14 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse, visual.pulseMs]);
+  }, [motionEnabled, pulse, visual.pulseMs]);
   const coreScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
   const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.6] });
 
   // --- Umlaufende Partikel ---
   const orbit = useMemo(() => new Animated.Value(0), []);
   useEffect(() => {
-    if (visual.particles <= 0) return;
+    if (!motionEnabled || visual.particles <= 0) return;
     const loop = Animated.loop(
       Animated.timing(orbit, {
         toValue: 1,
@@ -96,12 +98,12 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
     );
     loop.start();
     return () => loop.stop();
-  }, [glass.glassMotion.particleDrift, orbit, visual.particles]);
+  }, [motionEnabled, glass.glassMotion.particleDrift, orbit, visual.particles]);
 
   // --- Gegenlaeufiger innerer Ring (Sprint 192: zweite Rotationsebene) ---
   const counterRotation = useMemo(() => new Animated.Value(0), []);
   useEffect(() => {
-    if (visual.rotationMs <= 0) return;
+    if (!motionEnabled || visual.rotationMs <= 0) return;
     const loop = Animated.loop(
       Animated.timing(counterRotation, {
         toValue: 1,
@@ -112,7 +114,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
     );
     loop.start();
     return () => loop.stop();
-  }, [counterRotation, visual.rotationMs]);
+  }, [motionEnabled, counterRotation, visual.rotationMs]);
   const counterSpin = counterRotation.interpolate({ inputRange: [0, 1], outputRange: ["360deg", "0deg"] });
 
   const ringWidth = Math.max(2, size * 0.055);
@@ -135,7 +137,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
           ]}
         />
         {/* Rotierender Ring mit Segmenten */}
-        {visual.rotationMs > 0 ? (
+        {motionEnabled && visual.rotationMs > 0 ? (
           <>
             <Animated.View
               style={[
@@ -201,7 +203,7 @@ export function AiCore({ size = 44, state = "idle", withLabel = false }: AiCoreP
           </LinearGradient>
         </Animated.View>
         {/* Umlaufende Partikel: rotierender Container, Dot am Ringrand */}
-        {visual.particles > 0 &&
+        {motionEnabled && visual.particles > 0 &&
           Array.from({ length: visual.particles }).map((_, index) => (
             <Animated.View
               key={index}

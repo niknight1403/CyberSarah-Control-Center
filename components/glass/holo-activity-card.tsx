@@ -16,6 +16,7 @@ import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
 import { sparklineGeometry } from "@/lib/dashboard-view-model";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 
 const CHART_WIDTH = 280;
 const CHART_HEIGHT = 56;
@@ -45,12 +46,19 @@ export function HoloActivityCard({
   const geometry = sparklineGeometry(points);
   const hasData = geometry.length >= 2;
   const path = buildPath(geometry);
-  const fadeIn = useAnimatedValue(0);
+  const fadeIn = useAnimatedValue(1);
+  const motionEnabled = decorativeMotionEnabled();
 
   useEffect(() => {
+    if (!motionEnabled) {
+      fadeIn.setValue(1);
+      return;
+    }
     fadeIn.setValue(0);
-    Animated.timing(fadeIn, { toValue: 1, duration: 420, useNativeDriver: true }).start();
-  }, [fadeIn, points.length, count]);
+    const animation = Animated.timing(fadeIn, { toValue: 1, duration: 420, useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [fadeIn, points.length, count, motionEnabled]);
 
   return (
     <GlassCard accent="blue" glow={0} style={styles.card}>
