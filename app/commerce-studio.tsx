@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { router } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard } from "@/components/glass/glass-primitives";
+import { AutonomousDraftsCard } from "@/components/glass/autonomous-drafts";
 import { NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { trpc } from "@/lib/trpc";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
@@ -159,6 +161,16 @@ export default function CommerceStudioScreen() {
               </GlassCard>
             );
           })}
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.outlineButton}
+              onPress={() => router.push("/media-studio" as never)}
+            >
+              <Text style={styles.outlineText}>Reel als Video im Media Studio rendern</Text>
+            </Pressable>
+          </View>
+          <AutonomousDraftsCard kinds={["content", "revenue-loop"]} accent="cyan" autoGenerate={false} />
           <Text style={styles.footer}>
             *Nur zugeordnete Transaktionen und erfasste Kosten. Unbekannte Kosten werden nicht als 0 gezählt.
             Preise sind Simulationen ohne garantierte Conversion-Rate. Bestehende Freigaben: Revenue OS / Entwürfe.
