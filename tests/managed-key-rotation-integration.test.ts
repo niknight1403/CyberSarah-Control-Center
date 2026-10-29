@@ -228,6 +228,11 @@ describe(
     await expect(invokeLLM({ messages: [{ role: "user", content: "hi" }] })).rejects.toThrow(
       /LLM invoke failed: 429/,
     );
-    expect(calls.length).toBe(2);
+    // Cloud-Kette bleibt zuerst Gemini -> OpenAI. Danach darf Sprint 3
+    // zusaetzlich die kostenfreien lokalen Endpoints per /models pruefen.
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls[0].url).toContain(GEMINI_URL);
+    expect(calls[1].url).toContain(OPENAI_URL);
+    expect(calls.slice(2).every((call) => call.url.endsWith("/models"))).toBe(true);
   });
 });
