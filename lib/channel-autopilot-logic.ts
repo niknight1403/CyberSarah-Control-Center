@@ -49,7 +49,7 @@ export function channelAutopilotHealth(s:ChannelAutopilotSnapshot){
   };
 }
 
-export function buildChannelExperimentDraft(decision:ChannelAutopilotDecision,runId?:string){
+export function buildChannelExperimentDraft(decision:ChannelAutopilotDecision,runId?:string,evidenceFingerprint?:string){
   return {
     hub:"loop" as const,
     name:`CHANNEL AUTO · ${decision.lever}${runId?` · ${runId}`:""}`,
@@ -64,10 +64,11 @@ export function buildChannelExperimentDraft(decision:ChannelAutopilotDecision,ru
     unit:decision.unit,
     targetValue:decision.targetValue,
     currentValue:0,
+    ...(evidenceFingerprint?{evidenceFingerprint}:{}),
   };
 }
 
-export function buildChannelContentDraft(decision:ChannelAutopilotDecision){
+export function buildChannelContentDraft(decision:ChannelAutopilotDecision,evidenceFingerprint?:string){
   return {
     personaId:"automationsklar-editorial",
     platform:"youtube/shorts",
@@ -77,5 +78,26 @@ export function buildChannelContentDraft(decision:ChannelAutopilotDecision){
     assetCount:0,
     disclosure:"Autonom erzeugter Optimierungsentwurf; Fakten/Assets prüfen; Veröffentlichung bleibt freigabepflichtig.",
     autopilotKey:`channel-content:${decision.lever.toLowerCase()}`,
+    ...(evidenceFingerprint?{evidenceFingerprint}:{}),
   };
+}
+
+
+/** Sprint 7/10 — Grober Evidenz-Fingerprint statt Zeit-Bucket.
+ * Kleine Messrauschen erzeugen keine neuen Drafts; erst ein materiell neues
+ * Datenfenster öffnet die nächste Lernrunde.
+ */
+export function channelEvidenceFingerprint(s:ChannelAutopilotSnapshot):string{
+  const bucket=(value:number,size:number)=>Math.floor(safe(value)/size)*size;
+  return [
+    `i${bucket(s.impressions,250)}`,
+    `v${bucket(s.views,50)}`,
+    `c${bucket(s.clicks,5)}`,
+    `l${safe(s.leads)}`,
+    `p${safe(s.purchases)}`,
+    `r${safe(s.refunds)}`,
+    `rev${bucket(s.confirmedRevenueCents,1000)}`,
+    `pub${safe(s.published)}`,
+    `fail${safe(s.failed)}`,
+  ].join(":");
 }
