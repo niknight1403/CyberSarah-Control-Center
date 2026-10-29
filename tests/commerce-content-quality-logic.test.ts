@@ -43,6 +43,16 @@ describe("Commerce Content Quality Gate", () => {
     expect(audit.passed).toBe(false);
     expect(audit.blockers.some(v => v.includes("Timing"))).toBe(true);
   });
+  it("blocks affiliate product drafts without an identifiable advertising disclosure", () => {
+    const result = auditCommerceDraft({
+      ...valid, disclosure: "Bitte Details lesen, alles unverbindlich",
+    }, { ...input, requiresAffiliateDisclosure: true });
+    expect(result.passed).toBe(false);
+    expect(result.blockers.some(message => message.includes("Affiliate"))).toBe(true);
+    expect(auditCommerceDraft({
+      ...valid, disclosure: "Werbung / Affiliate-Link – Provision moeglich",
+    }, { ...input, requiresAffiliateDisclosure: true }).passed).toBe(true);
+  });
   it("adds explicit link and rights review requirements, not silent execution", () => {
     const result = auditCommerceDraft({ ...valid, reelScript: "Link: https://unknown.example/sale" }, input);
     expect(result.warnings.some(item => item.includes("URL"))).toBe(true);
