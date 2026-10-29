@@ -1,14 +1,14 @@
 {
-  "stand": "2026-10-29T07:27:25",
-  "aktiv": "groq",
-  "aktiv_name": "Groq Free Tier",
-  "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-20b",
+  "stand": "2026-10-29T14:35:09",
+  "aktiv": "gemini",
+  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
+  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
+  "modell": "gemma-4-26b-a4b-it",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR",
-      "modell": "000 gemma-4-31b-it"
+      "status": "VERFUEGBAR",
+      "modell": "gemma-4-26b-a4b-it"
     },
     {
       "id": "gemini-backup",
@@ -22,8 +22,8 @@
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT",
-      "modell": "429 nvidia/nemotron-3.5-super-vl:free) — Changer rotiert weiter"
+      "status": "VERFUEGBAR",
+      "modell": "xingchen-agi/xing4.0-29b-a4b:free"
     },
     {
       "id": "cerebras",
