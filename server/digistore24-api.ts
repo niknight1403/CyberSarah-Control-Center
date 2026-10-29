@@ -22,7 +22,7 @@ import {
   boundedPageCount, boundedSyncDays, commissionCents, commissionProductSlug,
   hashedBuyerEmail, ledgerOrderKey, minimalCommissionPayload, normalizeApiFailure,
   parseCommissionDate, safeProductUrl, shouldPollCommissions, transactionIdentity,
-  type D24EventKind,
+  netConversionDelta, type D24EventKind,
 } from "../lib/digistore24-ledger-logic";
 import { resolveDigistore24IpnSecret } from "../lib/digistore24-ipn-config";
 
@@ -102,6 +102,7 @@ async function recordCommission(item: CommissionItem, kind: D24EventKind): Promi
   if (!db) throw new Error("D24_DATABASE_UNAVAILABLE");
   const identity = transactionIdentity(item);
   const orderKey = ledgerOrderKey("api", identity, kind);
+  const conversionsDelta = netConversionDelta(kind);
   const amountCents = commissionCents(item.amount, kind);
   const commissionAmount = amountCents;
   const currency = typeof item.currency === "string" && /^[A-Z]{3}$/.test(item.currency) ? item.currency : "EUR";
@@ -124,13 +125,13 @@ async function recordCommission(item: CommissionItem, kind: D24EventKind): Promi
     }).onConflictDoNothing({target:conversionEvents.orderKey}).returning({id:conversionEvents.id});
     if (rows.length === 0) return "duplicate" as const;
     if (productSlug) await tx.execute(sql`
-      UPDATE affiliate_products SET "conversionCount"="conversionCount"+1,
+      UPDATE affiliate_products SET "conversionCount"=GREATEST(0,"conversionCount"+${conversionsDelta}),
         "revenueCents"="revenueCents"+${commissionAmount}, "updatedAt"=now()
       WHERE slug=${productSlug}`);
     await tx.execute(sql`
       INSERT INTO revenue_daily_stats ("day","conversions","revenueCents")
-      VALUES (${day},1,${commissionAmount}) ON CONFLICT ("day") DO UPDATE SET
-      "conversions"=revenue_daily_stats."conversions"+1,
+      VALUES (${day},${conversionsDelta},${commissionAmount}) ON CONFLICT ("day") DO UPDATE SET
+      "conversions"=revenue_daily_stats."conversions"+${conversionsDelta},
       "revenueCents"=revenue_daily_stats."revenueCents"+${commissionAmount}, "updatedAt"=now()`);
     return "inserted" as const;
   });
