@@ -19,27 +19,31 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
   const [search, setSearch] = useState("");
   const sections = useMemo(() => groupDrawerItems(filterDrawerItems(search)), [search]);
+  const dismiss = useCallback(() => {
+    setSearch("");
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (!visible) return undefined;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
+      dismiss();
       return true;
     });
     return () => subscription.remove();
-  }, [visible, onClose]);
+  }, [visible, dismiss]);
 
   const select = useCallback(
     (route: string) => {
-      onClose();
+      dismiss();
       if (route !== pathname) router.push(route as never);
     },
-    [onClose, pathname, router],
+    [dismiss, pathname, router],
   );
 
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose} accessibilityLabel="Navigationsmenü">
-      <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={onClose} style={styles.backdrop}>
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={dismiss} accessibilityLabel="Navigationsmenü">
+      <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={dismiss} style={styles.backdrop}>
         <Pressable
           accessibilityRole="none"
           onPress={(event) => event.stopPropagation()}
@@ -52,7 +56,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
               <Text style={styles.brandTitle}>Cyber<Text style={{ color: glass.glassPalette.cyan }}>Sarah</Text></Text>
               <Text style={styles.brandSubtitle}>Autonomous Operations</Text>
             </View>
-            <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={onClose} style={styles.closeButton}>
+            <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={dismiss} hitSlop={8} style={styles.closeButton}>
               <IconSymbol name="xmark" size={18} color={glass.glassSurface.textSecondary} />
             </Pressable>
           </View>
@@ -85,6 +89,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                   key={item.route}
                   accessibilityLabel={`${item.title} öffnen`}
                   accessibilityRole="link"
+                  accessibilityState={{ selected: active }}
                   onPress={() => select(item.route)}
                   style={({ pressed }) => [styles.item, active && styles.itemActive, pressed && styles.itemPressed]}
                 >
@@ -116,7 +121,7 @@ export function NavDrawerButton({ onPress, tint }: { onPress: () => void; tint?:
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   return (
-    <Pressable accessibilityLabel="Menü öffnen" accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.hamburger, pressed && styles.itemPressed]}>
+    <Pressable accessibilityLabel="Menü öffnen" accessibilityHint="Öffnet die Navigation mit allen App-Bereichen" accessibilityRole="button" onPress={onPress} hitSlop={4} style={({ pressed }) => [styles.hamburger, pressed && styles.itemPressed]}>
       <IconSymbol name="line.3.horizontal" size={21} color={tint ?? glass.glassSurface.textPrimary} />
     </Pressable>
   );
@@ -235,8 +240,8 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     borderColor: glass.accentAlpha("cyan", 0.22),
     borderRadius: 13,
     borderWidth: 1,
-    height: 40,
+    minHeight: 44,
     justifyContent: "center",
-    width: 40,
+    minWidth: 44,
   },
 });
