@@ -25,6 +25,9 @@ export default function CommerceStudioScreen() {
   const price = trpc.commerceStudio.proposePriceTest.useMutation();
   const run = trpc.commerceStudio.runNow.useMutation();
   const importer = trpc.commerceStudio.importStripe.useMutation();
+  const stripeStatus = trpc.commerceStudio.stripeAdminStatus.useQuery(undefined, { retry: false, staleTime: 60_000 });
+  const stripeVerify = trpc.commerceStudio.stripeVerifyNow.useMutation();
+  const stripeSync = trpc.commerceStudio.stripeSyncNow.useMutation();
   const data = dashboard.data;
   async function execute(key: string, action: () => Promise<{ generated?: boolean; reason?: string }>) {
     setBusyKey(key);
@@ -64,6 +67,47 @@ export default function CommerceStudioScreen() {
           </View>
         </View>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <GlassCard accent="cyan" style={styles.hero}>
+            <Text style={styles.eyebrow}>ADMINISTRATOR · STRIPE DAUERVERBINDUNG</Text>
+            <Text style={styles.cardTitle}>Stripe-Zahlungen & Produktkatalog</Text>
+            {stripeStatus.isLoading ? <ActivityIndicator color={glassPalette.cyan} /> : null}
+            <Text style={styles.body}>{stripeStatus.data?.message ?? (stripeStatus.error?.message ?? "Stripe-Verbindung wird geprueft.")}</Text>
+            <View style={styles.statsRow}>
+              <Text style={styles.meta}>Modus: {stripeStatus.data?.mode ?? "—"}</Text>
+              <Text style={styles.meta}>Server-Key: {stripeStatus.data?.keyConfigured ? "Hinterlegt" : "Fehlt"}</Text>
+              <Text style={styles.meta}>Webhook: {stripeStatus.data?.webhookConfigured ? "Secret hinterlegt" : "Pruefung offen"}</Text>
+            </View>
+            <Text style={styles.note}>
+              {stripeStatus.data?.status === "connected"
+                ? "Stripe ist verbunden. Der Server nutzt die dauerhaft hinterlegte Konfiguration."
+                : "Einmalige serverseitige Einrichtung oder Berechtigungspruefung erforderlich. Schluessel niemals im Handy eingeben."}
+            </Text>
+            <Text style={styles.meta}>Katalog-Synchronisation: {stripeStatus.data?.autoSyncEnabled ? "Automatisch alle 6 Stunden" : "Deaktiviert"}
+              {" · "}Letzte Synchronisation: {stripeStatus.data?.lastSyncAt ?? "—"}
+            </Text>
+            <Pressable
+              accessibilityRole="button" disabled={busyKey !== null}
+              style={[styles.outlineButton, busyKey !== null && styles.disabled]}
+              onPress={() => void execute("stripe-verify", async () => {
+                const result = await stripeVerify.mutateAsync();
+                await stripeStatus.refetch();
+                return { generated: result.catalogReadReady, reason: result.message };
+              })}
+            >
+              <Text style={styles.outlineText}>Stripe-Verbindung jetzt pruefen</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button" disabled={busyKey !== null || !stripeStatus.data?.catalogReadReady}
+              style={[styles.actionButton, (busyKey !== null || !stripeStatus.data?.catalogReadReady) && styles.disabled]}
+              onPress={() => void execute("stripe-sync", async () => {
+                const result = await stripeSync.mutateAsync();
+                await stripeStatus.refetch();
+                return { generated: result.ran, reason: result.reason };
+              })}
+            >
+              <Text style={styles.actionText}>Produktkatalog sicher synchronisieren</Text>
+            </Pressable>
+          </GlassCard>
           <GlassCard accent="cyan" style={styles.hero}>
             <Text style={styles.eyebrow}>AUTOPILOT · ENTWURF & ANALYSE</Text>
             <Text style={styles.heroTitle}>Von Produkten zu Kampagnen.</Text>
