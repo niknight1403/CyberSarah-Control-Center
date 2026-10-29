@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AiCore } from "@/components/glass/ai-core";
@@ -20,6 +22,20 @@ export default function MediaStudioScreen() {
   const drawer = useNavDrawer();
   const styles = useMemo(() => createStyles(), []);
   const [text, setText] = useState("");
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    void AsyncStorage.getItem("cybersarah.commerce.media-handoff.v1").then(async script => {
+      if (!script || cancelled) return;
+      if (script.length >= 10 && script.length <= 1200) {
+        setText(script);
+        setApproved(false); // Every imported video script needs fresh explicit rendering consent.
+        await AsyncStorage.removeItem("cybersarah.commerce.media-handoff.v1");
+      }
+    }).catch(() => {
+      // Only the optional handoff failed; manual renderer remains available.
+    });
+    return () => { cancelled = true; };
+  }, []));
   const [voice, setVoice] = useState<TtsVoice>("de-DE-KatjaNeural");
   const [approved, setApproved] = useState(false);
 
@@ -66,6 +82,20 @@ export default function MediaStudioScreen() {
           />
         </View>
         <ScrollView contentContainerStyle={styles.content}>
+          <GlassCard accent="cyan" style={styles.formCard}>
+            <Text style={styles.heroTitle}>Commerce Studio · Content-Autopilot</Text>
+            <Text style={styles.body}>
+              Stripe-Produkte als Entwurf importieren, Produktkarten, Reels und Landingpages
+              automatisch vorbereiten und Preis-/Gewinnpotenzial analysieren.
+            </Text>
+            <Pressable
+              onPress={() => router.push("/commerce-studio" as never)}
+              accessibilityRole="button"
+              style={styles.generateButton}
+            >
+              <Text style={styles.generateButtonText}>Commerce Autopilot öffnen</Text>
+            </Pressable>
+          </GlassCard>
           <GlassCard accent="purple" glow={2} style={styles.hero}>
             <View style={styles.heroHeader}>
               <AiCore state={busy ? "thinking" : "idle"} size={38} />

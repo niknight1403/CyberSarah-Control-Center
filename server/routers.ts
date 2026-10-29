@@ -44,6 +44,7 @@ import { revenueAutopilotRouter } from "./revenue-autopilot-router";
 import { controlCenterAutopilotRouter } from "./control-center-autopilot-router";
 import { revenueOsV2Router } from "./revenue-os-v2-router";
 import { growthNetworkRouter } from "./growth-network-router";
+import { commerceStudioAutopilotRouter } from "./commerce-studio-autopilot-router";
 import { facelessChannelRouter } from "./faceless-channel-router";
 import { publicProcedure, router } from "./_core/trpc";
 
@@ -99,6 +100,7 @@ export const appRouter = router({
   controlCenterAutopilot: controlCenterAutopilotRouter,
   revenueOsV2: revenueOsV2Router,
   growthNetwork: growthNetworkRouter,
+  commerceStudio: commerceStudioAutopilotRouter,
   facelessChannel: facelessChannelRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)

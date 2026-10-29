@@ -7,7 +7,7 @@ describe("mobile drawer navigation", () => {
     expect(routes).toEqual([
       "/dashboard", "/chat", "/superagent",
       "/revenue-os", "/business", "/focus", "/ideas", "/decisions",
-      "/media-studio",
+      "/media-studio", "/commerce-studio",
       "/agent", "/", "/preview", "/quality", "/cyber-terminal",
       "/account",
     ]);

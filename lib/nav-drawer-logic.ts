@@ -11,6 +11,7 @@ export type DrawerRoute =
   | "/dashboard"
   | "/business"
   | "/media-studio"
+  | "/commerce-studio"
   | "/account"
   | "/chat"
   | "/revenue-os"
@@ -67,6 +68,7 @@ export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "revenue", keywords: ["ideen","entwurf"] },
   { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "revenue", keywords: ["entscheidung","protokoll"] },
   { route: "/media-studio", title: "Media Studio", icon: "video.fill", group: "studio", keywords: ["videos","reels","content","film"] },
+  { route: "/commerce-studio", title: "Commerce Autopilot", icon: "chart.bar.fill", group: "studio", keywords: ["produkte","preis","gewinn","reels","landingpages","content studio","profit"] },
   { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "development", keywords: ["programmierung","automation","entwicklung"] },
   { route: "/", title: "Workspace", icon: "folder.fill", group: "development", keywords: ["dateien","repository","github","code"] },
   { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill", group: "development", keywords: ["vorschau","website","testen"] },

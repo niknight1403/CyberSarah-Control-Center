@@ -31,6 +31,8 @@ type DraftsCardProps = {
   accent?: "cyan" | "green" | "purple" | "blue";
   /** Nur fuer kind "idea": legt die freigegebene Idee in die Inbox. */
   onAdoptIdea?: (payload: IdeaDraftPayload) => Promise<{ ok: boolean; reason: string }>;
+  /** Optional: a reel draft can be handed to the existing manual video renderer. */
+  onPrepareContent?: (payload: ContentDraftPayload) => void | Promise<void>;
   /** Fuer Revenue-Loops: Freigabe integriert den Plan in Loop Engineering. */
   onAdoptRevenueLoop?: (payload: RevenueLoopDraftPayload) => Promise<{ ok: boolean; reason: string }>;
   /** Optional: Revenue-Loop-Entwuerfe auf konkrete Revenue-Hubs begrenzen. */
@@ -54,7 +56,7 @@ function describePayload(row: DraftRow): string {
   return `${payload.note}\n\nWarum: ${payload.rationale}`;
 }
 
-export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, onAdoptRevenueLoop, revenueHubs, autoGenerate = true }: DraftsCardProps) {
+export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, onAdoptRevenueLoop, onPrepareContent, revenueHubs, autoGenerate = true }: DraftsCardProps) {
   const styles = useMemo(() => createStyles(), []);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -157,6 +159,16 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
               <Text style={styles.hint}>{draftApprovalHint(row.kind)}</Text>
             </View>
             <Text style={styles.payload}>{describePayload(row)}</Text>
+            {row.kind === "content" && onPrepareContent ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Reel in Media Studio vorbereiten, nicht direkt veroeffentlichen"
+                onPress={() => void onPrepareContent(row.payload as ContentDraftPayload)}
+                style={styles.generateButton}
+              >
+                <Text style={styles.generateText}>Reel in Media Studio vorbereiten</Text>
+              </Pressable>
+            ) : null}
             {notice && busyId === row.id ? <Text style={styles.errorNote}>{notice}</Text> : null}
             <View style={styles.buttonRow}>
               <Pressable
