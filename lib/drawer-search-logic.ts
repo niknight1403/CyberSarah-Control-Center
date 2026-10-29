@@ -8,7 +8,7 @@ export function normalizeDrawerSearch(value: string): string {
     .replace(/[ßẞ]/g, "ss")
     .toLocaleLowerCase("de")
     .trim()
-    .replace(/[\s_/-]+/g, " ");
+    .replace(/[\s_\/-]+/g, " ");
 }
 
 /**
