@@ -13,11 +13,13 @@ export type CommerceOffer = {
 };
 export type CommerceEvent = { contentId: string; eventType: string; valueCents: number };
 export type CommerceCost = { amountCents: number; metadata: Record<string, unknown> };
+export type CommerceReelScene = { startSec: number; endSec: number; voiceover: string; onScreenText: string; visualPrompt: string };
 export type CommerceBundle = {
   productCard: string;
   reelScript: string;
   landingCopy: string;
   hookVariants: [string, string, string];
+  scenePlan: CommerceReelScene[];
   cta: string;
   disclosure: string;
 };
@@ -167,6 +169,11 @@ export function buildContentAssets(offer: CommerceOffer, bundle: CommerceBundle)
       { format: "product-card", variant: 1, title: offer.name, content: bundle.productCard, cta: bundle.cta },
       { format: "reel-script", variant: 1, title: "Reel", content: bundle.reelScript, cta: bundle.cta },
       { format: "reel-hook", variant: 2, title: "A/B Hooks", content: bundle.hookVariants.join("\n\n") },
+      { format: "reel-shotlist", variant: 1, title: "Szenen & Voiceover", content: bundle.scenePlan.map(s =>
+        "[" + s.startSec + "-" + s.endSec + "s] Voice: " + s.voiceover +
+        " | Bild: " + s.visualPrompt).join("\n") },
+      { format: "reel-subtitles", variant: 1, title: "Untertitel & Timing", content: bundle.scenePlan.map(s =>
+        "[" + s.startSec + "-" + s.endSec + "s] " + s.onScreenText).join("\n") },
       { format: "landing-copy", variant: 1, title: "Landingpage", content: bundle.landingCopy, cta: bundle.cta },
     ],
     disclosure: bundle.disclosure,
