@@ -159,10 +159,18 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
             ))}
           </ScrollView>
 
-          <View style={styles.footer} accessibilityLabel={`API- und Datenbankstatus: ${readiness.view.detail}`}>
+          <Pressable
+            style={styles.footer}
+            accessibilityRole="button"
+            accessibilityLabel={`API- und Datenbankstatus: ${readiness.view.detail} ${readiness.isChecking ? "Prüfung läuft." : "Erneut prüfen."}`}
+            accessibilityState={{ busy: readiness.isChecking, disabled: readiness.isChecking }}
+            disabled={readiness.isChecking}
+            onPress={readiness.refresh}
+          >
             <View style={[styles.footerDot, { backgroundColor: glass.glassPalette[readiness.view.accent] }]} />
             <Text style={styles.footerText}>API + Datenbank · {readiness.view.label}</Text>
-          </View>
+            <IconSymbol name="arrow.clockwise" size={16} color={glass.glassSurface.textSecondary} />
+          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
@@ -280,6 +288,7 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   badge: { backgroundColor: glass.accentAlpha("purple", 0.14), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { color: glass.glassPalette.purple, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
   footer: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
