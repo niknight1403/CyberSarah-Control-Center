@@ -37,7 +37,7 @@ export function transactionIdentity(record: D24Record): string {
 export function ledgerOrderKey(source: "api" | "ipn", identity: string, kind: D24EventKind): string {
   // Preserve pre-hardening keys so existing recorded events cannot be counted a second time.
   const legacy = source === "api" ? `d24:${identity}:${kind}` : identity;
-  if (legacy.length <= 200 && !/[\\r\\n\\0]/.test(legacy)) return legacy;
+  if (legacy.length <= 200 && [...legacy].every(ch => ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) <= 126)) return legacy;
   // For oversized/untrusted IDs avoid truncation collisions, keeping the DB's 200 char limit.
   const digest = createHash("sha256").update(identity).digest("hex");
   return `d24:${source}:${kind}:${digest}`;
