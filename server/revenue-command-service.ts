@@ -61,14 +61,16 @@ function database(): Pool {
 }
 
 export async function revenueRows<T extends QueryResultRow>(sql: string): Promise<T[]> {
+  let activePool: Pool | undefined;
   try {
     // SQL darf ausschliesslich aus serverseitigen SELECT-Konstanten stammen.
     if (!/^\s*SELECT\b/i.test(sql)) throw new Error("Nur lesende Revenue-Abfragen erlaubt.");
-    return (await database().query<T>(sql)).rows;
+    activePool = database();
+    return (await activePool.query<T>(sql)).rows;
   } catch (error) {
     if (error instanceof TRPCError) throw error;
     if (isRevenuePoolConnectionFailure(error)) {
-      retireRevenuePool(pool);
+      retireRevenuePool(activePool);
     }
     console.warn("Revenue-Datenabfrage fehlgeschlagen", error instanceof Error ? error.name : "unbekannt");
     throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Revenue-Datenquelle ist nicht erreichbar oder ihr Schema fehlt." });
