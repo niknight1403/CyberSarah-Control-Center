@@ -18,6 +18,16 @@ type IntegrationStatus = {
     preferredOrder: string[];
     checkedAt: string;
   };
+  routeRotation: {
+    enabled: boolean;
+    primary: string | null;
+    forced: string | null;
+    lastTickAt: string | null;
+    configured: number;
+    healthy: number;
+    recentAction: "keep" | "rotate" | "degraded";
+    recentReason: string | null;
+  };
   telegram: {
     configured: boolean;
     maskedToken: string;
@@ -91,6 +101,33 @@ export function IntegrationStatusCard({ isAdmin }: { isAdmin: boolean }) {
               value={status.llm.preferredOrder.length > 0 ? status.llm.preferredOrder.join(" → ") : "Auto (Zero-Cost)"}
               tone="muted"
             />
+          </View>
+
+          <View style={styles.group}>
+            <Text style={[styles.groupTitle, { color: colors.text }]}>Autonome LLM-Rotation</Text>
+            <MetricRow
+              label="Primärroute"
+              value={status.routeRotation.primary ?? "wird geprüft"}
+              tone={status.routeRotation.healthy > 0 ? "ok" : "warn"}
+            />
+            <MetricRow
+              label="Gesund / konfiguriert"
+              value={`${status.routeRotation.healthy} / ${status.routeRotation.configured}`}
+              tone={status.routeRotation.healthy > 0 ? "ok" : "warn"}
+            />
+            {status.routeRotation.forced ? (
+              <MetricRow label="Admin-Zwang" value={status.routeRotation.forced} tone="warn" />
+            ) : null}
+            <MetricRow
+              label="Letzter Health-Tick"
+              value={status.routeRotation.lastTickAt ? new Date(status.routeRotation.lastTickAt).toLocaleTimeString() : "noch keiner"}
+              tone="muted"
+            />
+            {status.routeRotation.recentAction === "degraded" && status.routeRotation.recentReason ? (
+              <Text style={[styles.errorText, { color: colors.muted }]} numberOfLines={3}>
+                {status.routeRotation.recentReason}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.group}>
