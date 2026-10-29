@@ -254,6 +254,12 @@ export async function restoreRouteRotationState(): Promise<void> {
   } catch (error) {
     console.warn("[route-rotation] Zustand nicht ladbar:", error instanceof Error ? error.message : error);
   }
+  // Sprint 2/10 — Sofort-Tick beim Boot: persistierte, inzwischen
+  // degradierte Primärrouten werden vor dem ersten produktiven LLM-Aufruf
+  // neu bewertet, statt bis zum ersten 60s-Intervall zu warten.
+  await runRouteRotationTick().catch((error) => {
+    console.warn("[route-rotation] Initialer Boot-Tick fehlgeschlagen:", error instanceof Error ? error.message : error);
+  });
   startRouteRotationAgent();
 }
 
