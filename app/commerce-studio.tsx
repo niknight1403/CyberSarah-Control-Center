@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { ContentDraftPayload } from "@/lib/draft-engine-logic";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
@@ -38,6 +40,19 @@ export default function CommerceStudioScreen() {
     }
   }
   const pricePlan = (offerId: number) => data?.pricePlans.find(row => row.offerId === offerId)?.plan;
+  async function prepareReel(payload: ContentDraftPayload) {
+    const script = payload.content.trim();
+    if (script.length < 10 || script.length > 1200) {
+      setFeedback("Reel-Skript muss fuer den vorhandenen Renderer 10–1200 Zeichen haben. Bitte erst pruefen und kuerzen.");
+      return;
+    }
+    try {
+      await AsyncStorage.setItem("cybersarah.commerce.media-handoff.v1", script);
+      router.push("/media-studio" as never);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Video-Uebergabe fehlgeschlagen.");
+    }
+  }
   return (
     <GlassBackdrop accent="cyan">
       <ScreenContainer containerClassName="bg-transparent" edges={["top", "left", "right"]}>
@@ -170,7 +185,7 @@ export default function CommerceStudioScreen() {
               <Text style={styles.outlineText}>Reel als Video im Media Studio rendern</Text>
             </Pressable>
           </View>
-          <AutonomousDraftsCard kinds={["content", "revenue-loop"]} accent="cyan" autoGenerate={false} />
+          <AutonomousDraftsCard kinds={["content", "revenue-loop"]} accent="cyan" autoGenerate={false} onPrepareContent={prepareReel} />
           <Text style={styles.footer}>
             *Nur zugeordnete Transaktionen und erfasste Kosten. Unbekannte Kosten werden nicht als 0 gezählt.
             Preise sind Simulationen ohne garantierte Conversion-Rate. Bestehende Freigaben: Revenue OS / Entwürfe.
