@@ -11,7 +11,7 @@ export type StripeAdminSettings = {
 };
 export function stripeAdminSettings(env: Record<string, string | undefined>): StripeAdminSettings {
   const mode = (env.STRIPE_MODE ?? "live").trim().toLowerCase();
-  const resultMode = mode === "live" || mode === "test" ? mode : null;
+  const resultMode: StripeAdminMode | null = mode === "live" ? "live" : mode === "test" ? "test" : null;
   const key = env.STRIPE_SECRET_KEY?.trim() ?? "";
   const webhook = env.STRIPE_WEBHOOK_SECRET?.trim() ?? "";
   const webhookReady = webhook.startsWith("whsec_") && webhook.length > 12;
