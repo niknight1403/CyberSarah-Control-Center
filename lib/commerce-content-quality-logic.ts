@@ -25,7 +25,7 @@ const unsafeClaims = [
 ];
 export function auditCommerceDraft(
   bundle: CopyBundle,
-  input: { priceCents: number | null; productUrl: string | null; assetRightsVerified?: boolean },
+  input: { priceCents: number | null; productUrl: string | null; assetRightsVerified?: boolean; requiresAffiliateDisclosure?: boolean },
 ): DraftQualityResult {
   const texts = [bundle.productCard, bundle.reelScript, bundle.landingCopy, ...bundle.hookVariants, bundle.cta];
   const all = texts.join("\n");
@@ -67,6 +67,9 @@ export function auditCommerceDraft(
     }
   }
   if (bundle.disclosure.trim().length < 10) blockers.push("Werbekennzeichnung fehlt.");
+  if (input.requiresAffiliateDisclosure && !/werbung|anzeige|affiliate|provision/i.test(bundle.disclosure)) {
+    blockers.push("Affiliate-/Werbekennzeichnung vor Freigabe erforderlich.");
+  }
   if (!input.assetRightsVerified) warnings.push("Bild-/Video-/Audio-/Markenrechte vor Render pruefen.");
   if (!/faq|fragen|häufig/i.test(bundle.landingCopy)) warnings.push("FAQ fuer Landingpage pruefen.");
   return { passed: blockers.length === 0, blockers, warnings, reviewRequired: true };
