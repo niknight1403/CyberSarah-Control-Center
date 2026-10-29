@@ -10,6 +10,7 @@ import {
   isJobDue,
   nextRetryAt,
   resolvePublishingMode,
+  evaluatePublishingReliabilityCircuit,
 } from "@/lib/publishing-queue-logic";
 
 describe("publishing queue logic (Sprint 365)", () => {
@@ -90,6 +91,15 @@ describe("publishing queue logic (Sprint 365)", () => {
     expect(resolvePublishingMode("tiktok", ttCred, { hasAsset: true }).mode).toBe("live");
     expect(resolvePublishingMode("tiktok", ttCred).mode).toBe("blocked");
     expect(resolvePublishingMode("tiktok", {}).reason).toContain("TIKTOK_PUBLISH_TOKEN");
+  });
+
+  it("oeffnet den Publishing-Circuit nur bei einer klaren aktuellen Fehlerwelle", () => {
+    expect(evaluatePublishingReliabilityCircuit({ published: 1, failed: 2 }).open).toBe(false);
+    const open = evaluatePublishingReliabilityCircuit({ published: 2, failed: 3 });
+    expect(open.open).toBe(true);
+    expect(open.failureRatePct).toBe(60);
+    expect(open.reason).toContain("Publishing pausiert");
+    expect(evaluatePublishingReliabilityCircuit({ published: 8, failed: 2 }).open).toBe(false);
   });
 
   it("schaltet den Autopilot per Env-Flag aus", () => {

@@ -26,6 +26,7 @@ export type IntegrationStatus = IntegrationDefinition & {
   readiness: IntegrationReadiness;
   missingEnv: string[];
   configuredEnv: string[];
+  capabilityReadiness?: Record<string, IntegrationReadiness>;
 };
 
 export const INTEGRATION_REGISTRY: readonly IntegrationDefinition[] = [
@@ -87,10 +88,30 @@ export function getIntegrationStatus(
 ): IntegrationStatus | null {
   const definition = INTEGRATION_REGISTRY.find((entry) => entry.key === key);
   if (!definition) return null;
-  const missingEnv = definition.requiredEnv.filter((name) => !(env[name]?.trim()));
-  const configuredEnv = [...definition.requiredEnv, ...(definition.optionalEnv ?? [])].filter((name) => Boolean(env[name]?.trim()));
+
+  // Sprint 6/10 — Digistore24 hat historisch zwei Namen fuer dasselbe
+  // IPN-Geheimnis verwendet. Die Registry bewertet beide als denselben
+  // kanonischen Slot, damit UI und Laufzeit nicht widersprechen.
+  const normalizedEnv = { ...env };
+  if (
+    key === "digistore24" &&
+    !normalizedEnv.DIGISTORE24_IPN_SECRET?.trim() &&
+    normalizedEnv.DIGISTORE24_IPN_PASSPHRASE?.trim()
+  ) {
+    normalizedEnv.DIGISTORE24_IPN_SECRET = normalizedEnv.DIGISTORE24_IPN_PASSPHRASE;
+  }
+
+  const missingEnv = definition.requiredEnv.filter((name) => !(normalizedEnv[name]?.trim()));
+  const configuredEnv = [...definition.requiredEnv, ...(definition.optionalEnv ?? [])].filter((name) => Boolean(normalizedEnv[name]?.trim()));
   const readiness: IntegrationReadiness = missingEnv.length === 0 ? "ready" : configuredEnv.length === 0 ? "not_configured" : "partial";
-  return { ...definition, readiness, missingEnv, configuredEnv };
+  const capabilityReadiness =
+    key === "digistore24"
+      ? {
+          "REST-API Sync": normalizedEnv.DIGISTORE24_API_KEY?.trim() ? "ready" as const : "not_configured" as const,
+          "IPN-Verifikation": normalizedEnv.DIGISTORE24_IPN_SECRET?.trim() ? "ready" as const : "not_configured" as const,
+        }
+      : undefined;
+  return { ...definition, readiness, missingEnv, configuredEnv, ...(capabilityReadiness ? { capabilityReadiness } : {}) };
 }
 
 export function getAllIntegrationStatuses(env: Record<string, string | undefined> = process.env): IntegrationStatus[] {

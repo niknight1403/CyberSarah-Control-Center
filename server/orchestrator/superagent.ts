@@ -147,14 +147,13 @@ async function callManagedCloud(config: LlmConfig, messages: ChatMessage[]): Pro
     if (!choice) throw new Error("LLM-API: keine Antwort-Message erhalten.");
     return choice as ChatMessage;
   } catch (error: any) {
-    console.warn(`⚠️ Cloud-Provider Limit/Fehler erreicht (${error.message}). Wechsle zu lokalem Ollama-Fallback...`);
-    const localUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
-    const ollamaConfig: LlmConfig = {
-      mode: "ollama",
-      baseUrl: localUrl,
-      model: process.env.ORCHESTRATOR_MODEL ?? "llama3.1",
-    };
-    return await callOllama(ollamaConfig, messages);
+    // Sprint 4/10 — Der zentrale invokeLLM-Pfad besitzt bereits Cloud-
+    // Rotation UND Ollama/LM-Studio-Endfallback. Kein zweiter, abweichender
+    // localhost-Fallback mehr im Superagenten: sonst würden Remote-Ollama-
+    // Konfigurationen umgangen und derselbe Fehler doppelt produziert.
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[superagent] LLM-Kette nicht verfügbar: ${describeLlmError(message)}`);
+    throw new Error(describeLlmError(message));
   }
 }
 

@@ -18,7 +18,7 @@
  * Tabelle platform_tokens — der Autopilot frischt vor Ablauf selbst nach.
  */
 
-import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { create, type AxiosInstance } from "axios";
 import {
   autoCardAssetUrl,
@@ -39,6 +39,7 @@ import {
   MAX_PUBLISH_ATTEMPTS,
   nextRetryAt,
   resolvePublishingMode,
+  evaluatePublishingReliabilityCircuit,
   type PlatformCredentials,
   type PublishingMode,
 } from "../lib/publishing-queue-logic";
@@ -411,6 +412,7 @@ export type AutopilotOutcome = {
   live: number;
   sandbox: number;
   failed: number;
+  circuitOpen?: boolean;
 };
 
 /** Verarbeitet alle faelligen Jobs eines Nutzers. Ehrlich bei jedem Fehler. */
@@ -531,6 +533,28 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
     .where(and(eq(publishingJobs.userOpenId, userOpenId), eq(publishingJobs.status, "geplant")))
     .orderBy(asc(publishingJobs.scheduledFor))
     .limit(AUTOPILOT_BATCH);
+
+  const recentSince = new Date(now.getTime() - 30 * 60_000);
+  const recentReliabilityRows = await db
+    .select({ status: publishingJobs.status })
+    .from(publishingJobs)
+    .where(
+      and(
+        eq(publishingJobs.userOpenId, userOpenId),
+        gte(publishingJobs.updatedAt, recentSince),
+        inArray(publishingJobs.status, ["veroeffentlicht", "fehlgeschlagen"]),
+      ),
+    )
+    .orderBy(desc(publishingJobs.updatedAt))
+    .limit(20);
+  const circuit = evaluatePublishingReliabilityCircuit({
+    published: recentReliabilityRows.filter((row) => row.status === "veroeffentlicht").length,
+    failed: recentReliabilityRows.filter((row) => row.status === "fehlgeschlagen").length,
+  });
+  if (circuit.open) {
+    console.warn(`[Publishing-Autopilot] Circuit offen fuer Nutzer: ${circuit.reason}`);
+    return { processed: 0, live: 0, sandbox: 0, failed: 0, circuitOpen: true };
+  }
 
   const credentials = readPlatformCredentialsFromEnv();
 

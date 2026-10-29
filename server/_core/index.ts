@@ -597,9 +597,12 @@ async function startServer() {
   const port = parseInt(process.env.PORT || "3000", 10);
   void restoreRouterState().catch(() => undefined);
   void initProviderAdmin().catch(() => undefined);
-  // Sprint 196 — Autonomer Route-Rotations-Agent: Zustand restaurieren,
-  // synchronen Spiegel fuer die Ketten-Sortierung setzen und Tick starten.
-  void restoreRouteRotationState().catch(() => undefined);
+  // Sprint 196 + Sprint 2/10 — Autonomer Route-Rotations-Agent:
+  // Zustand UND erster Health-Tick werden vor dem Listener abgeschlossen.
+  // So kann kein erster produktiver Request eine persistierte, inzwischen
+  // degradierte Primärroute überholen. restoreRouteRotationState behandelt
+  // DB-/Probe-Probleme intern best-effort; der Server bleibt startfähig.
+  await restoreRouteRotationState();
 
   // Sprint 169 — Port-Konflikt-Haertung (EADDRINUSE): Ohne diesen Handler
   // wirft der Listener eine unbehandelte Exception mit rohem Stack-Trace und
