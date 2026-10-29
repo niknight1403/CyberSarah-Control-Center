@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { router } from "expo-router";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AiCore } from "@/components/glass/ai-core";
@@ -66,6 +67,20 @@ export default function MediaStudioScreen() {
           />
         </View>
         <ScrollView contentContainerStyle={styles.content}>
+          <GlassCard accent="cyan" style={styles.formCard}>
+            <Text style={styles.heroTitle}>Commerce Studio · Content-Autopilot</Text>
+            <Text style={styles.body}>
+              Stripe-Produkte als Entwurf importieren, Produktkarten, Reels und Landingpages
+              automatisch vorbereiten und Preis-/Gewinnpotenzial analysieren.
+            </Text>
+            <Pressable
+              onPress={() => router.push("/commerce-studio" as never)}
+              accessibilityRole="button"
+              style={styles.generateButton}
+            >
+              <Text style={styles.generateButtonText}>Commerce Autopilot öffnen</Text>
+            </Pressable>
+          </GlassCard>
           <GlassCard accent="purple" glow={2} style={styles.hero}>
             <View style={styles.heroHeader}>
               <AiCore state={busy ? "thinking" : "idle"} size={38} />
