@@ -175,3 +175,82 @@ export function buildContentAssets(offer: CommerceOffer, bundle: CommerceBundle)
     approvalRequired: true,
   };
 }
+
+
+/** Conservative conversion uncertainty for randomised, independently observed price arms. */
+export type PriceTestArm = {
+  name: string;
+  priceCents: number;
+  visitors: number;
+  purchases: number;
+  refundsCents: number;
+  knownCostsCents: number;
+  completeCostAttribution: boolean;
+};
+export type PriceTestDecision = {
+  status: "NOT_READY" | "KEEP_BASELINE" | "REVIEW_WINNER";
+  reason: string;
+  baseline: string;
+  proposedWinner: string | null;
+  arms: Array<PriceTestArm & {
+    observedProfitCents: number | null;
+    profitPerVisitorCents: number | null;
+    conservativeProfitBandCents: [number, number] | null;
+  }>;
+  requiresHumanApproval: true;
+  applied: false;
+};
+function wilson(success: number, total: number): [number, number] {
+  if (total <= 0) return [0, 1];
+  const p = success / total, z = 1.96, z2 = z * z;
+  const centre = (p + z2 / (2 * total)) / (1 + z2 / total);
+  const span = z * Math.sqrt((p * (1 - p) + z2 / (4 * total)) / total) / (1 + z2 / total);
+  return [Math.max(0, centre - span), Math.min(1, centre + span)];
+}
+export function evaluatePriceTest(arms: PriceTestArm[], baselineName: string): PriceTestDecision {
+  const analysed = arms.map(arm => {
+    const valid = Number.isSafeInteger(arm.priceCents) && arm.priceCents > 0 &&
+      Number.isSafeInteger(arm.visitors) && arm.visitors >= 0 &&
+      Number.isSafeInteger(arm.purchases) && arm.purchases >= 0 &&
+      arm.purchases <= arm.visitors && Number.isFinite(arm.refundsCents) &&
+      arm.refundsCents >= 0 && Number.isFinite(arm.knownCostsCents) && arm.knownCostsCents >= 0;
+    const complete = valid && arm.completeCostAttribution;
+    const profit = complete
+      ? arm.purchases * arm.priceCents - arm.refundsCents - arm.knownCostsCents : null;
+    const band = complete && arm.visitors > 0
+      ? wilson(arm.purchases, arm.visitors) : null;
+    const averageNonSalesCosts = arm.visitors > 0
+      ? (arm.refundsCents + arm.knownCostsCents) / arm.visitors : 0;
+    return {
+      ...arm,
+      observedProfitCents: profit,
+      profitPerVisitorCents: profit === null || !arm.visitors ? null
+        : Number((profit / arm.visitors).toFixed(2)),
+      conservativeProfitBandCents: band === null ? null : [
+        Number((band[0] * arm.priceCents - averageNonSalesCosts).toFixed(2)),
+        Number((band[1] * arm.priceCents - averageNonSalesCosts).toFixed(2)),
+      ] as [number, number],
+    };
+  });
+  const result = (status: PriceTestDecision["status"], reason: string, proposedWinner: string | null): PriceTestDecision =>
+    ({ status, reason, baseline: baselineName, proposedWinner,
+      arms: analysed, requiresHumanApproval: true, applied: false });
+  if (analysed.length < 2 || new Set(analysed.map(a => a.name)).size !== analysed.length) {
+    return result("NOT_READY", "Mindestens zwei eindeutig benannte Testarme erforderlich.", null);
+  }
+  const base = analysed.find(a => a.name === baselineName);
+  if (!base) return result("NOT_READY", "Baseline nicht gefunden.", null);
+  if (analysed.some(a => a.visitors < 200 || a.purchases < 10 ||
+    a.conservativeProfitBandCents === null)) {
+    return result("NOT_READY", "Zu wenig Stichproben oder keine vollstaendige Kostenzuordnung.", null);
+  }
+  const baseUpper = base.conservativeProfitBandCents?.[1] ?? Number.POSITIVE_INFINITY;
+  const winner = analysed.filter(a => a.name !== baselineName &&
+    (a.conservativeProfitBandCents?.[0] ?? Number.NEGATIVE_INFINITY) > baseUpper)
+    .sort((a, b) => (b.profitPerVisitorCents ?? 0) - (a.profitPerVisitorCents ?? 0))[0];
+  if (!winner) return result("KEEP_BASELINE",
+    "Kein konservativ ueberzeugender Mehrgewinn gegenueber der Baseline belegt.", null);
+  return result("REVIEW_WINNER",
+    "Positive untere Konfidenzschranke ueber Baseline. Nur nach Fachpruefung und expliziter Freigabe testen/anpassen.",
+    winner.name);
+}
