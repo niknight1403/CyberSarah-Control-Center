@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelEvidenceFingerprint,decideChannelAutopilot} from "../lib/channel-autopilot-logic";
+import {buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelEvidenceFingerprint,decideChannelAutopilot} from "../lib/channel-autopilot-logic";
 const base={impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,confirmedRevenueCents:0,published:0,failed:0,activeExperiments:0,pendingContentDrafts:0,pendingRevenueDrafts:0};
 describe("Channel Autopilot",()=>{
  it("explores before pretending low-data optimization is known",()=>{expect(decideChannelAutopilot({...base,impressions:200}).lever).toBe("DISCOVERY");});
@@ -17,6 +17,14 @@ describe("Channel Autopilot",()=>{
    const c=channelEvidenceFingerprint({...base,impressions:1251,views:151,clicks:16});
    expect(a).toBe(b);
    expect(c).not.toBe(a);
+ });
+ it("applies learning backpressure before the draft queue becomes noise",()=>{
+   expect(channelAutopilotDraftGate({...base,pendingContentDrafts:3,pendingRevenueDrafts:2,activeExperiments:2}).allowed).toBe(true);
+   const queueBlocked=channelAutopilotDraftGate({...base,pendingContentDrafts:5,pendingRevenueDrafts:3,activeExperiments:1});
+   expect(queueBlocked.allowed).toBe(false);
+   expect(queueBlocked.reason).toContain("Backpressure");
+   const experimentsBlocked=channelAutopilotDraftGate({...base,activeExperiments:6});
+   expect(experimentsBlocked.allowed).toBe(false);
  });
  it("reports only confirmed revenue as truth",()=>{const h=channelAutopilotHealth({...base,confirmedRevenueCents:12345});expect(h.confirmedRevenueCents).toBe(12345);expect(h.truthMode).toBe("confirmed-revenue-only");});
 });
