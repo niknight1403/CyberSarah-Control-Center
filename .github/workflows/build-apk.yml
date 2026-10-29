@@ -166,7 +166,9 @@ jobs:
           ls -lh "$APK"
           SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
           APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort | tail -1)"
-          "$APKSIGNER" verify --print-certs "$APK" | head -3
+          set -euo pipefail
+          test -x "$APKSIGNER" || { echo "apksigner im Android SDK nicht gefunden"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | sed -n '1,10p'
 
       - name: Signiertes Release-AAB bauen (Google Play, = Admin-Variante)
         working-directory: android
@@ -182,7 +184,8 @@ jobs:
           AAB="android/app/build/outputs/bundle/release/app-release.aab"
           test -s "$AAB" || { echo "Release-AAB fehlt: $AAB"; exit 1; }
           ls -lh "$AAB"
-          jarsigner -verify "$AAB" 2>&1 | head -5
+          set -euo pipefail
+          jarsigner -verify "$AAB" 2>&1 | sed -n '1,8p'
           rm -f "$RUNNER_TEMP/cybersarah-release.keystore"
 
       - name: AAB als Workflow-Artefakt hochladen
