@@ -21,6 +21,7 @@ import { spawnSync } from "node:child_process";
 import {
   buildServiceCreateRequest,
   buildServiceEnv,
+  mergePersistedRenderEnvVars,
   buildWorkspaceEnv,
   findServiceByName,
   maskSecrets,
@@ -45,6 +46,27 @@ function env(name, fallback) {
 }
 
 async function apiFetch(path, options = {}) {
+  // A Render env-vars PUT REPLACES all settings. Preserve existing credentials
+  // in every deployment path, including custom domain/workspace updates.
+  if (options.method === "PUT" && /^\/services\/[^/]+\/env-vars$/.test(path)) {
+    const current = [];
+    let cursor = "";
+    for (let page = 0; page < 20; page++) {
+      const suffix = "?limit=100" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : "");
+      const fetched = await apiFetch(path + suffix);
+      if (!Array.isArray(fetched)) throw new Error("Render ENV-Abfrage fehlerhaft: Deploy abgebrochen.");
+      current.push(...fetched);
+      if (fetched.length < 100) break;
+      const next = fetched.at(-1)?.cursor;
+      if (typeof next !== "string" || !next || next === cursor || page === 19) {
+        throw new Error("Render ENV-Pagination unvollstaendig: Deploy aus Sicherheitsgruenden abgebrochen.");
+      }
+      cursor = next;
+    }
+    options = { ...options, body: JSON.stringify(
+      mergePersistedRenderEnvVars(current, JSON.parse(String(options.body))),
+    ) };
+  }
   const key = env("RENDER_API_KEY");
   const response = await fetch(`${API}${path}`, {
     ...options,
