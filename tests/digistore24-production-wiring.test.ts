@@ -20,8 +20,11 @@ describe("Digistore24 production wiring",()=>{
     const workflow=readFileSync(".github/workflows/render-deploy.yml","utf8");
     expect(deploy).toContain('"DIGISTORE24_API_KEY"');
     expect(deploy).toContain('"DIGISTORE24_IPN_SECRET"');
-    expect(workflow).toContain("DIGISTORE24_API_KEY=$D24_API_KEY");
-    expect(workflow).toContain("QUARANTINED");
-    expect(workflow).toContain("https://www.digistore24.com/api/call/ping");
+    const guard=readFileSync("scripts/digistore24-deploy-guard.mjs","utf8");
+    expect(workflow).toContain("node scripts/digistore24-deploy-guard.mjs");
+    expect(guard).toContain('appendEnv("DIGISTORE24_API_KEY",apiKey)');
+    expect(guard).toContain("INVALID_KEY_QUARANTINED");
+    expect(guard).toContain("D24_PROBE_UNAVAILABLE");
+    expect(guard).toContain("https://www.digistore24.com/api/call/listCommissions");
   });
 });
