@@ -16,6 +16,7 @@ import {
 import { getTelegramStatus } from "./_core/telegram";
 import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 import { getRouteRotationStatus } from "./route-rotation-agent";
+import { getAdministratorStripeHealth } from "./stripe-admin-health";
 
 /**
  * Sprint 66 — appStatusRouter: Laufzeit-Status und Konsolen-Logs als
@@ -54,6 +55,7 @@ export const appStatusRouter = router({
     const telegram = getTelegramStatus();
     const queue = getToolProxyQueueMetrics();
     const rotation = await getRouteRotationStatus();
+    const stripe = await getAdministratorStripeHealth();
     const configuredRoutes = rotation.routes.filter((route) => route.configured);
     const healthyRoutes = configuredRoutes.filter((route) => route.healthy);
     return {
@@ -75,6 +77,7 @@ export const appStatusRouter = router({
         recentReason: rotation.ledger[0]?.reason ?? null,
       },
       telegram,
+      stripe,
       queue,
       mcp: {
         configured: Boolean(process.env.MCP_SERVER_URL?.trim()),
