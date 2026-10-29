@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments } from "../drizzle/schema";
 import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
-import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
+import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
 import { materializeProductionSystem } from "./faceless-multichannel-service";
 
@@ -63,6 +63,15 @@ export async function runChannelAutopilot(){
   const result=await db.transaction(async tx=>{
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cybersarah-channel-autopilot'))`);
     const pending=await tx.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue).where(eq(draftQueue.status,"pending"));
+    const actualSnapshot={
+      ...snapshot,
+      pendingContentDrafts:pending.filter(x=>x.kind==="content").length,
+      pendingRevenueDrafts:pending.filter(x=>x.kind==="revenue-loop").length,
+    };
+    const draftGate=channelAutopilotDraftGate(actualSnapshot);
+    if(!draftGate.allowed){
+      return {generated:0,skipped:draftGate.reason};
+    }
     const recent=await tx.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue)
       .where(and(eq(draftQueue.createdBy,"channel-autopilot"),gte(draftQueue.createdAt,new Date(Date.now()-6*60*60_000))));
     const history=await tx.select({payload:draftQueue.payload}).from(draftQueue)
