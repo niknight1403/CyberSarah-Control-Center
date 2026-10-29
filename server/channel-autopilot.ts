@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments } from "../drizzle/schema";
 import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
-import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
+import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
 import { materializeProductionSystem } from "./faceless-multichannel-service";
 
@@ -57,13 +57,20 @@ export async function runChannelAutopilot(){
   const snapshot=await collectChannelAutopilotSnapshot();
   const decision=decideChannelAutopilot(snapshot);
   const cooldownBucket=Math.floor(Date.now()/(6*60*60_000));
-  const experiment=buildChannelExperimentDraft(decision,String(cooldownBucket));
-  const content=buildChannelContentDraft(decision);
+  const evidenceFingerprint=channelEvidenceFingerprint(snapshot);
+  const experiment=buildChannelExperimentDraft(decision,String(cooldownBucket),evidenceFingerprint);
+  const content=buildChannelContentDraft(decision,evidenceFingerprint);
   const result=await db.transaction(async tx=>{
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('cybersarah-channel-autopilot'))`);
     const pending=await tx.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue).where(eq(draftQueue.status,"pending"));
     const recent=await tx.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue)
       .where(and(eq(draftQueue.createdBy,"channel-autopilot"),gte(draftQueue.createdAt,new Date(Date.now()-6*60*60_000))));
+    const history=await tx.select({payload:draftQueue.payload}).from(draftQueue)
+      .where(eq(draftQueue.createdBy,"channel-autopilot")).orderBy(desc(draftQueue.createdAt)).limit(50);
+    const seenEvidence=new Set(history.map(x=>(x.payload as {evidenceFingerprint?:string}).evidenceFingerprint).filter(Boolean));
+    if(seenEvidence.has(evidenceFingerprint)){
+      return {generated:0,skipped:"no-material-new-evidence" as const};
+    }
     const revenueKeys=new Set([...pending,...recent].filter(x=>x.kind==="revenue-loop").map(x=>(x.payload as RevenueLoopDraftPayload).autopilotKey).filter(Boolean));
     const contentKeys=new Set([...pending,...recent].filter(x=>x.kind==="content").map(x=>(x.payload as {autopilotKey?:string}).autopilotKey).filter(Boolean));
     let generated=0;
@@ -75,7 +82,7 @@ export async function runChannelAutopilot(){
       await tx.insert(draftQueue).values({kind:"content",title:`Channel Autopilot · ${decision.lever}`,payload:content,status:"pending",createdBy:"channel-autopilot",dedupeKey:`channel-autopilot:content:${decision.lever}:${cooldownBucket}`}).onConflictDoNothing({target:draftQueue.dedupeKey});
       generated++;
     }
-    return {generated};
+    return {generated,skipped:null as string|null};
   });
   return {snapshot,health:channelAutopilotHealth(snapshot),decision,...result,externalActionsExecuted:0};
 }
