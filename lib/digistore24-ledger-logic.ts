@@ -18,6 +18,10 @@ export function boundedPageCount(input: unknown): number {
   return Number.isFinite(value) && value > 0 ? Math.min(20, Math.ceil(value)) : 1;
 }
 
+export function netConversionDelta(kind: D24EventKind): number {
+  return kind === "sale" ? 1 : -1;
+}
+
 export function commissionCents(value: unknown, kind: D24EventKind): number {
   const number = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
   if (!Number.isFinite(number)) throw new Error("D24_INVALID_AMOUNT");
