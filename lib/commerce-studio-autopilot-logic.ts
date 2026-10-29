@@ -17,7 +17,7 @@ export type CommerceBundle = {
   productCard: string;
   reelScript: string;
   landingCopy: string;
-  hookVariants: [string, string];
+  hookVariants: [string, string, string];
   cta: string;
   disclosure: string;
 };
