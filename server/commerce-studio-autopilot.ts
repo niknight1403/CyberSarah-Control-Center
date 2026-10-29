@@ -190,3 +190,36 @@ export async function runCommerceStudioCycle(maxOffers = 2) {
   return { created, generated: created.filter(row => row.generated).length,
     externalActionsExecuted: 0, priceChangesApplied: 0 };
 }
+
+
+/**
+ * Default 6-hourly, idempotent planning loop; no publishing or automatic pricing.
+ * Environment COMMERCE_STUDIO_AUTOPILOT=off disables it on deployment.
+ */
+const COMMERCE_TICK_MS = 6 * 60 * 60_000;
+let commerceTimer: ReturnType<typeof setInterval> | null = null;
+let commerceBusy = false;
+export async function commerceStudioTickOnce(): Promise<void> {
+  if (commerceBusy) return;
+  commerceBusy = true;
+  try {
+    const result = await runCommerceStudioCycle(2);
+    console.log("[Commerce Studio] content drafts: " + result.generated +
+      "; external actions: 0; price changes: 0.");
+  } catch (error) {
+    console.error("[Commerce Studio] autopilot: " +
+      (error instanceof Error ? error.message : "unknown error"));
+  } finally {
+    commerceBusy = false;
+  }
+}
+export function startCommerceStudioAutopilot(): void {
+  if (commerceTimer) return;
+  if (String(process.env.COMMERCE_STUDIO_AUTOPILOT ?? "on").toLowerCase() === "off") {
+    console.log("[Commerce Studio] disabled by COMMERCE_STUDIO_AUTOPILOT=off.");
+    return;
+  }
+  console.log("[Commerce Studio] 6-hour draft-only cycle enabled.");
+  void commerceStudioTickOnce();
+  commerceTimer = setInterval(() => void commerceStudioTickOnce(), COMMERCE_TICK_MS);
+}
