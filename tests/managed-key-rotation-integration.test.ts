@@ -178,6 +178,8 @@ describe(
     delete process.env.OPENAI_API_KEY;
     delete process.env.AI_OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
+    delete process.env.AI_GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     process.env.AI_GROQ_API_KEY = "groq-cloud-exhausted";
     process.env.AI_OLLAMA_BASE_URL = "http://ollama.test/v1";
     process.env.AI_OLLAMA_MODEL = "qwen2.5:1.5b";
