@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildContentAssets, commerceKey, evaluateOffers, simulatePricePlan, taggedOfferId, evaluatePriceTest,
+  buildContentAssets, commerceKey, evaluateOffers, simulatePricePlan, taggedOfferId, evaluatePriceTest, selectCommerceOffersForCycle,
   type CommerceOffer,
 } from "../lib/commerce-studio-autopilot-logic";
 
@@ -110,6 +110,19 @@ describe("Commerce Studio Autopilot: Sicherheit und Umsatzintelligenz", () => {
     expect(evidence.proposedWinner).toBe("B");
     expect(evidence.requiresHumanApproval).toBe(true);
     expect(evidence.applied).toBe(false);
+  });
+
+  it("verteilt die zyklische Content-Planung fair auf alle aktiven Angebote", () => {
+    const values = Array.from({ length: 7 }, (_, i) => ({
+      id: i + 1, status: i === 3 ? "paused" : "active",
+    }));
+    const first = selectCommerceOffersForCycle(values, 2, 0);
+    const second = selectCommerceOffersForCycle(values, 2, 1);
+    const third = selectCommerceOffersForCycle(values, 2, 2);
+    expect(first.map(v => v.id)).toEqual([1, 2]);
+    expect(second.map(v => v.id)).toEqual([3, 5]);
+    expect(third.map(v => v.id)).toEqual([6, 7]);
+    expect(new Set([...first, ...second, ...third].map(v => v.id)).size).toBe(6);
   });
 
 });
