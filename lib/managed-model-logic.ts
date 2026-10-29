@@ -66,6 +66,18 @@ export function resolveManagedModelCandidates(
           ? env.AI_GEMINI_MODEL?.trim()
           : undefined;
   if (override) return [override];
+
+  // Produktions-Härtung 2026-10-29: Ein explizites Ollama-Modell darf die
+  // lokale Route nicht dauerhaft blockieren, wenn der Tag auf dem Server
+  // entfernt/umbenannt wurde. Der konfigurierte Tag führt weiterhin die
+  // Liste an; bei 404/400 rotiert invokeLLM anschließend durch die bekannte
+  // Qwen-2.5-Flotte, die scripts/ollama-server-setup.sh installiert.
+  if (source === "local-ollama") {
+    const configured = env.AI_OLLAMA_MODEL?.trim() || env.OLLAMA_MODEL?.trim();
+    const preferred = pickQwenForTask("chat", QWEN_LADDER) ?? "qwen2.5:1.5b";
+    return [...new Set([configured, preferred, ...QWEN_LADDER].filter((value): value is string => Boolean(value)))];
+  }
+
   switch (source) {
     case "openrouter":
       return [...OPENROUTER_FREE_MODEL_CANDIDATES];

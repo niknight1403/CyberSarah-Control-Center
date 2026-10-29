@@ -61,6 +61,16 @@ describe("resolveManagedModel (Sprint 85)", () => {
     expect(resolveManagedModelCandidates("openai", {})).toEqual(["gpt-4o-mini"]);
   });
 
+  it("faellt bei einem veralteten Ollama-Override auf die installierte Qwen-2.5-Flotte zurueck", () => {
+    const candidates = resolveManagedModelCandidates("local-ollama", {
+      AI_OLLAMA_MODEL: "qwen3.6:27b",
+    });
+    expect(candidates[0]).toBe("qwen3.6:27b");
+    expect(candidates).toContain("qwen2.5:1.5b");
+    expect(candidates).toContain("qwen2.5:7b");
+    expect(new Set(candidates).size).toBe(candidates.length);
+  });
+
   it("liefert gpt-4o-mini, wenn weder Anforderung noch ENV ein Modell liefern", () => {
     expect(resolveManagedModel(undefined, "openai", {})).toBe("gpt-4o-mini");
     expect(resolveManagedModel("   ", "forge", { AI_MANAGED_MODEL: "   " })).toBe("gpt-4o-mini");
