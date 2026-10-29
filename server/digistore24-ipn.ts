@@ -21,12 +21,11 @@ import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { affiliateProducts, conversionEvents } from "../drizzle/schema";
 import { resolveDigistore24IpnSecret } from "../lib/digistore24-ipn-config";
-
-function cents(value: unknown): number {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.round(n * 100));
-}
+import {
+  commissionCents, hashedBuyerEmail, ledgerOrderKey,
+  minimalIpnPayload, validSha512Hex,
+  type D24EventKind,
+} from "../lib/digistore24-ledger-logic";
 
 function sha512(text: string): string {
   return crypto.createHash("sha512").update(text, "utf8").digest("hex");
@@ -38,8 +37,6 @@ export function buildIpnSignature(fields: Record<string, string>, passphrase: st
   const material = keys.map((k) => fields[k]).join("") + passphrase;
   return sha512(material);
 }
-
-type IpnResult = { status: number; body: Record<string, unknown> };
 
 export async function handleDigistore24Ipn(req: Request, res: Response): Promise<void> {
   const passphrase = resolveDigistore24IpnSecret();
@@ -54,26 +51,31 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
   }
   const expected = buildIpnSignature(fields, passphrase);
   const received = fields.sha_sign ?? "";
-  const valid = received.length === 128 && crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received.padEnd(128, "0").slice(0, 128), "hex"));
+  const valid = validSha512Hex(received) &&
+    crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received, "hex"));
   if (!valid) {
     res.status(401).json({ ok: false, detail: "Ungültige Signatur." });
     return;
   }
-  const orderId = fields.order_id ?? fields.order ?? "";
-  const eventType = (fields.event ?? fields.status ?? fields.sale_status ?? "sale").toString().slice(0, 64);
-  if (!orderId) {
-    res.status(400).json({ ok: false, detail: "order_id fehlt." });
-    return;
-  }
-  const productSlug = (fields.product_id ?? fields.product_name ?? "").toString().toLowerCase().replace(/[^a-z0-9-]+/g, "-").slice(0, 200);
-  const orderKey = `${orderId}:${eventType}`.slice(0, 200);
-  const amountCents = cents(fields.amount ?? fields.gross_amount);
-  const commissionCents = cents(fields.commission ?? fields.net_amount ?? fields.amount);
-  const currency = (fields.currency ?? "EUR").toString().slice(0, 8);
-  const buyerEmailHash = fields.buyer_email ? sha512(fields.buyer_email).slice(0, 128) : null;
+  const orderId = String(fields.order_id ?? fields.order ?? "").trim();
+  const eventType = String(fields.event ?? fields.status ?? fields.sale_status ?? "sale").slice(0,64);
+  if (!orderId) {res.status(400).json({ok:false,detail:"order_id fehlt."});return;}
+  const eventLower = eventType.toLowerCase();
+  const kind: D24EventKind = eventLower.includes("chargeback") ? "chargeback" :
+    eventLower.includes("refund") || eventLower.includes("return") ? "refund" : "sale";
+  const productSlug = String(fields.product_id ?? fields.product_name ?? "")
+    .toLowerCase().replace(/[^a-z0-9-]+/g,"-").slice(0,200);
+  const orderKey = ledgerOrderKey("ipn", `${orderId}:${eventType}`,kind);
+  let amountCents: number;
+  let commissionAmount: number;
+  try {
+    amountCents = commissionCents(fields.amount ?? fields.gross_amount ?? "0",kind);
+    commissionAmount = commissionCents(fields.commission ?? fields.net_amount ?? fields.amount ?? "0",kind);
+  } catch {res.status(400).json({ok:false,detail:"Ungültiger Betrag."});return;}
+  const currency = /^[A-Z]{3}$/.test(fields.currency ?? "EUR") ? (fields.currency ?? "EUR") : "EUR";
+  const buyerEmailHash = hashedBuyerEmail(fields.buyer_email, process.env.D24_CUSTOMER_HASH_SECRET || process.env.JWT_SECRET);
   const occurredAt = new Date();
-  const day = occurredAt.toISOString().slice(0, 10);
-
+  const day = occurredAt.toISOString().slice(0,10);
   let db: Awaited<ReturnType<typeof getDb>>;
   try {
     db = await getDb();
@@ -86,57 +88,30 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
     return;
   }
 
-  // Auto-Discovery: unbekanntes Produkt ehrlich anlegen (kein Fake-Titel).
-  if (productSlug) {
-    try {
-      await db.insert(affiliateProducts).values({
-        slug: productSlug,
-        title: (fields.product_name ?? productSlug).toString().slice(0, 300),
-        url: `https://www.digistore24.com/product/${productSlug}/`,
-        platform: "digistore24",
-        conversionCount: 0,
-        revenueCents: 0,
-      }).onConflictDoNothing({ target: affiliateProducts.slug });
-    } catch {
-      // Nicht fatal: Conversion zaehlt trotzdem.
-    }
-  }
-
   try {
-    const inserted = await db.insert(conversionEvents).values({
-      orderKey,
-      productSlug: productSlug || null,
-      eventType,
-      amountCents,
-      commissionCents,
-      currency,
-      buyerEmailHash,
-      rawPayload: fields,
-      occurredAt,
-    }).onConflictDoNothing({ target: conversionEvents.orderKey }).returning({ id: conversionEvents.id });
-
-    if (inserted.length === 0) {
-      res.status(200).type("text/plain").send(`OK duplicate_orderKey:${orderKey}`);
-      return;
-    }
-    if (productSlug) {
-      // Aggregation per SQL-Ausdruck (atomar, keine Race-Conditions, parameterisiert).
-      await db.execute(sql`
-        UPDATE affiliate_products
-        SET "conversionCount" = "conversionCount" + 1,
-            "revenueCents" = "revenueCents" + ${commissionCents},
-            "updatedAt" = now()
-        WHERE slug = ${productSlug}`);
-    }
-    await db.execute(sql`
-      INSERT INTO revenue_daily_stats ("day", "conversions", "revenueCents")
-      VALUES (${day}, 1, ${commissionCents})
-      ON CONFLICT ("day") DO UPDATE
-      SET "conversions" = revenue_daily_stats."conversions" + 1,
-          "revenueCents" = revenue_daily_stats."revenueCents" + ${commissionCents},
-          "updatedAt" = now()`);
-    res.status(200).type("text/plain").send(`OK recorded_orderKey:${orderKey}`);
-  } catch (error) {
-    res.status(503).json({ ok: false, detail: `Conversion nicht speicherbar: ${error instanceof Error ? error.message : String(error)}` });
+    const status = await db.transaction(async (tx) => {
+      if (productSlug) await tx.insert(affiliateProducts).values({
+        slug:productSlug,title:String(fields.product_name ?? productSlug).slice(0,300),
+        url:"https://www.digistore24.com/marketplace/",platform:"digistore24",conversionCount:0,revenueCents:0,
+      }).onConflictDoNothing({target:affiliateProducts.slug});
+      const inserted = await tx.insert(conversionEvents).values({
+        orderKey,productSlug:productSlug || null,eventType,amountCents,commissionCents:commissionAmount,
+        currency,buyerEmailHash,rawPayload:minimalIpnPayload(fields),occurredAt,
+      }).onConflictDoNothing({target:conversionEvents.orderKey}).returning({id:conversionEvents.id});
+      if (!inserted.length) return "duplicate" as const;
+      if (productSlug) await tx.execute(sql`
+        UPDATE affiliate_products SET "conversionCount"="conversionCount"+1,
+          "revenueCents"="revenueCents"+${commissionAmount},"updatedAt"=now() WHERE slug=${productSlug}`);
+      await tx.execute(sql`
+        INSERT INTO revenue_daily_stats ("day","conversions","revenueCents") VALUES (${day},1,${commissionAmount})
+        ON CONFLICT ("day") DO UPDATE SET
+        "conversions"=revenue_daily_stats."conversions"+1,
+        "revenueCents"=revenue_daily_stats."revenueCents"+${commissionAmount},"updatedAt"=now()`);
+      return "recorded" as const;
+    });
+    res.status(200).type("text/plain").send(status === "duplicate" ? "OK duplicate" : "OK recorded");
+  } catch {
+    // Never expose SQL, credentials or provider payloads to public callers.
+    res.status(503).json({ok:false,detail:"Conversion vorübergehend nicht speicherbar."});
   }
 }
