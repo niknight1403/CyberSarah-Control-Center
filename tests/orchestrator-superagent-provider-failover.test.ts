@@ -125,7 +125,7 @@ describe("runOrchestratorTask — Zero-Cost-Multi-Provider-Failover (Sprint 150)
     delete process.env.OLLAMA_BASE_URL;
     delete process.env.AI_OLLAMA_BASE_URL;
     delete process.env.OPENAI_API_KEY;
-    process.env.AI_GROQ_API_KEY = "groq-test-key-1234";
+    process.env.AI_GROQ_API_KEY = "x";
 
     vi.stubGlobal(
       "fetch",
