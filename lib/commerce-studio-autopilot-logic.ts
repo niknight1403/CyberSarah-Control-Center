@@ -108,7 +108,7 @@ export function evaluateOffers(
     return { id: offer.id, name: offer.name, status: offer.status,
       priceCents: offer.priceCents, impressions, clicks, leads, purchases, refunds,
       revenueCents, refundCents, costCents, contributionCents,
-      costCoverage: ownCosts.length ? "partially-recorded" : "unknown", evidence,
+      costCoverage: ownCosts.length ? ("partially-recorded" as const) : ("unknown" as const), evidence,
       ctrPct: ratioPct(clicks, impressions),
       clickToPurchasePct: ratioPct(purchases, clicks), nextAction, reason };
   }).sort((a, b) => a.id - b.id);
