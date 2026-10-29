@@ -13,6 +13,7 @@ import { filterDrawerItems } from "@/lib/drawer-search-logic";
 import { isDrawerSectionCollapsed, toggleDrawerSection, type DrawerCollapseState } from "@/lib/drawer-collapse-logic";
 import { RECENT_DRAWER_STORAGE_KEY, parseRecentRoutes, recordRecentRoute } from "@/lib/drawer-recent-logic";
 import type { DrawerRoute } from "@/lib/nav-drawer-logic";
+import { useMobileReadiness } from "@/hooks/use-mobile-readiness";
 
 export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pathname = usePathname() ?? "/";
@@ -21,6 +22,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
+  const readiness = useMobileReadiness();
   const [search, setSearch] = useState("");
   const [collapsedSections, setCollapsedSections] = useState<DrawerCollapseState>({});
   const [recentRoutes, setRecentRoutes] = useState<DrawerRoute[]>([]);
@@ -157,10 +159,18 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
             ))}
           </ScrollView>
 
-          <View style={styles.footer}>
-            <View style={styles.footerDot} />
-            <Text style={styles.footerText}>CyberSarah · Future Glass 2.0</Text>
-          </View>
+          <Pressable
+            style={styles.footer}
+            accessibilityRole="button"
+            accessibilityLabel={`API- und Datenbankstatus: ${readiness.view.detail} ${readiness.isChecking ? "Prüfung läuft." : "Erneut prüfen."}`}
+            accessibilityState={{ busy: readiness.isChecking, disabled: readiness.isChecking }}
+            disabled={readiness.isChecking}
+            onPress={readiness.refresh}
+          >
+            <View style={[styles.footerDot, { backgroundColor: glass.glassPalette[readiness.view.accent] }]} />
+            <Text style={styles.footerText}>API + Datenbank · {readiness.view.label}</Text>
+            <IconSymbol name="arrow.clockwise" size={16} color={glass.glassSurface.textSecondary} />
+          </Pressable>
         </Pressable>
       </Pressable>
     </Modal>
@@ -278,6 +288,7 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   badge: { backgroundColor: glass.accentAlpha("purple", 0.14), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { color: glass.glassPalette.purple, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
   footer: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -286,7 +297,7 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: glass.glassSurface.border,
   },
-  footerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: glass.glassPalette.green },
+  footerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: glass.glassPalette.cyan },
   footerText: { color: glass.glassSurface.textMuted, fontSize: 9, fontWeight: "700" },
   hamburger: {
     alignItems: "center",

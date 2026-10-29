@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { usePathname } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { resolveMobileHeader } from "@/lib/mobile-header-logic";
+import { useMobileReadiness } from "@/hooks/use-mobile-readiness";
 
 export function TopNavigation() {
   const pathname = usePathname() ?? "/";
@@ -14,6 +15,7 @@ export function TopNavigation() {
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const route = resolveMobileHeader(pathname);
+  const readiness = useMobileReadiness();
 
   return (
     <>
@@ -27,9 +29,21 @@ export function TopNavigation() {
             <Text style={styles.title} numberOfLines={1}>{route.title}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>{route.subtitle}</Text>
           </View>
-          <View style={styles.contextPill} accessibilityLabel="CyberSarah App">
-            <Text style={styles.contextText}>APP</Text>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`API- und Datenbankstatus: ${readiness.view.detail} ${readiness.isChecking ? "Prüfung läuft." : "Zum Aktualisieren tippen."}`}
+            accessibilityState={{ busy: readiness.isChecking, disabled: readiness.isChecking }}
+            disabled={readiness.isChecking}
+            onPress={readiness.refresh}
+            style={[styles.contextPill, {
+              borderColor: glass.accentAlpha(readiness.view.accent, 0.26),
+              backgroundColor: glass.accentAlpha(readiness.view.accent, 0.08),
+            }]}
+          >
+            <Text numberOfLines={1} style={[styles.contextText, { color: glass.glassPalette[readiness.view.accent] }]}>
+              {readiness.view.label}
+            </Text>
+          </Pressable>
         </View>
       </View>
       <NavDrawer {...navDrawer.drawerProps} />
@@ -96,6 +110,9 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     borderRadius: glass.glassRadii.pill,
     paddingHorizontal: 10,
     paddingVertical: 7,
+    minHeight: 44,
+    maxWidth: 116,
+    justifyContent: "center",
     backgroundColor: glass.accentAlpha("cyan", 0.08),
     borderWidth: 1,
     borderColor: glass.accentAlpha("cyan", 0.26),
