@@ -21,6 +21,7 @@ import { spawnSync } from "node:child_process";
 import {
   buildServiceCreateRequest,
   buildServiceEnv,
+  mergePersistedRenderEnvVars,
   buildWorkspaceEnv,
   findServiceByName,
   maskSecrets,
@@ -204,9 +205,13 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
   if (existing) {
     log(`Service "${serviceName}" existiert (${existing.id}) — setze ENV vollstaendig …`);
     const priorDeployIds = await deployIdsSnapshot(existing.id);
+    // Read and preserve all existing environment variables. Render PUT replaces all;
+    // omitted GitHub secrets must not silently erase a functioning Stripe setup.
+    const stored = await apiFetch(`/services/${existing.id}/env-vars?limit=100`);
+    const preserved = mergePersistedRenderEnvVars(stored, requestBody.envVars);
     await apiFetch(`/services/${existing.id}/env-vars`, {
       method: "PUT",
-      body: JSON.stringify(requestBody.envVars),
+      body: JSON.stringify(preserved),
     });
     const liveDeploy = await waitForLive(existing.id, priorDeployIds);
     if (liveDeploy) log(`Deploy ${liveDeploy.id ?? ""} live.`);
