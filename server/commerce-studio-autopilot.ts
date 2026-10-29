@@ -5,6 +5,7 @@
  */
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
+import { auditCommerceDraft } from "../lib/commerce-content-quality-logic";
 import Stripe from "stripe";
 import { mapStripeProductToDraft, readStripeCatalogue } from "../lib/commerce-catalog-logic";
 import { getDb } from "./db";
@@ -20,7 +21,7 @@ const bundleSchema = z.object({
   productCard: z.string().trim().min(30).max(3000),
   reelScript: z.string().trim().min(60).max(4000),
   landingCopy: z.string().trim().min(100).max(6000),
-  hookVariants: z.tuple([z.string().trim().min(8).max(300), z.string().trim().min(8).max(300)]),
+  hookVariants: z.tuple([z.string().trim().min(8).max(300), z.string().trim().min(8).max(300), z.string().trim().min(8).max(300)]),
   cta: z.string().trim().min(4).max(240),
   disclosure: z.string().trim().min(8).max(500),
 });
@@ -52,7 +53,7 @@ async function generateBundle(offer: CommerceOffer, audience: string): Promise<C
     "Zielgruppe: " + audience,
     "Katalogpreis (nur wenn belegt): " + (offer.priceCents === null ? "unbekannt" : (offer.priceCents / 100).toFixed(2) + " EUR"),
     "Zieladresse (nur wenn vorhanden): " + (offer.targetUrl ?? "noch nicht verbunden"),
-    "Valides JSON-Objekt mit productCard, reelScript, landingCopy, hookVariants (2 Strings), cta, disclosure.",
+    "Valides JSON-Objekt mit productCard, reelScript, landingCopy, hookVariants (genau 3 unterschiedliche Strings), cta, disclosure.",
     "Reel: 15-30 Sekunden, starker klarer Hook, Szenen mit Sprechertext und visuellen Hinweisen.",
     "Landing: Headline, Kundennutzen, Features, FAQ, CTA und transparente Hinweise.",
     "Produktkarte: kurze Fakten, Zielgruppe, Nutzen und Handlungsaufforderung.",
@@ -116,7 +117,9 @@ export async function createCommerceBundleDraft(offerId: number, audience = "deu
     .where(eq(draftQueue.dedupeKey, key)).limit(1);
   if (existing.length) return { generated: false, reason: "Paket heute bereits vorhanden." };
   const bundle = await generateBundle(offer, audience);
-  const payload = buildContentAssets(offer, bundle);
+  const audit = auditCommerceDraft(bundle, { priceCents: offer.priceCents, productUrl: offer.targetUrl });
+  if (!audit.passed) return { generated: false, reason: "Qualitaetspruefung: " + audit.blockers.join(" ") };
+  const payload = { ...buildContentAssets(offer, bundle), qualityWarnings: audit.warnings };
   const inserted = await db.transaction(async tx => {
     await tx.execute(sql.raw("SELECT pg_advisory_xact_lock(hashtext('cybersarah-commerce-studio-content'))"));
     const open = await tx.select({ id: draftQueue.id }).from(draftQueue)
