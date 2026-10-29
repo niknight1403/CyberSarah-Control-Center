@@ -28,6 +28,23 @@ describe("integration registry (Sprint 263)", () => {
     expect(getIntegrationStatus("stripe", {})?.missingEnv).toContain("STRIPE_SECRET_KEY");
   });
 
+  it("bewertet Digistore24 REST und IPN getrennt und akzeptiert den Legacy-Alias", () => {
+    const apiOnly = getIntegrationStatus("digistore24", { DIGISTORE24_API_KEY: "api" });
+    expect(apiOnly?.readiness).toBe("partial");
+    expect(apiOnly?.capabilityReadiness).toEqual({
+      "REST-API Sync": "ready",
+      "IPN-Verifikation": "not_configured",
+    });
+
+    const legacy = getIntegrationStatus("digistore24", {
+      DIGISTORE24_API_KEY: "api",
+      DIGISTORE24_IPN_PASSPHRASE: "legacy-secret",
+    });
+    expect(legacy?.readiness).toBe("ready");
+    expect(legacy?.missingEnv).toEqual([]);
+    expect(legacy?.capabilityReadiness?.["IPN-Verifikation"]).toBe("ready");
+  });
+
   it("jede Integration hat eine harte Ausfuehrungs-Grenze", () => {
     for (const status of getAllIntegrationStatuses(fullEnv)) {
       expect(status.executionBoundary.length).toBeGreaterThan(20);
