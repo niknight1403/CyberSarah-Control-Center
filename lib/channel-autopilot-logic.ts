@@ -101,3 +101,20 @@ export function channelEvidenceFingerprint(s:ChannelAutopilotSnapshot):string{
     `fail${safe(s.failed)}`,
   ].join(":");
 }
+
+
+/** Sprint 9/10 — Lern-Backpressure: Der Autopilot darf keine immer groessere
+ * Draft-/Experiment-Schlange produzieren, wenn Auswertung/Freigabe hinterherhinkt.
+ */
+export function channelAutopilotDraftGate(s:ChannelAutopilotSnapshot):{allowed:boolean;reason:string}{
+  const pending=safe(s.pendingContentDrafts)+safe(s.pendingRevenueDrafts);
+  const active=safe(s.activeExperiments);
+  const load=pending+active;
+  if(active>=6){
+    return {allowed:false,reason:`Lern-Backpressure: ${active} aktive Experimente — erst messen/abschliessen, dann neue starten.`};
+  }
+  if(pending>=8||load>=12){
+    return {allowed:false,reason:`Lern-Backpressure: ${pending} Pending-Drafts und ${active} aktive Experimente — Queue zuerst abbauen.`};
+  }
+  return {allowed:true,reason:"Lernkapazitaet verfuegbar."};
+}
