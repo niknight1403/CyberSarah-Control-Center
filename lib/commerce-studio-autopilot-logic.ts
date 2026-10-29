@@ -254,3 +254,17 @@ export function evaluatePriceTest(arms: PriceTestArm[], baselineName: string): P
     "Positive untere Konfidenzschranke ueber Baseline. Nur nach Fachpruefung und expliziter Freigabe testen/anpassen.",
     winner.name);
 }
+
+
+/** Fair deterministic round-robin instead of always selecting only the first two products. */
+export function selectCommerceOffersForCycle<T extends { id: number; status: string }>(
+  offers: T[], maxOffers: number, slot: number,
+): T[] {
+  const active = offers.filter(o => o.status === "active")
+    .sort((a, b) => a.id - b.id);
+  if (!active.length) return [];
+  const limit = Math.max(1, Math.min(3, Math.floor(maxOffers)));
+  const offset = ((Math.floor(slot) * limit) % active.length + active.length) % active.length;
+  return Array.from({ length: Math.min(limit, active.length) },
+    (_, i) => active[(offset + i) % active.length]!);
+}
