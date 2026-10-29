@@ -81,7 +81,7 @@ export default function CommerceStudioScreen() {
               return { generated: result.imported > 0, reason:
                 result.imported + " Produkte als unveroeffentlichte Entwuerfe importiert; " +
                 result.skipped + " bereits vorhanden. " +
-                (result.remainingPages ? "Weitere Produkte folgen in einem spaeteren Import." : "") +
+                (("remainingPages" in result && result.remainingPages) ? "Weitere Produkte folgen in einem spaeteren Import." : "") +
                 (result.status === "not-configured" ? " Stripe nicht konfiguriert." : "") };
             })}
           >
