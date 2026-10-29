@@ -1,5 +1,6 @@
 /** Admin-only Commerce Studio APIs. Never performs external publishing or pricing writes. */
 import { z } from "zod";
+import { evaluatePriceTest } from "../lib/commerce-studio-autopilot-logic";
 import { adminProcedure, router } from "./_core/trpc";
 import {
   commerceStudioOverview, createCommerceBundleDraft,
@@ -18,6 +19,18 @@ export const commerceStudioAutopilotRouter = router({
     offerId: z.number().int().positive(),
   })).mutation(({ input }) => createPriceExperimentDraft(input.offerId)),
   importStripe: adminProcedure.mutation(() => importStripeProductDrafts()),
+  evaluatePriceTest: adminProcedure.input(z.object({
+    baselineName: z.string().trim().min(1).max(80),
+    arms: z.array(z.object({
+      name: z.string().trim().min(1).max(80),
+      priceCents: z.number().int().positive(),
+      visitors: z.number().int().nonnegative(),
+      purchases: z.number().int().nonnegative(),
+      refundsCents: z.number().int().nonnegative(),
+      knownCostsCents: z.number().int().nonnegative(),
+      completeCostAttribution: z.boolean(),
+    })).min(2).max(6),
+  })).query(({ input }) => evaluatePriceTest(input.arms, input.baselineName)),
   runNow: adminProcedure.input(z.object({
     maxOffers: z.number().int().min(1).max(3).default(2),
   }).optional()).mutation(({ input }) => runCommerceStudioCycle(input?.maxOffers ?? 2)),
