@@ -5,6 +5,7 @@
  */
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
+import Stripe from "stripe";
 import { getDb } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { draftQueue, revenueOffers, revenueAttributionEvents, revenueCostEvents } from "../drizzle/schema";
@@ -222,4 +223,49 @@ export function startCommerceStudioAutopilot(): void {
   console.log("[Commerce Studio] 6-hour draft-only cycle enabled.");
   void commerceStudioTickOnce();
   commerceTimer = setInterval(() => void commerceStudioTickOnce(), COMMERCE_TICK_MS);
+}
+
+/**
+ * One-way import of genuine Stripe catalogue products into local DRAFT offers.
+ * Does not create prices, overwrite existing offers or expose payment credentials.
+ * This is intentionally a user-triggered action, not a scheduled write.
+ */
+export async function importStripeProductDrafts() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return { imported: 0, skipped: 0, status: "not-configured", details: ["STRIPE_SECRET_KEY fehlt."] };
+  const stripe = new Stripe(key);
+  const products = await stripe.products.list({ active: true, limit: 30, expand: ["data.default_price"] });
+  const db = await database();
+  return db.transaction(async tx => {
+    await tx.execute(sql.raw("SELECT pg_advisory_xact_lock(hashtext('cybersarah-commerce-stripe-import'))"));
+    const existing = await tx.select({ metadata: revenueOffers.metadata }).from(revenueOffers).limit(5000);
+    const known = new Set(existing.map(row => String(row.metadata.stripeProductId ?? "")).filter(Boolean));
+    let imported = 0, skipped = 0;
+    const details: string[] = [];
+    for (const product of products.data) {
+      if (known.has(product.id)) { skipped++; continue; }
+      const price = product.default_price;
+      const expanded = typeof price === "object" && price !== null ? price : null;
+      const amount = expanded?.currency === "eur" && expanded.unit_amount != null
+        ? expanded.unit_amount : null;
+      const priceId = typeof price === "string" ? price : expanded?.id ?? null;
+      await tx.insert(revenueOffers).values({
+        name: product.name.slice(0, 220),
+        kind: expanded?.recurring ? "subscription" : "digital",
+        status: "draft",
+        priceCents: amount,
+        marginPct: null,
+        targetUrl: null,
+        metadata: {
+          source: "stripe", stripeProductId: product.id, stripePriceId: priceId,
+          priceCurrency: expanded?.currency ?? "unknown",
+          importedAt: new Date().toISOString(), reviewRequired: true,
+        },
+      });
+      known.add(product.id);
+      imported++;
+      details.push(product.name.slice(0, 80));
+    }
+    return { imported, skipped, status: "draft-only", details, remainingPages: products.has_more };
+  });
 }
