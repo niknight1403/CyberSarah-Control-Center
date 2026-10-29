@@ -72,7 +72,7 @@ describe("Commerce Studio Autopilot: Sicherheit und Umsatzintelligenz", () => {
       productCard: "Eine ehrliche Produktbeschreibung",
       reelScript: "Skript mit Hook und CTA",
       landingCopy: "Landingpage mit Nutzen und FAQ",
-      hookVariants: ["Hook A", "Hook B"],
+      hookVariants: ["Hook A", "Hook B", "Hook C"],
       cta: "Mehr erfahren", disclosure: "Werbung, falls erforderlich",
     });
     expect(payload.assets.map(a => a.format)).toEqual([
