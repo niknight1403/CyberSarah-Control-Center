@@ -28,6 +28,7 @@ export type OfferPerformance = {
   impressions: number; clicks: number; leads: number; purchases: number;
   refunds: number; revenueCents: number; refundCents: number;
   costCents: number | null; contributionCents: number | null;
+  costCoverage: "unknown" | "partially-recorded";
   ctrPct: number | null; clickToPurchasePct: number | null;
   evidence: "missing" | "low" | "measured";
   nextAction: "MEASURE" | "TEST_HOOK" | "TEST_LANDING" | "REVIEW_SCALE" | "HOLD";
@@ -100,12 +101,14 @@ export function evaluateOffers(
       nextAction = "TEST_LANDING"; reason = "Landingpage, Angebot und Checkout testen.";
     } else if (evidence === "measured" && purchases >= 3 &&
       contributionCents !== null && contributionCents > 0) {
-      nextAction = "REVIEW_SCALE";
-      reason = "Gemessener positiver Deckungsbeitrag: Skalierungsversuch nur nach Freigabe.";
+      // Recorded costs do not prove that *all* marketing, fees and variable costs were captured.
+      nextAction = "MEASURE";
+      reason = "Positiver beobachteter Beitrag, aber vollstaendige Kostenabdeckung nicht nachgewiesen. Vor einer Skalierung Kosten und Refunds abgleichen.";
     }
     return { id: offer.id, name: offer.name, status: offer.status,
       priceCents: offer.priceCents, impressions, clicks, leads, purchases, refunds,
-      revenueCents, refundCents, costCents, contributionCents, evidence,
+      revenueCents, refundCents, costCents, contributionCents,
+      costCoverage: ownCosts.length ? "partially-recorded" : "unknown", evidence,
       ctrPct: ratioPct(clicks, impressions),
       clickToPurchasePct: ratioPct(purchases, clicks), nextAction, reason };
   }).sort((a, b) => a.id - b.id);
