@@ -13,7 +13,7 @@ import { invokeLLM } from "./_core/llm";
 import { draftQueue, revenueOffers, revenueAttributionEvents, revenueCostEvents } from "../drizzle/schema";
 import { DRAFT_MAX_PENDING_BY_KIND } from "../lib/draft-engine-logic";
 import {
-  buildContentAssets, commerceKey, evaluateOffers, simulatePricePlan,
+  buildContentAssets, commerceKey, evaluateOffers, simulatePricePlan, selectCommerceOffersForCycle,
   type CommerceBundle, type CommerceOffer,
 } from "../lib/commerce-studio-autopilot-logic";
 
@@ -180,8 +180,8 @@ export async function createPriceExperimentDraft(offerId: number) {
 }
 export async function runCommerceStudioCycle(maxOffers = 2) {
   const overview = await commerceStudioOverview();
-  const selected = overview.offers.filter(offer => offer.status === "active")
-    .slice(0, Math.min(3, Math.max(1, maxOffers)));
+  const slot = Math.floor(Date.now() / (6 * 60 * 60_000));
+  const selected = selectCommerceOffersForCycle(overview.offers, maxOffers, slot);
   const created: Array<{ offerId: number; generated: boolean; reason: string }> = [];
   for (const offer of selected) {
     try {
