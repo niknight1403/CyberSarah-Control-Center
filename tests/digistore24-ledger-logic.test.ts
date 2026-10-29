@@ -3,7 +3,7 @@ import {
   boundedPageCount,boundedSyncDays,commissionCents,commissionProductSlug,
   hashedBuyerEmail,ledgerOrderKey,minimalCommissionPayload,minimalIpnPayload,
   normalizeApiFailure,parseCommissionDate,safeProductUrl,shouldPollCommissions,
-  transactionIdentity,validSha512Hex,
+  transactionIdentity,validSha512Hex,netConversionDelta,
 } from "../lib/digistore24-ledger-logic";
 
 describe("Digistore24 deterministic ledger and production gates (10 sprints)",()=>{
@@ -11,6 +11,9 @@ describe("Digistore24 deterministic ledger and production gates (10 sprints)",()
     expect(commissionCents("12.34","sale")).toBe(1234);
     expect(commissionCents("-12.34","refund")).toBe(-1234);
     expect(commissionCents("12.34","chargeback")).toBe(-1234);
+    expect(netConversionDelta("sale")).toBe(1);
+    expect(netConversionDelta("refund")).toBe(-1);
+    expect(netConversionDelta("chargeback")).toBe(-1);
     expect(()=>commissionCents("NaN","sale")).toThrow("D24_INVALID_AMOUNT");
     expect(()=>commissionCents("9999999999","sale")).toThrow("D24_AMOUNT_OUT_OF_RANGE");
   });
