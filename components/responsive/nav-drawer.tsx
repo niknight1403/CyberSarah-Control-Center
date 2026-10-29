@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { AiCore } from "@/components/glass/ai-core";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -9,6 +10,9 @@ import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
 import { groupDrawerItems } from "@/lib/drawer-sections-logic";
 import { filterDrawerItems } from "@/lib/drawer-search-logic";
+import { isDrawerSectionCollapsed, toggleDrawerSection, type DrawerCollapseState } from "@/lib/drawer-collapse-logic";
+import { RECENT_DRAWER_STORAGE_KEY, parseRecentRoutes, recordRecentRoute } from "@/lib/drawer-recent-logic";
+import type { DrawerRoute } from "@/lib/nav-drawer-logic";
 
 export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pathname = usePathname() ?? "/";
@@ -18,11 +22,22 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const styles = useMemo(() => createStyles(glass), [glass]);
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
   const [search, setSearch] = useState("");
+  const [collapsedSections, setCollapsedSections] = useState<DrawerCollapseState>({});
+  const [recentRoutes, setRecentRoutes] = useState<DrawerRoute[]>([]);
   const sections = useMemo(() => groupDrawerItems(filterDrawerItems(search)), [search]);
   const dismiss = useCallback(() => {
     setSearch("");
     onClose();
   }, [onClose]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    let mounted = true;
+    void AsyncStorage.getItem(RECENT_DRAWER_STORAGE_KEY)
+      .then((raw) => { if (mounted) setRecentRoutes(parseRecentRoutes(raw)); })
+      .catch(() => { if (mounted) setRecentRoutes([]); });
+    return () => { mounted = false; };
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -35,10 +50,13 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
 
   const select = useCallback(
     (route: string) => {
+      const nextRecent = recordRecentRoute(recentRoutes, route);
+      setRecentRoutes(nextRecent);
+      void AsyncStorage.setItem(RECENT_DRAWER_STORAGE_KEY, JSON.stringify(nextRecent)).catch(() => {});
       dismiss();
       if (route !== pathname) router.push(route as never);
     },
-    [dismiss, pathname, router],
+    [dismiss, pathname, recentRoutes, router],
   );
 
   return (
@@ -75,12 +93,43 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
             style={styles.searchInput}
           />
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {!search.trim() && recentRoutes.length > 0 ? (
+              <View style={styles.sectionBlock}>
+                <Text accessibilityRole="header" style={styles.sectionLabel}>ZULETZT GEÖFFNET</Text>
+                <View style={styles.quickLinks}>
+                  {recentRoutes.map((route) => {
+                    const item = DRAWER_ITEMS.find((candidate) => candidate.route === route);
+                    if (!item) return null;
+                    return (
+                      <Pressable key={route} onPress={() => select(route)} accessibilityRole="link"
+                        accessibilityLabel={`${item.title} erneut öffnen`}
+                        style={({ pressed }) => [styles.quickLink, pressed && styles.itemPressed]}>
+                        <IconSymbol name={item.icon} color={glass.glassPalette.cyan} size={16} />
+                        <Text numberOfLines={1} style={styles.quickLinkText}>{item.title}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
             {sections.length === 0 ? (
               <Text accessibilityRole="text" style={styles.emptyMessage}>Keine Bereiche gefunden. Andere Suche versuchen.</Text>
             ) : null}
             {sections.map((section) => (
               <View key={section.key} style={styles.sectionBlock}>
-                <Text accessibilityRole="header" style={styles.sectionLabel}>{section.title}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${section.title} ${isDrawerSectionCollapsed(collapsedSections, section.key, search) ? "aufklappen" : "einklappen"}`}
+                  accessibilityState={{ expanded: !isDrawerSectionCollapsed(collapsedSections, section.key, search) }}
+                  disabled={Boolean(search.trim())}
+                  onPress={() => setCollapsedSections((current) => toggleDrawerSection(current, section.key))}
+                  style={styles.sectionHeader}
+                >
+                  <Text style={styles.sectionLabel}>{section.title}</Text>
+                  <IconSymbol name="chevron.right" size={18} color={glass.glassSurface.textMuted}
+                    style={{ transform: [{ rotate: isDrawerSectionCollapsed(collapsedSections, section.key, search) ? "0deg" : "90deg" }] }} />
+                </Pressable>
+                {!isDrawerSectionCollapsed(collapsedSections, section.key, search) ? (
                 <View style={styles.sectionItems}>
                 {section.items.map((item) => {
               const active = activeItem?.route === item.route;
@@ -103,6 +152,7 @@ export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () 
               );
                 })}
                 </View>
+                ) : null}
               </View>
             ))}
           </ScrollView>
@@ -190,6 +240,10 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
   emptyMessage: { color: glass.glassSurface.textSecondary, fontSize: 13, padding: 14, lineHeight: 20 },
   list: { gap: 12, paddingHorizontal: 10, paddingBottom: 18 },
   sectionBlock: { gap: 5 },
+  quickLinks: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingHorizontal: 7 },
+  quickLink: { minHeight: 44, maxWidth: "100%", paddingHorizontal: 10, flexDirection: "row", gap: 6, alignItems: "center", borderRadius: 11, borderWidth: 1, borderColor: glass.accentAlpha("cyan", 0.24), backgroundColor: glass.accentAlpha("cyan", 0.07) },
+  quickLinkText: { color: glass.glassSurface.textPrimary, fontSize: 12, fontWeight: "700", flexShrink: 1 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44, paddingRight: 12 },
   sectionItems: { gap: 5 },
   item: {
     alignItems: "center",

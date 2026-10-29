@@ -5,25 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
-
-const routes: Record<string, { title: string; subtitle: string }> = {
-  "/": { title: "Workspace", subtitle: "Code, Repository & Delivery" },
-  "/dashboard": { title: "Übersicht", subtitle: "Systemlage auf einen Blick" },
-  "/chat": { title: "Chat", subtitle: "KI-Dialog & Agentensteuerung" },
-  "/superagent": { title: "Superagent", subtitle: "Autonome Orchestrierung" },
-  "/business": { title: "Business", subtitle: "Revenue, Trading & Operations" },
-  "/revenue-os": { title: "Revenue OS", subtitle: "Wachstum & Monetarisierung" },
-  "/media-studio": { title: "Media Studio", subtitle: "Content & Kampagnen" },
-  "/account": { title: "Konto", subtitle: "Profil, Plan & Einstellungen" },
-  "/agent": { title: "Entwicklung", subtitle: "Agenten, Builds & Automatisierung" },
-  "/preview": { title: "Vorschau", subtitle: "App-Erlebnis prüfen" },
-  "/quality": { title: "Qualität", subtitle: "CI, Sicherheit & Release-Status" },
-  "/focus": { title: "Fokus", subtitle: "Prioritäten & Rückblick" },
-  "/ideas": { title: "Ideen-Inbox", subtitle: "Ideen prüfen und entwickeln" },
-  "/decisions": { title: "Entscheidungen", subtitle: "Entscheidungsverlauf & Nachweise" },
-  "/cyber-terminal": { title: "Terminal", subtitle: "Entwicklung & Diagnose" },
-  "/loop-engineering": { title: "Loop Engineering", subtitle: "Autonome Entwicklungszyklen" },
-};
+import { resolveMobileHeader } from "@/lib/mobile-header-logic";
 
 export function TopNavigation() {
   const pathname = usePathname() ?? "/";
@@ -31,7 +13,7 @@ export function TopNavigation() {
   const navDrawer = useNavDrawer();
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
-  const route = routes[pathname] ?? { title: "CyberSarah", subtitle: "AI Control Center" };
+  const route = resolveMobileHeader(pathname);
 
   return (
     <>
