@@ -60,8 +60,9 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
   const [busyId, setBusyId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const queueQuery = trpc.draftEngine.queue.useQuery(undefined, { retry: false, staleTime: 15_000 });
   const meQuery = trpc.auth.me.useQuery(undefined, { staleTime: 60_000 });
+  const isAdmin = meQuery.data?.role === "admin";
+  const queueQuery = trpc.draftEngine.queue.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 15_000 });
   const decideMutation = trpc.draftEngine.decide.useMutation();
   const runMutation = trpc.draftEngine.runNow.useMutation();
   const autoStarted = useRef(false);
@@ -127,7 +128,11 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
       <Text style={styles.subtitle}>
         {kinds.map((kind) => draftKindLabel(kind)).join(" · ")} — erzeugt von der täglichen Draft-Engine, warten auf deine Freigabe.
       </Text>
-      {queueQuery.isLoading || runMutation.isPending ? (
+      {meQuery.isLoading ? (
+        <Text style={styles.emptyNote}>Administratorrechte werden geprüft …</Text>
+      ) : !isAdmin ? (
+        <Text style={styles.emptyNote}>Zentrale Freigabe-Entwürfe sind nur für Administratoren zugänglich.</Text>
+      ) : queueQuery.isLoading || runMutation.isPending ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator color={glassPalette[accent]} />
           <Text style={styles.emptyNote}>{runMutation.isPending ? "Autonome Engine erzeugt fehlende Entwürfe …" : "Entwürfe werden geladen …"}</Text>
