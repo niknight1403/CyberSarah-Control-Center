@@ -38,12 +38,14 @@ export interface AndroidReleaseManifest {
 
 const VERSION_RE = /^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/;
 const SHA_RE = /^[a-f0-9]{40}$/i;
-const FINGERPRINT_RE = /Signer #\d+ certificate SHA-256 digest:\s*([a-fA-F0-9:]+)/g;
+const FINGERPRINT_RE = /(?:Signer #\d+|V\d+(?:\.\d+)? Signer):? certificate SHA-256 digest:\s*([a-fA-F0-9:]+)/g;
 
 export function parseApkCertificateFingerprint(output: string): string {
-  const fingerprints = Array.from(output.matchAll(FINGERPRINT_RE), match =>
+  // Different apksigner versions list either "Signer #1" or V1/V2
+  // signers individually. The SAME certificate may appear several times.
+  const fingerprints = Array.from(new Set(Array.from(output.matchAll(FINGERPRINT_RE), match =>
     match[1].replace(/:/g, "").toLowerCase(),
-  );
+  )));
   if (fingerprints.length !== 1 || !/^[a-f0-9]{64}$/.test(fingerprints[0])) {
     throw new Error("APK certificate fingerprint missing, malformed or ambiguous");
   }

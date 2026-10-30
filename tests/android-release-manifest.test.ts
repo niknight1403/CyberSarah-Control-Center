@@ -74,7 +74,13 @@ describe("Sprint 89 – Android release evidence", () => {
   it("rejects absent, malformed or ambiguous signing evidence", async () => {
     expect(() => parseApkCertificateFingerprint("Verifies\n")).toThrow();
     expect(() => parseApkCertificateFingerprint("Signer #1 certificate SHA-256 digest: invalid")).toThrow();
-    expect(() => parseApkCertificateFingerprint(signatureOutput + signatureOutput)).toThrow(/ambiguous/);
+    const v2Output = `V2 Signer: certificate SHA-256 digest: ${cert}`;
+    const v1Output = `V1 Signer: certificate SHA-256 digest: ${cert}`;
+    expect(parseApkCertificateFingerprint(v2Output)).toBe(cert);
+    expect(parseApkCertificateFingerprint(v1Output + "\n" + v2Output)).toBe(cert);
+    expect(() => parseApkCertificateFingerprint(
+      v1Output + "\n" + "V2 Signer: certificate SHA-256 digest: " + "cd".repeat(32),
+    )).toThrow(/ambiguous/);
     await expect(build({ verifyApk: () => "" })).rejects.toThrow(/fingerprint/);
     await expect(build({ verifyApk: () => { throw new Error("bad APK signature"); } })).rejects.toThrow(/bad APK/);
   });
