@@ -25,16 +25,26 @@ export async function collectPages<T extends { id: string }>(
   list: (args: { limit: number; starting_after?: string }) => Promise<{ data: T[]; has_more: boolean }>,
 ): Promise<{ rows: T[]; complete: boolean }> {
   const rows: T[] = [];
+  const visitedCursors = new Set<string>();
   let cursor: string | undefined;
   for (let page = 0; page < MAX_PAGES; page++) {
     const response = await list({ limit: PAGE_SIZE, ...(cursor ? { starting_after: cursor } : {}) });
-    if (!Array.isArray(response.data)) throw new Error("Stripe Katalogantwort unvollstaendig.");
+    if (!response || !Array.isArray(response.data) || typeof response.has_more !== "boolean") {
+      throw new Error("Stripe Katalogantwort unvollstaendig oder Pagination ungueltig.");
+    }
+    if (response.data.length > PAGE_SIZE || response.data.some(item => !item || typeof item.id !== "string" || !item.id)) {
+      throw new Error("Stripe lieferte ungueltige Katalogeintraege.");
+    }
+    // The cursor must advance. Duplicate page boundaries can be stale snapshots;
+    // never claim that the entire catalog has been read.
+    const last = response.data.at(-1)?.id;
+    if (cursor && response.data[0]?.id === cursor) return { rows, complete: false };
     rows.push(...response.data);
     if (!response.has_more) return { rows, complete: true };
-    const last = response.data.at(-1)?.id;
-    if (!last || last === cursor || page === MAX_PAGES - 1) {
+    if (!last || last === cursor || visitedCursors.has(last) || page === MAX_PAGES - 1) {
       return { rows, complete: false };
     }
+    visitedCursors.add(last);
     cursor = last;
   }
   return { rows, complete: false };
