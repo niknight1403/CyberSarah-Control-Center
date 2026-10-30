@@ -17,6 +17,12 @@ import { makeGrowthExecutionGuard } from "../lib/growth-execution-guard";
 import { compareGrowthWindows } from "../lib/growth-trend-logic";
 let runtime = initialGrowthRunState();
 const executionGuard = makeGrowthExecutionGuard();
+let lastMeasuredPlan: ReturnType<typeof decideGrowthPlan> | null = null;
+const NO_EVIDENCE_METRICS: GrowthMetrics = {
+  impressions: 0, views: 0, clicks: 0, leads: 0, purchases: 0, refunds: 0,
+  confirmedRevenueCents: 0, published: 0, failed: 0,
+  pendingContentDrafts: 0, pendingRevenueDrafts: 0, activeExperiments: 0,
+};
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
 function growthMetrics(snapshot: Snapshot): GrowthMetrics {
   return {
@@ -67,6 +73,7 @@ async function executeGrowthPulse(): Promise<{
   const snapshot = await collectChannelAutopilotSnapshot();
   const metrics = growthMetrics(snapshot);
   const plan = refundRiskPlan(metrics) ?? decideGrowthPlan(metrics);
+  lastMeasuredPlan = plan;
   const quality = auditGrowthMetrics(metrics, new Date(), snapshot);
   if (quality.status === "blocked" || snapshot.jobsTruncated) {
     return { generated: 0, skipped: "invalid-growth-data", focus: "DATA", plan,
@@ -108,9 +115,10 @@ async function executeGrowthPulse(): Promise<{
 /** Process-local observable lifecycle, independent of successful drafts. */
 export async function runGrowthPulse(): Promise<Awaited<ReturnType<typeof executeGrowthPulse>>> {
   if (!executionGuard.acquire()) {
-    const overview = await growthPulseOverview();
-    return { generated: 0, skipped: "run-already-in-progress", focus: overview.plan.focus,
-      plan: overview.plan, externalActionsExecuted: 0, executedAt: new Date().toISOString() };
+    // Never issue a second database query while the original Growth Pulse holds its lock.
+    const plan = lastMeasuredPlan ?? decideGrowthPlan(NO_EVIDENCE_METRICS);
+    return { generated: 0, skipped: "run-already-in-progress", focus: plan.focus,
+      plan, externalActionsExecuted: 0, executedAt: new Date().toISOString() };
   }
   runtime = growthRunStarted(runtime, new Date());
   try {
