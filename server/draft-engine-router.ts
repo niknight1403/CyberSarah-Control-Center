@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { decideDraft, listDraftQueue, runDraftEngine } from "./draft-engine";
 import { buildDraftQueueView, type DraftRow } from "../lib/draft-engine-logic";
-import { protectedProcedure, router } from "./_core/trpc";
+import { adminProcedure, router } from "./_core/trpc";
 
 function serializeRow(row: Awaited<ReturnType<typeof listDraftQueue>>[number]): DraftRow {
   return {
@@ -23,7 +23,7 @@ function serializeRow(row: Awaited<ReturnType<typeof listDraftQueue>>[number]): 
 
 export const draftEngineRouter = router({
   /** Freigabe-Queue: pending nach Art gruppiert + bereits entschieden. */
-  queue: protectedProcedure.query(async () => {
+  queue: adminProcedure.query(async () => {
     const rows = (await listDraftQueue(60)).map(serializeRow);
     const view = buildDraftQueueView(rows, Date.now());
     // Label-Funktionen bleiben Client-seitig (lib/draft-engine-logic) —
@@ -32,7 +32,7 @@ export const draftEngineRouter = router({
   }),
 
   /** Entscheidung ueber einen pending-Entwurf — nur Menschen. */
-  decide: protectedProcedure
+  decide: adminProcedure
     .input(z.object({ id: z.number().int().positive(), action: z.enum(["approve", "reject"]) }))
     .mutation(async ({ input, ctx }) => {
       const decidedBy = ctx.user?.openId ?? ctx.user?.email ?? "unbekannt";
@@ -42,10 +42,7 @@ export const draftEngineRouter = router({
     }),
 
   /** Admin-Trigger: Engine sofort ausfuehren (sonst taeglicher Cron). */
-  runNow: protectedProcedure.mutation(async ({ ctx }) => {
-    if (ctx.user?.role !== "admin") {
-      throw new Error("Nur Administratoren duerfen die Engine manuell starten.");
-    }
+  runNow: adminProcedure.mutation(async () => {
     const result = await runDraftEngine();
     return { ok: true as const, result };
   }),
