@@ -25,6 +25,8 @@ export default function AccountScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [stripeProductQuery, setStripeProductQuery] = useState("");
+  const [stripeShowInactive, setStripeShowInactive] = useState(false);
   const [localUser, setLocalUser] = useState<Awaited<ReturnType<typeof Auth.getUserInfo>>>(null);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const registerMutation = trpc.account.register.useMutation();
@@ -174,7 +176,24 @@ export default function AccountScreen() {
                         {stripeCatalog.data.problems.map(problem => (
                           <Text key={problem} style={styles.billingCopy}>Prüfen: {problem}</Text>
                         ))}
-                        {stripeCatalog.data.products.slice(0, 12).map(product => (
+                        <TextInput
+                          value={stripeProductQuery}
+                          onChangeText={setStripeProductQuery}
+                          placeholder="Stripe-Produkt suchen"
+                          accessibilityLabel="Stripe-Produktkatalog durchsuchen"
+                          style={styles.input}
+                          autoCapitalize="none"
+                        />
+                        <GlowButton
+                          label={stripeShowInactive ? "Nur aktive Produkte" : "Auch inaktive Produkte anzeigen"}
+                          accent="cyan" variant="secondary"
+                          onPress={() => setStripeShowInactive(!stripeShowInactive)}
+                        />
+                        {stripeCatalog.data.products.filter(product =>
+                          (stripeShowInactive || product.active) &&
+                          (product.name.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()) ||
+                           product.id.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()))
+                        ).slice(0, 12).map(product => (
                           <Text key={product.id} style={styles.billingCopy}>
                             {product.name} · {product.priceCount} Preise ·
                             {product.active ? " aktiv" : " inaktiv"}
@@ -183,7 +202,7 @@ export default function AccountScreen() {
                         ))}
                         <Text style={styles.billingCopy}>
                           Stripe bleibt read-only; Medienrechte und Affiliate-Freigabe sind nicht automatisch verifiziert.
-                          {stripeCatalog.data.productCount > 12 ? " Es werden die ersten zwölf Produkte angezeigt." : ""}
+                          {stripeCatalog.data.productCount > 12 ? " Es werden maximal zwölf passende Produkte angezeigt." : ""}
                         </Text>
                       </>
                     ) : null}
