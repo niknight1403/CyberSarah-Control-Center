@@ -14,6 +14,7 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
       "reel-storyboard","landing-outline","story-outline",
     ]);
     expect(result.payload.content).toContain("CyberSarah Digitalpaket");
+    expect(result.payload.commerceSource).toEqual({provider:"stripe",productId:"prod_sample",priceId:"price_sample"});
     expect(result.payload.reviewFlags).toEqual(expect.arrayContaining([...PRODUCT_CONTENT_REVIEW]));
     expect(result.payload.content).not.toMatch(/79[.,]00|garantiert|sofort kaufen/i);
   });
