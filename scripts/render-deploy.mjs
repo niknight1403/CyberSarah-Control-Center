@@ -30,6 +30,7 @@ import {
   renderApiError,
   validateDatabaseUrl,
   validateRenderApiKey,
+  verifyRenderLiveCommit,
 
 } from "../lib/render-deploy-logic.mjs";
 
@@ -453,6 +454,17 @@ async function deployApp() {
   const verifiedPublicUrl = configuredPublicUrl || publicUrl;
 
   await verifyPublic(verifiedPublicUrl, "/api/health");
+  // The HTTP health response might be from a stale revision. Compare the exact
+  // latest Render deploy commit against GitHub Actions' checked-out SHA.
+  const expectedSha = env("GITHUB_SHA", "");
+  if (expectedSha) {
+    const rawDeploys = await apiFetch(`/services/${service.id}/deploys?limit=1`);
+    const latest = Array.isArray(rawDeploys) ? rawDeploys[0] : null;
+    const result = verifyRenderLiveCommit(latest, expectedSha);
+    log(result.reason);
+  } else {
+    log("GITHUB_SHA fehlt: Render-Commit-Gate nur bei GitHub-Deployment aktiv.");
+  }
   log(`Deployment abgeschlossen: ${verifiedPublicUrl} (Web + API)`);
   log("Naechste Schritte: Custom Domain app.cybersarah-ki.com (Phase 5).");
 }
