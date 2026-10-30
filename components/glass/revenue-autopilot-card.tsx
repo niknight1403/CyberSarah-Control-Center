@@ -19,6 +19,8 @@ export function RevenueAutopilotCard() {
   const b2b = trpc.growthNetwork.b2bOverview.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
   const learning = trpc.growthNetwork.influencerLearning.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
   const learningLoop = trpc.growthNetwork.learningLoopStatus.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 15_000, refetchInterval: 60_000 });
+  const growth = trpc.controlCenterAutopilot.growthOverview.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
+  const growNow = trpc.controlCenterAutopilot.growthRunNow.useMutation();
   const run = trpc.controlCenterAutopilot.runNow.useMutation();
   const utils = trpc.useUtils();
 
@@ -65,6 +67,51 @@ export function RevenueAutopilotCard() {
             <Metric label="KI Personas" value={learning.data?.states.length ?? "—"} />
           </View>
 
+          <View style={styles.learningStrip}>
+            <Text style={styles.opportunityTitle}>24/7 Growth Pulse · Reichweite → Gewinn</Text>
+            <StatusChip
+              label={growth.isError ? "Growth-Fehler" : growth.isLoading ? "Analyse" : growth.data?.plan.focus ?? "Ohne Daten"}
+              accent={growth.isError ? "red" : growth.data?.plan.stage === "repair" ? "amber" : "cyan"}
+              live={Boolean(growth.data && !growth.isError)}
+            />
+            {growth.data ? (
+              <>
+                <Text style={styles.note}>{growth.data.plan.title} · {growth.data.plan.reason}</Text>
+                <View style={styles.metrics}>
+                  <Metric label="Impressionen" value={growth.data.metrics.impressions} />
+                  <Metric label="Klicks" value={growth.data.metrics.clicks} />
+                  <Metric label="Käufe" value={growth.data.metrics.purchases} />
+                  <Metric label="Netto-Umsatz*" value={(growth.data.metrics.confirmedRevenueCents / 100).toLocaleString("de-DE", { maximumFractionDigits: 2 }) + " €"} />
+                </View>
+                <Text style={styles.note}>Nächster Schritt: {growth.data.plan.nextActions[0]} · Datenbasis: {growth.data.plan.evidence}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Growth Pulse analysieren und Entwürfe vorbereiten"
+                  disabled={growNow.isPending}
+                  style={[styles.button, growNow.isPending && styles.buttonDisabled]}
+                  onPress={() => {
+                    setRunFeedback(null);
+                    growNow.mutate(undefined, {
+                      onSuccess: async result => {
+                        setRunFeedback(result.generated > 0
+                          ? result.generated + " neue Reichweiten-/Funnel-Entwürfe zur Freigabe vorbereitet."
+                          : "Growth Pulse: " + (result.skipped ?? "Keine neuen Daten – kein Entwurf erforderlich."));
+                        await Promise.all([
+                          utils.controlCenterAutopilot.growthOverview.invalidate(),
+                          utils.draftEngine.queue.invalidate(),
+                        ]);
+                      },
+                    });
+                  }}
+                >
+                  <Text style={styles.buttonText}>{growNow.isPending ? "Werte Signale aus …" : "Growth Pulse jetzt starten"}</Text>
+                </Pressable>
+                {growNow.error ? <Text style={styles.error}>{growNow.error.message}</Text> : null}
+                <Text style={styles.note}>*Käufe minus Refunds, kein belegter Gewinn. Veröffentlichungen, Werbeausgaben und Preisänderungen bleiben freigabepflichtig.</Text>
+              </>
+            ) : growth.isError ? <Text style={styles.error}>Growth Pulse nicht erreichbar: {growth.error.message}</Text>
+              : <Text style={styles.note}>Lese bestehende Reichweiten-, Funnel- und Publishing-Daten …</Text>}
+          </View>
           <View style={styles.learningStrip}>
             <StatusChip
               label={learningLoop.data?.enabled ? (learningLoop.data.lastError ? "KI-Lernen gestört" : "KI-Lernen 24/7") : "KI-Lernen aus"}
