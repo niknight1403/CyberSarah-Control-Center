@@ -32,4 +32,16 @@ describe("Growth Pulse Sprint 01 – trustworthy counters", () => {
     expect(report.reviewedAt).toBe("2026-10-30T00:00:00.000Z");
   });
 
+  it("warns about downstream conversions without corresponding upstream attribution", () => {
+    const report = auditGrowthMetrics({ ...base, impressions: 0, views: 20, clicks: 0, leads: 10, purchases: 3 });
+    expect(report.status).toBe("review");
+    expect(report.warnings.some(w => w.includes("ohne Impressionen"))).toBe(true);
+    expect(report.warnings.some(w => w.includes("ohne Klickdaten"))).toBe(true);
+  });
+  it("cannot claim complete purchase funnel if leads are not recorded", () => {
+    const report = auditGrowthMetrics({ ...base, leads: 0, purchases: 3 });
+    expect(report.status).toBe("review");
+    expect(report.warnings.some(w => w.includes("ohne Leads"))).toBe(true);
+  });
+
 });
