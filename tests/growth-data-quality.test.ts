@@ -24,4 +24,12 @@ describe("Growth Pulse Sprint 01 – trustworthy counters", () => {
     expect(report.warnings).toHaveLength(4);
     expect(report.errors).toHaveLength(0);
   });
+  it("signals truncated publishing history and rejected insight counts", () => {
+    const report = auditGrowthMetrics(base, new Date("2026-10-30T00:00:00Z"),
+      { jobsTruncated: true, invalidInsightValues: 3 });
+    expect(report.status).toBe("review");
+    expect(report.warnings).toHaveLength(2);
+    expect(report.reviewedAt).toBe("2026-10-30T00:00:00.000Z");
+  });
+
 });
