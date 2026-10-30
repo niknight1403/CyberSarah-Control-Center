@@ -8,7 +8,6 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 export type ArtifactKind = "development-apk" | "admin-apk" | "release-aab";
 
@@ -146,7 +145,8 @@ async function main() {
   console.log(`Verified Android release manifest: ${output}`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Works under tsx in both CommonJS (package.json has no "type") and ESM.
+if (process.argv[1] && /(?:^|[\\/])android-release-manifest\.(?:ts|js)$/.test(process.argv[1])) {
   main().catch(error => {
     console.error(`Android release evidence FAILED: ${error instanceof Error ? error.message : error}`);
     process.exitCode = 1;
