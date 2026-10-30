@@ -196,6 +196,43 @@ describe("Stripe-Webhook-Härtung (Sprint 278)", () => {
     vi.unstubAllEnvs();
   });
 
+  it("verwirft fehlgeschlagenen Webhook nicht und laesst Stripe ihn erneut zustellen", async () => {
+    vi.stubEnv("STRIPE_MODE", "test");
+    vi.stubEnv("STRIPE_SECRET_KEY", ["sk", "test", "localmocktoken123456789"].join("_"));
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_gueltig");
+    vi.stubEnv("APP_BASE_URL", "https://app.cybersarah-ki.com");
+    const { processStripeWebhook, StripeWebhookProcessingError } = await import("../server/billing");
+    const event = JSON.stringify({
+      id: "evt_retry_after_failure_2026", type: "invoice.payment_failed",
+      data: { object: { parent: null } },
+    });
+    const signature = signTestPayload(event);
+    const recorded = new Set<string>();
+    const mark = (id: string) => {
+      if (recorded.has(id)) return false;
+      recorded.add(id);
+      return true;
+    };
+    let calls = 0;
+    await expect(processStripeWebhook(Buffer.from(event), signature, {
+      markEventSeen: mark,
+      sendAlert: async () => { calls++; throw new Error("Ops notifier down"); },
+    })).rejects.toBeInstanceOf(StripeWebhookProcessingError);
+    expect(recorded.size).toBe(0);
+    const replay = await processStripeWebhook(Buffer.from(event), signature, {
+      markEventSeen: mark,
+      sendAlert: async () => { calls++; },
+    });
+    expect(replay.duplicate).toBe(false);
+    expect(calls).toBe(2);
+    expect(recorded.size).toBe(1);
+    const duplicate = await processStripeWebhook(Buffer.from(event), signature, {
+      markEventSeen: mark, sendAlert: async () => undefined,
+    });
+    expect(duplicate.duplicate).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
   it("sendet bei payment_failed einen Ops-Alert und zählt den Sync als erledigt", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_live_" + "a".repeat(25));
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_gueltig");
