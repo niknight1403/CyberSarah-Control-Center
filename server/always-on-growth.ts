@@ -7,7 +7,7 @@ import {
   channelAutopilotOverview, collectChannelAutopilotSnapshot, runChannelAutopilot,
 } from "./channel-autopilot";
 import {
-  decideGrowthPlan, growthPulseFingerprint, growthRateCard,
+  decideGrowthPlan, growthPulseFingerprint, growthRateCard, growthPulseEnabled,
   type GrowthMetrics,
 } from "../lib/always-on-growth-logic";
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
@@ -23,11 +23,15 @@ function growthMetrics(snapshot: Snapshot): GrowthMetrics {
     activeExperiments: snapshot.activeExperiments,
   };
 }
+export function isGrowthPulseRunning() {
+  return growthPulseEnabled(process.env.GROWTH_PULSE, process.env.CHANNEL_AUTOPILOT);
+}
 export async function growthPulseOverview() {
   const previous = await channelAutopilotOverview();
   const metrics = growthMetrics(previous.snapshot);
   return {
     status: "observe-measure-draft-approve" as const,
+    enabled: isGrowthPulseRunning(),
     plan: decideGrowthPlan(metrics),
     metrics,
     rates: growthRateCard(metrics),
@@ -48,6 +52,13 @@ export async function runGrowthPulse(): Promise<{
 }> {
   const snapshot = await collectChannelAutopilotSnapshot();
   const plan = decideGrowthPlan(growthMetrics(snapshot));
+  if (!isGrowthPulseRunning()) {
+    return {
+      generated: 0, skipped: "growth-pulse-disabled-by-admin",
+      focus: plan.focus, plan, externalActionsExecuted: 0,
+      executedAt: new Date().toISOString(),
+    };
+  }
   if (plan.focus === "QUEUE") {
     return {
       generated: 0, skipped: "approval-backpressure", focus: plan.focus, plan,
