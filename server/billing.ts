@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { createHash } from "node:crypto";
 import * as db from "./db";
 
 // ---------------------------------------------------------------------------
@@ -101,9 +102,22 @@ export function normalizeSubscriptionPrice(raw: unknown): SubscriptionPriceLike 
 }
 
 let resolvedPriceIdCache: string | null = null;
+let resolvedPriceScope: string | null = null;
+function currentPriceScope() {
+  // Restrict a cached checkout price to one Stripe account/mode and config.
+  // Hash the inputs: do not retain a plaintext Stripe key in the cache.
+  return createHash("sha256").update([
+    process.env.STRIPE_SECRET_KEY ?? "",
+    process.env.STRIPE_MODE ?? "live",
+    process.env.STRIPE_PRICE_ID ?? "",
+    process.env.STRIPE_PRICE_LOOKUP_KEY ?? "",
+    process.env.STRIPE_PRODUCT_MONATLICH ?? "",
+  ].join("|")).digest("hex");
+}
 
 export function resetResolvedPriceIdCache() {
   resolvedPriceIdCache = null;
+  resolvedPriceScope = null;
 }
 
 export function pickSubscriptionPriceId(
@@ -124,7 +138,10 @@ export function pickSubscriptionPriceId(
  * Erfolgreiche Auflösungen werden prozessweit gecacht.
  */
 export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
-  if (resolvedPriceIdCache) return resolvedPriceIdCache;
+  const scope = currentPriceScope();
+  if (resolvedPriceIdCache && resolvedPriceScope === scope) return resolvedPriceIdCache;
+  resolvedPriceIdCache = null;
+  resolvedPriceScope = null;
 
   const configured = process.env.STRIPE_PRICE_ID?.trim() ?? "";
   if (configured.startsWith("price_")) {
@@ -132,6 +149,7 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
       const price = normalizeSubscriptionPrice(await stripe.prices.retrieve(configured));
       if (price && price.active && price.type === "recurring") {
         resolvedPriceIdCache = configured;
+        resolvedPriceScope = scope;
         return configured;
       }
       console.warn(
@@ -164,6 +182,7 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
     );
     if (picked) {
       resolvedPriceIdCache = picked.id;
+      resolvedPriceScope = scope;
       console.info(
         `[Billing] Abo-Preis automatisch über STRIPE_PRICE_LOOKUP_KEY aufgelöst: ${picked.id}`,
       );
@@ -185,6 +204,7 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
     );
     if (picked) {
       resolvedPriceIdCache = picked.id;
+      resolvedPriceScope = scope;
       console.info(
         `[Billing] Abo-Preis automatisch über STRIPE_PRODUCT_MONATLICH aufgelöst: ${picked.id}`,
       );
@@ -332,13 +352,14 @@ export class StripeWebhookSignatureError extends Error {}
 export class StripeWebhookProcessingError extends Error {}
 
 /**
- * Sprint 278 — Best-Effort-Dedup bereits verarbeiteter Stripe-Event-IDs.
+ * Best-Effort-Dedup ERFOLGREICH verarbeiteter Stripe-Event-IDs.
  * Ehrlich: In-Memory pro Instanz — übersteht keinen Neustart und kennt
  * Nachbar-Instanzen nicht. Stripe-Events sind als Upsert idempotent
  * entworfen; das hier reduziert nur nutzlose Doppelarbeit.
  */
 const MAX_SEEN_EVENT_IDS = 500;
 const seenEventIds = new Set<string>();
+const processingEventIds = new Set<string>();
 function markEventSeen(id: string): boolean {
   if (seenEventIds.has(id)) return false;
   seenEventIds.add(id);
@@ -373,10 +394,15 @@ export async function processStripeWebhook(
   }
 
   const seen = deps?.markEventSeen ?? markEventSeen;
-  if (event.id && !seen(event.id)) {
+  // A failed delivery must NEVER be acknowledged as processed. Check only
+  // committed in-memory IDs here; mark after all required side effects finish.
+  if (event.id && !deps?.markEventSeen && seenEventIds.has(event.id)) {
     return { received: true, eventType: event.type, duplicate: true as const };
   }
-
+  if (event.id && processingEventIds.has(event.id)) {
+    throw new StripeWebhookProcessingError("Stripe-Event wird bereits verarbeitet; erneut zustellen.");
+  }
+  if (event.id) processingEventIds.add(event.id);
   try {
     if (isStripeSubscriptionEvent(event.type)) {
       await syncStripeSubscription(event.data.object as Stripe.Subscription);
@@ -415,8 +441,11 @@ export async function processStripeWebhook(
     throw new StripeWebhookProcessingError(
       error instanceof Error ? error.message : "Verarbeitung fehlgeschlagen.",
     );
+  } finally {
+    if (event.id) processingEventIds.delete(event.id);
   }
-  return { received: true, eventType: event.type, duplicate: false as const };
+  const firstDelivery = event.id ? seen(event.id) : true;
+  return { received: true, eventType: event.type, duplicate: !firstDelivery };
 }
 
 export type BillingUser = {
