@@ -17,6 +17,7 @@ import { getTelegramStatus } from "./_core/telegram";
 import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 import { getRouteRotationStatus } from "./route-rotation-agent";
 import { getAdministratorStripeHealth } from "./stripe-admin-health";
+import { readStripeAdminCatalog } from "./stripe-catalog-readonly";
 
 /**
  * Sprint 66 — appStatusRouter: Laufzeit-Status und Konsolen-Logs als
@@ -45,6 +46,10 @@ async function pingWorkspace(): Promise<number | null> {
 }
 
 export const appStatusRouter = router({
+  stripeCatalog: adminProcedure.query(async () => {
+    try { return await readStripeAdminCatalog(); }
+    catch { throw new Error("Stripe-Produktkatalog derzeit nicht lesbar. Admin-Konfiguration und Rechte pruefen."); }
+  }),
   /**
    * Sprint 196 — Aggregierter Integrations-Status fuer die Admin-UI:
    * LLM-Routen (Health/Reihenfolge), Telegram-Bruecke (maskiert) und
