@@ -31,7 +31,7 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
     db.select({active:sql<number>`count(*) filter (where ${revenueExperiments.name} like 'CHANNEL AUTO%')`}).from(revenueExperiments).where(eq(revenueExperiments.status,"learning")),
     db.select({content:sql<number>`count(*) filter (where ${draftQueue.kind}='content')`,revenue:sql<number>`count(*) filter (where ${draftQueue.kind}='revenue-loop')`}).from(draftQueue).where(eq(draftQueue.status,"pending")),
   ]);
-  const events=eventRows[0]??{impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,purchaseCents:0,refundCents:0};
+  const events=eventRows[0]??{lastEventAt:null,impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,purchaseCents:0,refundCents:0};
   const purchaseCents=Number(events.purchaseCents??0);
   const refundCents=Number(events.refundCents??0);
   const reach = mergeChannelReach(events.impressions, events.views,
