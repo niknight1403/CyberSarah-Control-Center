@@ -17,7 +17,12 @@ describe("control center autopilot", () => {
     counts: { nodes: 12, edges: 9, qualified: 3, customers: 2, partners: 2, optedOut: 0 },
     priorities: [], edges: [], autonomy: { discoveryAndScoring: true, unsolicitedOutreach: false, externalSendRequiresApproval: true },
   })) as never;
-  const growthDeps = { learnInfluencers, b2bOverview };
+  const growthPulse = vi.fn(async () => ({
+    generated: 1, skipped: null, focus: "REACH",
+    plan: { focus: "REACH" }, externalActionsExecuted: 0,
+    executedAt: "2026-10-30T00:00:00.000Z",
+  })) as never;
+  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse };
 
   it("orchestriert echte Scans, Revenue und Drafts in einem Lauf", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
@@ -31,6 +36,8 @@ describe("control center autopilot", () => {
     expect(result.realActions.join(" ")).toContain("Creator-Content");
     expect(result.realActions.join(" ")).toContain("Revenue");
     expect(result.growth).toMatchObject({ influencerPersonasLearned: 1, influencerExperimentsQueued: 1, b2bNodes: 12, b2bQualified: 3, b2bPartners: 2 });
+    expect(result.growthPulse?.generated).toBe(1);
+    expect(result.realActions.join(" ")).toContain("Reichweiten");
     expect(result.realActions.join(" ")).toContain("Influencer-Personas");
     expect(result.decision.action).toBe("VERIFY");
   });
@@ -43,6 +50,15 @@ describe("control center autopilot", () => {
     expect(result.deferred.join(" ")).toContain("429");
     expect(result.blocked).toEqual([]);
     expect(result.decision.action).toBe("RETRY");
+  });
+
+  it("meldet Growth-Ausfaelle als echte Blockade statt falschen Erfolg", async () => {
+    const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
+    const growth = vi.fn(async () => { throw new Error("Growth DB offline"); }) as never;
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts, learnInfluencers, b2bOverview, growth });
+    expect(result.ok).toBe(false);
+    expect(result.growthPulse).toBeNull();
+    expect(result.blocked.join(" ")).toContain("Growth DB offline");
   });
 
   it("meldet reale Blockaden statt sie als Erfolg zu simulieren", async () => {
