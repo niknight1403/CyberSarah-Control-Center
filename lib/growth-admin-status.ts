@@ -9,6 +9,10 @@ export function growthAdminStatus(
     detail: "Growth Pulse ist abgeschaltet. Keine neuen Growth-Entwuerfe." };
   if (quality.status === "blocked") return { label: "Messfehler", severity: "error" as const,
     detail: quality.errors[0] ?? "Eingabedaten bitte pruefen." };
+  if (runtime.lastOutcome === "blocked") return { label: "Autopilot blockiert", severity: "warning" as const,
+    detail: runtime.lastReason ?? "Blockade im letzten Analysezyklus." };
+  if (runtime.lastOutcome === "paused") return { label: "Letzter Lauf pausiert", severity: "muted" as const,
+    detail: "Die Growth-Freigabe war im letzten Lauf deaktiviert." };
   if (runtime.consecutiveFailures > 0) return { label: "Lauffehler", severity: "error" as const,
     detail: runtime.lastReason ?? "Letzten Growth-Lauf pruefen." };
   if (!runtime.completedAt) return { label: "Noch kein Lauf", severity: "warning" as const,

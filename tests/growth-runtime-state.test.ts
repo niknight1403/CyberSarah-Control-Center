@@ -23,4 +23,18 @@ describe("Sprint 05 – observable growth runtime", () => {
     expect(state.consecutiveFailures).toBe(0);
     expect(state.lastOutcome).toBe("no-change");
   });
+  it("marks operational stops and intentional pauses distinctly", () => {
+    const stopped = growthRunCompleted(initialGrowthRunState(),
+      { generated: 0, skipped: "attribution-review-required" }, at(1));
+    const paused = growthRunCompleted(initialGrowthRunState(),
+      { generated: 0, skipped: "growth-pulse-disabled-by-admin" }, at(1));
+    expect(stopped.lastOutcome).toBe("blocked");
+    expect(paused.lastOutcome).toBe("paused");
+  });
+  it("marks approval backlog as blocked rather than no-change success", () => {
+    const state = growthRunCompleted(initialGrowthRunState(),
+      { generated: 0, skipped: "approval-backpressure" }, at(1));
+    expect(state.lastOutcome).toBe("blocked");
+  });
+
 });

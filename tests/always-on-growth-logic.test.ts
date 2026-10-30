@@ -23,6 +23,7 @@ describe("24/7 Growth Pulse decision quality and safety", () => {
     expect(value.priceChangesAuthorized).toBe(false);
     expect(growthRateCard(empty).purchaseRatePct).toBeNull();
     expect(growthRateCard(empty).profitabilityVerified).toBe(false);
+    expect(growthRateCard(empty).revenueCurrency).toBe("unverified");
   });
   it("blocks queue floods before producing additional content", () => {
     expect(plan({ pendingContentDrafts: 5, pendingRevenueDrafts: 3 }).focus).toBe("QUEUE");

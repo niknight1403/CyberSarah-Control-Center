@@ -117,6 +117,8 @@ export function growthRateCard(input: GrowthMetrics) {
     leadRatePct: input.clicks > 0 ? round(100 * valid(input.leads) / input.clicks) : null,
     purchaseRatePct: input.leads > 0 ? round(100 * valid(input.purchases) / input.leads) : null,
     knownNetRevenueCents: input.confirmedRevenueCents,
+    revenueCurrency: "unverified" as const,
+    source: "attribution-events" as const,
     profitabilityVerified: false as const,
   };
 }

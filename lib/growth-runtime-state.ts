@@ -1,7 +1,7 @@
 export type GrowthRunState = {
   startedAt: string | null;
   completedAt: string | null;
-  lastOutcome: "none" | "drafts" | "no-change" | "blocked" | "failed";
+  lastOutcome: "none" | "drafts" | "no-change" | "blocked" | "paused" | "failed";
   lastReason: string | null;
   consecutiveFailures: number;
   runsObserved: number;
@@ -17,10 +17,12 @@ export function growthRunCompleted(
   state: GrowthRunState, result: { generated: number; skipped: string | null },
   time: Date,
 ): GrowthRunState {
+  const paused = result.skipped === "growth-pulse-disabled-by-admin";
   const blocked = result.skipped === "invalid-growth-data" ||
-    result.skipped === "incomplete-job-history" || result.skipped === "refund-risk-review";
+    result.skipped === "incomplete-job-history" || result.skipped === "refund-risk-review" ||
+    result.skipped === "attribution-review-required" || result.skipped === "approval-backpressure";
   return { ...state, completedAt: time.toISOString(),
-    lastOutcome: blocked ? "blocked" : result.generated > 0 ? "drafts" : "no-change",
+    lastOutcome: paused ? "paused" : blocked ? "blocked" : result.generated > 0 ? "drafts" : "no-change",
     lastReason: result.skipped, consecutiveFailures: 0 };
 }
 export function growthRunFailed(state: GrowthRunState, time: Date): GrowthRunState {

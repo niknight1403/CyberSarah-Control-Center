@@ -27,4 +27,12 @@ describe("Sprint 09: truthful admin growth status", () => {
     expect(status.label).toBe("Analyse aktiv");
     expect(status.detail).toContain("Belege");
   });
+  it("shows a stopped revenue growth cycle even when it technically returned HTTP 200", () => {
+    expect(growthAdminStatus(clean, { ...runtime, lastOutcome: "blocked",
+      lastReason: "approval-backpressure" }, true).label).toBe("Autopilot blockiert");
+  });
+  it("remembers the last paused run even if the environment is re-enabled", () => {
+    expect(growthAdminStatus(clean, { ...runtime, lastOutcome: "paused" }, true).label).toBe("Letzter Lauf pausiert");
+  });
+
 });
