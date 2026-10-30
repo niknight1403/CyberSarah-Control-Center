@@ -48,6 +48,7 @@ import { restoreRouteRotationState } from "../route-rotation-agent";
 import { runDraftEngine } from "../draft-engine";
 import { runRevenueAutopilot } from "../revenue-autopilot";
 import { runControlCenterAutopilot } from "../control-center-autopilot";
+import { redactAutopilotLog } from "../../lib/autopilot-log-safety";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -423,13 +424,13 @@ async function startServer() {
       const result = await runControlCenterAutopilot();
       console.info("[Control-Center-Autopilot] Lauf abgeschlossen:", JSON.stringify({
         ok: result.ok,
-        realActions: result.realActions,
-        blocked: result.blocked,
+        realActions: result.realActions.map(redactAutopilotLog),
+        blocked: result.blocked.map(redactAutopilotLog),
       }));
       res.status(result.ok ? 200 : 207).json({ ok: result.ok, result, timestamp: Date.now() });
     } catch (error) {
-      console.error("[Control-Center-Autopilot] Lauf fehlgeschlagen:", error);
-      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+      console.error("[Control-Center-Autopilot] Lauf fehlgeschlagen:", redactAutopilotLog(error));
+      res.status(500).json({ ok: false, error: "Autopilot-Lauf fehlgeschlagen. Administrator-Log pruefen." });
     }
   });
 
