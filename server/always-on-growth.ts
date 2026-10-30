@@ -31,7 +31,7 @@ export function isGrowthPulseRunning() {
 export async function growthPulseOverview() {
   const previous = await channelAutopilotOverview();
   const metrics = growthMetrics(previous.snapshot);
-  const quality = auditGrowthMetrics(metrics);
+  const quality = auditGrowthMetrics(metrics, new Date(), previous.snapshot);
   return {
     status: "observe-measure-draft-approve" as const,
     enabled: isGrowthPulseRunning(),
@@ -57,8 +57,8 @@ export async function runGrowthPulse(): Promise<{
   const snapshot = await collectChannelAutopilotSnapshot();
   const metrics = growthMetrics(snapshot);
   const plan = refundRiskPlan(metrics) ?? decideGrowthPlan(metrics);
-  const quality = auditGrowthMetrics(metrics);
-  if (quality.status === "blocked") {
+  const quality = auditGrowthMetrics(metrics, new Date(), snapshot);
+  if (quality.status === "blocked" || snapshot.jobsTruncated) {
     return { generated: 0, skipped: "invalid-growth-data", focus: "DATA", plan,
       externalActionsExecuted: 0, executedAt: new Date().toISOString() };
   }
