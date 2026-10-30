@@ -16,6 +16,7 @@ import { eq, desc, gte, and, sql, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { openai, openaiVerfuegbar } from "../lib/openaiClient";
 import { getStripeClient } from "../lib/stripeClient";
+import { agentStripeWritePolicy } from "../lib/stripeAgentSafety";
 import { AgentBase, type Aufgabe, type AufgabeErgebnis } from "./AgentBase";
 
 // 50+ Affiliate + Eigenprodukt-Programme für maximale Revenue-Diversifikation
@@ -113,8 +114,12 @@ export class RevenueAnalystAgent extends AgentBase {
       this.abandonedCartRecovery(),
     ]);
 
-    const erfolgreich = ergebnisse.filter(r => r.status === "fulfilled").length;
-    const fehlgeschlagen = ergebnisse.filter(r => r.status === "rejected").length;
+    const erfolgreich = ergebnisse.filter(r => r.status === "fulfilled" &&
+      r.value.success && r.value.metadaten?.skipped !== true).length;
+    const uebersprungen = ergebnisse.filter(r => r.status === "fulfilled" &&
+      r.value.metadaten?.skipped === true).length;
+    const fehlgeschlagen = ergebnisse.filter(r => r.status === "rejected" ||
+      (r.status === "fulfilled" && !r.value.success)).length;
 
     if (this.agentId) {
       await db.insert(agentLogsTable).values({
@@ -122,15 +127,15 @@ export class RevenueAnalystAgent extends AgentBase {
         agentName: "Revenue Analyst Agent",
         aktion: "auto_action_all_v5",
         status: fehlgeschlagen > 0 ? "warning" : "ok",
-        nachricht: `${erfolgreich}/7 Aktionen erfolgreich, ${fehlgeschlagen} fehlgeschlagen`,
-        details: { erfolgreich, fehlgeschlagen, timestamp: new Date().toISOString() },
+        nachricht: `${erfolgreich}/6 Aktionen, ${uebersprungen} freigabepflichtig, ${fehlgeschlagen} fehlgeschlagen`,
+        details: { erfolgreich, uebersprungen, fehlgeschlagen, timestamp: new Date().toISOString() },
       });
     }
 
     return {
       success: true,
-      message: `Auto-Action-All: ${erfolgreich}/7 Aktionen ausgeführt`,
-      metadaten: { erfolgreich, fehlgeschlagen },
+      message: `Auto-Action-All: ${erfolgreich}/6 ausgeführt, ${uebersprungen} wegen Freigabe übersprungen`,
+      metadaten: { erfolgreich, uebersprungen, fehlgeschlagen },
     };
   }
 
@@ -138,6 +143,10 @@ export class RevenueAnalystAgent extends AgentBase {
   // DYNAMIC PRICING V3: Erstellt/aktualisiert Stripe-Preise alle 15 Min
   // ═══════════════════════════════════════════════════════════════════
   private async dynamicPricing(): Promise<AufgabeErgebnis> {
+    const policy = agentStripeWritePolicy(process.env);
+    if (!policy.allowed) return { success: true, message: policy.reason, metadaten: {
+      skipped: true, stripeWrites: 0, requiresApproval: true, action: "dynamicPricing",
+    } };
     logger.info("💰 RevenueAnalyst-V5: Dynamic Pricing");
     const stripe = getStripeClient();
 
@@ -196,6 +205,10 @@ export class RevenueAnalystAgent extends AgentBase {
   // AUTO CROSS-SELL V3: Erstellt Stripe-Produkte + Payment-Links
   // ═══════════════════════════════════════════════════════════════════
   private async autoCrossSell(): Promise<AufgabeErgebnis> {
+    const policy = agentStripeWritePolicy(process.env);
+    if (!policy.allowed) return { success: true, message: policy.reason, metadaten: {
+      skipped: true, stripeWrites: 0, requiresApproval: true, action: "autoCrossSell",
+    } };
     logger.info("🔄 RevenueAnalyst-V5: Auto Cross-Sell");
     const stripe = getStripeClient();
 
@@ -248,6 +261,10 @@ export class RevenueAnalystAgent extends AgentBase {
   // AUTO DISCOUNT: Erstellt 20%-Rabatt-Aktionen bei schwacher Perf.
   // ═══════════════════════════════════════════════════════════════════
   private async autoDiscount(): Promise<AufgabeErgebnis> {
+    const policy = agentStripeWritePolicy(process.env);
+    if (!policy.allowed) return { success: true, message: policy.reason, metadaten: {
+      skipped: true, stripeWrites: 0, requiresApproval: true, action: "autoDiscount",
+    } };
     logger.info("🏷️ RevenueAnalyst-V5: Auto Discount");
     const stripe = getStripeClient();
 
