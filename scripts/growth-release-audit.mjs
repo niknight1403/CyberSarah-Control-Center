@@ -16,6 +16,13 @@ const checks = [
   ["refund safety gate", file("server/always-on-growth.ts").includes("refund-risk-review")],
   ["cron never logs raw response", !file(".github/workflows/control-center-autopilot.yml").includes('cat "$body_file"')],
   ["cron has bearer authentication", file(".github/workflows/control-center-autopilot.yml").includes('Authorization: Bearer $TOKEN')],
+  ["unverified attribution currency is explicit", file("lib/always-on-growth-logic.ts").includes('revenueCurrency: "unverified"')],
+  ["global operator stop", file("server/control-center-autopilot.ts").includes("assertControlCenterAutopilotEnabled(process.env)")],
+  ["DB-independent admin diagnostic", file("server/control-center-autopilot-router.ts").includes("growthRuntimeStatus: adminProcedure")],
+  ["stale attribution warning before growth", file("lib/growth-data-quality.ts").includes("growthEvidenceFreshness(")],
+  ["data ambiguity stops experiments", file("server/always-on-growth.ts").includes('skipped: "attribution-review-required"')],
+  ["safe incident logs", file("server/_core/index.ts").includes("blocked: result.blocked.map(redactAutopilotLog)")],
+  ["no redundant DB read for concurrency", !file("server/always-on-growth.ts").includes("const overview = await growthPulseOverview();")],
 ];
 const failures = checks.filter(([, ok]) => !ok).map(([label]) => label);
 console.log("CyberSarah Growth release audit: " + (checks.length - failures.length) + "/" + checks.length + " static safety gates.");
