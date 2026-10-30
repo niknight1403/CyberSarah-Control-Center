@@ -14,6 +14,11 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
       "reel-storyboard","landing-outline","story-outline",
     ]);
     expect(result.payload.content).toContain("CyberSarah Digitalpaket");
+    const reel = result.payload.assets?.find(asset => asset.format === "reel-storyboard");
+    expect(reel?.content).toContain("00–03 s | Sprechertext:");
+    expect(reel?.content).toContain("Untertitel:");
+    expect(reel?.content).toContain("Dauer: 27 Sekunden");
+    expect(reel?.content).toContain("kein gerendertes Video oder Audio");
     expect(result.payload.commerceSource).toEqual({provider:"stripe",productId:"prod_sample",priceId:"price_sample"});
     expect(result.payload.reviewFlags).toEqual(expect.arrayContaining([...PRODUCT_CONTENT_REVIEW]));
     expect(result.payload.content).not.toMatch(/79[.,]00|garantiert|sofort kaufen/i);
