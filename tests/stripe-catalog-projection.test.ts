@@ -43,4 +43,29 @@ describe("Sprints 21-23 and 27 – Stripe catalogue correctness", () => {
     const x=projectStripeCatalog([product], [], true, false);
     expect(x.products[0].issues).toContain("Standardpreis nicht im erfassten Preiskatalog");
   });
+  it("marks duplicate product names and unsupported urgency/discount copy for admin review", () => {
+    const name="🔥 -20%: Community Membership — NUR HEUTE";
+    const x=projectStripeCatalog([
+      {...product,id:"prod_1",name,default_price:null},
+      {...product,id:"prod_2",name,default_price:null},
+    ], [],true,true);
+    expect(x.products[0].issues.some(v=>v.includes("Produktname mehrfach"))).toBe(true);
+    expect(x.products[0].issues.some(v=>v.includes("Rabattversprechen"))).toBe(true);
+    expect(x.products[1].issues.some(v=>v.includes("Rabattversprechen"))).toBe(true);
+  });
+  it("distinguishes one-time membership offers from verified recurring subscriptions", () => {
+    const x=projectStripeCatalog([{...product,name:"Community Membership"}],
+      [{...monthly,type:"one_time",recurring:null,tax_behavior:"unspecified"}],true,true);
+    expect(x.products[0].issues).toContain("Mitgliedschaft ohne wiederkehrenden Stripe-Preis");
+    expect(x.products[0].issues).toContain("Steuerbehandlung mindestens einer Preisvariante pruefen");
+    const recurring=projectStripeCatalog([{...product,name:"Community Membership"}],[monthly],true,true);
+    expect(recurring.products[0].issues).not.toContain("Mitgliedschaft ohne wiederkehrenden Stripe-Preis");
+  });
+  it("never alleges a missing recurring price when the price catalogue is incomplete", () => {
+    const x=projectStripeCatalog([{...product,name:"Community Membership"}],
+      [{...monthly,type:"one_time",recurring:null}],true,false);
+    expect(x.products[0].issues.some(v=>v.includes("nicht nachgewiesen"))).toBe(true);
+    expect(x.products[0].issues).not.toContain("Mitgliedschaft ohne wiederkehrenden Stripe-Preis");
+  });
+
 });

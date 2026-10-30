@@ -98,7 +98,30 @@ export function projectStripeCatalog(
       taxBehavior, issues,
     });
   }
+  const nameCounts = new Map<string, number>();
+  for (const item of products.values()) {
+    const normalized = item.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
+    nameCounts.set(normalized, (nameCounts.get(normalized) ?? 0) + 1);
+  }
   for (const product of products.values()) {
+    const normalizedName = product.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
+    if ((nameCounts.get(normalizedName) ?? 0) > 1) {
+      product.issues.push("Produktname mehrfach vorhanden: Varianten und IDs pruefen");
+    }
+    if (/\b(?:nur heute|nur noch heute|letzte chance|limited time)\b/i.test(product.name)
+        || /\b-?\d{1,2}\s*%/.test(product.name)) {
+      product.issues.push("Zeit- oder Rabattversprechen vor Verwendung belegen");
+    }
+    const assigned = [...prices.values()].filter(price => price.productId === product.id && price.active);
+    if (/(?:membership|mitgliedschaft|abo(?:nnement)?|subscription)/i.test(product.name) &&
+        assigned.length > 0 && assigned.every(price => price.billing === "one_time")) {
+      product.issues.push(pricesComplete
+        ? "Mitgliedschaft ohne wiederkehrenden Stripe-Preis"
+        : "Wiederkehrender Mitgliedschaftspreis im Teilkatalog nicht nachgewiesen");
+    }
+    if (assigned.some(price => price.taxBehavior === "unspecified")) {
+      product.issues.push("Steuerbehandlung mindestens einer Preisvariante pruefen");
+    }
     if (!product.active) product.issues.push("Stripe-Produkt inaktiv");
     if (!product.defaultPriceId) product.issues.push("Kein Standardpreis");
     else if (!prices.has(product.defaultPriceId)) product.issues.push("Standardpreis nicht im erfassten Preiskatalog");
