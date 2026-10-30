@@ -70,7 +70,7 @@ export function RevenueAutopilotCard() {
           <View style={styles.learningStrip}>
             <Text style={styles.opportunityTitle}>24/7 Growth Pulse · Reichweite → Gewinn</Text>
             <StatusChip
-              label={growth.isError ? "Growth-Fehler" : growth.isLoading ? "Analyse" : growth.data?.plan.focus ?? "Ohne Daten"}
+              label={growth.isError ? "Growth-Fehler" : growth.isLoading ? "Analyse" : growth.data?.enabled === false ? "Pausiert" : growth.data?.plan.focus ?? "Ohne Daten"}
               accent={growth.isError ? "red" : growth.data?.plan.stage === "repair" ? "amber" : "cyan"}
               live={Boolean(growth.data && !growth.isError)}
             />
@@ -87,7 +87,7 @@ export function RevenueAutopilotCard() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Growth Pulse analysieren und Entwürfe vorbereiten"
-                  disabled={growNow.isPending}
+                  disabled={growNow.isPending || !growth.data.enabled}
                   style={[styles.button, growNow.isPending && styles.buttonDisabled]}
                   onPress={() => {
                     setRunFeedback(null);
