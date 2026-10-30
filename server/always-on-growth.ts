@@ -72,6 +72,11 @@ async function executeGrowthPulse(): Promise<{
     return { generated: 0, skipped: "invalid-growth-data", focus: "DATA", plan,
       externalActionsExecuted: 0, executedAt: new Date().toISOString() };
   }
+  // Suspicious cross-platform attribution is for human reconciliation, not new experimentation.
+  if (quality.status === "review") {
+    return { generated: 0, skipped: "attribution-review-required", focus: "DATA", plan,
+      externalActionsExecuted: 0, executedAt: new Date().toISOString() };
+  }
   if (!isGrowthPulseRunning()) {
     return {
       generated: 0, skipped: "growth-pulse-disabled-by-admin",
