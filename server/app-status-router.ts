@@ -18,6 +18,7 @@ import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 import { getRouteRotationStatus } from "./route-rotation-agent";
 import { getAdministratorStripeHealth } from "./stripe-admin-health";
 import { readStripeAdminCatalog } from "./stripe-catalog-readonly";
+import { queueStripeProductCampaign } from "./stripe-product-content-bridge";
 
 /**
  * Sprint 66 — appStatusRouter: Laufzeit-Status und Konsolen-Logs als
@@ -46,6 +47,11 @@ async function pingWorkspace(): Promise<number | null> {
 }
 
 export const appStatusRouter = router({
+  stripeCampaignDraft: adminProcedure.input(z.object({
+    productId: z.string().regex(/^prod_[A-Za-z0-9]+$/).max(90),
+    personaId: z.enum(["nova","mira","juno","lina","kaya","zara"]).default("nova"),
+    platform: z.enum(["instagram","tiktok","linkedin","x","threads","bluesky"]).default("instagram"),
+  })).mutation(({input}) => queueStripeProductCampaign(input)),
   stripeCatalog: adminProcedure.query(async () => {
     try { return await readStripeAdminCatalog(); }
     catch { throw new Error("Stripe-Produktkatalog derzeit nicht lesbar. Admin-Konfiguration und Rechte pruefen."); }
