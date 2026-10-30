@@ -18,6 +18,7 @@
  */
 
 import type { CampaignPlan, InfluencerGoal } from "./influencer-reach-logic";
+import { zonedCampaignSlot } from "./publishing-timezone-logic";
 
 export const PUBLISHING_STATUSES = [
   "geplant",
@@ -51,7 +52,7 @@ export type PlannedPublishJob = {
 /** Kampagnen-Slots -> geplante Jobs (deterministisch, ab startAt). */
 export function campaignToPlannedJobs(
   plan: CampaignPlan,
-  options: { startAt?: Date; slotOffsetHours?: number } = {}
+  options: { startAt?: Date; slotOffsetHours?: number; timeZone?: string } = {}
 ): PlannedPublishJob[] {
   const startAt = options.startAt ?? new Date();
   const offsetHours = Math.max(options.slotOffsetHours ?? 9, 0); // Standard: 09:00 lokale Zeit
@@ -59,7 +60,9 @@ export function campaignToPlannedJobs(
   startOfDay.setHours(offsetHours, 0, 0, 0);
 
   return plan.slots.map((slot) => {
-    const scheduledFor = new Date(startOfDay.getTime() + (slot.day - 1) * 86_400_000);
+    const scheduledFor = options.timeZone
+      ? zonedCampaignSlot(startAt,slot.day,Math.floor(offsetHours),options.timeZone)
+      : new Date(startOfDay.getTime() + (slot.day - 1) * 86_400_000);
     return {
       product: plan.product,
       goal: plan.goal,
