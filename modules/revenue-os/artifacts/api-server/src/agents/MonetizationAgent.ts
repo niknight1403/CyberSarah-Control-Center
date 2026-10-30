@@ -106,8 +106,8 @@ export class MonetizationAgent extends AgentBase {
 
     return {
       success: true,
-      message: `V5 Auto-Optimize: ${erfolgreich}/4 Aktionen ausgeführt`,
-      metadaten: { erfolgreich, fehlgeschlagen },
+      message: `V5 Auto-Optimize: ${erfolgreich}/4 ausgeführt, ${uebersprungen} ohne Freigabe übersprungen`,
+      metadaten: { erfolgreich, uebersprungen, fehlgeschlagen },
     };
   }
 
