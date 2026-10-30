@@ -4,6 +4,7 @@ import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/
 import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
 import { mergeChannelReach } from "../lib/channel-metric-source";
+import { latestGrowthEvidence } from "../lib/growth-evidence-freshness";
 import { materializeProductionSystem } from "./faceless-multichannel-service";
 
 const PERSONA="automationsklar-editorial";
@@ -16,6 +17,7 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
   const since=new Date(Date.now()-Math.min(90,Math.max(1,days))*86_400_000);
   const [eventRows,jobs,experiments,pending]=await Promise.all([
     db.select({
+      lastEventAt:sql<Date | null>`max(${revenueAttributionEvents.occurredAt})`,
       impressions:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='impression')`,
       views:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='view')`,
       clicks:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='click')`,
@@ -38,6 +40,8 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
     impressions:reach.impressions,
     views:reach.views,
     reachSource:reach.impressionsSource,
+    latestEvidenceAt:latestGrowthEvidence(events.lastEventAt,
+      ...jobs.map(j => j.insightsFetchedAt)),
     invalidInsightValues:reach.discardedValues,
     clicks:Number(events.clicks??0),leads:Number(events.leads??0),purchases:Number(events.purchases??0),refunds:Number(events.refunds??0),
     confirmedRevenueCents:purchaseCents-refundCents,
