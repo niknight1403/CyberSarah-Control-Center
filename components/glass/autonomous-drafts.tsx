@@ -42,7 +42,8 @@ type DraftsCardProps = {
 function describePayload(row: DraftRow): string {
   if (row.kind === "content") {
     const payload = row.payload as ContentDraftPayload;
-    return `${payload.personaId} · ${payload.platform}\n\n${payload.content}`;
+    const checks = payload.reviewFlags?.length ? `\n\nVor Freigabe prüfen:\n• ${payload.reviewFlags.join("\n• ")}` : "";
+    return `${payload.personaId} · ${payload.platform}\n\n${payload.content}${checks}`;
   }
   if (row.kind === "revenue-loop") {
     const payload = row.payload as RevenueLoopDraftPayload;
