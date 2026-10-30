@@ -39,6 +39,17 @@ function growthMetrics(snapshot: Snapshot): GrowthMetrics {
 export function isGrowthPulseRunning() {
   return growthPulseEnabled(process.env.GROWTH_PULSE, process.env.CHANNEL_AUTOPILOT);
 }
+/** Admin-only endpoint can still show last in-process diagnostic during DB outage. */
+export function growthRuntimeStatus() {
+  return {
+    enabled: isGrowthPulseRunning(),
+    runtime: growthRuntimeHealth(runtime, new Date()),
+    lastMeasuredFocus: lastMeasuredPlan?.focus ?? null,
+    source: "process-memory" as const,
+    databaseQueried: false as const,
+    observedAt: new Date().toISOString(),
+  };
+}
 export async function growthPulseOverview() {
   const [previous, recent] = await Promise.all([
     channelAutopilotOverview(), collectChannelAutopilotSnapshot(7),
