@@ -37,5 +37,11 @@ jobs:
           cat "$body_file"
           echo
           test "$http_code" = "200"
-          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
-          echo "Control-Center-Autopilot vollständig bestätigt."
+          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growthPulse != null) and (.result.growthPulse.generated >= 0) and (.result.growthPulse.externalActionsExecuted == 0) and (.result.growthPulse.plan.spendingAuthorized == false) and (.result.growthPulse.plan.publishingAuthorized == false) and (.result.growthPulse.plan.priceChangesAuthorized == false) and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
+          # Signed-in diagnostics stay in GitHub Actions: no invented reach or
+          # revenue metrics and never echo the authentication token.
+          {
+            echo "### CyberSarah 24/7 Growth Pulse"
+            jq -r '"- Fokus: \(.result.growthPulse.focus)\n- Neue Entwürfe: \(.result.growthPulse.generated)\n- Externe Aktionen: \(.result.growthPulse.externalActionsExecuted)\n- Blocker: \(.result.blocked | length)\n- Ergebnis: \(.ok)"' "$body_file"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Control-Center-Autopilot einschließlich Growth Pulse vollständig bestätigt."
