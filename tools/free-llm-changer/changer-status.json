@@ -1,5 +1,5 @@
 {
-  "stand": "2026-10-29T20:03:10",
+  "stand": "2026-10-30T00:04:32",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -23,7 +23,7 @@
     {
       "id": "openrouter",
       "status": "VERFUEGBAR",
-      "modell": "xingchen-agi/xing4.0-29b-a4b:free"
+      "modell": "recursive/flint-v1.0:free"
     },
     {
       "id": "cerebras",
