@@ -15,7 +15,7 @@ type CatalogResult = ReturnType<typeof projectStripeCatalog> & {
 };
 let cache: { key: string; expiresAt: number; data: CatalogResult } | null = null;
 
-async function collectPages<T extends { id: string }>(
+export async function collectPages<T extends { id: string }>(
   list: (args: { limit: number; starting_after?: string }) => Promise<{ data: T[]; has_more: boolean }>,
 ): Promise<{ rows: T[]; complete: boolean }> {
   const rows: T[] = [];
