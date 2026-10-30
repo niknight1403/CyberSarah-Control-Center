@@ -82,6 +82,9 @@ jobs:
           done
           echo "Service nicht healthy nach 20s — Deploy laeuft weiter, Render-Health-Check ist der verbindliche Gate."; pkill -f "node src/index.js" 2>/dev/null; exit 0
 
+      - name: Growth Pulse release safety gate
+        run: npm run audit:growth
+
       - name: Deterministic test suite mit Coverage
         run: npm run test:coverage
 

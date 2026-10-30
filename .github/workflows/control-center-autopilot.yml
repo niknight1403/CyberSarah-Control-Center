@@ -33,10 +33,12 @@ jobs:
           case "$BASE_URL" in https://*) ;; *) echo "::error::RENDER_PUBLIC_URL muss HTTPS sein"; exit 1;; esac
           body_file="$(mktemp)"
           trap 'rm -f "$body_file"' EXIT
-          http_code="$(curl --silent --show-error --retry 2 --retry-delay 2 --max-time 180             --output "$body_file" --write-out '%{http_code}' --request POST             --header "Authorization: Bearer $TOKEN"             "${BASE_URL%/}/api/cron/control-center-autopilot")"
-          cat "$body_file"
-          echo
-          test "$http_code" = "200"
+          http_code="$(curl --silent --show-error --max-time 180             --output "$body_file" --write-out '%{http_code}' --request POST             --header "Authorization: Bearer $TOKEN"             "${BASE_URL%/}/api/cron/control-center-autopilot")"
+          # Never echo raw response bodies: they may include internal revenue or customer data.
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Control-Center-Cron antwortet mit HTTP $http_code; keine Rohdaten in Actions-Logs."
+            exit 1
+          fi
           jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growthPulse != null) and (.result.growthPulse.generated >= 0) and (.result.growthPulse.externalActionsExecuted == 0) and (.result.growthPulse.plan.spendingAuthorized == false) and (.result.growthPulse.plan.publishingAuthorized == false) and (.result.growthPulse.plan.priceChangesAuthorized == false) and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
           # Signed-in diagnostics stay in GitHub Actions: no invented reach or
           # revenue metrics and never echo the authentication token.

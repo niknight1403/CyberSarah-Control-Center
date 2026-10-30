@@ -9,7 +9,7 @@ export type GrowthMetrics = {
   pendingContentDrafts: number; pendingRevenueDrafts: number; activeExperiments: number;
 };
 export type GrowthFocus =
-  | "DATA" | "RELIABILITY" | "QUEUE" | "REACH" | "HOOKS" | "CTA"
+  | "DATA" | "REFUNDS" | "RELIABILITY" | "QUEUE" | "REACH" | "HOOKS" | "CTA"
   | "LANDING" | "OFFER" | "PROFIT_EVIDENCE";
 export type GrowthPlan = {
   focus: GrowthFocus; title: string; reason: string; experiment: string;

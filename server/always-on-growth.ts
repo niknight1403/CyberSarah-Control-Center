@@ -10,6 +10,13 @@ import {
   decideGrowthPlan, growthPulseFingerprint, growthRateCard, growthPulseEnabled,
   type GrowthMetrics,
 } from "../lib/always-on-growth-logic";
+import { auditGrowthMetrics } from "../lib/growth-data-quality";
+import { refundRiskPlan } from "../lib/growth-refund-guard";
+import { initialGrowthRunState, growthRunStarted, growthRunCompleted, growthRunFailed, growthRuntimeHealth } from "../lib/growth-runtime-state";
+import { makeGrowthExecutionGuard } from "../lib/growth-execution-guard";
+import { compareGrowthWindows } from "../lib/growth-trend-logic";
+let runtime = initialGrowthRunState();
+const executionGuard = makeGrowthExecutionGuard();
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
 function growthMetrics(snapshot: Snapshot): GrowthMetrics {
   return {
@@ -27,13 +34,20 @@ export function isGrowthPulseRunning() {
   return growthPulseEnabled(process.env.GROWTH_PULSE, process.env.CHANNEL_AUTOPILOT);
 }
 export async function growthPulseOverview() {
-  const previous = await channelAutopilotOverview();
+  const [previous, recent] = await Promise.all([
+    channelAutopilotOverview(), collectChannelAutopilotSnapshot(7),
+  ]);
   const metrics = growthMetrics(previous.snapshot);
+  const quality = auditGrowthMetrics(metrics, new Date(), previous.snapshot);
   return {
     status: "observe-measure-draft-approve" as const,
     enabled: isGrowthPulseRunning(),
-    plan: decideGrowthPlan(metrics),
+    plan: refundRiskPlan(metrics) ?? decideGrowthPlan(metrics),
     metrics,
+    quality,
+    runtime: growthRuntimeHealth(runtime, new Date()),
+    trend: compareGrowthWindows(growthMetrics(recent), metrics,
+      !previous.snapshot.jobsTruncated && !recent.jobsTruncated),
     rates: growthRateCard(metrics),
     evidenceFingerprint: growthPulseFingerprint(metrics),
     channel: { health: previous.health, decision: previous.decision },
@@ -45,19 +59,29 @@ export async function growthPulseOverview() {
   };
 }
 /** Trigger existing idempotent Channel Autopilot, not a new draft producer. */
-export async function runGrowthPulse(): Promise<{
+async function executeGrowthPulse(): Promise<{
   generated: number; skipped: string | null; focus: string;
   plan: ReturnType<typeof decideGrowthPlan>;
   externalActionsExecuted: 0; executedAt: string;
 }> {
   const snapshot = await collectChannelAutopilotSnapshot();
-  const plan = decideGrowthPlan(growthMetrics(snapshot));
+  const metrics = growthMetrics(snapshot);
+  const plan = refundRiskPlan(metrics) ?? decideGrowthPlan(metrics);
+  const quality = auditGrowthMetrics(metrics, new Date(), snapshot);
+  if (quality.status === "blocked" || snapshot.jobsTruncated) {
+    return { generated: 0, skipped: "invalid-growth-data", focus: "DATA", plan,
+      externalActionsExecuted: 0, executedAt: new Date().toISOString() };
+  }
   if (!isGrowthPulseRunning()) {
     return {
       generated: 0, skipped: "growth-pulse-disabled-by-admin",
       focus: plan.focus, plan, externalActionsExecuted: 0,
       executedAt: new Date().toISOString(),
     };
+  }
+  if (plan.focus === "REFUNDS") {
+    return { generated: 0, skipped: "refund-risk-review", focus: plan.focus, plan,
+      externalActionsExecuted: 0, executedAt: new Date().toISOString() };
   }
   if (plan.focus === "QUEUE") {
     return {
@@ -73,4 +97,25 @@ export async function runGrowthPulse(): Promise<{
     focus: plan.focus, plan, externalActionsExecuted: 0,
     executedAt: new Date().toISOString(),
   };
+}
+
+
+/** Process-local observable lifecycle, independent of successful drafts. */
+export async function runGrowthPulse(): Promise<Awaited<ReturnType<typeof executeGrowthPulse>>> {
+  if (!executionGuard.acquire()) {
+    const overview = await growthPulseOverview();
+    return { generated: 0, skipped: "run-already-in-progress", focus: overview.plan.focus,
+      plan: overview.plan, externalActionsExecuted: 0, executedAt: new Date().toISOString() };
+  }
+  runtime = growthRunStarted(runtime, new Date());
+  try {
+    const result = await executeGrowthPulse();
+    runtime = growthRunCompleted(runtime, result, new Date());
+    return result;
+  } catch (error) {
+    runtime = growthRunFailed(runtime, new Date());
+    throw error;
+  } finally {
+    executionGuard.release();
+  }
 }

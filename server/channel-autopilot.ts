@@ -3,6 +3,7 @@ import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments }
 import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
 import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
+import { mergeChannelReach } from "../lib/channel-metric-source";
 import { materializeProductionSystem } from "./faceless-multichannel-service";
 
 const PERSONA="automationsklar-editorial";
@@ -25,24 +26,27 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
       refundCents:sql<number>`coalesce(sum(case when ${revenueAttributionEvents.eventType}='refund' then ${revenueAttributionEvents.valueCents} else 0 end),0)`,
     }).from(revenueAttributionEvents).where(and(eq(revenueAttributionEvents.personaId,PERSONA),gte(revenueAttributionEvents.occurredAt,since))),
     db.select().from(publishingJobs).where(and(eq(publishingJobs.persona,PERSONA),gte(publishingJobs.createdAt,since))).orderBy(desc(publishingJobs.createdAt)).limit(5000),
-    db.select().from(revenueExperiments).where(eq(revenueExperiments.status,"learning")).limit(100),
-    db.select({kind:draftQueue.kind,payload:draftQueue.payload}).from(draftQueue).where(eq(draftQueue.status,"pending")).limit(500),
+    db.select({active:sql<number>`count(*) filter (where ${revenueExperiments.name} like 'CHANNEL AUTO%')`}).from(revenueExperiments).where(eq(revenueExperiments.status,"learning")),
+    db.select({content:sql<number>`count(*) filter (where ${draftQueue.kind}='content')`,revenue:sql<number>`count(*) filter (where ${draftQueue.kind}='revenue-loop')`}).from(draftQueue).where(eq(draftQueue.status,"pending")),
   ]);
   const events=eventRows[0]??{impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,purchaseCents:0,refundCents:0};
   const purchaseCents=Number(events.purchaseCents??0);
   const refundCents=Number(events.refundCents??0);
-  const insightImpressions=jobs.reduce((s,j)=>s+Number(j.insights?.impressions??j.insights?.reach??0),0);
-  const insightViews=jobs.reduce((s,j)=>s+Number(j.insights?.views??j.insights?.plays??j.insights?.video_views??0),0);
+  const reach = mergeChannelReach(events.impressions, events.views,
+    jobs.map(j => (j.insights ?? {}) as Record<string, unknown>));
   return {
-    impressions:Math.max(Number(events.impressions??0),insightImpressions),
-    views:Math.max(Number(events.views??0),insightViews),
+    impressions:reach.impressions,
+    views:reach.views,
+    reachSource:reach.impressionsSource,
+    invalidInsightValues:reach.discardedValues,
     clicks:Number(events.clicks??0),leads:Number(events.leads??0),purchases:Number(events.purchases??0),refunds:Number(events.refunds??0),
     confirmedRevenueCents:purchaseCents-refundCents,
     published:jobs.filter(j=>j.status==="veroeffentlicht").length,
     failed:jobs.filter(j=>j.status==="fehlgeschlagen").length,
-    activeExperiments:experiments.filter(e=>e.name.startsWith("CHANNEL AUTO")).length,
-    pendingContentDrafts:pending.filter(x=>x.kind==="content").length,
-    pendingRevenueDrafts:pending.filter(x=>x.kind==="revenue-loop").length,
+    activeExperiments:Number(experiments[0]?.active??0),
+    pendingContentDrafts:Number(pending[0]?.content??0),
+    pendingRevenueDrafts:Number(pending[0]?.revenue??0),
+    jobsTruncated:jobs.length>=5000,
   };
 }
 

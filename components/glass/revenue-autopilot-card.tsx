@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 import { trpc } from "@/lib/trpc";
+import { growthAdminStatus } from "@/lib/growth-admin-status";
 
 export function RevenueAutopilotCard() {
   const styles = useMemo(() => createStyles(), []);
@@ -21,6 +22,7 @@ export function RevenueAutopilotCard() {
   const learningLoop = trpc.growthNetwork.learningLoopStatus.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 15_000, refetchInterval: 60_000 });
   const growth = trpc.controlCenterAutopilot.growthOverview.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
   const growNow = trpc.controlCenterAutopilot.growthRunNow.useMutation();
+  const growthHealth = growth.data ? growthAdminStatus(growth.data.quality, growth.data.runtime, growth.data.enabled) : null;
   const run = trpc.controlCenterAutopilot.runNow.useMutation();
   const utils = trpc.useUtils();
 
@@ -77,6 +79,18 @@ export function RevenueAutopilotCard() {
             {growth.data ? (
               <>
                 <Text style={styles.note}>{growth.data.plan.title} · {growth.data.plan.reason}</Text>
+                <Text style={styles.note} accessibilityRole="summary">
+                  Status: {growthHealth?.label} · {growthHealth?.detail}
+                </Text>
+                <Text style={styles.note}>Letzter Lauf: {growth.data.runtime.completedAt
+                  ? new Date(growth.data.runtime.completedAt).toLocaleString("de-DE")
+                  : "kein Nachweis"} · Fehler in Folge: {growth.data.runtime.consecutiveFailures}</Text>
+                <Text style={styles.note}>7-Tage-Reichweite/Tag: {growth.data.trend.ready
+                  ? growth.data.trend.recentImpressionsPerDay
+                  : "nicht belastbar"} · Änderung gegenüber vorherigen 23 Tagen: {
+                    growth.data.trend.reachDailyChangePct === null ? "—"
+                      : growth.data.trend.reachDailyChangePct + "%"
+                  }</Text>
                 <View style={styles.metrics}>
                   <Metric label="Impressionen" value={growth.data.metrics.impressions} />
                   <Metric label="Klicks" value={growth.data.metrics.clicks} />
@@ -87,8 +101,8 @@ export function RevenueAutopilotCard() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Growth Pulse analysieren und Entwürfe vorbereiten"
-                  disabled={growNow.isPending || !growth.data.enabled}
-                  style={[styles.button, growNow.isPending && styles.buttonDisabled]}
+                  disabled={growNow.isPending || !growth.data.enabled || growth.data.quality.status === "blocked"}
+                  style={[styles.button, (growNow.isPending || !growth.data.enabled || growth.data.quality.status === "blocked") && styles.buttonDisabled]}
                   onPress={() => {
                     setRunFeedback(null);
                     growNow.mutate(undefined, {

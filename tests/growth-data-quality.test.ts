@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import { auditGrowthMetrics } from "../lib/growth-data-quality";
+import type { GrowthMetrics } from "../lib/always-on-growth-logic";
+const base: GrowthMetrics = {
+  impressions: 1000, views: 500, clicks: 50, leads: 15, purchases: 4, refunds: 1,
+  confirmedRevenueCents: 18000, published: 9, failed: 1,
+  pendingContentDrafts: 0, pendingRevenueDrafts: 0, activeExperiments: 1,
+};
+describe("Growth Pulse Sprint 01 – trustworthy counters", () => {
+  it("accepts coherent measured counters", () => {
+    expect(auditGrowthMetrics(base).status).toBe("valid");
+  });
+  it.each([NaN, Infinity, -1, 0.8, Number.MAX_SAFE_INTEGER + 1])("blocks invalid counters: %s", input => {
+    const report = auditGrowthMetrics({ ...base, clicks: input });
+    expect(report.status).toBe("blocked");
+    expect(report.errors.some(e => e.includes("clicks"))).toBe(true);
+  });
+  it("accepts negative net revenue if refunds occurred", () => {
+    expect(auditGrowthMetrics({ ...base, confirmedRevenueCents: -1200 }).status).toBe("valid");
+  });
+  it("flags incompatible funnel counts for human review, not automatic tampering", () => {
+    const report = auditGrowthMetrics({ ...base, views: 1100, leads: 55, purchases: 60, refunds: 70 });
+    expect(report.status).toBe("review");
+    expect(report.warnings).toHaveLength(4);
+    expect(report.errors).toHaveLength(0);
+  });
+  it("signals truncated publishing history and rejected insight counts", () => {
+    const report = auditGrowthMetrics(base, new Date("2026-10-30T00:00:00Z"),
+      { jobsTruncated: true, invalidInsightValues: 3 });
+    expect(report.status).toBe("review");
+    expect(report.warnings).toHaveLength(2);
+    expect(report.reviewedAt).toBe("2026-10-30T00:00:00.000Z");
+  });
+
+});
