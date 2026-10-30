@@ -11,7 +11,7 @@ const counterKeys = [
   "impressions", "views", "clicks", "leads", "purchases", "refunds",
   "published", "failed", "pendingContentDrafts", "pendingRevenueDrafts", "activeExperiments",
 ] as const;
-export function auditGrowthMetrics(data: GrowthMetrics, at = new Date()): GrowthQualityReport {
+export function auditGrowthMetrics(data: GrowthMetrics, at = new Date(), source?: { jobsTruncated?: boolean; invalidInsightValues?: number }): GrowthQualityReport {
   const errors: string[] = [];
   const warnings: string[] = [];
   for (const key of counterKeys) {
@@ -37,6 +37,8 @@ export function auditGrowthMetrics(data: GrowthMetrics, at = new Date()): Growth
       warnings.push("Refunds ueber Kaeufen: Periodenversatz und Refund-Kohorte pruefen");
     }
   }
+  if (source?.jobsTruncated) warnings.push("Publishing-Job-Abfrage ist auf 5000 Eintraege begrenzt; Verlauf unvollstaendig");
+  if ((source?.invalidInsightValues ?? 0) > 0) warnings.push("Plattformdaten enthalten verworfene, ungueltige Kennzahlen");
   return {
     status: errors.length ? "blocked" : warnings.length ? "review" : "valid",
     errors, warnings, observedCounters: counterKeys.length,
