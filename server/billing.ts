@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { createHash } from "node:crypto";
 import * as db from "./db";
 
 // ---------------------------------------------------------------------------
@@ -101,9 +102,22 @@ export function normalizeSubscriptionPrice(raw: unknown): SubscriptionPriceLike 
 }
 
 let resolvedPriceIdCache: string | null = null;
+let resolvedPriceScope: string | null = null;
+function currentPriceScope() {
+  // Restrict a cached checkout price to one Stripe account/mode and config.
+  // Hash the inputs: do not retain a plaintext Stripe key in the cache.
+  return createHash("sha256").update([
+    process.env.STRIPE_SECRET_KEY ?? "",
+    process.env.STRIPE_MODE ?? "live",
+    process.env.STRIPE_PRICE_ID ?? "",
+    process.env.STRIPE_PRICE_LOOKUP_KEY ?? "",
+    process.env.STRIPE_PRODUCT_MONATLICH ?? "",
+  ].join("|")).digest("hex");
+}
 
 export function resetResolvedPriceIdCache() {
   resolvedPriceIdCache = null;
+  resolvedPriceScope = null;
 }
 
 export function pickSubscriptionPriceId(
@@ -124,7 +138,10 @@ export function pickSubscriptionPriceId(
  * Erfolgreiche Auflösungen werden prozessweit gecacht.
  */
 export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
-  if (resolvedPriceIdCache) return resolvedPriceIdCache;
+  const scope = currentPriceScope();
+  if (resolvedPriceIdCache && resolvedPriceScope === scope) return resolvedPriceIdCache;
+  resolvedPriceIdCache = null;
+  resolvedPriceScope = null;
 
   const configured = process.env.STRIPE_PRICE_ID?.trim() ?? "";
   if (configured.startsWith("price_")) {
@@ -132,6 +149,7 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
       const price = normalizeSubscriptionPrice(await stripe.prices.retrieve(configured));
       if (price && price.active && price.type === "recurring") {
         resolvedPriceIdCache = configured;
+        resolvedPriceScope = scope;
         return configured;
       }
       console.warn(
@@ -164,6 +182,7 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
     );
     if (picked) {
       resolvedPriceIdCache = picked.id;
+      resolvedPriceScope = scope;
       console.info(
         `[Billing] Abo-Preis automatisch über STRIPE_PRICE_LOOKUP_KEY aufgelöst: ${picked.id}`,
       );
@@ -185,6 +204,7 @@ export async function resolveSubscriptionPriceId(stripe: StripePriceApi) {
     );
     if (picked) {
       resolvedPriceIdCache = picked.id;
+      resolvedPriceScope = scope;
       console.info(
         `[Billing] Abo-Preis automatisch über STRIPE_PRODUCT_MONATLICH aufgelöst: ${picked.id}`,
       );
