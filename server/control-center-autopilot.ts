@@ -4,6 +4,7 @@ import { triggerRevenueScan } from "./revenue-command-service";
 import { deriveUltraAutopilotDecision, type UltraAutopilotDecision } from "../lib/ultra-orchestrator-logic";
 import { b2bNetworkOverview, refreshInfluencerLearning } from "./growth-network-service";
 import { runGrowthPulse } from "./always-on-growth";
+import { assertControlCenterAutopilotEnabled } from "../lib/control-center-operator-policy";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -59,6 +60,7 @@ async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof trigge
  * Preis-/Geldaktionen bleiben bewusst außerhalb dieses reversiblen Loops.
  */
 export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps = {}): Promise<ControlCenterAutopilotResult> {
+  assertControlCenterAutopilotEnabled(process.env);
   const startedAt = new Date().toISOString();
   const trigger = deps.scan ?? triggerRevenueScan;
   const runRevenue = deps.revenue ?? runRevenueAutopilot;
