@@ -25,16 +25,16 @@ export async function queueStripeProductCampaign(input: {
     const [existing] = await tx.select({ id: draftQueue.id })
       .from(draftQueue).where(eq(draftQueue.dedupeKey,dedupeKey)).limit(1);
     if (existing) return { queued:false, reason:"Kampagnenentwurf in diesem Monat bereits vorhanden." };
-    const [{total}] = await tx.select({ total:sql<number>`count(*)` })
+    const countRows = await tx.select({ total:sql<number>`count(*)` })
       .from(draftQueue).where(and(eq(draftQueue.status,"pending"),eq(draftQueue.kind,"content")));
-    if (Number(total) >= DRAFT_MAX_PENDING_BY_KIND.content) {
+    if (Number(countRows[0]?.total ?? 0) >= DRAFT_MAX_PENDING_BY_KIND.content) {
       return { queued:false, reason:"Content-Freigabequeue voll; zuerst Entwürfe prüfen." };
     }
     const added = await tx.insert(draftQueue).values({
       kind:"content",title:brief.title,payload:brief.payload,status:"pending",
       createdBy:"stripe-product-bridge",dedupeKey,
     }).onConflictDoNothing({target:draftQueue.dedupeKey}).returning({id:draftQueue.id});
-    return added.length ? { queued:true, reason:"Produktkampagne als prüfbarer Freigabeentwurf gespeichert.",draftId:added[0].id }
+    return added.length ? { queued:true, reason:"Produktkampagne als prüfbarer Freigabeentwurf gespeichert.",draftId:added[0]!.id }
       : { queued:false, reason:"Kampagnenentwurf bereits vorhanden." };
   });
 }
