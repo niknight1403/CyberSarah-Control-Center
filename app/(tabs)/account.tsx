@@ -173,6 +173,17 @@ export default function AccountScreen() {
                           {stripeCatalog.data.complete ? " Katalog vollständig" : " Katalog unvollständig"}
                           {" · "}{stripeCatalog.data.mode === "test" ? "TESTDATEN" : "LIVE-DATEN"}
                         </Text>
+                        <Text style={styles.billingCopy}>
+                          Importierte lokale Angebote: {
+                            stripeCatalog.data.localOfferStatus === "checked"
+                              ? stripeCatalog.data.localOfferReconciliation?.importedOffersChecked ?? 0
+                              : "Datenbank-Abgleich nicht verfügbar"
+                          }
+                          {" · "}Dubletten: {stripeCatalog.data.localOfferReconciliation?.duplicateProductIds.length ?? "—"}
+                          {" · "}Verwaiste IDs: {stripeCatalog.data.localOfferReconciliation?.comparisonComplete
+                            ? stripeCatalog.data.localOfferReconciliation.orphanProductIds.length
+                            : "nicht vollständig verifiziert"}
+                        </Text>
                         {stripeCatalog.data.problems.map(problem => (
                           <Text key={problem} style={styles.billingCopy}>Prüfen: {problem}</Text>
                         ))}
