@@ -135,7 +135,9 @@ export async function enqueueCampaignForUser(
   // Fokus-Persona-Wahl ein — bewaehrte Personas steigen im Ranking auf.
   const performance = await getPersonaPerformanceForUser(userOpenId);
   const plan = planInfluencerCampaign(input.product, input.goal, { days: input.days, performance });
-  const jobs = campaignToPlannedJobs(plan);
+  const jobs = campaignToPlannedJobs(plan, {
+    timeZone: process.env.CONTENT_SCHEDULE_TIMEZONE?.trim() || undefined,
+  });
   const rows: InsertPublishingJobRow[] = jobs.map((job) => ({
     userOpenId,
     product: job.product,
