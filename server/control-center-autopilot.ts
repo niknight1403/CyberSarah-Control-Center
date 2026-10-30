@@ -3,6 +3,7 @@ import { runRevenueAutopilot, type RevenueAutopilotRunResult } from "./revenue-a
 import { triggerRevenueScan } from "./revenue-command-service";
 import { deriveUltraAutopilotDecision, type UltraAutopilotDecision } from "../lib/ultra-orchestrator-logic";
 import { b2bNetworkOverview, refreshInfluencerLearning } from "./growth-network-service";
+import { runGrowthPulse } from "./always-on-growth";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -21,6 +22,7 @@ export type ControlCenterAutopilotResult = {
     b2bQualified: number;
     b2bPartners: number;
   };
+  growthPulse: Awaited<ReturnType<typeof runGrowthPulse>> | null;
   realActions: string[];
   deferred: string[];
   blocked: string[];
@@ -34,6 +36,7 @@ export type ControlCenterAutopilotDeps = {
   drafts?: typeof runDraftEngine;
   learnInfluencers?: typeof refreshInfluencerLearning;
   b2bOverview?: typeof b2bNetworkOverview;
+  growth?: typeof runGrowthPulse;
 };
 
 async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
@@ -62,6 +65,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   const runDrafts = deps.drafts ?? runDraftEngine;
   const learnInfluencers = deps.learnInfluencers ?? refreshInfluencerLearning;
   const getB2BOverview = deps.b2bOverview ?? b2bNetworkOverview;
+  const growthRunner = deps.growth ?? runGrowthPulse;
 
   const [hara, expansion] = await Promise.all([scan("hara/scan", trigger), scan("expansion/scan", trigger)]);
   const revenue = await runRevenue(5);
@@ -76,6 +80,10 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   };
 
   const realActions: string[] = [];
+  let growthPulse: Awaited<ReturnType<typeof runGrowthPulse>> | null = null;
+  let growthError: string | null = null;
+  try { growthPulse = await growthRunner(); }
+  catch (error) { growthError = error instanceof Error ? error.message : "Growth Pulse fehlgeschlagen"; }
   const deferred: string[] = [];
   const blocked: string[] = [];
   if (hara.ok) realActions.push("HARA-Live-Scan gestartet"); else blocked.push(`HARA: ${hara.detail}`);
@@ -87,6 +95,8 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (growth.influencerPersonasLearned > 0) realActions.push(`${growth.influencerPersonasLearned} Influencer-Personas aus Live-Signalen weiterentwickelt`);
   if (growth.influencerExperimentsQueued > 0) realActions.push(`${growth.influencerExperimentsQueued} Influencer-Lernexperimente priorisiert`);
   if (growth.b2bQualified > 0) realActions.push(`${growth.b2bQualified} qualifizierte B2B-Beziehungen im Netzwerk bewertet`);
+  if (growthPulse?.generated) realActions.push(`${growthPulse.generated} datenbasierte Reichweiten-/Funnel-Entwuerfe erzeugt`);
+  if (growthError) blocked.push(`Growth Pulse: ${growthError}`);
   for (const item of drafts.skipped) {
     const detail = `${item.kind}: ${item.reason}`;
     if (/\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(item.reason)) deferred.push(detail);
@@ -101,6 +111,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     drafts,
     revenue,
     growth,
+    growthPulse,
     realActions,
     deferred,
     blocked,

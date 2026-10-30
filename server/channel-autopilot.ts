@@ -84,12 +84,12 @@ export async function runChannelAutopilot(){
     const contentKeys=new Set([...pending,...recent].filter(x=>x.kind==="content").map(x=>(x.payload as {autopilotKey?:string}).autopilotKey).filter(Boolean));
     let generated=0;
     if(!revenueKeys.has(experiment.autopilotKey)&&pending.filter(x=>x.kind==="revenue-loop").length<DRAFT_MAX_PENDING_BY_KIND["revenue-loop"]){
-      await tx.insert(draftQueue).values({kind:"revenue-loop",title:experiment.name,payload:experiment,status:"pending",createdBy:"channel-autopilot",dedupeKey:`channel-autopilot:revenue:${decision.lever}:${cooldownBucket}`}).onConflictDoNothing({target:draftQueue.dedupeKey});
-      generated++;
+      const inserted = await tx.insert(draftQueue).values({kind:"revenue-loop",title:experiment.name,payload:experiment,status:"pending",createdBy:"channel-autopilot",dedupeKey:`channel-autopilot:revenue:${decision.lever}:${cooldownBucket}`}).onConflictDoNothing({target:draftQueue.dedupeKey}).returning({id:draftQueue.id});
+      generated += inserted.length;
     }
     if(!contentKeys.has(content.autopilotKey)&&pending.filter(x=>x.kind==="content").length<DRAFT_MAX_PENDING_BY_KIND.content){
-      await tx.insert(draftQueue).values({kind:"content",title:`Channel Autopilot · ${decision.lever}`,payload:content,status:"pending",createdBy:"channel-autopilot",dedupeKey:`channel-autopilot:content:${decision.lever}:${cooldownBucket}`}).onConflictDoNothing({target:draftQueue.dedupeKey});
-      generated++;
+      const inserted = await tx.insert(draftQueue).values({kind:"content",title:`Channel Autopilot · ${decision.lever}`,payload:content,status:"pending",createdBy:"channel-autopilot",dedupeKey:`channel-autopilot:content:${decision.lever}:${cooldownBucket}`}).onConflictDoNothing({target:draftQueue.dedupeKey}).returning({id:draftQueue.id});
+      generated += inserted.length;
     }
     return {generated,skipped:null as string|null};
   });
