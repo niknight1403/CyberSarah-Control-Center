@@ -47,6 +47,7 @@ export type ContentDraftPayload = {
   assetCount?: number;
   disclosure?: string;
   reviewFlags?: string[];
+  commerceSource?: { provider: "stripe"; productId: string; priceId: string };
 };
 
 export type RevenueLoopDraftPayload = {

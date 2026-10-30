@@ -73,6 +73,7 @@ export default function AccountScreen() {
   const user = accountQuery.data ?? localUser;
   const stripeAdminQuery = trpc.appStatus.integrationStatus.useQuery(undefined, { enabled: accountQuery.data?.role === "admin", retry: false, staleTime: 120_000 });
   const stripeCatalog = trpc.appStatus.stripeCatalog.useQuery(undefined, { enabled: false, retry: false });
+  const stripeCampaign = trpc.appStatus.stripeCampaignDraft.useMutation();
   const busy = registerMutation.isPending || loginMutation.isPending || logoutMutation.isPending;
 
   const persistAccount = async (result: { sessionToken: string; user: NonNullable<typeof user> }) => {
@@ -205,11 +206,23 @@ export default function AccountScreen() {
                           (product.name.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()) ||
                            product.id.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()))
                         ).slice(0, 12).map(product => (
-                          <Text key={product.id} style={styles.billingCopy}>
-                            {product.name} · {product.priceCount} Preise ·
-                            {product.active ? " aktiv" : " inaktiv"}
-                            {product.issues.length ? " · " + product.issues.join(", ") : ""}
-                          </Text>
+                          <View key={product.id} style={{ gap: 6, marginBottom: 10 }}>
+                            <Text style={styles.billingCopy}>
+                              {product.name} · {product.priceCount} Preise ·
+                              {product.active ? " aktiv" : " inaktiv"}
+                              {product.issues.length ? " · " + product.issues.join(", ") : ""}
+                            </Text>
+                            <GlowButton
+                              label={stripeCampaign.isPending && stripeCampaign.variables?.productId === product.id
+                                ? "Erstelle Prüfling …" : "Content-Paket als Entwurf vorbereiten"}
+                              accent="cyan"
+                              variant="secondary"
+                              disabled={stripeCampaign.isPending || !product.active || !stripeCatalog.data.complete}
+                              onPress={() => void stripeCampaign.mutateAsync({ productId: product.id }).then(result => {
+                                setMessage(result.reason);
+                              }).catch(() => setMessage("Produktkampagnen-Entwurf konnte nicht gespeichert werden."))}
+                            />
+                          </View>
                         ))}
                         <Text style={styles.billingCopy}>
                           Stripe bleibt read-only; Medienrechte und Affiliate-Freigabe sind nicht automatisch verifiziert.

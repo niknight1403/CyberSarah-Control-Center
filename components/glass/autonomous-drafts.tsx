@@ -43,7 +43,8 @@ function describePayload(row: DraftRow): string {
   if (row.kind === "content") {
     const payload = row.payload as ContentDraftPayload;
     const checks = payload.reviewFlags?.length ? `\n\nVor Freigabe prüfen:\n• ${payload.reviewFlags.join("\n• ")}` : "";
-    return `${payload.personaId} · ${payload.platform}\n\n${payload.content}${checks}`;
+    const source = payload.commerceSource ? `\n\nStripe-Quelle: ${payload.commerceSource.productId} / ${payload.commerceSource.priceId}` : "";
+    return `${payload.personaId} · ${payload.platform}\n\n${payload.content}${source}${checks}`;
   }
   if (row.kind === "revenue-loop") {
     const payload = row.payload as RevenueLoopDraftPayload;
