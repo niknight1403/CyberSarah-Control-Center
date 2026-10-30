@@ -227,6 +227,15 @@ jobs:
             "CyberSarah-ControlCenter-v${VERSION}-release.aab" \
             > "CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
           sha256sum --check "CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
+          # Sprint 89: fail-closed evidence that these EXACT artifacts were
+          # signed and built from the checked-out commit, not a stale release.
+          SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          export APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -x "$APKSIGNER" || { echo "apksigner missing for release evidence"; exit 1; }
+          npx tsx scripts/android-release-manifest.ts "$VERSION"
+          sha256sum "CyberSarah-ControlCenter-v${VERSION}-manifest.json" \
+            >> "CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
+          sha256sum --check "CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
           TAG="v${VERSION}-apk"
           NOTES="Automatisierter Capacitor-Build aus Commit ${GITHUB_SHA::7}.
           Zwei Varianten aus einem Codestand (Sprint 107-Erweiterung):
@@ -238,10 +247,10 @@ jobs:
             und Optik). Empfohlene APK fuer die taegliche Nutzung.
           Web-Export der CyberSarah-App als Android-Wrapper (com.cybersarah.controlcenter).
           Installation (APK): Unbekannte Quellen erlauben und die APK oeffnen.
-          Play-Store-Upload: das signierte AAB (jarsigner-verifiziert, Admin-
+          Release-Manifest: verifizierte APK-Zertifikatsfingerprints, SHA-256 der\n          drei Binärartefakte, unveränderte Git-Revision und Actions-Run-ID.\n          Play-Store-Upload: das signierte AAB (jarsigner-verifiziert, Admin-
           Variante) direkt in der Play Console hochladen — siehe
           docs/PLAY_STORE_SUBMISSION_GUIDE.md und docs/APK_VARIANTEN.md."
-          RELEASE_FILES="CyberSarah-ControlCenter-v${VERSION}-dev.apk CyberSarah-ControlCenter-v${VERSION}-admin.apk CyberSarah-ControlCenter-v${VERSION}-release.aab CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
+          RELEASE_FILES="CyberSarah-ControlCenter-v${VERSION}-dev.apk CyberSarah-ControlCenter-v${VERSION}-admin.apk CyberSarah-ControlCenter-v${VERSION}-release.aab CyberSarah-ControlCenter-v${VERSION}-manifest.json CyberSarah-ControlCenter-v${VERSION}-SHA256SUMS.txt"
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" $RELEASE_FILES --clobber
           else
