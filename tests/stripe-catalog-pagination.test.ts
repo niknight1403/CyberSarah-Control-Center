@@ -44,4 +44,20 @@ describe("Sprints 21/29: bounded Stripe pagination with truthful completeness", 
     }))).rejects.toThrow("ungueltige");
   });
 
+  it("never claims completeness for a repeated provider ID across pages", async () => {
+    const result = await collectPages(async ({ starting_after }) => (
+      starting_after ? { data:[{id:"prod_b"},{id:"prod_a"}],has_more:false }
+        : { data:[{id:"prod_a"},{id:"prod_b"}],has_more:true }
+    ));
+    expect(result.complete).toBe(false);
+    expect(result.rows).toHaveLength(2);
+  });
+  it("never claims completeness for a duplicate product ID inside one page", async () => {
+    const result = await collectPages(async () => ({
+      data:[{id:"prod_a"},{id:"prod_a"}],has_more:false,
+    }));
+    expect(result.complete).toBe(false);
+    expect(result.rows).toEqual([{id:"prod_a"}]);
+  });
+
 });
