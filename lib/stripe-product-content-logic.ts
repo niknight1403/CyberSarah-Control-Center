@@ -59,6 +59,7 @@ export function buildProductContentBrief(
       // Domain-specific review flags are required even without a keyword hit.
       reviewFlags: [...new Set([...(payload.reviewFlags ?? []), ...PRODUCT_CONTENT_REVIEW,
         ...product.issues, ...price.issues])],
+      commerceSource: { provider: "stripe", productId: product.id, priceId: price.id },
     },
   };
 }
