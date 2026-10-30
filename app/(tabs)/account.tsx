@@ -25,6 +25,8 @@ export default function AccountScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [stripeProductQuery, setStripeProductQuery] = useState("");
+  const [stripeShowInactive, setStripeShowInactive] = useState(false);
   const [localUser, setLocalUser] = useState<Awaited<ReturnType<typeof Auth.getUserInfo>>>(null);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const registerMutation = trpc.account.register.useMutation();
@@ -70,6 +72,7 @@ export default function AccountScreen() {
 
   const user = accountQuery.data ?? localUser;
   const stripeAdminQuery = trpc.appStatus.integrationStatus.useQuery(undefined, { enabled: accountQuery.data?.role === "admin", retry: false, staleTime: 120_000 });
+  const stripeCatalog = trpc.appStatus.stripeCatalog.useQuery(undefined, { enabled: false, retry: false });
   const busy = registerMutation.isPending || loginMutation.isPending || logoutMutation.isPending;
 
   const persistAccount = async (result: { sessionToken: string; user: NonNullable<typeof user> }) => {
@@ -160,6 +163,60 @@ export default function AccountScreen() {
                       Katalogzugriff: {stripeAdminQuery.data?.stripe?.catalogReadable ? "verifiziert" : "noch nicht verifiziert"} · Webhook-Secret: {stripeAdminQuery.data?.stripe?.webhookSecretConfigured ? "hinterlegt" : "fehlt"}
                     </Text>
                     <GlowButton label="Stripe-Verbindung erneut pruefen" onPress={() => void stripeAdminQuery.refetch()} accent="cyan" variant="secondary" />
+                    <GlowButton label="Stripe-Produktkatalog lesen" onPress={() => void stripeCatalog.refetch()} accent="cyan" variant="secondary" disabled={stripeCatalog.isFetching} />
+                    {stripeCatalog.isFetching ? <Text style={styles.billingCopy}>Lese Stripe-Produkte und Preisvarianten …</Text> : null}
+                    {stripeCatalog.error ? <Text style={styles.billingCopy}>Katalog nicht abrufbar. Admin-Leserechte und Render-Stripe-Konfiguration prüfen.</Text> : null}
+                    {stripeCatalog.data ? (
+                      <>
+                        <Text style={styles.billingCopy}>
+                          {stripeCatalog.data.productCount} Produkte · {stripeCatalog.data.priceCount} Preisvarianten ·
+                          {stripeCatalog.data.complete ? " Katalog vollständig" : " Katalog unvollständig"}
+                          {" · "}{stripeCatalog.data.mode === "test" ? "TESTDATEN" : "LIVE-DATEN"}
+                        </Text>
+                        <Text style={styles.billingCopy}>
+                          Importierte lokale Angebote: {
+                            stripeCatalog.data.localOfferStatus === "checked"
+                              ? stripeCatalog.data.localOfferReconciliation?.importedOffersChecked ?? 0
+                              : "Datenbank-Abgleich nicht verfügbar"
+                          }
+                          {" · "}Dubletten: {stripeCatalog.data.localOfferReconciliation?.duplicateProductIds.length ?? "—"}
+                          {" · "}Verwaiste IDs: {stripeCatalog.data.localOfferReconciliation?.comparisonComplete
+                            ? stripeCatalog.data.localOfferReconciliation.orphanProductIds.length
+                            : "nicht vollständig verifiziert"}
+                        </Text>
+                        {stripeCatalog.data.problems.map(problem => (
+                          <Text key={problem} style={styles.billingCopy}>Prüfen: {problem}</Text>
+                        ))}
+                        <TextInput
+                          value={stripeProductQuery}
+                          onChangeText={setStripeProductQuery}
+                          placeholder="Stripe-Produkt suchen"
+                          accessibilityLabel="Stripe-Produktkatalog durchsuchen"
+                          style={styles.input}
+                          autoCapitalize="none"
+                        />
+                        <GlowButton
+                          label={stripeShowInactive ? "Nur aktive Produkte" : "Auch inaktive Produkte anzeigen"}
+                          accent="cyan" variant="secondary"
+                          onPress={() => setStripeShowInactive(!stripeShowInactive)}
+                        />
+                        {stripeCatalog.data.products.filter(product =>
+                          (stripeShowInactive || product.active) &&
+                          (product.name.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()) ||
+                           product.id.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()))
+                        ).slice(0, 12).map(product => (
+                          <Text key={product.id} style={styles.billingCopy}>
+                            {product.name} · {product.priceCount} Preise ·
+                            {product.active ? " aktiv" : " inaktiv"}
+                            {product.issues.length ? " · " + product.issues.join(", ") : ""}
+                          </Text>
+                        ))}
+                        <Text style={styles.billingCopy}>
+                          Stripe bleibt read-only; Medienrechte und Affiliate-Freigabe sind nicht automatisch verifiziert.
+                          {stripeCatalog.data.productCount > 12 ? " Es werden maximal zwölf passende Produkte angezeigt." : ""}
+                        </Text>
+                      </>
+                    ) : null}
                   </GlassCard>
                   <GlassCard accent="green" style={styles.billingCard}>
                     <Text style={styles.billingTitle}>EXPERT-ZUGANG AKTIV</Text>
