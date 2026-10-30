@@ -1,6 +1,6 @@
 # CyberSarah – 100 echte Entwicklungs-Sprints (Nummer 11–110)
 
-Stand: 30.10.2026. Nur 'CODE – CI ausstehend' bedeutet bereits implementierte Änderungen im PR #135; erst erfolgreiches CI und E2E-Abnahme schließen einen Sprint ab. 'OFFEN' bedeutet keine fertige Umsetzung. Keine Erfolgsgarantie oder rückwirkend erfundenen Tests.
+Stand: 30.10.2026. Sprints 11–20 haben einen grünen GitHub-CI-Nachweis (PR #135, Merge c9f6cbe) und einen Render-Deploy. Für Sprints 21–30 beschreibt CODE nur implementierte, noch nicht vollständig end-to-end-abgenommene Teilziele im Draft-PR #136. Keine ungetesteten Implementierungen als abgeschlossen ausgeben. Keine Erfolgsgarantie oder rückwirkend erfundenen Tests.
 
 Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel mit Commit-Referenz, TypeScript/Lint/Test-Nachweis und relevantem E2E-Gate. Das Ändern einer einzelnen Datei zählt nicht als Sprint.
 
@@ -8,31 +8,31 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 
 | Sprint | Ziel | Status |
 |---:|---|---|
-| 11 | Umsatzwerte ohne Currency-Nachweis niemals als EUR ausgeben | CODE – CI ausstehend |
-| 12 | Fehlende Funnel-Stufen erkennen und riskante Experimente blockieren | CODE – CI ausstehend |
-| 13 | Pausen, Blockaden und Leerlauf im Growth-Protokoll getrennt ausweisen | CODE – CI ausstehend |
-| 14 | Mobile Admin-Statusanzeige mit echten Blockerursachen | CODE – CI ausstehend |
-| 15 | Parallele Growth-Starts ohne redundante Datenbankabfrage behandeln | CODE – CI ausstehend |
-| 16 | Growth-Diagnose auch bei Datenbankausfall bereithalten | CODE – CI ausstehend |
-| 17 | Veraltete Plattform-Messwerte erkennen und Optimierungen pausieren | CODE – CI ausstehend |
-| 18 | Zentralen Operator-Kill-Switch vor externen Scans respektieren | CODE – CI ausstehend |
-| 19 | Providergeheimnisse und persönliche Kontaktdaten in Cron-Logs maskieren | CODE – CI ausstehend |
-| 20 | Neue Sicherheitsregeln als verbindliche CI-Release-Gates prüfen | CODE – CI ausstehend |
+| 11 | Umsatzwerte ohne Currency-Nachweis niemals als EUR ausgeben | CI + Render |
+| 12 | Fehlende Funnel-Stufen erkennen und riskante Experimente blockieren | CI + Render |
+| 13 | Pausen, Blockaden und Leerlauf im Growth-Protokoll getrennt ausweisen | CI + Render |
+| 14 | Mobile Admin-Statusanzeige mit echten Blockerursachen | CI + Render |
+| 15 | Parallele Growth-Starts ohne redundante Datenbankabfrage behandeln | CI + Render |
+| 16 | Growth-Diagnose auch bei Datenbankausfall bereithalten | CI + Render |
+| 17 | Veraltete Plattform-Messwerte erkennen und Optimierungen pausieren | CI + Render |
+| 18 | Zentralen Operator-Kill-Switch vor externen Scans respektieren | CI + Render |
+| 19 | Providergeheimnisse und persönliche Kontaktdaten in Cron-Logs maskieren | CI + Render |
+| 20 | Neue Sicherheitsregeln als verbindliche CI-Release-Gates prüfen | CI + Render |
 
 ## 2. Product & Stripe
 
 | Sprint | Ziel | Status |
 |---:|---|---|
-| 21 | Stripe-Produkte über Produktstatus und Varianten zuverlässig abgleichen | OFFEN |
-| 22 | Stripe-Produktvarianten mit steuerlicher/zeitlicher Gültigkeit vergleichen | OFFEN |
-| 23 | Doppelte Stripe-IDs und verwaiste lokale Offers sicher behandeln | OFFEN |
-| 24 | Checkout-Messung mit Stripe-Testmode-End-to-End abnehmen | OFFEN |
-| 25 | Webhook-Wiederholungen bei Bestellung/Refund idempotent verarbeiten | OFFEN |
+| 21 | Stripe-Produkte über Produktstatus und Varianten zuverlässig abgleichen | CODE – CI ausstehend |
+| 22 | Stripe-Produktvarianten mit steuerlicher/zeitlicher Gültigkeit vergleichen | CODE – CI ausstehend |
+| 23 | Doppelte Stripe-IDs und verwaiste lokale Offers sicher behandeln | TEILWEISE – lokale Orphan-Offers offen |
+| 24 | Checkout-Messung mit Stripe-Testmode-End-to-End abnehmen | BLOCKIERT – echte Stripe-Testmode-Abnahme |
+| 25 | Webhook-Wiederholungen bei Bestellung/Refund idempotent verarbeiten | TEILWEISE – Retry korrigiert, DB-ID-Ledger offen |
 | 26 | Abonnements mit Kündigung, Retention und Wiederaufnahme konsistent lesen | OFFEN |
-| 27 | Produktrechte und Affiliate-Kennzeichnung als prüfbare Freigaben speichern | OFFEN |
+| 27 | Produktrechte und Affiliate-Kennzeichnung als prüfbare Freigaben speichern | TEILWEISE – Rechteclaims als ungeprüft |
 | 28 | Produkt-Matching über Herkunftsquellen ohne stillen Importkollisionsverlust | OFFEN |
-| 29 | Produkt-Sync-Fehler pro Provider mit Recovery-Status dokumentieren | OFFEN |
-| 30 | Admin-Produktkatalog mobil filtern, prüfen und manuell freigeben | OFFEN |
+| 29 | Produkt-Sync-Fehler pro Provider mit Recovery-Status dokumentieren | TEILWEISE – read-only Diagnose |
+| 30 | Admin-Produktkatalog mobil filtern, prüfen und manuell freigeben | CODE – CI ausstehend |
 
 ## 3. Content Production
 
@@ -164,3 +164,11 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 6. Für jeden weiteren Sprint Commit, Tests, Betriebsgate und Status im Dokument aktualisieren.
 
 Offene Risiken: reale Profitvalidierung, Kosten-Kohorten, Social-/Stripe-Berechtigungen, Publish-E2E, Android-APK und dauerhaft aktive Worker.
+
+## Nachweis für PR #136 (Stripe-Katalog und Billing-Reliability)
+
+- `server/stripe-catalog-readonly.ts` und `lib/stripe-catalog-projection.ts`: read-only Stripe-Produkte und Preise, je fünf Seiten à 100; Pagination und Vollständigkeit werden ausdrücklich ausgewiesen; Admin-only tRPC.
+- `app/(tabs)/account.tsx`: Stripe-Produkte/Varianten und Rechtehinweise, mobile Suche und Aktiv-Filter. Keine Live-Preisänderung oder Auto-Publishing.
+- `server/billing.ts`: Events werden erst nach erfolgreicher Verarbeitung als verarbeitet markiert; fehlgeschlagene Webhook-Aufrufe bleiben erneut zustellbar. Cross-Replica-Idempotenz benötigt noch persistente Event-ID-Prüfung.
+- `tests/stripe-catalog-projection.test.ts`, `tests/stripe-catalog-pagination.test.ts` und `tests/billing.test.ts`: deterministische Regressionstests. CI-Abnahme ist commitbezogen zu prüfen.
+- Fehlende echte Testmode-Credentials, Provider-/Device-E2E, Rechtsnachweise und DB-Migrationsabnahme verhindern eine vollständige Abnahme der zehn Produkt-/Stripe-Sprints.
