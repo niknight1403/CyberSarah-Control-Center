@@ -26,6 +26,7 @@ Bestehende Module wiederverwenden statt Parallelagenten zu bauen:
 - Bei zu vielen offenen Entwürfen/Experimenten stoppt das Wachstumssignal die zusätzliche Content-Produktion.
 - Wiederholung über GitHub Actions schützt gegen Server-Schlaf, aber GitHub-Cron kann verspätet sein oder ausfallen. Ein 24/7-Service-Level erfordert einen dauerhaft laufenden Worker mit Monitoring.
 - Keine garantierte tägliche Veröffentlichungsfrequenz: Plattformanbindungen, Rechte und Freigaben müssen nachgewiesen werden.
+- Bei `GROWTH_PULSE=off` oder `CHANNEL_AUTOPILOT=off` führt der zentrale Growth Pulse keine neuen Wachstumsexperimente aus; die Admin-UI kennzeichnet den Zustand als pausiert. Andere, bereits vorhandene autonome Module sind davon nicht automatisch abgeschaltet.
 
 ## Technische Abnahme
 
