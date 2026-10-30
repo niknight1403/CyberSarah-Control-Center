@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideGrowthPlan, growthPulseFingerprint, growthRateCard, type GrowthMetrics } from "../lib/always-on-growth-logic";
+import { decideGrowthPlan, growthPulseFingerprint, growthRateCard, growthPulseEnabled, type GrowthMetrics } from "../lib/always-on-growth-logic";
 const empty: GrowthMetrics = {
   impressions: 0, views: 0, clicks: 0, leads: 0,
   purchases: 0, refunds: 0, confirmedRevenueCents: 0,
@@ -8,6 +8,12 @@ const empty: GrowthMetrics = {
 };
 const plan = (patch: Partial<GrowthMetrics> = {}) => decideGrowthPlan({ ...empty, ...patch });
 describe("24/7 Growth Pulse decision quality and safety", () => {
+  it("honors operator off switches in both in-server and cron loops", () => {
+    expect(growthPulseEnabled(undefined, undefined)).toBe(true);
+    expect(growthPulseEnabled("off", undefined)).toBe(false);
+    expect(growthPulseEnabled("ON", "OFF")).toBe(false);
+    expect(growthPulseEnabled("on", "on")).toBe(true);
+  });
   it("starts with evidence gathering, never fictional monetization data", () => {
     const value = plan();
     expect(value.focus).toBe("REACH");
