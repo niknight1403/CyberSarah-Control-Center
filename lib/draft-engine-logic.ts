@@ -1,3 +1,4 @@
+import { contentEvidenceReview } from "./content-evidence-review";
 /**
  * Sprint 346 — Autonome Draft-Engine: reine, deterministische Logik fuer
  * die Erstellung von Entwuerfen (Content, Revenue-Loop, Idee), die NUR auf
@@ -45,6 +46,7 @@ export type ContentDraftPayload = {
   assets?: ContentDraftAsset[];
   assetCount?: number;
   disclosure?: string;
+  reviewFlags?: string[];
 };
 
 export type RevenueLoopDraftPayload = {
@@ -144,7 +146,8 @@ export function validateDraftPayload(
       return [{ format, variant, content: assetContent, ...(title ? { title } : {}), ...(cta ? { cta } : {}), ...(qualityReason ? { qualityReason } : {}) }];
     }).slice(0, 30) : undefined;
     const disclosure = nonEmpty(raw.disclosure, 600) ?? undefined;
-    return { valid: true, payload: { personaId, platform, topic, content, ...(assets?.length ? { assets, assetCount: assets.length } : {}), ...(disclosure ? { disclosure } : {}) }, title: topic.slice(0, 120) };
+    const reviewFlags = contentEvidenceReview([topic, content, ...(assets?.map(asset => asset.content) ?? [])].join("\n"), disclosure);
+    return { valid: true, payload: { personaId, platform, topic, content, ...(assets?.length ? { assets, assetCount: assets.length } : {}), ...(disclosure ? { disclosure } : {}), ...(reviewFlags.length ? { reviewFlags } : {}) }, title: topic.slice(0, 120) };
   }
   if (kind === "revenue-loop") {
     const rawHub = nonEmpty(raw.hub, 40);
