@@ -92,6 +92,22 @@ describe("subscription price resolution", () => {
     resetResolvedPriceIdCache();
   });
 
+  it("verwendet keinen gecachten Testmode-Preis nach Stripe-Key- oder Konfigurationswechsel", async () => {
+    vi.stubEnv("STRIPE_MODE", "test");
+    vi.stubEnv("STRIPE_SECRET_KEY", ["sk","test","mockaccountone"].join("_"));
+    vi.stubEnv("STRIPE_PRICE_ID", "price_first");
+    const api = fakeStripe(async id => price({id}));
+    expect(await resolveSubscriptionPriceId(api)).toBe("price_first");
+    expect(api.prices.retrieve).toHaveBeenCalledTimes(1);
+    expect(await resolveSubscriptionPriceId(api)).toBe("price_first");
+    expect(api.prices.retrieve).toHaveBeenCalledTimes(1);
+    vi.stubEnv("STRIPE_MODE", "live");
+    vi.stubEnv("STRIPE_SECRET_KEY", ["sk","live","mockaccounttwo"].join("_"));
+    vi.stubEnv("STRIPE_PRICE_ID", "price_second");
+    expect(await resolveSubscriptionPriceId(api)).toBe("price_second");
+    expect(api.prices.retrieve).toHaveBeenCalledTimes(2);
+  });
+
   it("uebernimmt den konfigurierten Preis, wenn Stripe ihn als aktiv und wiederkehrend bestaetigt", async () => {
     vi.stubEnv("STRIPE_PRICE_ID", "price_gueltig");
     const stripe = fakeStripe(async () => price({ id: "price_gueltig" }));
@@ -193,6 +209,43 @@ describe("Stripe-Webhook-Härtung (Sprint 278)", () => {
     expect(first.duplicate).toBe(false);
     expect(second.duplicate).toBe(true);
     expect(StripeWebhookSignatureError).toBeDefined();
+    vi.unstubAllEnvs();
+  });
+
+  it("verwirft fehlgeschlagenen Webhook nicht und laesst Stripe ihn erneut zustellen", async () => {
+    vi.stubEnv("STRIPE_MODE", "test");
+    vi.stubEnv("STRIPE_SECRET_KEY", ["sk", "test", "localmocktoken123456789"].join("_"));
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_gueltig");
+    vi.stubEnv("APP_BASE_URL", "https://app.cybersarah-ki.com");
+    const { processStripeWebhook, StripeWebhookProcessingError } = await import("../server/billing");
+    const event = JSON.stringify({
+      id: "evt_retry_after_failure_2026", type: "invoice.payment_failed",
+      data: { object: { parent: null } },
+    });
+    const signature = signTestPayload(event);
+    const recorded = new Set<string>();
+    const mark = (id: string) => {
+      if (recorded.has(id)) return false;
+      recorded.add(id);
+      return true;
+    };
+    let calls = 0;
+    await expect(processStripeWebhook(Buffer.from(event), signature, {
+      markEventSeen: mark,
+      sendAlert: async () => { calls++; throw new Error("Ops notifier down"); },
+    })).rejects.toBeInstanceOf(StripeWebhookProcessingError);
+    expect(recorded.size).toBe(0);
+    const replay = await processStripeWebhook(Buffer.from(event), signature, {
+      markEventSeen: mark,
+      sendAlert: async () => { calls++; },
+    });
+    expect(replay.duplicate).toBe(false);
+    expect(calls).toBe(2);
+    expect(recorded.size).toBe(1);
+    const duplicate = await processStripeWebhook(Buffer.from(event), signature, {
+      markEventSeen: mark, sendAlert: async () => undefined,
+    });
+    expect(duplicate.duplicate).toBe(true);
     vi.unstubAllEnvs();
   });
 
