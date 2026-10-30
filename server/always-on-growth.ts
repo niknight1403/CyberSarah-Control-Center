@@ -11,6 +11,7 @@ import {
   type GrowthMetrics,
 } from "../lib/always-on-growth-logic";
 import { auditGrowthMetrics } from "../lib/growth-data-quality";
+import { refundRiskPlan } from "../lib/growth-refund-guard";
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
 function growthMetrics(snapshot: Snapshot): GrowthMetrics {
   return {
@@ -34,7 +35,7 @@ export async function growthPulseOverview() {
   return {
     status: "observe-measure-draft-approve" as const,
     enabled: isGrowthPulseRunning(),
-    plan: decideGrowthPlan(metrics),
+    plan: refundRiskPlan(metrics) ?? decideGrowthPlan(metrics),
     metrics,
     quality,
     rates: growthRateCard(metrics),
@@ -55,7 +56,7 @@ export async function runGrowthPulse(): Promise<{
 }> {
   const snapshot = await collectChannelAutopilotSnapshot();
   const metrics = growthMetrics(snapshot);
-  const plan = decideGrowthPlan(metrics);
+  const plan = refundRiskPlan(metrics) ?? decideGrowthPlan(metrics);
   const quality = auditGrowthMetrics(metrics);
   if (quality.status === "blocked") {
     return { generated: 0, skipped: "invalid-growth-data", focus: "DATA", plan,
@@ -67,6 +68,10 @@ export async function runGrowthPulse(): Promise<{
       focus: plan.focus, plan, externalActionsExecuted: 0,
       executedAt: new Date().toISOString(),
     };
+  }
+  if (plan.focus === "REFUNDS") {
+    return { generated: 0, skipped: "refund-risk-review", focus: plan.focus, plan,
+      externalActionsExecuted: 0, executedAt: new Date().toISOString() };
   }
   if (plan.focus === "QUEUE") {
     return {
