@@ -3,6 +3,7 @@
  * Nothing is published, charged, price-adjusted or rendered by this bridge.
  */
 import type { StripeCatalogPage } from "./stripe-catalog-projection";
+import { buildReviewableProductReel } from "./reel-storyboard-logic";
 import {
   validateDraftPayload, type ContentDraftPayload,
 } from "./draft-engine-logic";
@@ -33,6 +34,8 @@ export function buildProductContentBrief(
   if (!/^[a-z0-9_-]{2,40}$/i.test(personaId) || !["instagram","tiktok","linkedin","x","threads","bluesky"].includes(platform)) {
     return { ok: false, reason: "Persona oder Plattform nicht unterstützt." };
   }
+  const storyboard = buildReviewableProductReel(name);
+  if (!storyboard.ok) return { ok: false, reason: storyboard.reason };
   const content = [
     "Produkt im Überblick: " + name + ".",
     "Worum geht es bei diesem Angebot? Welche Informationen sind für Interessierte wichtig?",
@@ -42,8 +45,7 @@ export function buildProductContentBrief(
   const candidate = validateDraftPayload("content", {
     personaId, platform, topic: "Produktvorstellung: " + name, content,
     assets: [
-      {format:"reel-storyboard",variant:1,title:"Reel-Konzept",content:
-        "0–3 s: Produktname und neutrale Frage als Hook.\n3–12 s: Prüffragen zu Nutzen und Zielgruppe.\n12–22 s: Nachweisbare Details ergänzen.\n22–27 s: CTA erst nach Checkout- und Rechteprüfung."},
+      {format:"reel-storyboard",variant:1,title:"Reel-Konzept (Timing, Sprechertext, Untertitel)",content:storyboard.content},
       {format:"landing-outline",variant:1,title:"Landingpage-Konzept",content:
         "Headline: Produktname.\nAbschnitte: Zielgruppe, nachweisbare Produktdetails, Bedingungen, Datenschutzhinweise und erst nach Prüfung Checkout-CTA."},
       {format:"story-outline",variant:1,title:"Story-Konzept",content:
