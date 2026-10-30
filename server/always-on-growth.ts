@@ -15,6 +15,7 @@ import { refundRiskPlan } from "../lib/growth-refund-guard";
 import { initialGrowthRunState, growthRunStarted, growthRunCompleted, growthRunFailed, growthRuntimeHealth } from "../lib/growth-runtime-state";
 import { makeGrowthExecutionGuard } from "../lib/growth-execution-guard";
 import { compareGrowthWindows } from "../lib/growth-trend-logic";
+import { controlCenterAutopilotEnabled } from "../lib/control-center-operator-policy";
 let runtime = initialGrowthRunState();
 const executionGuard = makeGrowthExecutionGuard();
 let lastMeasuredPlan: ReturnType<typeof decideGrowthPlan> | null = null;
@@ -37,7 +38,8 @@ function growthMetrics(snapshot: Snapshot): GrowthMetrics {
   };
 }
 export function isGrowthPulseRunning() {
-  return growthPulseEnabled(process.env.GROWTH_PULSE, process.env.CHANNEL_AUTOPILOT);
+  return controlCenterAutopilotEnabled(process.env.CONTROL_CENTER_AUTOPILOT) &&
+    growthPulseEnabled(process.env.GROWTH_PULSE, process.env.CHANNEL_AUTOPILOT);
 }
 /** Admin-only endpoint can still show last in-process diagnostic during DB outage. */
 export function growthRuntimeStatus() {
