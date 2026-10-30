@@ -25,13 +25,13 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 |---:|---|---|
 | 21 | Stripe-Produkte über Produktstatus und Varianten zuverlässig abgleichen | CODE – CI ausstehend |
 | 22 | Stripe-Produktvarianten mit steuerlicher/zeitlicher Gültigkeit vergleichen | CODE – CI ausstehend |
-| 23 | Doppelte Stripe-IDs und verwaiste lokale Offers sicher behandeln | TEILWEISE – lokale Orphan-Offers offen |
+| 23 | Doppelte Stripe-IDs und verwaiste lokale Offers sicher behandeln | TEILWEISE – Abgleich implementiert, DB-E2E offen |
 | 24 | Checkout-Messung mit Stripe-Testmode-End-to-End abnehmen | BLOCKIERT – echte Stripe-Testmode-Abnahme |
 | 25 | Webhook-Wiederholungen bei Bestellung/Refund idempotent verarbeiten | TEILWEISE – Retry korrigiert, DB-ID-Ledger offen |
-| 26 | Abonnements mit Kündigung, Retention und Wiederaufnahme konsistent lesen | OFFEN |
+| 26 | Abonnements mit Kündigung, Retention und Wiederaufnahme konsistent lesen | TEILWEISE – Preis-Cache nach Account/Modus abgesichert |
 | 27 | Produktrechte und Affiliate-Kennzeichnung als prüfbare Freigaben speichern | TEILWEISE – Rechteclaims als ungeprüft |
 | 28 | Produkt-Matching über Herkunftsquellen ohne stillen Importkollisionsverlust | OFFEN |
-| 29 | Produkt-Sync-Fehler pro Provider mit Recovery-Status dokumentieren | TEILWEISE – read-only Diagnose |
+| 29 | Produkt-Sync-Fehler pro Provider mit Recovery-Status dokumentieren | TEILWEISE – begrenzte read-only Diagnose |
 | 30 | Admin-Produktkatalog mobil filtern, prüfen und manuell freigeben | CODE – CI ausstehend |
 
 ## 3. Content Production
@@ -172,3 +172,6 @@ Offene Risiken: reale Profitvalidierung, Kosten-Kohorten, Social-/Stripe-Berecht
 - `server/billing.ts`: Events werden erst nach erfolgreicher Verarbeitung als verarbeitet markiert; fehlgeschlagene Webhook-Aufrufe bleiben erneut zustellbar. Cross-Replica-Idempotenz benötigt noch persistente Event-ID-Prüfung.
 - `tests/stripe-catalog-projection.test.ts`, `tests/stripe-catalog-pagination.test.ts` und `tests/billing.test.ts`: deterministische Regressionstests. CI-Abnahme ist commitbezogen zu prüfen.
 - Fehlende echte Testmode-Credentials, Provider-/Device-E2E, Rechtsnachweise und DB-Migrationsabnahme verhindern eine vollständige Abnahme der zehn Produkt-/Stripe-Sprints.
+
+- Erweitert: `lib/stripe-offer-reconciliation.ts` + `tests/stripe-offer-reconciliation.test.ts`: lokale importierte Draft-Offers mit Produkt-IDs abgleichen (ohne DB-Writes), Dubletten/Orphans nur bei vollstaendigen Quellen als bestaetigt deklarieren.
+- Erweitert: `server/billing.ts` + `tests/billing.test.ts`: abgelegter Stripe-Preis-Cache ist an Stripe-Konto, Modus, Produkt und Lookup-Konfiguration gekoppelt; Key-Rotation und Sandbox-Wechsel duerfen keinen alten Checkout-Preis wiederverwenden.
