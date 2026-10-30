@@ -3,6 +3,7 @@ import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments }
 import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
 import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
+import { mergeChannelReach } from "../lib/channel-metric-source";
 import { materializeProductionSystem } from "./faceless-multichannel-service";
 
 const PERSONA="automationsklar-editorial";
@@ -31,11 +32,13 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
   const events=eventRows[0]??{impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,purchaseCents:0,refundCents:0};
   const purchaseCents=Number(events.purchaseCents??0);
   const refundCents=Number(events.refundCents??0);
-  const insightImpressions=jobs.reduce((s,j)=>s+Number(j.insights?.impressions??j.insights?.reach??0),0);
-  const insightViews=jobs.reduce((s,j)=>s+Number(j.insights?.views??j.insights?.plays??j.insights?.video_views??0),0);
+  const reach = mergeChannelReach(events.impressions, events.views,
+    jobs.map(j => (j.insights ?? {}) as Record<string, unknown>));
   return {
-    impressions:Math.max(Number(events.impressions??0),insightImpressions),
-    views:Math.max(Number(events.views??0),insightViews),
+    impressions:reach.impressions,
+    views:reach.views,
+    reachSource:reach.impressionsSource,
+    invalidInsightValues:reach.discardedValues,
     clicks:Number(events.clicks??0),leads:Number(events.leads??0),purchases:Number(events.purchases??0),refunds:Number(events.refunds??0),
     confirmedRevenueCents:purchaseCents-refundCents,
     published:jobs.filter(j=>j.status==="veroeffentlicht").length,
