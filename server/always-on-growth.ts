@@ -10,6 +10,7 @@ import {
   decideGrowthPlan, growthPulseFingerprint, growthRateCard, growthPulseEnabled,
   type GrowthMetrics,
 } from "../lib/always-on-growth-logic";
+import { auditGrowthMetrics } from "../lib/growth-data-quality";
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
 function growthMetrics(snapshot: Snapshot): GrowthMetrics {
   return {
@@ -29,11 +30,13 @@ export function isGrowthPulseRunning() {
 export async function growthPulseOverview() {
   const previous = await channelAutopilotOverview();
   const metrics = growthMetrics(previous.snapshot);
+  const quality = auditGrowthMetrics(metrics);
   return {
     status: "observe-measure-draft-approve" as const,
     enabled: isGrowthPulseRunning(),
     plan: decideGrowthPlan(metrics),
     metrics,
+    quality,
     rates: growthRateCard(metrics),
     evidenceFingerprint: growthPulseFingerprint(metrics),
     channel: { health: previous.health, decision: previous.decision },
@@ -51,7 +54,13 @@ export async function runGrowthPulse(): Promise<{
   externalActionsExecuted: 0; executedAt: string;
 }> {
   const snapshot = await collectChannelAutopilotSnapshot();
-  const plan = decideGrowthPlan(growthMetrics(snapshot));
+  const metrics = growthMetrics(snapshot);
+  const plan = decideGrowthPlan(metrics);
+  const quality = auditGrowthMetrics(metrics);
+  if (quality.status === "blocked") {
+    return { generated: 0, skipped: "invalid-growth-data", focus: "DATA", plan,
+      externalActionsExecuted: 0, executedAt: new Date().toISOString() };
+  }
   if (!isGrowthPulseRunning()) {
     return {
       generated: 0, skipped: "growth-pulse-disabled-by-admin",
