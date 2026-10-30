@@ -92,6 +92,22 @@ describe("subscription price resolution", () => {
     resetResolvedPriceIdCache();
   });
 
+  it("verwendet keinen gecachten Testmode-Preis nach Stripe-Key- oder Konfigurationswechsel", async () => {
+    vi.stubEnv("STRIPE_MODE", "test");
+    vi.stubEnv("STRIPE_SECRET_KEY", ["sk","test","mockaccountone"].join("_"));
+    vi.stubEnv("STRIPE_PRICE_ID", "price_first");
+    const api = fakeStripe(async id => price({id}));
+    expect(await resolveSubscriptionPriceId(api)).toBe("price_first");
+    expect(api.prices.retrieve).toHaveBeenCalledTimes(1);
+    expect(await resolveSubscriptionPriceId(api)).toBe("price_first");
+    expect(api.prices.retrieve).toHaveBeenCalledTimes(1);
+    vi.stubEnv("STRIPE_MODE", "live");
+    vi.stubEnv("STRIPE_SECRET_KEY", ["sk","live","mockaccounttwo"].join("_"));
+    vi.stubEnv("STRIPE_PRICE_ID", "price_second");
+    expect(await resolveSubscriptionPriceId(api)).toBe("price_second");
+    expect(api.prices.retrieve).toHaveBeenCalledTimes(2);
+  });
+
   it("uebernimmt den konfigurierten Preis, wenn Stripe ihn als aktiv und wiederkehrend bestaetigt", async () => {
     vi.stubEnv("STRIPE_PRICE_ID", "price_gueltig");
     const stripe = fakeStripe(async () => price({ id: "price_gueltig" }));
