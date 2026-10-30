@@ -26,6 +26,7 @@ export async function collectPages<T extends { id: string }>(
 ): Promise<{ rows: T[]; complete: boolean }> {
   const rows: T[] = [];
   const visitedCursors = new Set<string>();
+  const seenIds = new Set<string>();
   let cursor: string | undefined;
   for (let page = 0; page < MAX_PAGES; page++) {
     const response = await list({ limit: PAGE_SIZE, ...(cursor ? { starting_after: cursor } : {}) });
@@ -39,7 +40,11 @@ export async function collectPages<T extends { id: string }>(
     // never claim that the entire catalog has been read.
     const last = response.data.at(-1)?.id;
     if (cursor && response.data[0]?.id === cursor) return { rows, complete: false };
-    rows.push(...response.data);
+    for (const entry of response.data) {
+      if (seenIds.has(entry.id)) return { rows, complete: false };
+      seenIds.add(entry.id);
+      rows.push(entry);
+    }
     if (!response.has_more) return { rows, complete: true };
     if (!last || last === cursor || visitedCursors.has(last) || page === MAX_PAGES - 1) {
       return { rows, complete: false };
