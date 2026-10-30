@@ -22,6 +22,9 @@ export function auditGrowthMetrics(data: GrowthMetrics, at = new Date(), source?
     errors.push("confirmedRevenueCents: keine sichere ganzzahlige Minor-Unit");
   }
   if (!errors.length) {
+    if (data.impressions === 0 && (data.views > 0 || data.clicks > 0)) warnings.push("Reichweite ohne Impressionen: Tracking-Basis abgleichen");
+    if (data.clicks === 0 && data.leads > 0) warnings.push("Leads ohne Klickdaten: Quellenzuordnung unvollstaendig");
+    if (data.leads === 0 && data.purchases > 0) warnings.push("Kaeufe ohne Leads: Funnel-Attribution unvollstaendig");
     // Different sources, attribution windows and delayed events can explain these
     // discrepancies. Never silently correct or label them as fraud.
     if (data.views > data.impressions && data.impressions > 0) {
