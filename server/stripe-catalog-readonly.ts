@@ -3,6 +3,10 @@
  * change live checkout prices, charge customers, or publish content.
  */
 import Stripe from "stripe";
+import { sql } from "drizzle-orm";
+import { getDb } from "./db";
+import { revenueOffers } from "../drizzle/schema";
+import { reconcileStripeOfferRefs } from "../lib/stripe-offer-reconciliation";
 import { stripeAdminSettings } from "../lib/stripe-admin-status-logic";
 import { projectStripeCatalog } from "../lib/stripe-catalog-projection";
 
@@ -12,6 +16,8 @@ type CatalogResult = ReturnType<typeof projectStripeCatalog> & {
   mode: "live" | "test";
   fetchedAt: string;
   readOnly: true;
+  localOfferReconciliation: ReturnType<typeof reconcileStripeOfferRefs> | null;
+  localOfferStatus: "checked" | "unavailable";
 };
 let cache: { key: string; expiresAt: number; data: CatalogResult } | null = null;
 
@@ -47,9 +53,26 @@ export async function readStripeAdminCatalog(): Promise<CatalogResult> {
     collectPages(args => client.products.list(args)),
     collectPages(args => client.prices.list(args)),
   ]);
+  const projected = projectStripeCatalog(products.rows, prices.rows, products.complete, prices.complete);
+  let localOfferReconciliation: ReturnType<typeof reconcileStripeOfferRefs> | null = null;
+  try {
+    const db = await getDb();
+    if (db) {
+      const rows = await db.select({ id: revenueOffers.id, metadata: revenueOffers.metadata })
+        .from(revenueOffers)
+        .where(sql`${revenueOffers.metadata}->>'source' = 'stripe'`)
+        .limit(1001);
+      localOfferReconciliation = reconcileStripeOfferRefs(
+        rows, new Set(projected.products.map(p => p.id)), projected.complete, rows.length <= 1000,
+      );
+    }
+  } catch {
+    // Database unavailable must never become a false "0 orphan offers" result.
+  }
   const data: CatalogResult = {
-    ...projectStripeCatalog(products.rows, prices.rows, products.complete, prices.complete),
-    mode: settings.mode, readOnly: true,
+    ...projected, mode: settings.mode, readOnly: true,
+    localOfferStatus: localOfferReconciliation ? "checked" : "unavailable",
+    localOfferReconciliation,
     fetchedAt: new Date().toISOString(),
   };
   cache = { key, expiresAt: Date.now() + 2 * 60_000, data };
