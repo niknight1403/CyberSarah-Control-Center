@@ -120,3 +120,9 @@ export function growthRateCard(input: GrowthMetrics) {
     profitabilityVerified: false as const,
   };
 }
+
+/** A deliberate operator pause always wins, including scheduled cron runs. */
+export function growthPulseEnabled(growthFlag?: string, channelFlag?: string): boolean {
+  return (growthFlag ?? "on").trim().toLowerCase() !== "off" &&
+    (channelFlag ?? "on").trim().toLowerCase() !== "off";
+}
