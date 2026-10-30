@@ -17,6 +17,7 @@ import { eq, desc, sql, gte, and, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { openai, openaiVerfuegbar } from "../lib/openaiClient";
 import { getStripeClient } from "../lib/stripeClient";
+import { agentStripeWritePolicy } from "../lib/stripeAgentSafety";
 
 // 30 Premium-Upsell-Produkte für maximale Revenue (V5: mehr + günstigere Einstiege)
 const UPSELL_PRODUKTE: Array<{ name: string; marke: string; beschreibung: string; preis: string }> = [
@@ -88,21 +89,25 @@ export class MonetizationAgent extends AgentBase {
       this.flashSale(),
     ]);
 
-    const erfolgreich = ergebnisse.filter(r => r.status === "fulfilled").length;
-    const fehlgeschlagen = ergebnisse.filter(r => r.status === "rejected").length;
+    const erfolgreich = ergebnisse.filter(r => r.status === "fulfilled" &&
+      r.value.success && r.value.metadaten?.skipped !== true).length;
+    const uebersprungen = ergebnisse.filter(r => r.status === "fulfilled" &&
+      r.value.metadaten?.skipped === true).length;
+    const fehlgeschlagen = ergebnisse.filter(r => r.status === "rejected" ||
+      (r.status === "fulfilled" && !r.value.success)).length;
 
     if (this.agentId) {
       await db.insert(agentLogsTable).values({
         agentId: this.agentId, agentName: "Monetization Agent",
         aktion: "auto_optimize_all_v5", status: fehlgeschlagen > 0 ? "warning" : "ok",
-        nachricht: `V5: ${erfolgreich}/4 Aktionen erfolgreich`,
+        nachricht: `V5: ${erfolgreich}/4 Aktionen ausgeführt, ${uebersprungen} freigabepflichtig`,
       });
     }
 
     return {
       success: true,
-      message: `V5 Auto-Optimize: ${erfolgreich}/4 Aktionen ausgeführt`,
-      metadaten: { erfolgreich, fehlgeschlagen },
+      message: `V5 Auto-Optimize: ${erfolgreich}/4 ausgeführt, ${uebersprungen} ohne Freigabe übersprungen`,
+      metadaten: { erfolgreich, uebersprungen, fehlgeschlagen },
     };
   }
 
@@ -110,6 +115,10 @@ export class MonetizationAgent extends AgentBase {
   // UPSELL-PRODUKTE ERSTELLEN V5: Erstellt Stripe-Produkte + Links
   // ═══════════════════════════════════════════════════════════════════
   private async erstelleUpsellProdukte(marke?: string): Promise<AufgabeErgebnis> {
+    const policy = agentStripeWritePolicy(process.env);
+    if (!policy.allowed) return { success: true, message: policy.reason, metadaten: {
+      skipped: true, stripeWrites: 0, requiresApproval: true, action: "erstelleUpsellProdukte",
+    } };
     logger.info("📦 Monetization-V5: Upsell-Produkte erstellen");
     const stripe = getStripeClient();
     const produkte = marke ? UPSELL_PRODUKTE.filter(p => p.marke === marke) : UPSELL_PRODUKTE;
@@ -155,6 +164,10 @@ export class MonetizationAgent extends AgentBase {
   // DYNAMIC PRICING V5: Premium + Budget Preise automatisch
   // ═══════════════════════════════════════════════════════════════════
   private async dynamicPricing(): Promise<AufgabeErgebnis> {
+    const policy = agentStripeWritePolicy(process.env);
+    if (!policy.allowed) return { success: true, message: policy.reason, metadaten: {
+      skipped: true, stripeWrites: 0, requiresApproval: true, action: "dynamicPricing",
+    } };
     logger.info("💰 Monetization-V5: Dynamic Pricing");
     const stripe = getStripeClient();
 
@@ -207,6 +220,10 @@ export class MonetizationAgent extends AgentBase {
   // AUTO BUNDLE V5: Erstellt Bundles aus Top-Verkäufen
   // ═══════════════════════════════════════════════════════════════════
   private async autoBundle(): Promise<AufgabeErgebnis> {
+    const policy = agentStripeWritePolicy(process.env);
+    if (!policy.allowed) return { success: true, message: policy.reason, metadaten: {
+      skipped: true, stripeWrites: 0, requiresApproval: true, action: "autoBundle",
+    } };
     logger.info("📦 Monetization-V5: Auto Bundle");
     const stripe = getStripeClient();
 
@@ -273,6 +290,10 @@ export class MonetizationAgent extends AgentBase {
   // FLASH SALE V5: Erstellt zeitlich begrenzte Angebote
   // ═══════════════════════════════════════════════════════════════════
   private async flashSale(): Promise<AufgabeErgebnis> {
+    const policy = agentStripeWritePolicy(process.env);
+    if (!policy.allowed) return { success: true, message: policy.reason, metadaten: {
+      skipped: true, stripeWrites: 0, requiresApproval: true, action: "flashSale",
+    } };
     logger.info("⚡ Monetization-V5: Flash Sale");
     const stripe = getStripeClient();
 
