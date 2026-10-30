@@ -14,6 +14,7 @@ import { auditGrowthMetrics } from "../lib/growth-data-quality";
 import { refundRiskPlan } from "../lib/growth-refund-guard";
 import { initialGrowthRunState, growthRunStarted, growthRunCompleted, growthRunFailed, growthRuntimeHealth } from "../lib/growth-runtime-state";
 import { makeGrowthExecutionGuard } from "../lib/growth-execution-guard";
+import { compareGrowthWindows } from "../lib/growth-trend-logic";
 let runtime = initialGrowthRunState();
 const executionGuard = makeGrowthExecutionGuard();
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
@@ -33,7 +34,9 @@ export function isGrowthPulseRunning() {
   return growthPulseEnabled(process.env.GROWTH_PULSE, process.env.CHANNEL_AUTOPILOT);
 }
 export async function growthPulseOverview() {
-  const previous = await channelAutopilotOverview();
+  const [previous, recent] = await Promise.all([
+    channelAutopilotOverview(), collectChannelAutopilotSnapshot(7),
+  ]);
   const metrics = growthMetrics(previous.snapshot);
   const quality = auditGrowthMetrics(metrics, new Date(), previous.snapshot);
   return {
@@ -43,6 +46,8 @@ export async function growthPulseOverview() {
     metrics,
     quality,
     runtime: growthRuntimeHealth(runtime, new Date()),
+    trend: compareGrowthWindows(growthMetrics(recent), metrics,
+      !previous.snapshot.jobsTruncated && !recent.jobsTruncated),
     rates: growthRateCard(metrics),
     evidenceFingerprint: growthPulseFingerprint(metrics),
     channel: { health: previous.health, decision: previous.decision },
