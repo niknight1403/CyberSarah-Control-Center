@@ -13,7 +13,9 @@ import {
 import { auditGrowthMetrics } from "../lib/growth-data-quality";
 import { refundRiskPlan } from "../lib/growth-refund-guard";
 import { initialGrowthRunState, growthRunStarted, growthRunCompleted, growthRunFailed, growthRuntimeHealth } from "../lib/growth-runtime-state";
+import { makeGrowthExecutionGuard } from "../lib/growth-execution-guard";
 let runtime = initialGrowthRunState();
+const executionGuard = makeGrowthExecutionGuard();
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
 function growthMetrics(snapshot: Snapshot): GrowthMetrics {
   return {
@@ -95,6 +97,11 @@ async function executeGrowthPulse(): Promise<{
 
 /** Process-local observable lifecycle, independent of successful drafts. */
 export async function runGrowthPulse(): Promise<Awaited<ReturnType<typeof executeGrowthPulse>>> {
+  if (!executionGuard.acquire()) {
+    const overview = await growthPulseOverview();
+    return { generated: 0, skipped: "run-already-in-progress", focus: overview.plan.focus,
+      plan: overview.plan, externalActionsExecuted: 0, executedAt: new Date().toISOString() };
+  }
   runtime = growthRunStarted(runtime, new Date());
   try {
     const result = await executeGrowthPulse();
@@ -103,5 +110,7 @@ export async function runGrowthPulse(): Promise<Awaited<ReturnType<typeof execut
   } catch (error) {
     runtime = growthRunFailed(runtime, new Date());
     throw error;
+  } finally {
+    executionGuard.release();
   }
 }
