@@ -2,7 +2,7 @@ export type ChannelAutopilotSnapshot={
   impressions:number;views:number;clicks:number;leads:number;purchases:number;refunds:number;
   confirmedRevenueCents:number;published:number;failed:number;
   activeExperiments:number;pendingContentDrafts:number;pendingRevenueDrafts:number;
-  reachSource?:"events"|"platform";invalidInsightValues?:number;
+  reachSource?:"events"|"platform";invalidInsightValues?:number;jobsTruncated?:boolean;
 };
 export type ChannelLever="DISCOVERY"|"PACKAGING"|"RETENTION"|"CTA"|"LANDING"|"MONETIZATION"|"RELIABILITY"|"COMPOUND";
 export type ChannelAutopilotDecision={
