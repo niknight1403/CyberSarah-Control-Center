@@ -95,7 +95,7 @@ export function RevenueAutopilotCard() {
                   <Metric label="Impressionen" value={growth.data.metrics.impressions} />
                   <Metric label="Klicks" value={growth.data.metrics.clicks} />
                   <Metric label="Käufe" value={growth.data.metrics.purchases} />
-                  <Metric label="Netto-Umsatz*" value={(growth.data.metrics.confirmedRevenueCents / 100).toLocaleString("de-DE", { maximumFractionDigits: 2 }) + " €"} />
+                  <Metric label="Attribution*" value={growth.data.metrics.confirmedRevenueCents.toLocaleString("de-DE") + " Minor Units"} />
                 </View>
                 <Text style={styles.note}>Nächster Schritt: {growth.data.plan.nextActions[0]} · Datenbasis: {growth.data.plan.evidence}</Text>
                 <Pressable
@@ -121,7 +121,7 @@ export function RevenueAutopilotCard() {
                   <Text style={styles.buttonText}>{growNow.isPending ? "Werte Signale aus …" : "Growth Pulse jetzt starten"}</Text>
                 </Pressable>
                 {growNow.error ? <Text style={styles.error}>{growNow.error.message}</Text> : null}
-                <Text style={styles.note}>*Käufe minus Refunds, kein belegter Gewinn. Veröffentlichungen, Werbeausgaben und Preisänderungen bleiben freigabepflichtig.</Text>
+                <Text style={styles.note}>*Attributierter Umsatzwert abzüglich Refunds; Währung nicht verifiziert, kein belegter Gewinn. Veröffentlichungen, Werbeausgaben und Preisänderungen bleiben freigabepflichtig.</Text>
               </>
             ) : growth.isError ? <Text style={styles.error}>Growth Pulse nicht erreichbar: {growth.error.message}</Text>
               : <Text style={styles.note}>Lese bestehende Reichweiten-, Funnel- und Publishing-Daten …</Text>}
