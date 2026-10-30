@@ -12,6 +12,8 @@ import {
 } from "../lib/always-on-growth-logic";
 import { auditGrowthMetrics } from "../lib/growth-data-quality";
 import { refundRiskPlan } from "../lib/growth-refund-guard";
+import { initialGrowthRunState, growthRunStarted, growthRunCompleted, growthRunFailed, growthRuntimeHealth } from "../lib/growth-runtime-state";
+let runtime = initialGrowthRunState();
 type Snapshot = Awaited<ReturnType<typeof collectChannelAutopilotSnapshot>>;
 function growthMetrics(snapshot: Snapshot): GrowthMetrics {
   return {
@@ -38,6 +40,7 @@ export async function growthPulseOverview() {
     plan: refundRiskPlan(metrics) ?? decideGrowthPlan(metrics),
     metrics,
     quality,
+    runtime: growthRuntimeHealth(runtime, new Date()),
     rates: growthRateCard(metrics),
     evidenceFingerprint: growthPulseFingerprint(metrics),
     channel: { health: previous.health, decision: previous.decision },
@@ -49,7 +52,7 @@ export async function growthPulseOverview() {
   };
 }
 /** Trigger existing idempotent Channel Autopilot, not a new draft producer. */
-export async function runGrowthPulse(): Promise<{
+async function executeGrowthPulse(): Promise<{
   generated: number; skipped: string | null; focus: string;
   plan: ReturnType<typeof decideGrowthPlan>;
   externalActionsExecuted: 0; executedAt: string;
@@ -87,4 +90,18 @@ export async function runGrowthPulse(): Promise<{
     focus: plan.focus, plan, externalActionsExecuted: 0,
     executedAt: new Date().toISOString(),
   };
+}
+
+
+/** Process-local observable lifecycle, independent of successful drafts. */
+export async function runGrowthPulse(): Promise<Awaited<ReturnType<typeof executeGrowthPulse>>> {
+  runtime = growthRunStarted(runtime, new Date());
+  try {
+    const result = await executeGrowthPulse();
+    runtime = growthRunCompleted(runtime, result, new Date());
+    return result;
+  } catch (error) {
+    runtime = growthRunFailed(runtime, new Date());
+    throw error;
+  }
 }
