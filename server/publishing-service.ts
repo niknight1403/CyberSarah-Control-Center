@@ -45,6 +45,7 @@ import {
 } from "../lib/publishing-queue-logic";
 import { getDb } from "./db";
 import { resolveXToken } from "./x-token-service";
+import { assertPublishingMediaUrls, reviewPublishingMediaUrl } from "../lib/publishing-asset-url-logic";
 import { invokeLLM } from "./_core/llm";
 
 const PUBLISHING_HTTP_TIMEOUT_MS = 15_000;
@@ -131,6 +132,8 @@ export async function enqueueCampaignForUser(
   input: { product: string; goal: InfluencerGoal; days?: number; assetUrl?: string | null; assetUrls?: string[] }
 ): Promise<{ planned: number; inserted: number; focusPersona: string; firstSlotAt: Date }> {
   if (!userOpenId) throw new Error("Nutzerkontext fehlt — Kampagne nicht einreihbar.");
+  // Reject invalid external upload URLs before scheduling DB jobs.
+  assertPublishingMediaUrls(input.assetUrl, input.assetUrls);
   // Sprint 368 (Conversion-Loop): Insights vergangener Jobs fliessen in die
   // Fokus-Persona-Wahl ein — bewaehrte Personas steigen im Ranking auf.
   const performance = await getPersonaPerformanceForUser(userOpenId);
@@ -168,7 +171,7 @@ export async function setPublishingJobAsset(
   const db = await getDb();
   if (!db) return false;
   const url = assetUrl.trim();
-  if (!/^https?:\/\/.+/.test(url)) return false;
+  if (!reviewPublishingMediaUrl(url).valid) return false;
   const updated = await db
     .update(publishingJobs)
     .set({ assetUrl: url, updatedAt: new Date() })
@@ -207,8 +210,9 @@ export async function setPublishingJobAssets(
   const cleaned: string[] = [];
   for (const url of assetUrls) {
     const trimmed = url.trim();
-    const check = validateAssetUrl(trimmed, "image");
+    const check = reviewPublishingMediaUrl(trimmed);
     if (!check.valid) return { updated: false, reason: `Asset ungueltig: ${check.reason}` };
+    if (check.type !== "image") return { updated: false, reason: "Carousel braucht Bild-Assets, keine Videos." };
     cleaned.push(trimmed);
   }
   const updated = await db
