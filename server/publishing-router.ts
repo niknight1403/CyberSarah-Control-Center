@@ -9,7 +9,7 @@ import { getDb } from "./db";
 import {publishingOpsOverviewDb} from "./publishing-ops";
 import {getPublishingModeOverview} from "./publishing-service";
 import {isAutopilotEnabled} from "../lib/publishing-queue-logic";
-import { listUncertainPublishingForAdmin, listPublishingReviewHistory, reconcileUncertainPublishingJob } from "./publishing-review";
+import { listUncertainPublishingForAdmin, listPublishingReviewHistory, listPublishingReviewAudit, reconcileUncertainPublishingJob } from "./publishing-review";
 import {
   cancelPublishingJob,
   setPublishingJobAssets,
@@ -20,6 +20,24 @@ import {
 } from "./publishing-service";
 
 export const publishingRouter = router({
+  /** Query-only audit desk. Filters are bounded and validated before database access. */
+  reviewAudit: adminProcedure.input(z.object({
+    limit:z.number().int().min(1).max(50).optional(),
+    offset:z.number().int().min(0).max(5000).optional(),
+    resolution:z.enum(["confirmed_published","closed_without_replay"]).optional(),
+    jobId:z.number().int().positive().optional(),
+    from:z.coerce.date().optional(),
+    until:z.coerce.date().optional(),
+  }).optional()).query(async ({ctx,input})=>{
+    if(input?.from&&input?.until&&input.from>input.until)
+      throw new TRPCError({code:"BAD_REQUEST",message:"Startdatum darf nicht nach Enddatum liegen."});
+    const db=await getDb();
+    if(!db)throw new TRPCError({code:"SERVICE_UNAVAILABLE",message:"Datenbank nicht verfügbar."});
+    const result=await listPublishingReviewAudit(db,ctx.user.openId,input??{});
+    return {...result,events:result.events.map(event=>({
+      ...event,reviewedAt:event.reviewedAt.toISOString(),
+    }))};
+  }),
   /** Read-only monitoring; no secrets and no cross-account totals. */
   opsOverview: adminProcedure.query(async ({ctx})=>{
     const db=await getDb();
