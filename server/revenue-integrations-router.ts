@@ -1,6 +1,16 @@
 import {z} from "zod";
 import {adminProcedure,router} from "./_core/trpc";
 import {hubspotContacts,hubspotDeals,firecrawlPreview,draftWeeklyMarketing,revenueKpis} from "./revenue-connectors";
+import {
+  CONNECTOR_CATALOG, buildHubspotSyncPlan, buildLeadScrapePlan, buildMeteredUsageEvent,
+  buildOutreachDispatchPlan, evaluateConnectorReadiness, summarizeConnectorReadiness,
+} from "../lib/revenue-connectors-logic";
+import {
+  ACCOUNT_PROVIDERS, buildSetupGuide, createAccountEntry, nextAccountStep, reviewAccountConfiguration,
+} from "../lib/account-agent-logic";
+import { buildMetricsSnapshot, formatCents } from "../lib/revenue-metrics-logic";
+import { approveDraft, buildContentDraft, nextWeeklyRun } from "../lib/content-distribution-logic";
+
 export const revenueIntegrationsRouter=router({
   readiness:adminProcedure.query(()=>({
     hubspot:Boolean(process.env.HUBSPOT_ACCESS_TOKEN),
@@ -23,4 +33,66 @@ export const revenueIntegrationsRouter=router({
     leads:z.number().int().nonnegative(),conversions:z.number().int().nonnegative(),
     apiCalls:z.number().int().nonnegative(),
   })).query(({input})=>({...revenueKpis(input),source:"supplied_preview_only" as const})),
+
+  /* ---- Konto-Agent: Konten anlegen und einstellen (Metadaten, keine Fremd-Registrierung) ---- */
+  accountProviders:adminProcedure.query(()=>({
+    providers:ACCOUNT_PROVIDERS,
+    setup:ACCOUNT_PROVIDERS.map(p=>buildSetupGuide(p.key)),
+  })),
+  accountCreate:adminProcedure.input(z.object({provider:z.string().max(40),label:z.string().max(80).optional()}))
+    .mutation(({input})=>{
+      const result=createAccountEntry(input);
+      if(!result.ok)return {ok:false as const,reason:result.reason};
+      return {ok:true as const,account:result.value,nextStep:nextAccountStep(result.value)};
+    }),
+  accountReview:adminProcedure.input(z.object({provider:z.string().max(40)}))
+    .query(({input})=>reviewAccountConfiguration(input.provider)),
+  accountTemplate:adminProcedure.input(z.object({provider:z.string().max(40)}))
+    .query(({input})=>buildSetupGuide(input.provider)),
+
+  /* ---- Verbindungen: sauberer Status und sichere Vorschauen ---- */
+  connectorCatalog:adminProcedure.query(()=>({catalog:CONNECTOR_CATALOG,readiness:summarizeConnectorReadiness()})),
+  connectorReadiness:adminProcedure.input(z.object({key:z.enum(["hubspot","firecrawl","outreach","stripe_metered","apollo"])}))
+    .query(({input})=>evaluateConnectorReadiness(input.key)),
+  crmSyncPlan:adminProcedure.input(z.object({
+    contacts:z.number().int().min(0).max(10_000),deals:z.number().int().min(0).max(10_000),
+    direction:z.enum(["pull","push","both"]).optional(),
+  })).mutation(({input})=>buildHubspotSyncPlan(input)),
+  scrapeGuard:adminProcedure.input(z.object({url:z.string().max(2048)}))
+    .mutation(({input})=>buildLeadScrapePlan(input.url)),
+  outreachPlan:adminProcedure.input(z.object({candidates:z.array(z.object({
+    email:z.string().max(320),companyDomain:z.string().max(253).default(""),
+    consentGiven:z.boolean(),suppressed:z.boolean().optional(),
+  })).max(500)})).mutation(({input})=>buildOutreachDispatchPlan(input.candidates)),
+  meteredEventPlan:adminProcedure.input(z.object({
+    customerId:z.string().max(64),meterEventName:z.string().max(120).optional(),
+    quantity:z.number(),occurredAt:z.string().datetime().optional(),
+  })).mutation(({input})=>buildMeteredUsageEvent({customerId:input.customerId,
+    meterEventName:input.meterEventName??process.env.STRIPE_METER_EVENT_NAME??"",quantity:input.quantity,
+    occurredAt:input.occurredAt?new Date(input.occurredAt):undefined})),
+
+  /* ---- Kennzahlen und Inhalte ---- */
+  mrrSnapshot:adminProcedure.input(z.object({
+    subscriptions:z.array(z.object({customerId:z.string().max(64),status:z.enum(["active","trialing","past_due","canceled"]),
+      amountCents:z.number().int().min(0),interval:z.enum(["month","year"])})).max(5000).default([]),
+    funnel:z.object({visitors:z.number().int().min(0),signups:z.number().int().min(0),paidCustomers:z.number().int().min(0)})
+      .default({visitors:0,signups:0,paidCustomers:0}),
+    usage:z.array(z.object({customerId:z.string().max(64),calls:z.number().int().min(0),occurredAt:z.string()})).max(20000).default([]),
+  }).default({subscriptions:[],funnel:{visitors:0,signups:0,paidCustomers:0},usage:[]})).query(({input})=>{
+    const snapshot=buildMetricsSnapshot(input);
+    return {...snapshot,mrrFormatted:formatCents(snapshot.mrrCents),arrFormatted:formatCents(snapshot.arrCents)};
+  }),
+  contentDraftAuto:adminProcedure.input(z.object({
+    kind:z.enum(["case_study","release_notes"]),customer:z.string().max(120).optional(),metric:z.string().max(160).optional(),
+    improvement:z.string().max(160).optional(),features:z.array(z.string().max(160)).max(20).optional(),version:z.string().max(40).optional(),
+  })).mutation(({input})=>buildContentDraft(input)),
+  contentApprove:adminProcedure.input(z.object({
+    title:z.string().max(160),body:z.string().max(8000),channels:z.array(z.string()).max(8),
+    publishAt:z.string().datetime(),approvedBy:z.string().min(1).max(120),
+  })).mutation(({input})=>{
+    const draft=approveDraft({kind:"release_notes",title:input.title,body:input.body,channels:input.channels,
+      requiresApproval:true,publishAt:null},input.approvedBy,new Date(input.publishAt));
+    return draft?{ok:true as const,draft}:{ok:false as const,reason:"freigabe-ungueltig"};
+  }),
+  contentSchedule:adminProcedure.query(()=>({nextContentRun:nextWeeklyRun().toISOString()})),
 });

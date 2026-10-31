@@ -33,3 +33,26 @@ HUBSPOT_ACCESS_TOKEN, FIRECRAWL_API_KEY, RESEND_API_KEY,
 STRIPE_SECRET_KEY, verified RESEND_FROM_EMAIL, Stripe meter name/customer mapping.
 The existing production deploy workflow must explicitly forward newly introduced
 provider secrets to Render; do **not** display the values in logs.
+
+## Umsetzung 2026-11-01 (abgeschlossen)
+
+Die Umsatz-Konnektoren sind als geprueftes Paket umgesetzt und getestet:
+
+- `lib/revenue-connectors-logic.ts` — Bereitschaft, HubSpot-Batching (100er), SSRF-Schutz
+  fuer Scraping (nur HTTPS, keine internen Adressen), Outreach-Regeln (Einwilligung,
+  Sperrliste, Wegwerf-Domains, 50 pro Lauf), idempotente Stripe-Meter-Ereignisse.
+- `lib/account-agent-logic.ts` — **Konto-Agent**: Katalog der fuenf Anbieter, Konto-Entwuerfe
+  mit fehlenden Angaben, maskierte Pruefung der Zugangsdaten, Einrichtungsanleitungen mit
+  Berechtigungen und ENV-Vorlagen.
+- `lib/revenue-metrics-logic.ts` — MRR inkl. Jahresabo-Umrechnung, ARR, Conversion- und
+  Signup-Rate, API-Nutzung im 30-Tage-Fenster.
+- `lib/content-distribution-logic.ts` — woechentliche Case Studies und Release Notes mit
+  Freigabepflicht und Terminierung auf Montag 09:00 UTC.
+- `server/revenue-integrations-router.ts` — 14 Admin-Verfahren, siehe `docs/revenue-integrations.md`.
+
+Teststand: 2.835 Tests in 389 Dateien gruen, `tsc --noEmit` ohne Fehler,
+`npm run build` erzeugt `dist/index.js`, PM2- und Docker-Konfiguration validiert.
+
+Offen bleiben die menschlichen Schritte: Anbieter-Konten anlegen, Zugangsdaten
+hinterlegen, Domain verifizieren, Webhook registrieren. Details in
+`docs/revenue-integrations.md`.
