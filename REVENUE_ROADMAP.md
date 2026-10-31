@@ -15,9 +15,7 @@ time MRR source of truth were **not** present as one integrated production path.
 3. **Resend** consent-gated email adapter (implemented, **not** wired for automated send).
    Next: durable approval records, unsubscribe links, suppression lists, bounce webhooks,
    sending-domain verification and rate limits before enabling API mutations.
-4. **Stripe Meter Events** validated HTTP adapter (implemented, **not** wired into
-   automatic billing). Next: durable unique usage ledger, customer/meter mapping,
-   replay-safe transport, Stripe webhook reconciliation and billing dispute handling.
+4. **Stripe Meter Events** validated HTTP adapter and an opt-in Postgres-backed unique event ledger with lease-based retries (implemented in branch). **Automatic billing remains disabled.** Next: activate a reviewed migration and worker, customer/meter mapping, Stripe webhook reconciliation, billing dispute handling and E2E proof.
 5. **Admin tRPC preview** readiness, CRM, website, draft content and **explicitly
    supplied** KPI inputs (implemented; these are **not real-time revenue metrics**).
 6. **HubSpot MCP / Apollo / Outreach**: not connected. Require independent
