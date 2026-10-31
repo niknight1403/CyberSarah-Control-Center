@@ -42,4 +42,9 @@ export function assertPublishingMediaUrls(assetUrl?: string | null, assetUrls?: 
     const result = reviewPublishingMediaUrl(candidate);
     if (!result.valid) throw new Error(result.reason);
   }
+  for (const candidate of assetUrls ?? []) {
+    const result = reviewPublishingMediaUrl(candidate);
+    if (!result.valid || result.type !== "image")
+      throw new Error("Mehrteilige Publishing-Carousels benötigen ausschließlich öffentliche HTTPS-Bilder.");
+  }
 }
