@@ -43,6 +43,12 @@ export function publishingFailureDecision(dispatched: boolean, attempts: number,
   return {status:retryAt?"geplant":"fehlgeschlagen",retryAt};
 }
 
+/** Remote API acknowledgements without an actual post ID are uncertain. */
+export function isConfirmedPublishingReceipt(externalId: string): boolean {
+  return typeof externalId === "string" && externalId.length > 0 &&
+    !externalId.endsWith("-unknown") && !externalId.startsWith("ig-");
+}
+
 export function isStalePublishingClaim(status: string, updatedAt: Date, now: Date): boolean {
   return status === "in_bearbeitung" && Number.isFinite(updatedAt.getTime()) &&
     updatedAt.getTime() < now.getTime() - STALE_PUBLISHING_CLAIM_MINUTES * 60_000;

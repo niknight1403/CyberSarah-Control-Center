@@ -38,6 +38,7 @@ import {
   isJobDue,
   MAX_PUBLISH_ATTEMPTS,
   publishingFailureDecision,
+  isConfirmedPublishingReceipt,
   UNCERTAIN_PUBLISHING_MESSAGE,
   STALE_PUBLISHING_CLAIM_MINUTES,
   resolvePublishingMode,
@@ -650,7 +651,9 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
       const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls, {
         onXUnauthorized: () => resolveXToken({ now, force: true }).then((resolution) => resolution.token),
       });
-      await db
+      if (!isConfirmedPublishingReceipt(externalId))
+        throw new Error("Plattform lieferte keinen überprüfbaren Beitragsschlüssel.");
+      const [persisted] = await db
         .update(publishingJobs)
         .set({
           status: "veroeffentlicht",
@@ -660,7 +663,9 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
           lastError: null,
           updatedAt: new Date(),
         })
-        .where(and(eq(publishingJobs.id, job.id), eq(publishingJobs.status, "in_bearbeitung")));
+        .where(and(eq(publishingJobs.id, job.id), eq(publishingJobs.status, "in_bearbeitung")))
+        .returning({id:publishingJobs.id});
+      if (!persisted) throw new Error("Provider quittierte, DB-Bestätigung blieb aus.");
       outcome.live += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unbekannter Publishing-Fehler";

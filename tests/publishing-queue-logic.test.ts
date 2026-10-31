@@ -15,6 +15,7 @@ import {
   isStalePublishingClaim,
   STALE_PUBLISHING_CLAIM_MINUTES,
   PUBLISHING_STATUSES,
+  isConfirmedPublishingReceipt,
 } from "@/lib/publishing-queue-logic";
 
 describe("publishing queue logic (Sprint 365)", () => {
@@ -120,6 +121,15 @@ describe("publishing queue logic (Sprint 365)", () => {
     expect(publishingFailureDecision(true,3,now)).toEqual({status:"versand_ungeklaert",retryAt:null});
     expect(publishingFailureDecision(false,1,now)).toEqual({status:"geplant",retryAt:nextRetryAt(1,now)});
     expect(publishingFailureDecision(false,3,now)).toEqual({status:"fehlgeschlagen",retryAt:null});
+  });
+
+  it("rejects missing or fabricated provider acknowledgements after external send", () => {
+    expect(isConfirmedPublishingReceipt("x-unknown")).toBe(false);
+    expect(isConfirmedPublishingReceipt("bluesky-unknown")).toBe(false);
+    expect(isConfirmedPublishingReceipt("ig-12345")).toBe(false);
+    expect(isConfirmedPublishingReceipt("")).toBe(false);
+    expect(isConfirmedPublishingReceipt("23123459392")).toBe(true);
+    expect(isConfirmedPublishingReceipt("at://did:plc:abc/app.bsky.feed.post/xyz")).toBe(true);
   });
 
   it("detects abandoned claims without expiring fresh workers", () => {
