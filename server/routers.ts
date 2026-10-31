@@ -43,6 +43,7 @@ import { haraRouter, saasRouter, crossSellRouter, expansionRouter, subscriptionM
 import { revenueAutopilotRouter } from "./revenue-autopilot-router";
 import { controlCenterAutopilotRouter } from "./control-center-autopilot-router";
 import { revenueOsV2Router } from "./revenue-os-v2-router";
+import { revenueIntegrationsRouter } from "./revenue-integrations-router";
 import { growthNetworkRouter } from "./growth-network-router";
 import { facelessChannelRouter } from "./faceless-channel-router";
 import { publicProcedure, router } from "./_core/trpc";
@@ -99,6 +100,7 @@ export const appRouter = router({
   controlCenterAutopilot: controlCenterAutopilotRouter,
   revenueOsV2: revenueOsV2Router,
   growthNetwork: growthNetworkRouter,
+  revenueIntegrations: revenueIntegrationsRouter,
   facelessChannel: facelessChannelRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
