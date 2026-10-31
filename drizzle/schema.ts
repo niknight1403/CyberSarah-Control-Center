@@ -289,6 +289,8 @@ export type InsertDraftQueueRow = typeof draftQueue.$inferInsert;
 // Tokens liegen NUR in Env-Variablen, niemals in der DB.
 export const publishingStatus = pgEnum("publishing_status", [
   "geplant",
+  "in_bearbeitung",
+  "versand_ungeklaert",
   "sandbox_veroeffentlicht",
   "veroeffentlicht",
   "fehlgeschlagen",

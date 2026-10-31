@@ -37,7 +37,10 @@ import {
   isAutopilotEnabled,
   isJobDue,
   MAX_PUBLISH_ATTEMPTS,
-  nextRetryAt,
+  publishingFailureDecision,
+  isConfirmedPublishingReceipt,
+  UNCERTAIN_PUBLISHING_MESSAGE,
+  STALE_PUBLISHING_CLAIM_MINUTES,
   resolvePublishingMode,
   evaluatePublishingReliabilityCircuit,
   type PlatformCredentials,
@@ -273,6 +276,25 @@ export async function retryFailedPublishingJobs(userOpenId: string): Promise<num
     .where(and(eq(publishingJobs.userOpenId, userOpenId), eq(publishingJobs.status, "fehlgeschlagen")))
     .returning({ id: publishingJobs.id });
   return updated.length;
+}
+
+/**
+ * Claims with no heartbeat for 30 minutes are not retried automatically:
+ * an external provider may already have accepted the post before a crash.
+ */
+export async function quarantineStalePublishingClaims(now = new Date()): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const cutoff = new Date(now.getTime() - STALE_PUBLISHING_CLAIM_MINUTES * 60_000);
+  const rows = await db.update(publishingJobs).set({
+    status: "versand_ungeklaert",
+    lastError: UNCERTAIN_PUBLISHING_MESSAGE,
+    updatedAt: now,
+  }).where(and(
+    eq(publishingJobs.status, "in_bearbeitung"),
+    lte(publishingJobs.updatedAt, cutoff),
+  )).returning({id:publishingJobs.id});
+  return rows.length;
 }
 
 /** Faellige Nutzer ermitteln (autopilot-tauglich, indexgestuetzt). */
@@ -575,8 +597,24 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
 
   const outcome: AutopilotOutcome = { processed: 0, live: 0, sandbox: 0, failed: 0 };
 
-  for (const job of due) {
-    if (!isJobDue(job, now)) continue;
+  for (const candidate of due) {
+    if (!isJobDue(candidate, now)) continue;
+
+    // Atomic compare-and-swap is the distributed lease. A competing worker
+    // can read the same candidate, but only one can change geplant -> active.
+    const [job] = await db.update(publishingJobs).set({
+      status: "in_bearbeitung",
+      attempts: sql`${publishingJobs.attempts} + 1`,
+      lastError: null,
+      mode: null,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(publishingJobs.id, candidate.id),
+      eq(publishingJobs.userOpenId, userOpenId),
+      eq(publishingJobs.status, "geplant"),
+      lte(publishingJobs.scheduledFor, now),
+    )).returning();
+    if (!job) continue;
     outcome.processed += 1;
 
     // Sprint 367 (Optimierung 2+5): Instagram-Job ohne Asset -> automatisch
@@ -593,41 +631,54 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
 
     const resolution = resolvePublishingMode(job.platform, credentials, { hasAsset: Boolean(jobAssetUrl) || hasCarousel });
 
+    let dispatchStarted = false;
     try {
       const content = await generateJobContent(job);
       if (resolution.mode !== "live") {
         throw new Error(resolution.reason);
       }
+      // Persist the dispatch boundary before the network request. If a
+      // worker crashes after this point, replay requires manual reconciliation.
+      const [armed] = await db.update(publishingJobs).set({
+        mode: "dispatching", updatedAt: new Date(),
+      }).where(and(
+        eq(publishingJobs.id, job.id),
+        eq(publishingJobs.userOpenId, userOpenId),
+        eq(publishingJobs.status, "in_bearbeitung"),
+      )).returning({id:publishingJobs.id});
+      if (!armed) throw new Error("Publishing-Reservierung abgelaufen.");
+      dispatchStarted = true;
       const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls, {
         onXUnauthorized: () => resolveXToken({ now, force: true }).then((resolution) => resolution.token),
       });
-      await db
+      if (!isConfirmedPublishingReceipt(externalId))
+        throw new Error("Plattform lieferte keinen überprüfbaren Beitragsschlüssel.");
+      const [persisted] = await db
         .update(publishingJobs)
         .set({
           status: "veroeffentlicht",
           mode: "live",
           externalId,
           publishedAt: new Date(),
-          attempts: job.attempts + 1,
           lastError: null,
           updatedAt: new Date(),
         })
-        .where(eq(publishingJobs.id, job.id));
+        .where(and(eq(publishingJobs.id, job.id), eq(publishingJobs.status, "in_bearbeitung")))
+        .returning({id:publishingJobs.id});
+      if (!persisted) throw new Error("Provider quittierte, DB-Bestätigung blieb aus.");
       outcome.live += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unbekannter Publishing-Fehler";
-      const attempts = job.attempts + 1;
-      const retryAt = nextRetryAt(attempts, now);
+      const decision = publishingFailureDecision(dispatchStarted, job.attempts, now);
       await db
         .update(publishingJobs)
         .set({
-          status: retryAt ? "geplant" : "fehlgeschlagen",
-          attempts,
-          lastError: message,
-          scheduledFor: retryAt ?? job.scheduledFor,
+          status: decision.status,
+          lastError: dispatchStarted ? UNCERTAIN_PUBLISHING_MESSAGE : message,
+          scheduledFor: decision.retryAt ?? job.scheduledFor,
           updatedAt: new Date(),
         })
-        .where(eq(publishingJobs.id, job.id));
+        .where(and(eq(publishingJobs.id, job.id), eq(publishingJobs.status, "in_bearbeitung")));
       outcome.failed += 1;
     }
   }
@@ -699,6 +750,8 @@ async function autopilotTick(): Promise<void> {
   autopilotBusy = true;
   try {
     if (!isAutopilotEnabled(process.env.PUBLISHING_AUTOPILOT)) return;
+    const stale = await quarantineStalePublishingClaims();
+    if (stale > 0) console.warn(`[Publishing-Autopilot] ${stale} verwaiste Versand-Reservierungen gesperrt; Plattformprüfung nötig.`);
     const users = await usersWithDueJobs();
     for (const userOpenId of users) {
       const outcome = await processDueJobsForUser(userOpenId);

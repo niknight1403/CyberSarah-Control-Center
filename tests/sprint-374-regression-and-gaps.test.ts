@@ -162,13 +162,15 @@ describe("Sprint 374 — Kritische Pfade & Test-Lücken (Serie J)", () => {
   // 3. Publishing Queue Critical Path
   // -------------------------------------------------------------------------
   describe("Publishing Queue - Status-Invarianten & Modus-Logik", () => {
-    it("PUBLISHING_STATUSES definiert alle 5 gültigen Warteschlangen-Zustände", () => {
+    it("PUBLISHING_STATUSES definiert alle 7 gültigen Warteschlangen-Zustände", () => {
       expect(PUBLISHING_STATUSES).toContain("geplant");
       expect(PUBLISHING_STATUSES).toContain("sandbox_veroeffentlicht");
       expect(PUBLISHING_STATUSES).toContain("veroeffentlicht");
       expect(PUBLISHING_STATUSES).toContain("fehlgeschlagen");
       expect(PUBLISHING_STATUSES).toContain("abgebrochen");
-      expect(PUBLISHING_STATUSES.length).toBe(5);
+      expect(PUBLISHING_STATUSES).toContain("in_bearbeitung");
+      expect(PUBLISHING_STATUSES).toContain("versand_ungeklaert");
+      expect(PUBLISHING_STATUSES.length).toBe(7);
     });
   });
 

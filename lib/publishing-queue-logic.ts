@@ -22,12 +22,37 @@ import { zonedCampaignSlot } from "./publishing-timezone-logic";
 
 export const PUBLISHING_STATUSES = [
   "geplant",
+  "in_bearbeitung",
+  "versand_ungeklaert",
   "sandbox_veroeffentlicht",
   "veroeffentlicht",
   "fehlgeschlagen",
   "abgebrochen",
 ] as const;
 export type PublishingStatus = (typeof PUBLISHING_STATUSES)[number];
+
+/** Durable transitions for multi-instance publishing. */
+export const STALE_PUBLISHING_CLAIM_MINUTES = 30;
+export const UNCERTAIN_PUBLISHING_MESSAGE =
+  "Versandstatus ungeklärt: Plattform prüfen; nie automatisch erneut senden.";
+
+export function publishingFailureDecision(dispatched: boolean, attempts: number, now: Date):
+  { status: "geplant" | "fehlgeschlagen" | "versand_ungeklaert"; retryAt: Date | null } {
+  if (dispatched) return {status:"versand_ungeklaert",retryAt:null};
+  const retryAt = nextRetryAt(attempts,now);
+  return {status:retryAt?"geplant":"fehlgeschlagen",retryAt};
+}
+
+/** Remote API acknowledgements without an actual post ID are uncertain. */
+export function isConfirmedPublishingReceipt(externalId: string): boolean {
+  return typeof externalId === "string" && externalId.length > 0 &&
+    !externalId.endsWith("-unknown") && !externalId.startsWith("ig-");
+}
+
+export function isStalePublishingClaim(status: string, updatedAt: Date, now: Date): boolean {
+  return status === "in_bearbeitung" && Number.isFinite(updatedAt.getTime()) &&
+    updatedAt.getTime() < now.getTime() - STALE_PUBLISHING_CLAIM_MINUTES * 60_000;
+}
 
 export const MAX_PUBLISH_ATTEMPTS = 3;
 export const RETRY_BACKOFF_MINUTES = [10, 60, 360] as const;

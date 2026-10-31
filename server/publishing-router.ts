@@ -58,6 +58,7 @@ export const publishingRouter = router({
           platform: job.platform,
           campaignDay: job.campaignDay,
           status: job.status,
+          requiresManualReview: job.status === "versand_ungeklaert",
           mode: job.mode,
           scheduledFor: job.scheduledFor.toISOString(),
           publishedAt: job.publishedAt?.toISOString() ?? null,

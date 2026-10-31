@@ -11,6 +11,11 @@ import {
   nextRetryAt,
   resolvePublishingMode,
   evaluatePublishingReliabilityCircuit,
+  publishingFailureDecision,
+  isStalePublishingClaim,
+  STALE_PUBLISHING_CLAIM_MINUTES,
+  PUBLISHING_STATUSES,
+  isConfirmedPublishingReceipt,
 } from "@/lib/publishing-queue-logic";
 
 describe("publishing queue logic (Sprint 365)", () => {
@@ -100,6 +105,38 @@ describe("publishing queue logic (Sprint 365)", () => {
     expect(open.failureRatePct).toBe(60);
     expect(open.reason).toContain("Publishing pausiert");
     expect(evaluatePublishingReliabilityCircuit({ published: 8, failed: 2 }).open).toBe(false);
+  });
+
+  it("separates active and uncertain dispatch from due jobs", () => {
+    const due=new Date("2026-01-01T00:00:00Z"),now=new Date("2026-01-02T00:00:00Z");
+    expect(PUBLISHING_STATUSES).toContain("in_bearbeitung");
+    expect(PUBLISHING_STATUSES).toContain("versand_ungeklaert");
+    expect(isJobDue({status:"in_bearbeitung",scheduledFor:due},now)).toBe(false);
+    expect(isJobDue({status:"versand_ungeklaert",scheduledFor:due},now)).toBe(false);
+  });
+
+  it("never automatically retries a possibly dispatched social post", () => {
+    const now=new Date("2026-10-31T11:00:00Z");
+    expect(publishingFailureDecision(true,1,now)).toEqual({status:"versand_ungeklaert",retryAt:null});
+    expect(publishingFailureDecision(true,3,now)).toEqual({status:"versand_ungeklaert",retryAt:null});
+    expect(publishingFailureDecision(false,1,now)).toEqual({status:"geplant",retryAt:nextRetryAt(1,now)});
+    expect(publishingFailureDecision(false,3,now)).toEqual({status:"fehlgeschlagen",retryAt:null});
+  });
+
+  it("rejects missing or fabricated provider acknowledgements after external send", () => {
+    expect(isConfirmedPublishingReceipt("x-unknown")).toBe(false);
+    expect(isConfirmedPublishingReceipt("bluesky-unknown")).toBe(false);
+    expect(isConfirmedPublishingReceipt("ig-12345")).toBe(false);
+    expect(isConfirmedPublishingReceipt("")).toBe(false);
+    expect(isConfirmedPublishingReceipt("23123459392")).toBe(true);
+    expect(isConfirmedPublishingReceipt("at://did:plc:abc/app.bsky.feed.post/xyz")).toBe(true);
+  });
+
+  it("detects abandoned claims without expiring fresh workers", () => {
+    const now=new Date("2026-10-31T11:00:00Z");
+    expect(isStalePublishingClaim("in_bearbeitung",new Date(now.getTime()-(STALE_PUBLISHING_CLAIM_MINUTES+1)*60000),now)).toBe(true);
+    expect(isStalePublishingClaim("in_bearbeitung",new Date(now.getTime()-5*60000),now)).toBe(false);
+    expect(isStalePublishingClaim("geplant",new Date(0),now)).toBe(false);
   });
 
   it("schaltet den Autopilot per Env-Flag aus", () => {
