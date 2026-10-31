@@ -18,7 +18,7 @@
  * Tabelle platform_tokens — der Autopilot frischt vor Ablauf selbst nach.
  */
 
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { create, type AxiosInstance } from "axios";
 import {
   autoCardAssetUrl,
@@ -40,13 +40,13 @@ import {
   publishingFailureDecision,
   isConfirmedPublishingReceipt,
   UNCERTAIN_PUBLISHING_MESSAGE,
-  STALE_PUBLISHING_CLAIM_MINUTES,
   resolvePublishingMode,
   evaluatePublishingReliabilityCircuit,
   type PlatformCredentials,
   type PublishingMode,
 } from "../lib/publishing-queue-logic";
 import { getDb } from "./db";
+import { claimDuePublishingJob, quarantineStalePublishingClaimsDb } from "./publishing-claim";
 import { resolveXToken } from "./x-token-service";
 import { assertPublishingMediaUrls, reviewPublishingMediaUrl } from "../lib/publishing-asset-url-logic";
 import { invokeLLM } from "./_core/llm";
@@ -285,16 +285,7 @@ export async function retryFailedPublishingJobs(userOpenId: string): Promise<num
 export async function quarantineStalePublishingClaims(now = new Date()): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
-  const cutoff = new Date(now.getTime() - STALE_PUBLISHING_CLAIM_MINUTES * 60_000);
-  const rows = await db.update(publishingJobs).set({
-    status: "versand_ungeklaert",
-    lastError: UNCERTAIN_PUBLISHING_MESSAGE,
-    updatedAt: now,
-  }).where(and(
-    eq(publishingJobs.status, "in_bearbeitung"),
-    lte(publishingJobs.updatedAt, cutoff),
-  )).returning({id:publishingJobs.id});
-  return rows.length;
+  return quarantineStalePublishingClaimsDb(db, now);
 }
 
 /** Faellige Nutzer ermitteln (autopilot-tauglich, indexgestuetzt). */
@@ -602,18 +593,7 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
 
     // Atomic compare-and-swap is the distributed lease. A competing worker
     // can read the same candidate, but only one can change geplant -> active.
-    const [job] = await db.update(publishingJobs).set({
-      status: "in_bearbeitung",
-      attempts: sql`${publishingJobs.attempts} + 1`,
-      lastError: null,
-      mode: null,
-      updatedAt: new Date(),
-    }).where(and(
-      eq(publishingJobs.id, candidate.id),
-      eq(publishingJobs.userOpenId, userOpenId),
-      eq(publishingJobs.status, "geplant"),
-      lte(publishingJobs.scheduledFor, now),
-    )).returning();
+    const job = await claimDuePublishingJob(db, candidate.id, userOpenId, now);
     if (!job) continue;
     outcome.processed += 1;
 

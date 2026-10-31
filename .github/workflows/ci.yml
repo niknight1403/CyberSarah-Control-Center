@@ -147,3 +147,34 @@ jobs:
           EXTERNAL_ACTION_AUDIT_URL: ${{ secrets.EXTERNAL_ACTION_AUDIT_URL }}
           AUDIT_AUTH_TOKEN: ${{ secrets.SERVICE_ACCESS_TOKEN }}
         run: node scripts/ci-audit.mjs
+
+  publishing-postgres-concurrency:
+    name: PostgreSQL Publishing Multi-Worker Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: publishing_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d publishing_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PUBLISHING_INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/publishing_ci
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Assert live CAS and quarantine transitions with 24 concurrent claims
+        run: npx tsx scripts/test-publishing-claim-postgres.ts
