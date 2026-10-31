@@ -35,3 +35,13 @@ export function validateStripeSourceIds(productId: string, priceId: string): str
     return "Stripe-Quell-IDs nicht eindeutig gültig; Entwurf nicht speichern";
   return null;
 }
+
+/** Sprint 33: three editorially distinct, conservative hook experiments. */
+export function buildSafeProductHooks(productName: string): string[] {
+  const title=productName.replace(/\s+/g," ").trim();
+  return [
+    `Neugierig auf ${title}? Diese Angaben solltest du zuerst prüfen.`,
+    `Drei Fakten-Checks vor deiner Entscheidung zu ${title}.`,
+    `Welche Fragen sind bei ${title} noch offen? Ein kurzer Überblick.`,
+  ];
+}

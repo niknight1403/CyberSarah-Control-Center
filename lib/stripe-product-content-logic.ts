@@ -3,7 +3,7 @@
  * Nothing is published, charged, price-adjusted or rendered by this bridge.
  */
 import type { StripeCatalogPage } from "./stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds } from "./commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks } from "./commerce-draft-guards";
 import { buildReviewableProductReel } from "./reel-storyboard-logic";
 import {
   validateDraftPayload, type ContentDraftPayload,
@@ -41,6 +41,7 @@ export function buildProductContentBrief(
   }
   const storyboard = buildReviewableProductReel(name);
   if (!storyboard.ok) return { ok: false, reason: storyboard.reason };
+  const hookVariants = buildSafeProductHooks(name);
   const content = [
     "Produkt im Überblick: " + name + ".",
     "Worum geht es bei diesem Angebot? Welche Informationen sind für Interessierte wichtig?",
@@ -55,6 +56,7 @@ export function buildProductContentBrief(
         "Headline: Produktname.\nAbschnitte: Zielgruppe, nachweisbare Produktdetails, Bedingungen, Datenschutzhinweise und erst nach Prüfung Checkout-CTA."},
       {format:"story-outline",variant:1,title:"Story-Konzept",content:
         "Frame 1: Produktname. Frame 2: häufige Interessentenfrage. Frame 3: sachliche Antwort nach Quellenprüfung. Frame 4: überprüfter CTA."},
+      ...hookVariants.map((hook, index)=>({format:"hook-variant",variant:index+1,title:`Hook-Version ${index+1}`,content:hook})),
     ],
   });
   if (!candidate.valid) return { ok: false, reason: candidate.reason };

@@ -10,9 +10,9 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     const result=buildProductContentBrief(catalog(),"prod_sample","nova","instagram");
     expect(result.ok).toBe(true);
     if(!result.ok)throw Error(result.reason);
-    expect(result.payload.assets?.map(a=>a.format)).toEqual([
+    expect(result.payload.assets?.map(a=>a.format)).toEqual(expect.arrayContaining([
       "reel-storyboard","landing-outline","story-outline",
-    ]);
+    ]));
     expect(result.payload.content).toContain("CyberSarah Digitalpaket");
     const reel = result.payload.assets?.find(asset => asset.format === "reel-storyboard");
     expect(reel?.content).toContain("00–03 s | Sprechertext:");
@@ -67,6 +67,16 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     const result=buildProductContentBrief(invalid,"prod_bad:id");
     expect(result.ok).toBe(false);
     if(!result.ok) expect(result.reason).toMatch(/Quell-IDs/);
+  });
+
+  it("Sprint 33: produces differentiated reviewable hook assets in the shared content payload", () => {
+    const result=buildProductContentBrief(catalog(),"prod_sample");
+    expect(result.ok).toBe(true);
+    if(!result.ok)return;
+    const hooks=result.payload.assets?.filter(x=>x.format==="hook-variant")??[];
+    expect(hooks).toHaveLength(3);
+    expect(hooks.map(x=>x.variant)).toEqual([1,2,3]);
+    expect(new Set(hooks.map(x=>x.content)).size).toBe(3);
   });
 
 });

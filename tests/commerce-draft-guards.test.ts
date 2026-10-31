@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectStripeCatalog } from "../lib/stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds } from "../lib/commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks } from "../lib/commerce-draft-guards";
 
 const baseProduct = {id:"prod_sample",name:"CyberSarah Paket",active:true,default_price:"price_default"};
 const basePrice = {id:"price_default",product:"prod_sample",active:true,currency:"eur",unit_amount:7900,type:"one_time",tax_behavior:"inclusive"};
@@ -28,6 +28,14 @@ describe("Commerce draft release safeguards", () => {
     expect(validateStripeSourceIds("prod_sample","price_../../hack")).toMatch(/Quell-IDs/);
     expect(validateStripeSourceIds("prod_<script>","price_sample")).toMatch(/Quell-IDs/);
     expect(validateStripeSourceIds("prod_sample","price_")).toMatch(/Quell-IDs/);
+  });
+
+  it("Sprint 33: generates three different safe hooks without price or success inventions", () => {
+    const hooks=buildSafeProductHooks("CyberSarah Paket");
+    expect(hooks).toHaveLength(3);
+    expect(new Set(hooks).size).toBe(3);
+    expect(hooks.every(x=>x.includes("CyberSarah Paket"))).toBe(true);
+    expect(hooks.join(" ")).not.toMatch(/garantiert|jetzt kaufen|kostenlos|100 %/i);
   });
 
 });
