@@ -19,16 +19,23 @@ import {
 
 export const publishingRouter = router({
   /** Admin can inspect only their OWN uncertain jobs (never cross-tenant). */
-  reviewQueue: adminProcedure.query(async ({ctx}) => {
+  reviewQueue: adminProcedure.input(z.object({
+    limit:z.number().int().min(1).max(50).optional(),
+    offset:z.number().int().min(0).max(5000).optional(),
+    platform:z.enum(["x","linkedin","threads","bluesky","instagram","tiktok"]).optional(),
+    search:z.string().trim().max(80).optional(),
+  }).optional()).query(async ({ctx,input}) => {
     const db=await getDb();
     if (!db) throw new TRPCError({code:"SERVICE_UNAVAILABLE",message:"Datenbank nicht verfügbar."});
-    const [jobs,events]=await Promise.all([
-      listUncertainPublishingForAdmin(db,ctx.user.openId),
+    const [queue,events]=await Promise.all([
+      listUncertainPublishingForAdmin(db,ctx.user.openId,input??{}),
       listPublishingReviewHistory(db,ctx.user.openId),
     ]);
     return {
-      jobs: jobs.map(job => ({...job,updatedAt:job.updatedAt.toISOString(),scheduledFor:job.scheduledFor.toISOString()})),
-      events: events.map(event => ({...event,reviewedAt:event.reviewedAt.toISOString()})),
+      ...queue,
+      jobs:queue.jobs.map(job=>({...job,updatedAt:job.updatedAt.toISOString(),
+        scheduledFor:job.scheduledFor.toISOString()})),
+      events:events.map(event=>({...event,reviewedAt:event.reviewedAt.toISOString()})),
     };
   }),
   /**
