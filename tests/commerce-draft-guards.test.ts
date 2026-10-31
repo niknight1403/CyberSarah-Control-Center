@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectStripeCatalog } from "../lib/stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona, mobileCreativeSpec } from "../lib/commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona, mobileCreativeSpec, buildLandingCtaContract } from "../lib/commerce-draft-guards";
 
 const baseProduct = {id:"prod_sample",name:"CyberSarah Paket",active:true,default_price:"price_default"};
 const basePrice = {id:"price_default",product:"prod_sample",active:true,currency:"eur",unit_amount:7900,type:"one_time",tax_behavior:"inclusive"};
@@ -57,6 +57,13 @@ describe("Commerce draft release safeguards", () => {
     expect(mobileCreativeSpec("tiktok")).toMatchObject({width:1080,height:1920});
     expect(mobileCreativeSpec("linkedin")).toMatchObject({width:1080,height:1080});
     expect(mobileCreativeSpec("rogue-platform")).toBeNull();
+  });
+
+  it("Sprint 51: landing checkout CTA is explicitly disabled without independent checkout evidence", () => {
+    const cta=buildLandingCtaContract("prod_sample","price_default");
+    expect(cta).toMatchObject({enabled:false,destination:null,status:"requires-review"});
+    expect(cta.productId).toBe("prod_sample");
+    expect(cta.requiredEvidence).toHaveLength(3);
   });
 
 });

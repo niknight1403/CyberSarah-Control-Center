@@ -3,7 +3,7 @@
  * Nothing is published, charged, price-adjusted or rendered by this bridge.
  */
 import type { StripeCatalogPage } from "./stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona, mobileCreativeSpec } from "./commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona, mobileCreativeSpec, buildLandingCtaContract } from "./commerce-draft-guards";
 import { buildReviewableProductReel } from "./reel-storyboard-logic";
 import {
   validateDraftPayload, type ContentDraftPayload,
@@ -46,6 +46,7 @@ export function buildProductContentBrief(
   const storyboard = buildReviewableProductReel(name);
   if (!storyboard.ok) return { ok: false, reason: storyboard.reason };
   const hookVariants = buildSafeProductHooks(name);
+  const cta = buildLandingCtaContract(product.id, price.id);
   const content = [
     "Produkt im Überblick: " + name + ".",
     "Worum geht es bei diesem Angebot? Welche Informationen sind für Interessierte wichtig?",
@@ -58,6 +59,7 @@ export function buildProductContentBrief(
       {format:"reel-storyboard",variant:1,title:"Reel-Konzept (Timing, Sprechertext, Untertitel)",content:storyboard.content},
       {format:"landing-outline",variant:1,title:"Landingpage-Konzept",content:
         "Headline: Produktname.\nAbschnitte: Zielgruppe, nachweisbare Produktdetails, Bedingungen, Datenschutzhinweise und erst nach Prüfung Checkout-CTA."},
+      {format:"landing-cta-contract",variant:1,title:"CTA-Vertrag (Freigabe ausstehend)",content:JSON.stringify(cta)},
       {format:"story-outline",variant:1,title:"Story-Konzept",content:
         "Frame 1: Produktname. Frame 2: häufige Interessentenfrage. Frame 3: sachliche Antwort nach Quellenprüfung. Frame 4: überprüfter CTA."},
       ...hookVariants.map((hook, index)=>({format:"hook-variant",variant:index+1,title:`Hook-Version ${index+1}`,content:hook})),

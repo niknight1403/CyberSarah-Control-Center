@@ -75,3 +75,23 @@ export function mobileCreativeSpec(platform: string): {width:number;height:numbe
       notes:"Quadratischer Preview-Entwurf; Text als barrierearme Beschreibung bereitstellen"};
   return null;
 }
+
+/** Sprint 51: no active checkout CTA without a source URL, title and rights approval. */
+export type LandingCtaContract = {
+  enabled: false;
+  status: "requires-review";
+  destination: null;
+  productId: string;
+  priceId: string;
+  requiredEvidence: string[];
+};
+export function buildLandingCtaContract(productId: string, priceId: string): LandingCtaContract {
+  return {
+    enabled:false,status:"requires-review",destination:null,productId,priceId,
+    requiredEvidence:[
+      "Stripe-Checkout-URL via autorisierten Checkout-Pfad validieren",
+      "Preis, Währung, Steuern und aktive Verfügbarkeit freigeben",
+      "Medienrechte, Werbung/Affiliate und Verbraucherinformationen prüfen",
+    ],
+  };
+}

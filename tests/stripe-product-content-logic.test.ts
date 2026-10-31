@@ -107,4 +107,13 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     expect(li.payload.assets?.find(x=>x.format==="mobile-creative-spec")?.content).toContain("1080x1080");
   });
 
+  it("Sprint 51: includes a machine-readable disabled CTA contract and original Stripe IDs", () => {
+    const r=buildProductContentBrief(catalog(),"prod_sample");
+    expect(r.ok).toBe(true); if(!r.ok)return;
+    const cta=r.payload.assets?.find(x=>x.format==="landing-cta-contract");
+    expect(cta).toBeDefined();
+    const data=JSON.parse(cta!.content);
+    expect(data).toMatchObject({enabled:false,destination:null,productId:"prod_sample",priceId:"price_sample"});
+  });
+
 });
