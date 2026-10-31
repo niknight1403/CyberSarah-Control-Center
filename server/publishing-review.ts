@@ -2,7 +2,7 @@
  * Human-only resolution of uncertain social-media publishing.
  * Query, filtering, and transactional decisions never dispatch a post.
  */
-import {and, asc, count, desc, eq, ilike, ne, or, sql} from "drizzle-orm";
+import {and, asc, count, desc, eq, gte, ilike, lte, ne, or, sql} from "drizzle-orm";
 import {TRPCError} from "@trpc/server";
 import {publishingJobs,publishingReviewEvents} from "../drizzle/schema";
 import {cleanReviewSearch,validManualReviewReceipt,type ReviewPlatform} from "../lib/publishing-review-logic";
@@ -93,6 +93,44 @@ export async function listPublishingReviewHistory(db:PublishingDb,userOpenId:str
     .where(eq(publishingReviewEvents.userOpenId,userOpenId))
     .orderBy(desc(publishingReviewEvents.reviewedAt),desc(publishingReviewEvents.id))
     .limit(12);
+}
+
+/** Strict owner-scoped, paginated audit history. No tokens, URLs or credentials. */
+export type ReviewAuditFilter={
+  limit?:number;
+  offset?:number;
+  resolution?:"confirmed_published"|"closed_without_replay";
+  jobId?:number;
+  from?:Date;
+  until?:Date;
+};
+export async function listPublishingReviewAudit(
+  db:PublishingDb,userOpenId:string,filter:ReviewAuditFilter={},
+){
+  const limit=Math.min(Math.max(filter.limit??10,1),50);
+  const offset=Math.min(Math.max(filter.offset??0,0),5000);
+  const conditions=[eq(publishingReviewEvents.userOpenId,userOpenId)];
+  if(filter.resolution)conditions.push(eq(publishingReviewEvents.resolution,filter.resolution));
+  if(filter.jobId)conditions.push(eq(publishingReviewEvents.jobId,filter.jobId));
+  if(filter.from)conditions.push(gte(publishingReviewEvents.reviewedAt,filter.from));
+  if(filter.until)conditions.push(lte(publishingReviewEvents.reviewedAt,filter.until));
+  const where=and(...conditions);
+  const [totals,events]=await Promise.all([
+    db.select({total:count()}).from(publishingReviewEvents).where(where),
+    db.select({
+      id:publishingReviewEvents.id,
+      jobId:publishingReviewEvents.jobId,
+      resolution:publishingReviewEvents.resolution,
+      externalId:publishingReviewEvents.externalId,
+      evidence:publishingReviewEvents.evidence,
+      actorOpenId:publishingReviewEvents.actorOpenId,
+      reviewedAt:publishingReviewEvents.reviewedAt,
+    }).from(publishingReviewEvents).where(where)
+      .orderBy(desc(publishingReviewEvents.reviewedAt),desc(publishingReviewEvents.id))
+      .limit(limit).offset(offset),
+  ]);
+  const total=totals[0]?.total??0;
+  return {events,total,hasMore:offset+events.length<total,offset,limit};
 }
 
 export async function reconcileUncertainPublishingJob(
