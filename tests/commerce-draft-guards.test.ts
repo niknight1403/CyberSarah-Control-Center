@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectStripeCatalog } from "../lib/stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks } from "../lib/commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist } from "../lib/commerce-draft-guards";
 
 const baseProduct = {id:"prod_sample",name:"CyberSarah Paket",active:true,default_price:"price_default"};
 const basePrice = {id:"price_default",product:"prod_sample",active:true,currency:"eur",unit_amount:7900,type:"one_time",tax_behavior:"inclusive"};
@@ -36,6 +36,14 @@ describe("Commerce draft release safeguards", () => {
     expect(new Set(hooks).size).toBe(3);
     expect(hooks.every(x=>x.includes("CyberSarah Paket"))).toBe(true);
     expect(hooks.join(" ")).not.toMatch(/garantiert|jetzt kaufen|kostenlos|100 %/i);
+  });
+
+  it("Sprint 34: keeps production media render blocked without independent license evidence", () => {
+    const p=catalog([basePrice]).products[0];
+    const notes=buildMediaRightsChecklist(p);
+    expect(notes).toContain("RENDER-STATUS: BLOCKIERT");
+    expect(notes).toContain("prod_sample");
+    expect(notes).toMatch(/keine Lizenz/);
   });
 
 });

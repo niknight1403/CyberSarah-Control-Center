@@ -45,3 +45,15 @@ export function buildSafeProductHooks(productName: string): string[] {
     `Welche Fragen sind bei ${title} noch offen? Ein kurzer Überblick.`,
   ];
 }
+
+/** Sprint 34: text-only evidence checklist; it cannot authorize a real render. */
+export function buildMediaRightsChecklist(product: StripeCatalogProduct): string {
+  return [
+    "RENDER-STATUS: BLOCKIERT – keine verwendungsberechtigten Medien-Dateien nachgewiesen.",
+    `Stripe-Produkt: ${product.id}`,
+    "Quelle/Urheber und Lizenztyp je Bild/Audio/Video belegen.",
+    "Nutzungsgebiet, Plattformen, Laufzeit, Bearbeitungs- und Werberechte prüfen.",
+    "KI-Avatar- und Markenfreigaben separat dokumentieren.",
+    "Rechte-Checkliste ist keine Lizenz und keine automatische Freigabe.",
+  ].join("\n");
+}

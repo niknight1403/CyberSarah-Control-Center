@@ -79,4 +79,13 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     expect(new Set(hooks.map(x=>x.content)).size).toBe(3);
   });
 
+  it("Sprint 34: carries a pending media license checklist, never a rendered asset", () => {
+    const result=buildProductContentBrief(catalog(),"prod_sample");
+    expect(result.ok).toBe(true);
+    if(!result.ok)return;
+    const rights=result.payload.assets?.find(x=>x.format==="media-rights-checklist");
+    expect(rights?.content).toContain("RENDER-STATUS: BLOCKIERT");
+    expect(result.payload.assets?.some(x=>x.format==="rendered-video")).toBe(false);
+  });
+
 });

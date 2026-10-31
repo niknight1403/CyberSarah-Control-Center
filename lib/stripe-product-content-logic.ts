@@ -3,7 +3,7 @@
  * Nothing is published, charged, price-adjusted or rendered by this bridge.
  */
 import type { StripeCatalogPage } from "./stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks } from "./commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist } from "./commerce-draft-guards";
 import { buildReviewableProductReel } from "./reel-storyboard-logic";
 import {
   validateDraftPayload, type ContentDraftPayload,
@@ -57,6 +57,7 @@ export function buildProductContentBrief(
       {format:"story-outline",variant:1,title:"Story-Konzept",content:
         "Frame 1: Produktname. Frame 2: häufige Interessentenfrage. Frame 3: sachliche Antwort nach Quellenprüfung. Frame 4: überprüfter CTA."},
       ...hookVariants.map((hook, index)=>({format:"hook-variant",variant:index+1,title:`Hook-Version ${index+1}`,content:hook})),
+      {format:"media-rights-checklist",variant:1,title:"Render- und Lizenz-Freigabe (ausstehend)",content:buildMediaRightsChecklist(product)},
     ],
   });
   if (!candidate.valid) return { ok: false, reason: candidate.reason };
