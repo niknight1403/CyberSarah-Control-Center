@@ -125,6 +125,9 @@ jobs:
           TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
           TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           # Sprint 367: Publishing-Tokens (optional — leere Secrets bleiben
           # leer, die Modus-Aufloesung ignoriert inaktive Plattformen).
           X_PUBLISH_TOKEN: ${{ secrets.X_PUBLISH_TOKEN }}

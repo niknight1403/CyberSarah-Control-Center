@@ -303,6 +303,7 @@ function makeAppEnvBuilder(databaseUrl) {
     "GA4_PROPERTY_ID",
     "GA4_ACCESS_TOKEN",
     "HUBSPOT_ACCESS_TOKEN",
+    "FIRECRAWL_API_KEY",
     "RESEND_API_KEY",
     "RESEND_FROM_EMAIL",
     "PERPLEXITY_API_KEY",
