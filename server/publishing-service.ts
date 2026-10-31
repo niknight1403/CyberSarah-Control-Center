@@ -47,6 +47,7 @@ import { getDb } from "./db";
 import {
   claimDuePublishingJob,
   quarantineStalePublishingClaimsDb,
+  recoverStalePublishingClaimsDb,
   armPublishingDispatch,
   confirmPublishingReceipt,
   quarantineAmbiguousPublishingDispatch,
@@ -271,15 +272,36 @@ export async function cancelPublishingJob(userOpenId: string, jobId: number): Pr
   return updated.length > 0;
 }
 
+/**
+ * Explicit operator retry ONLY for never-dispatched failures.
+ * Resetting attempts gives a deliberate new preflight retry budget.
+ * Armed or uncertain provider posts are excluded even if corrupted status
+ * data incorrectly labels them as failed.
+ */
+export async function retryFailedPublishingJobsDb(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userOpenId: string,
+  now = new Date(),
+): Promise<number> {
+  const updated = await db.update(publishingJobs).set({
+    status: "geplant",
+    attempts: 0,
+    mode: null,
+    lastError: null,
+    updatedAt: now,
+    scheduledFor: new Date(now.getTime() + 60_000),
+  }).where(and(
+    eq(publishingJobs.userOpenId, userOpenId),
+    eq(publishingJobs.status, "fehlgeschlagen"),
+    isNull(publishingJobs.mode),
+  )).returning({id:publishingJobs.id});
+  return updated.length;
+}
+
 export async function retryFailedPublishingJobs(userOpenId: string): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
-  const updated = await db
-    .update(publishingJobs)
-    .set({ status: "geplant", updatedAt: new Date(), lastError: null, scheduledFor: new Date(Date.now() + 60_000) })
-    .where(and(eq(publishingJobs.userOpenId, userOpenId), eq(publishingJobs.status, "fehlgeschlagen")))
-    .returning({ id: publishingJobs.id });
-  return updated.length;
+  return retryFailedPublishingJobsDb(db, userOpenId);
 }
 
 /**
@@ -290,6 +312,13 @@ export async function quarantineStalePublishingClaims(now = new Date()): Promise
   const db = await getDb();
   if (!db) return 0;
   return quarantineStalePublishingClaimsDb(db, now);
+}
+
+/** Explicit operational summary; no external sends. */
+export async function recoverStalePublishingClaims(now = new Date()) {
+  const db = await getDb();
+  if (!db) return { requeued: 0, failed: 0, uncertain: 0 };
+  return recoverStalePublishingClaimsDb(db, now);
 }
 
 /** Faellige Nutzer ermitteln (autopilot-tauglich, indexgestuetzt). */
@@ -553,7 +582,7 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
   const due = await db
     .select()
     .from(publishingJobs)
-    .where(and(eq(publishingJobs.userOpenId, userOpenId), eq(publishingJobs.status, "geplant")))
+    .where(and(eq(publishingJobs.userOpenId, userOpenId), eq(publishingJobs.status, "geplant"), lte(publishingJobs.scheduledFor, now)))
     .orderBy(asc(publishingJobs.scheduledFor))
     .limit(AUTOPILOT_BATCH);
 
@@ -727,8 +756,10 @@ async function autopilotTick(): Promise<void> {
   autopilotBusy = true;
   try {
     if (!isAutopilotEnabled(process.env.PUBLISHING_AUTOPILOT)) return;
-    const stale = await quarantineStalePublishingClaims();
-    if (stale > 0) console.warn(`[Publishing-Autopilot] ${stale} verwaiste Versand-Reservierungen gesperrt; Plattformprüfung nötig.`);
+    const stale = await recoverStalePublishingClaims();
+    if (stale.requeued || stale.failed || stale.uncertain) {
+      console.warn(`[Publishing-Autopilot] Verwaiste Claims: ${stale.requeued} sicher neu geplant, ${stale.failed} erschöpft, ${stale.uncertain} unklar (keine automatische Wiederholung).`);
+    }
     const users = await usersWithDueJobs();
     for (const userOpenId of users) {
       const outcome = await processDueJobsForUser(userOpenId);
