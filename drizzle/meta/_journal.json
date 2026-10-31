@@ -155,6 +155,13 @@
       "when": 1793470000000,
       "tag": "0021_publishing_atomic_dispatch",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793471000000,
+      "tag": "0022_publishing_manual_review_audit",
+      "breakpoints": true
     }
   ]
 }

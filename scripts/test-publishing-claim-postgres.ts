@@ -10,6 +10,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { claimDuePublishingJob, quarantineStalePublishingClaimsDb, armPublishingDispatch, confirmPublishingReceipt, quarantineAmbiguousPublishingDispatch } from "../server/publishing-claim";
 import { createServer } from "node:http";
 import axios from "axios";
+import {reconcileUncertainPublishingJob} from "../server/publishing-review";
 
 async function main(): Promise<void> {
   const value = process.env.PUBLISHING_INTEGRATION_DATABASE_URL ?? "";
@@ -181,6 +182,45 @@ async function main(): Promise<void> {
         provider.close(err => err ? reject(err) : resolve());
       });
     }
+
+    // Real PostgreSQL review transitions, immutable evidence and concurrent reviewers.
+    const reviewMigration=await readFile("drizzle/0022_publishing_manual_review_audit.sql","utf8");
+    for(const statement of reviewMigration.split("--> statement-breakpoint").map(x=>x.trim()).filter(Boolean)){
+      await setup.query(statement);
+      await setup.query(statement); // repeat-safe migration
+    }
+    const makeUncertain=async(key:string,owner:string)=> {
+      const id=(await setup.query(`INSERT INTO "publishingJobs"
+        (user_open_id,product,goal,persona,platform,campaign_day,dedupe_key,scheduled_for,status)
+        VALUES($1,'product','reach','nova','x',1,$2,$3,'versand_ungeklaert') RETURNING id`,
+        [owner,key,new Date(now.getTime()-60_000)])).rows[0].id as number;
+      return id;
+    };
+    const owner="owner-a";
+    const publishedId=await makeUncertain("review-published",owner);
+    const evidence="Checked the live provider post page and verified the exact content and ID.";
+    const decision={resolution:"confirmed_published" as const,externalId:"post-verified-12345",evidence};
+    const result=await Promise.all(Array.from({length:12},(_,i)=>
+      reconcileUncertainPublishingJob(i%2?wa:wb,owner,"admin-actor",publishedId,decision,now)));
+    assert.equal(result.filter(Boolean).length,1,"exactly one reviewer may confirm a post");
+    assert.equal((await setup.query('SELECT status,external_id FROM "publishingJobs" WHERE id=$1',[publishedId])).rows[0].status,"veroeffentlicht");
+    const history=(await setup.query('SELECT * FROM publishing_review_events WHERE job_id=$1',[publishedId])).rows;
+    assert.equal(history.length,1,"audit event inserted atomically exactly once");
+    assert.equal(history[0].actor_open_id,"admin-actor");
+    assert.equal(history[0].evidence,evidence);
+    assert.equal(await claimDuePublishingJob(wb,publishedId,owner,now),null);
+
+    const closedId=await makeUncertain("review-closed",owner);
+    assert.equal(await reconcileUncertainPublishingJob(wa,"another-owner","admin-actor",closedId,{
+      resolution:"closed_without_replay",evidence:"Verified on provider account: no matching post found."
+    },now),false,"cross-tenant mutation must fail closed");
+    assert.equal(await reconcileUncertainPublishingJob(wb,owner,"admin-actor",closedId,{
+      resolution:"closed_without_replay",evidence:"Verified on provider account: no matching post found."
+    },now),true);
+    assert.equal((await setup.query('SELECT status FROM "publishingJobs" WHERE id=$1',[closedId])).rows[0].status,"abgebrochen");
+    assert.equal(await claimDuePublishingJob(wa,closedId,owner,now),null);
+    assert.equal((await setup.query('SELECT count(*)::int AS count FROM publishing_review_events WHERE job_id=$1',[closedId])).rows[0].count,1);
+    console.log("PASS: human review CAS, tenant isolation, two resolution modes, durable audit, no automatic resend.");
     console.log("PASS: PostgreSQL 24-worker CAS, tenant isolation, due-time, stale quarantine, migration replay.");
   } finally {
     await Promise.all([setup.end(),a.end(),b.end()]);
