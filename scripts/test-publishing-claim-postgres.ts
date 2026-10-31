@@ -46,7 +46,7 @@ async function main(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
-    const migration = await readFile(new URL("../drizzle/0021_publishing_atomic_dispatch.sql",import.meta.url),"utf8");
+    const migration = await readFile("drizzle/0021_publishing_atomic_dispatch.sql", "utf8");
     for (const statement of migration.split("--> statement-breakpoint").map(x=>x.trim()).filter(Boolean)) {
       await setup.query(statement);
       await setup.query(statement); // migration must be idempotent
