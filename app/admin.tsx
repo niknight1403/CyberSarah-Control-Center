@@ -16,6 +16,7 @@ import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 import { AdminLiveStatusCard } from "@/components/studio/admin-live-status-card";
 import { ProviderAdminCard } from "@/components/studio/provider-admin-card";
 import { PublishingReviewAdminCard } from "@/components/studio/publishing-review-admin-card";
+import { PublishingOpsAdminCard } from "@/components/studio/publishing-ops-admin-card";
 import { IntegrationStatusCard } from "@/components/studio/integration-status-card";
 import { WixCard } from "@/components/studio/wix-card";
 import { AutonomousDevCard } from "@/components/studio/autonomous-dev-card";
@@ -111,6 +112,7 @@ export default function AdminDashboardScreen() {
         <AdminLiveStatusCard isAdmin={isAdmin} />
         <Text style={styles.sectionLabel}>PUBLISHING-SICHERHEIT</Text>
         <Text style={styles.sectionTitle}>Ungeklärte Veröffentlichungen</Text>
+        <PublishingOpsAdminCard isAdmin={isAdmin} />
         <PublishingReviewAdminCard isAdmin={isAdmin} />
 
         <Text style={styles.sectionLabel}>PROVIDER</Text>
