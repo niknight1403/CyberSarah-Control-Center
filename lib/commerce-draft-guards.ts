@@ -17,3 +17,13 @@ export function reviewProductPriceVariants(catalog: StripeCatalogPage, productId
     flags.push("Zeitliche Gültigkeit und regionale Verfügbarkeit von Stripe-Preisen separat belegen");
   return flags;
 }
+
+/** Sprint 27: provider metadata is never proof of commercial usage rights. */
+export function reviewProductRights(product: StripeCatalogProduct): string[] {
+  const checks = [];
+  if (product.rightsVerified !== true)
+    checks.push("Rechtefreigabe offen: Lizenzinhaber, Medienquelle und Nutzungsumfang dokumentieren");
+  if (product.affiliateDisclosureVerified !== true)
+    checks.push("Affiliate-/Werbekennzeichnung offen: Vergütungsmodell und Plattformhinweis prüfen");
+  return checks;
+}

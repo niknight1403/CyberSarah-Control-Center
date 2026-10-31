@@ -52,4 +52,13 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     if (!result.ok) expect(result.reason).toMatch(/Doppelte Stripe/);
   });
 
+  it("Sprint 27: holds product campaigns for independent license and advertisement evidence", () => {
+    const brief=buildProductContentBrief(catalog(),"prod_sample");
+    expect(brief.ok).toBe(true);
+    if(!brief.ok) return;
+    expect(brief.payload.reviewFlags).toEqual(expect.arrayContaining([
+      expect.stringContaining("Rechtefreigabe offen"),expect.stringContaining("Affiliate-/Werbekennzeichnung offen"),
+    ]));
+  });
+
 });
