@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectStripeCatalog } from "../lib/stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona } from "../lib/commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona, mobileCreativeSpec } from "../lib/commerce-draft-guards";
 
 const baseProduct = {id:"prod_sample",name:"CyberSarah Paket",active:true,default_price:"price_default"};
 const basePrice = {id:"price_default",product:"prod_sample",active:true,currency:"eur",unit_amount:7900,type:"one_time",tax_behavior:"inclusive"};
@@ -50,6 +50,13 @@ describe("Commerce draft release safeguards", () => {
     expect(resolveCampaignPersona("nova")?.disclosure).toMatch(/KI-Persönlichkeit/);
     expect(resolveCampaignPersona("juno")?.name).toBe("Juno");
     expect(resolveCampaignPersona("unregistered-persona")).toBeNull();
+  });
+
+  it("Sprint 37: gives mobile-first dimensions and safe areas for each allowed platform", () => {
+    expect(mobileCreativeSpec("instagram")).toMatchObject({width:1080,height:1920});
+    expect(mobileCreativeSpec("tiktok")).toMatchObject({width:1080,height:1920});
+    expect(mobileCreativeSpec("linkedin")).toMatchObject({width:1080,height:1080});
+    expect(mobileCreativeSpec("rogue-platform")).toBeNull();
   });
 
 });

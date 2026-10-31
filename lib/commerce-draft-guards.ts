@@ -64,3 +64,14 @@ export function resolveCampaignPersona(personaId: string): {id:string; disclosur
   const persona=INFLUENCER_PERSONAS.find(p=>p.id===personaId);
   return persona ? {id:persona.id,disclosure:persona.disclosure,name:persona.name} : null;
 }
+
+/** Sprint 37: mobile-first creative specifications, not a fabricated rendered asset. */
+export function mobileCreativeSpec(platform: string): {width:number;height:number;safeArea:string;notes:string}|null {
+  if (platform==="instagram" || platform==="tiktok")
+    return {width:1080,height:1920,safeArea:"Text nicht in untere 20% oder obere 10% legen",
+      notes:"9:16 Story/Reel; Vorschau und Kontrast auf kleinem Display prüfen"};
+  if (platform==="linkedin" || platform==="threads" || platform==="bluesky" || platform==="x")
+    return {width:1080,height:1080,safeArea:"Wesentliche Texte mittig innerhalb 80% halten",
+      notes:"Quadratischer Preview-Entwurf; Text als barrierearme Beschreibung bereitstellen"};
+  return null;
+}

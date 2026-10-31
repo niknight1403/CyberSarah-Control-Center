@@ -3,7 +3,7 @@
  * Nothing is published, charged, price-adjusted or rendered by this bridge.
  */
 import type { StripeCatalogPage } from "./stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona } from "./commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds, buildSafeProductHooks, buildMediaRightsChecklist, resolveCampaignPersona, mobileCreativeSpec } from "./commerce-draft-guards";
 import { buildReviewableProductReel } from "./reel-storyboard-logic";
 import {
   validateDraftPayload, type ContentDraftPayload,
@@ -41,6 +41,8 @@ export function buildProductContentBrief(
   }
   const persona = resolveCampaignPersona(personaId);
   if (!persona) return { ok: false, reason: "KI-Persona ist nicht in der offiziellen Persona-Bibliothek vorhanden." };
+  const mobileSpec = mobileCreativeSpec(platform);
+  if (!mobileSpec) return { ok: false, reason: "Mobile-Format für Plattform unbekannt." };
   const storyboard = buildReviewableProductReel(name);
   if (!storyboard.ok) return { ok: false, reason: storyboard.reason };
   const hookVariants = buildSafeProductHooks(name);
@@ -60,6 +62,8 @@ export function buildProductContentBrief(
         "Frame 1: Produktname. Frame 2: häufige Interessentenfrage. Frame 3: sachliche Antwort nach Quellenprüfung. Frame 4: überprüfter CTA."},
       ...hookVariants.map((hook, index)=>({format:"hook-variant",variant:index+1,title:`Hook-Version ${index+1}`,content:hook})),
       {format:"media-rights-checklist",variant:1,title:"Render- und Lizenz-Freigabe (ausstehend)",content:buildMediaRightsChecklist(product)},
+      {format:"mobile-creative-spec",variant:1,title:"Mobile-Format und Safe-Area",
+        content:`Canvas: ${mobileSpec.width}x${mobileSpec.height}. ${mobileSpec.safeArea}. ${mobileSpec.notes}. Kein gerendertes Asset.`},
     ],
   });
   if (!candidate.valid) return { ok: false, reason: candidate.reason };

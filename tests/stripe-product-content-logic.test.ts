@@ -98,4 +98,13 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     expect(buildProductContentBrief(catalog(),"prod_sample","fake","instagram").ok).toBe(false);
   });
 
+  it("Sprint 37: adds an appropriate mobile safe-area specification to the content package", () => {
+    const ig=buildProductContentBrief(catalog(),"prod_sample");
+    const li=buildProductContentBrief(catalog(),"prod_sample","juno","linkedin");
+    expect(ig.ok && li.ok).toBe(true);
+    if(!ig.ok || !li.ok)return;
+    expect(ig.payload.assets?.find(x=>x.format==="mobile-creative-spec")?.content).toContain("1080x1920");
+    expect(li.payload.assets?.find(x=>x.format==="mobile-creative-spec")?.content).toContain("1080x1080");
+  });
+
 });
