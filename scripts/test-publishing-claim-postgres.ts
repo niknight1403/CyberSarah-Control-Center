@@ -10,7 +10,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { claimDuePublishingJob, quarantineStalePublishingClaimsDb, armPublishingDispatch, confirmPublishingReceipt, quarantineAmbiguousPublishingDispatch } from "../server/publishing-claim";
 import { createServer } from "node:http";
 import axios from "axios";
-import {reconcileUncertainPublishingJob} from "../server/publishing-review";
+import {reconcileUncertainPublishingJob, listUncertainPublishingForAdmin, listPublishingReviewHistory} from "../server/publishing-review";
 
 async function main(): Promise<void> {
   const value = process.env.PUBLISHING_INTEGRATION_DATABASE_URL ?? "";
@@ -221,6 +221,75 @@ async function main(): Promise<void> {
     assert.equal(await claimDuePublishingJob(wa,closedId,owner,now),null);
     assert.equal((await setup.query('SELECT count(*)::int AS count FROM publishing_review_events WHERE job_id=$1',[closedId])).rows[0].count,1);
     console.log("PASS: human review CAS, tenant isolation, two resolution modes, durable audit, no automatic resend.");
+
+    // Ten-sprint review-desk E2E: unfiltered totals, oldest-first, filters,
+    // owner isolation, literal '%' and '_' search, and stable paging.
+    const triageOwner="review-triage-owner";
+    for(let i=0;i<23;i++) {
+      const label=i===4?"50%_impact":"product "+i;
+      await setup.query(`INSERT INTO "publishingJobs"
+        (user_open_id,product,goal,persona,platform,campaign_day,dedupe_key,scheduled_for,status,updated_at)
+        VALUES($1,$2,'reach',$3,$4,1,$5,$6,'versand_ungeklaert',$7)`,
+        [triageOwner,label,i===8?"marketing-expert":"nova",i%2?"instagram":"x",
+         "review-triage-"+i,new Date(now.getTime()-60_000),
+         new Date(now.getTime()-(i+1)*2*3_600_000)]);
+    }
+    await makeUncertain("other-owner-does-not-leak","another-owner");
+    const p1=await listUncertainPublishingForAdmin(wa,triageOwner,{limit:10,offset:0},now);
+    const p2=await listUncertainPublishingForAdmin(wb,triageOwner,{limit:10,offset:10},now);
+    const p3=await listUncertainPublishingForAdmin(wa,triageOwner,{limit:10,offset:20},now);
+    assert.equal(p1.total,23,"total must not show only the first page");
+    assert.equal(p1.matching,23);
+    assert.equal(p1.jobs.length,10);
+    assert.equal(p2.jobs.length,10);
+    assert.equal(p3.jobs.length,3);
+    assert.equal(p1.hasMore,true);
+    assert.equal(p3.hasMore,false);
+    assert.equal(new Set([...p1.jobs,...p2.jobs,...p3.jobs].map(x=>x.id)).size,23);
+    assert(p1.jobs.every((job,idx,rows)=>idx===0||rows[idx-1].updatedAt<=job.updatedAt),
+      "oldest review item must be first");
+    assert(p1.critical>0&&p1.urgent>=p1.critical);
+    const byPlatform=await listUncertainPublishingForAdmin(wa,triageOwner,{platform:"instagram",limit:50},now);
+    assert.equal(byPlatform.matching,11);
+    assert(byPlatform.jobs.every(j=>j.platform==="instagram"));
+    const byPersona=await listUncertainPublishingForAdmin(wa,triageOwner,{search:"marketing-expert"},now);
+    assert.equal(byPersona.matching,1);
+    const literal=await listUncertainPublishingForAdmin(wa,triageOwner,{search:"50%_impact"},now);
+    assert.equal(literal.matching,1,"ILIKE wildcard escapes must stay literal");
+    assert.equal(literal.jobs[0].product,"50%_impact");
+
+    // Two separate uncertain jobs MUST NOT be manually assigned the SAME
+    // provider receipt. A per-provider advisory transaction lock prevents
+    // simultaneous duplicate confirmations even on independent connection pools.
+    const sameA=await makeUncertain("duplicate-provider-a",owner);
+    const sameB=await makeUncertain("duplicate-provider-b",owner);
+    const duplicateDecision={
+      resolution:"confirmed_published" as const,
+      externalId:"real-provider-duplicate-100",
+      evidence:"Verified this exact external provider ID on the post's live page.",
+    };
+    const collisions=await Promise.allSettled([
+      reconcileUncertainPublishingJob(wa,owner,"admin-a",sameA,duplicateDecision,now),
+      reconcileUncertainPublishingJob(wb,owner,"admin-b",sameB,duplicateDecision,now),
+    ]);
+    const successes=collisions.filter(x=>x.status==="fulfilled"&&x.value===true);
+    const conflicts=collisions.filter(x=>x.status==="rejected");
+    assert.equal(successes.length,1,"one canonical receipt may confirm only one job");
+    assert.equal(conflicts.length,1,"duplicate receipt must surface an explicit conflict");
+    assert.match(String((conflicts[0] as PromiseRejectedResult).reason),/bereits/);
+    const counts=(await setup.query(
+      'SELECT status,COUNT(*)::int AS cnt FROM "publishingJobs" WHERE id=ANY($1) GROUP BY status',
+      [[sameA,sameB]]
+    )).rows;
+    assert.equal(counts.find(x=>x.status==="veroeffentlicht").cnt,1);
+    assert.equal(counts.find(x=>x.status==="versand_ungeklaert").cnt,1);
+    const allEvents=await listPublishingReviewHistory(wa,owner);
+    assert(allEvents.some(e=>e.externalId==="real-provider-duplicate-100"));
+    assert.equal((await setup.query(
+      'SELECT COUNT(*)::int AS count FROM publishing_review_events WHERE external_id=$1',
+      [duplicateDecision.externalId]
+    )).rows[0].count,1,"only one audit event may identify the provider receipt");
+    console.log("PASS: review pagination, owner isolation, literal search, platform filter, SLA, collision lock, audit.");
     console.log("PASS: PostgreSQL 24-worker CAS, tenant isolation, due-time, stale quarantine, migration replay.");
   } finally {
     await Promise.all([setup.end(),a.end(),b.end()]);
