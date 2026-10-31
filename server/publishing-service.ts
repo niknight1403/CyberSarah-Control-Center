@@ -18,7 +18,7 @@
  * Tabelle platform_tokens — der Autopilot frischt vor Ablauf selbst nach.
  */
 
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { create, type AxiosInstance } from "axios";
 import {
   autoCardAssetUrl,
@@ -652,8 +652,8 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
           eq(publishingJobs.id, job.id),
           eq(publishingJobs.userOpenId, userOpenId),
           eq(publishingJobs.status, "in_bearbeitung"),
-          // A failed preflight cannot reset a job that another worker
-          // has already armed for an external side effect.
+          // Never requeue a job if a send boundary was already armed.
+          isNull(publishingJobs.mode),
         ));
       }
       outcome.failed += 1;
