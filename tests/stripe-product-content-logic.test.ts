@@ -61,4 +61,12 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     ]));
   });
 
+  it("Sprint 28: rejects an invalid Stripe source reference instead of saving misleading attribution", () => {
+    const invalid=projectStripeCatalog([{...product,id:"prod_bad:id",default_price:"price_sample"}],
+      [{...price,product:"prod_bad:id"}],true,true);
+    const result=buildProductContentBrief(invalid,"prod_bad:id");
+    expect(result.ok).toBe(false);
+    if(!result.ok) expect(result.reason).toMatch(/Quell-IDs/);
+  });
+
 });

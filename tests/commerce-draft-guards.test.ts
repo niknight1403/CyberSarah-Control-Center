@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectStripeCatalog } from "../lib/stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights } from "../lib/commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds } from "../lib/commerce-draft-guards";
 
 const baseProduct = {id:"prod_sample",name:"CyberSarah Paket",active:true,default_price:"price_default"};
 const basePrice = {id:"price_default",product:"prod_sample",active:true,currency:"eur",unit_amount:7900,type:"one_time",tax_behavior:"inclusive"};
@@ -21,6 +21,13 @@ describe("Commerce draft release safeguards", () => {
     expect(projected.products[0].rightsVerified).toBe(false);
     expect(reviewProductRights(projected.products[0]).some(x=>x.includes("Rechtefreigabe offen"))).toBe(true);
     expect(reviewProductRights(projected.products[0]).some(x=>x.includes("Affiliate-/Werbekennzeichnung offen"))).toBe(true);
+  });
+
+  it("Sprint 28: rejects untrusted provider ID formats used in approvals", () => {
+    expect(validateStripeSourceIds("prod_sample","price_sample")).toBeNull();
+    expect(validateStripeSourceIds("prod_sample","price_../../hack")).toMatch(/Quell-IDs/);
+    expect(validateStripeSourceIds("prod_<script>","price_sample")).toMatch(/Quell-IDs/);
+    expect(validateStripeSourceIds("prod_sample","price_")).toMatch(/Quell-IDs/);
   });
 
 });

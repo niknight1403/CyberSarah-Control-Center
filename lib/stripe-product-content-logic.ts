@@ -3,7 +3,7 @@
  * Nothing is published, charged, price-adjusted or rendered by this bridge.
  */
 import type { StripeCatalogPage } from "./stripe-catalog-projection";
-import { reviewProductPriceVariants, reviewProductRights } from "./commerce-draft-guards";
+import { reviewProductPriceVariants, reviewProductRights, validateStripeSourceIds } from "./commerce-draft-guards";
 import { buildReviewableProductReel } from "./reel-storyboard-logic";
 import {
   validateDraftPayload, type ContentDraftPayload,
@@ -32,6 +32,8 @@ export function buildProductContentBrief(
   if (!price || price.amountMinor === null || !/^[a-z]{3}$/.test(price.currency)) {
     return { ok: false, reason: "Kein überprüfbarer aktiver Standardpreis vorhanden." };
   }
+  const sourceError = validateStripeSourceIds(product.id, price.id);
+  if (sourceError) return { ok: false, reason: sourceError };
   const name = product.name.trim();
   if (!name || name === "Ohne Namen") return { ok: false, reason: "Produktname ist nicht belastbar." };
   if (!/^[a-z0-9_-]{2,40}$/i.test(personaId) || !["instagram","tiktok","linkedin","x","threads","bluesky"].includes(platform)) {

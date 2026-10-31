@@ -21,9 +21,17 @@ export function reviewProductPriceVariants(catalog: StripeCatalogPage, productId
 /** Sprint 27: provider metadata is never proof of commercial usage rights. */
 export function reviewProductRights(product: StripeCatalogProduct): string[] {
   const checks = [];
-  if (product.rightsVerified !== true)
+  if (!product.rightsVerified)
     checks.push("Rechtefreigabe offen: Lizenzinhaber, Medienquelle und Nutzungsumfang dokumentieren");
-  if (product.affiliateDisclosureVerified !== true)
+  if (!product.affiliateDisclosureVerified)
     checks.push("Affiliate-/Werbekennzeichnung offen: Vergütungsmodell und Plattformhinweis prüfen");
   return checks;
+}
+
+/** Sprint 28: require Stripe-shaped provenance IDs, not user-controlled text. */
+export function validateStripeSourceIds(productId: string, priceId: string): string | null {
+  if (!/^prod_[A-Za-z0-9_]{2,120}$/.test(productId) ||
+      !/^price_[A-Za-z0-9_]{2,120}$/.test(priceId))
+    return "Stripe-Quell-IDs nicht eindeutig gültig; Entwurf nicht speichern";
+  return null;
 }
