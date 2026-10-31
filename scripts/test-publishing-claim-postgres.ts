@@ -7,10 +7,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { claimDuePublishingJob, quarantineStalePublishingClaimsDb, armPublishingDispatch, confirmPublishingReceipt, quarantineAmbiguousPublishingDispatch } from "../server/publishing-claim";
+import { claimDuePublishingJob, recoverStalePublishingClaimsDb, quarantineStalePublishingClaimsDb, armPublishingDispatch, confirmPublishingReceipt, quarantineAmbiguousPublishingDispatch } from "../server/publishing-claim";
 import { createServer } from "node:http";
 import axios from "axios";
 import {reconcileUncertainPublishingJob, listUncertainPublishingForAdmin, listPublishingReviewHistory} from "../server/publishing-review";
+import {retryFailedPublishingJobsDb} from "../server/publishing-service";
+import {publishingOpsOverviewDb} from "../server/publishing-ops";
 
 async function main(): Promise<void> {
   const value = process.env.PUBLISHING_INTEGRATION_DATABASE_URL ?? "";
@@ -87,18 +89,57 @@ async function main(): Promise<void> {
     assert.equal(await claimDuePublishingJob(wa,laterId,"owner-a",now),null);
     assert.equal(await claimDuePublishingJob(wa,laterId,"owner-b",now),null);
 
-    // A crashed worker remains quarantined, never re-enters the auto-queue.
+    // Crash before arming any external send is PROVEN safe to retry.
+    // Two independent database pools must never requeue the same row twice.
     await setup.query('UPDATE "publishingJobs" SET updated_at=$1 WHERE id=$2',
       [new Date(now.getTime()-35*60_000),created]);
-    assert.equal(await quarantineStalePublishingClaimsDb(wb,now),1);
+    const recoveries=await Promise.all([
+      recoverStalePublishingClaimsDb(wa,now),
+      recoverStalePublishingClaimsDb(wb,now),
+    ]);
+    assert.equal(recoveries.reduce((n,r)=>n+r.requeued,0),1);
+    assert.equal(recoveries.reduce((n,r)=>n+r.uncertain,0),0);
     assert.equal(await quarantineStalePublishingClaimsDb(wa,now),0);
-    const uncertain=(await setup.query(
-      'SELECT status,last_error,attempts FROM "publishingJobs" WHERE id=$1',[created]
+    const recovered=(await setup.query(
+      'SELECT status,scheduled_for,last_error,attempts FROM "publishingJobs" WHERE id=$1',[created]
     )).rows[0];
-    assert.equal(uncertain.status,"versand_ungeklaert");
-    assert.match(uncertain.last_error,/Plattform prüfen/);
-    assert.equal(uncertain.attempts,1);
+    assert.equal(recovered.status,"geplant");
+    assert.equal(recovered.attempts,1,"crash recovery must not spend a second attempt");
+    assert.equal(new Date(recovered.scheduled_for).getTime(),
+      now.getTime()+60*60_000,"first stale preflight retries after 60 minutes");
     assert.equal(await claimDuePublishingJob(wa,created,"owner-a",now),null);
+    assert.equal((await claimDuePublishingJob(wa,created,"owner-a",
+      new Date(now.getTime()+61*60_000)))?.attempts,2);
+
+    // Exhausted, second attempt, potentially dispatched, unknown mode, and
+    // fresh claims are all handled without making an external provider POST.
+    const makeActive=async(key:string,attempts:number,mode:string|null,minsOld:number)=>
+      (await setup.query(`INSERT INTO "publishingJobs"
+        (user_open_id,product,goal,persona,platform,campaign_day,dedupe_key,scheduled_for,status,attempts,mode,updated_at)
+        VALUES('recover-owner','product','reach','nova','x',1,$1,$2,'in_bearbeitung',$3,$4,$5)
+        RETURNING id`,[key,new Date(now.getTime()-60_000),
+        attempts,mode,new Date(now.getTime()-minsOld*60_000)])).rows[0].id as number;
+    const secondId=await makeActive("preflight-second",2,null,35);
+    const exhaustedId=await makeActive("preflight-exhausted",3,null,35);
+    const armedId=await makeActive("dispatch-armed",1,"dispatching",35);
+    const weirdId=await makeActive("unknown-mode",1,"legacy-sent",35);
+    const freshId=await makeActive("fresh-preflight",1,null,3);
+    const recoveredBatch=await recoverStalePublishingClaimsDb(wb,now);
+    assert.deepEqual(recoveredBatch,{requeued:1,failed:1,uncertain:2});
+    const getRow=async(id:number)=>(await setup.query(
+      'SELECT status,scheduled_for,mode,attempts FROM "publishingJobs" WHERE id=$1',[id])).rows[0];
+    assert.equal((await getRow(secondId)).status,"geplant");
+    assert.equal(new Date((await getRow(secondId)).scheduled_for).getTime(),
+      now.getTime()+360*60_000);
+    assert.equal((await getRow(exhaustedId)).status,"fehlgeschlagen");
+    assert.equal((await getRow(armedId)).status,"versand_ungeklaert");
+    assert.equal((await getRow(weirdId)).status,"versand_ungeklaert");
+    assert.equal((await getRow(freshId)).status,"in_bearbeitung");
+    assert.deepEqual(await recoverStalePublishingClaimsDb(wa,now),
+      {requeued:0,failed:0,uncertain:0},"recovery must be idempotent");
+    assert.equal(await claimDuePublishingJob(wa,armedId,"recover-owner",now),null);
+    assert.equal(await claimDuePublishingJob(wa,weirdId,"recover-owner",now),null);
+    console.log("PASS: crash recovery pre-send backoff, exhausted budget, armed quarantine, parallel idempotence.");
 
     // Controlled HTTP provider: accept the post, then drop its acknowledgement.
     // Real Axios network I/O and the same durable transitions as production.
@@ -290,6 +331,39 @@ async function main(): Promise<void> {
       [duplicateDecision.externalId]
     )).rows[0].count,1,"only one audit event may identify the provider receipt");
     console.log("PASS: review pagination, owner isolation, literal search, platform filter, SLA, collision lock, audit.");
+    // Read-only operator dashboard: every counter is per-tenant and based
+    // on actual stored states, including a non-retryable forged failed state.
+    const opsOwner="publishing-ops-owner";
+    const addOps=async(key:string,status:string,mode:string|null,scheduled:Date,attempts:number)=>{
+      const id=(await setup.query(`INSERT INTO "publishingJobs"
+        (user_open_id,product,goal,persona,platform,campaign_day,dedupe_key,scheduled_for,status,attempts,mode,published_at)
+        VALUES($1,'ops-product','reach','nova','x',1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [opsOwner,key,scheduled,status,attempts,mode,
+          status==="veroeffentlicht"?now:null])).rows[0].id as number;
+      return id;
+    };
+    await addOps("due","geplant",null,new Date(now.getTime()-60_000),0);
+    await addOps("future","geplant",null,new Date(now.getTime()+60_000),0);
+    await addOps("uncertain","versand_ungeklaert","dispatching",now,1);
+    const safeFailed=await addOps("failed-safe","fehlgeschlagen",null,now,3);
+    const unsafeFailed=await addOps("failed-armed","fehlgeschlagen","dispatching",now,3);
+    await addOps("live","veroeffentlicht","live",now,1);
+    const metrics=await publishingOpsOverviewDb(wa,opsOwner,now);
+    assert.equal(metrics.total,6);
+    assert.equal(metrics.due,1);
+    assert.equal(metrics.scheduled,1);
+    assert.equal(metrics.uncertain,1);
+    assert.equal(metrics.failed,2);
+    assert.equal(metrics.retryableFailed,1);
+    assert.equal(metrics.published24h,1);
+    assert.equal(await retryFailedPublishingJobsDb(wb,"different-owner",now),0);
+    assert.equal(await retryFailedPublishingJobsDb(wb,opsOwner,now),1);
+    assert.equal((await getRow(safeFailed)).attempts,0);
+    assert.equal((await getRow(safeFailed)).status,"geplant");
+    assert.equal((await getRow(unsafeFailed)).status,"fehlgeschlagen");
+    assert.equal(await retryFailedPublishingJobsDb(wa,opsOwner,now),0);
+    assert.equal((await publishingOpsOverviewDb(wb,opsOwner,now)).retryableFailed,0);
+    console.log("PASS: tenant-only ops telemetry, accurate queue status, safe operator retry and armed exclusion.");
     console.log("PASS: PostgreSQL 24-worker CAS, tenant isolation, due-time, stale quarantine, migration replay.");
   } finally {
     await Promise.all([setup.end(),a.end(),b.end()]);
