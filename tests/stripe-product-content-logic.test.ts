@@ -116,4 +116,12 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     expect(data).toMatchObject({enabled:false,destination:null,productId:"prod_sample",priceId:"price_sample"});
   });
 
+  it("Sprint 53: landing privacy gate defaults to no tracking until owner consent review", () => {
+    const r=buildProductContentBrief(catalog(),"prod_sample");
+    expect(r.ok).toBe(true); if(!r.ok)return;
+    const gate=r.payload.assets?.find(x=>x.format==="landing-privacy-gate");
+    expect(gate).toBeDefined();
+    expect(JSON.parse(gate!.content)).toMatchObject({trackingEnabled:false,consentState:"unverified",analyticsTags:[]});
+  });
+
 });

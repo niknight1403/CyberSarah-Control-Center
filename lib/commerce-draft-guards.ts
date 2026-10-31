@@ -95,3 +95,17 @@ export function buildLandingCtaContract(productId: string, priceId: string): Lan
     ],
   };
 }
+
+/** Sprint 53: absent verified consent, drafts must not embed tracking code/URLs. */
+export function buildPrivacyReviewGate(): {
+ trackingEnabled:false; consentState:"unverified"; analyticsTags:readonly []; checklist:readonly string[];
+} {
+  return {
+    trackingEnabled:false, consentState:"unverified",analyticsTags:[],
+    checklist:[
+      "Consent-Banner mit Opt-in vor optionalen Analyse- und Marketing-Skripten",
+      "Datenschutzerklärung, Impressum und notwendige Cookies separat prüfen",
+      "Ohne nachweisbare Einwilligung kein Tracking, kein Retargeting und kein Pixel",
+    ],
+  };
+}
