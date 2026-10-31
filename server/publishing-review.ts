@@ -2,7 +2,7 @@
  * Human-only resolution of uncertain social-media publishing.
  * Query, filtering, and transactional decisions never dispatch a post.
  */
-import {and, asc, count, desc, eq, ilike, or, sql} from "drizzle-orm";
+import {and, asc, count, desc, eq, ilike, ne, or, sql} from "drizzle-orm";
 import {TRPCError} from "@trpc/server";
 import {publishingJobs,publishingReviewEvents} from "../drizzle/schema";
 import {cleanReviewSearch,validManualReviewReceipt,type ReviewPlatform} from "../lib/publishing-review-logic";
@@ -128,6 +128,7 @@ export async function reconcileUncertainPublishingJob(
         eq(publishingJobs.userOpenId,ownerOpenId),
         eq(publishingJobs.platform,candidate.platform),
         eq(publishingJobs.externalId,externalId),
+        ne(publishingJobs.id,jobId),
         eq(publishingJobs.status,"veroeffentlicht"),
       )).limit(1);
       if(prior.length)
