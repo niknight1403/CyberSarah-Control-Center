@@ -69,6 +69,71 @@ Unterlagen: [docs/render-deployment.md](docs/render-deployment.md), [docs/SPRINT
 
 Alle Umgebungsvariablen sind mit Erklärungen in [.env.example](.env.example) dokumentiert: Kernbetrieb (DB, JWT, Origins, Rate-Limits), optionale OAuth-Logins, KI-Provider-Keys (ENV-Keys dürfen Key-Pools enthalten und rotieren autonom), Stripe (live/test), Render-/Discord-/Ops-Integrationen und der autonome Engineering-Optimizer-Loop. **Echte Werte nur in die lokale `.env` — niemals committen**; Secrets-Handling und Release-Abläufe: [docs/SECRETS_AND_RELEASE.md](docs/SECRETS_AND_RELEASE.md).
 
+## HubSpot-Integration
+
+HubSpot ist das führende CRM im Umsatz-Loop: Kontakte und Deals werden gelesen,
+qualifizierte Leads zurückgeschrieben. Die Integration ist bewusst zweistufig —
+reine Prüf-Logik ohne Netzzugriff (`lib/revenue-connectors-logic.ts`) und
+ausführende Server-Schicht (`server/revenue-connectors.ts`), die nur über
+Admin-Verfahren des `revenueIntegrations`-Routers erreichbar ist.
+
+### Einrichtung
+
+1. Im HubSpot-Konto unter **Settings → Integrations → Private Apps** eine App
+   anlegen (Name z. B. `CyberSarah Revenue Loop`).
+2. Scopes vergeben: `crm.objects.contacts.read`, `crm.objects.contacts.write`,
+   `crm.objects.deals.read`, `crm.objects.deals.write`. Ohne die Schreib-Scopes
+   bleibt der Kanal lesend, der Sync-Plan meldet dann `direction: pull`.
+3. Token kopieren (beginnt mit `pat-`) und als `HUBSPOT_PRIVATE_APP_TOKEN`
+   setzen. Der historische Name `HUBSPOT_ACCESS_TOKEN` wird weiterhin
+   akzeptiert; ist nur er gesetzt, löst das System ihn auf denselben Wert auf.
+   Beide Variablen sind in [.env.example](.env.example) dokumentiert.
+   **Werte niemals committen** — Gitleaks blockiert den Push.
+
+### Verfahren (Admin, tRPC `revenueIntegrations`)
+
+| Verfahren | Eingabe | Wirkung |
+|---|---|---|
+| `readiness` | — | Bereitschaft je Konnektor; `hubspot` ist `true`, sobald ein Token aufgelöst werden kann |
+| `connectorReadiness` | — | Bereitschaft aller Konnektoren inklusive fehlender Variablen |
+| `crmPreview` | `kind: "contacts" \| "deals"`, `limit` 1–50 (Standard 20) | liest live aus HubSpot, ohne zu schreiben |
+| `crmSyncPlan` | `contacts`, `deals`, `direction?: "pull" \| "push" \| "both"` | berechnet Batches, führt nichts aus |
+| `accountProviders` / `accountCreate` / `accountReview` / `accountTemplate` | Konto-Agent | Konto-Entwurf, maskierte Prüfung, Anleitung |
+
+### Sync-Regeln
+
+- Standardrichtung ist `pull` (lesend). `push` und `both` verlangen die
+  Schreib-Scopes.
+- Pro Lauf höchstens **10.000** Kontakte und **10.000** Deals; die Werte werden
+  auf ganze Zahlen begrenzt, negative Eingaben werden zu 0.
+- Batches fassen **100 Objekte** (HubSpot-Grenze für Batch-Endpunkte). Aus
+  250 Kontakten und 40 Deals entstehen also drei Kontakt- und ein Deal-Batch.
+- Ohne Token liefert der Plan `allowed: false, reason: "hubspot-not-configured"`
+  und keine Batches — kein stiller Leerlauf, keine Fake-Zahlen.
+
+### Betrieb und Fehlersuche
+
+| Symptom | Ursache | Abhilfe |
+|---|---|---|
+| `readiness.hubspot` bleibt `false` | Token leer oder nur in der Shell exportiert | Variable in der Laufzeitumgebung des Servers setzen (Render-Env, PM2-Dump) |
+| `hubspot-not-configured` trotz gesetztem Token | Tippfehler im Variablennamen | `HUBSPOT_PRIVATE_APP_TOKEN` oder `HUBSPOT_ACCESS_TOKEN` verwenden, exakt schreiben |
+| HTTP 401 der HubSpot-API | Token gelöscht/rotiert | neue Private App, Token tauschen, Dienst neu starten |
+| HTTP 403 bei `push`/`both` | Schreib-Scopes fehlen | Scopes nachziehen; bis dahin nur `pull` nutzen |
+| HTTP 429 | HubSpot-Ratenlimit (privates App-Token: 100 Anfragen/10 s) | Lauf wiederholen; Batches von 100 bleiben deutlich darunter |
+
+Ein Live-Schreibvorgang wird nie automatisch ausgelöst: `crmSyncPlan` rechnet,
+`crmPreview` liest. Das Zurückschreiben bleibt eine ausdrückliche Admin-Aktion.
+
+### Tests
+
+```
+npx vitest run tests/revenue-connectors-logic.test.ts
+```
+
+Abgedeckt: Bereitschaft mit und ohne Token, Variablen-Alias, Batch-Bildung an
+der 100er-Grenze, Kappung bei 10.000, Richtungsauflösung und der
+nicht-konfigurierte Zustand.
+
 ## Projektstruktur (Auszug)
 
 ```

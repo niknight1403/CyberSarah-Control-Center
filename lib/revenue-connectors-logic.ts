@@ -67,13 +67,42 @@ export type ConnectorReadiness = {
   missingEnv: string[];
 };
 
+/**
+ * Ein Variablenname kann mehrere Schreibweisen haben. HubSpot hat historisch
+ * HUBSPOT_ACCESS_TOKEN benutzt (Bestandscode), der Konto-Agent fuehrt
+ * HUBSPOT_PRIVATE_APP_TOKEN. Beide meinen dasselbe Private-App-Token; ohne
+ * diese Zuordnung meldet die Bereitschaft "nicht konfiguriert", obwohl ein
+ * Token gesetzt ist.
+ */
+const ENV_ALIASES: Record<string, readonly string[]> = {
+  HUBSPOT_PRIVATE_APP_TOKEN: ["HUBSPOT_ACCESS_TOKEN"],
+};
+
+export function resolveEnvValue(
+  name: string,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  for (const candidate of [name, ...(ENV_ALIASES[name] ?? [])]) {
+    const value = String(env[candidate] ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+/** Aufgeloestes HubSpot-Token (Private App), leer wenn nicht gesetzt. */
+export function resolveHubspotToken(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  return resolveEnvValue("HUBSPOT_PRIVATE_APP_TOKEN", env);
+}
+
 export function evaluateConnectorReadiness(
   key: ConnectorKey,
   env: Record<string, string | undefined> = process.env,
 ): ConnectorReadiness {
   const definition = CONNECTOR_CATALOG.find((item) => item.key === key);
   if (!definition) return { key, configured: false, missingEnv: [] };
-  const missingEnv = definition.requiredEnv.filter((name) => !String(env[name] ?? "").trim());
+  const missingEnv = definition.requiredEnv.filter((name) => !resolveEnvValue(name, env));
   return { key, configured: missingEnv.length === 0, missingEnv };
 }
 

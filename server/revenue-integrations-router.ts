@@ -4,6 +4,7 @@ import {hubspotContacts,hubspotDeals,firecrawlPreview,draftWeeklyMarketing,reven
 import {
   CONNECTOR_CATALOG, buildHubspotSyncPlan, buildLeadScrapePlan, buildMeteredUsageEvent,
   buildOutreachDispatchPlan, evaluateConnectorReadiness, summarizeConnectorReadiness,
+  resolveHubspotToken,
 } from "../lib/revenue-connectors-logic";
 import {
   ACCOUNT_PROVIDERS, buildSetupGuide, createAccountEntry, nextAccountStep, reviewAccountConfiguration,
@@ -13,15 +14,15 @@ import { approveDraft, buildContentDraft, nextWeeklyRun } from "../lib/content-d
 
 export const revenueIntegrationsRouter=router({
   readiness:adminProcedure.query(()=>({
-    hubspot:Boolean(process.env.HUBSPOT_ACCESS_TOKEN),
+    hubspot:Boolean(resolveHubspotToken()),
     firecrawl:Boolean(process.env.FIRECRAWL_API_KEY),
     resend:Boolean(process.env.RESEND_API_KEY),
     stripeMetered:Boolean(process.env.STRIPE_SECRET_KEY),
     outboundSendingEnabled:false,automaticBillingEnabled:false,
   })),
   crmPreview:adminProcedure.input(z.object({kind:z.enum(["contacts","deals"]),limit:z.number().int().min(1).max(50).default(20)}))
-    .query(({input})=>input.kind==="contacts"?hubspotContacts(process.env.HUBSPOT_ACCESS_TOKEN??"",input.limit):
-      hubspotDeals(process.env.HUBSPOT_ACCESS_TOKEN??"",input.limit)),
+    .query(({input})=>input.kind==="contacts"?hubspotContacts(resolveHubspotToken(),input.limit):
+      hubspotDeals(resolveHubspotToken(),input.limit)),
   sitePreview:adminProcedure.input(z.object({url:z.string().url().max(1200)}))
     .mutation(({input})=>firecrawlPreview(process.env.FIRECRAWL_API_KEY??"",input.url)),
   weeklyDraft:adminProcedure.input(z.object({

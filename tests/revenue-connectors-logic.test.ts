@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   CONNECTOR_CATALOG,
+  resolveEnvValue,
   buildHubspotSyncPlan,
   buildLeadScrapePlan,
   buildMeteredUsageEvent,
+  resolveHubspotToken,
   buildOutreachDispatchPlan,
   evaluateConnectorReadiness,
   summarizeConnectorReadiness,
@@ -127,5 +129,24 @@ describe("Stripe-Metering", () => {
 
   it("meldet fehlende Stripe-Konfiguration", () => {
     expect(buildMeteredUsageEvent({ customerId: "cus_ABC123", quantity: 1 }, {}).reason).toBe("stripe-not-configured");
+  });
+});
+
+describe("HubSpot-Token-Auflösung", () => {
+  it("bevorzugt HUBSPOT_PRIVATE_APP_TOKEN", () => {
+    const env = { HUBSPOT_PRIVATE_APP_TOKEN: "pat-neu", HUBSPOT_ACCESS_TOKEN: "pat-alt" };
+    expect(resolveHubspotToken(env)).toBe("pat-neu");
+  });
+
+  it("akzeptiert den historischen Namen HUBSPOT_ACCESS_TOKEN", () => {
+    expect(resolveHubspotToken({ HUBSPOT_ACCESS_TOKEN: "pat-alt" })).toBe("pat-alt");
+    expect(evaluateConnectorReadiness("hubspot", { HUBSPOT_ACCESS_TOKEN: "pat-alt" }).configured).toBe(true);
+  });
+
+  it("meldet fehlende Variable erst, wenn keine Schreibweise gesetzt ist", () => {
+    const leer = evaluateConnectorReadiness("hubspot", {});
+    expect(leer.configured).toBe(false);
+    expect(leer.missingEnv).toEqual(["HUBSPOT_PRIVATE_APP_TOKEN"]);
+    expect(resolveEnvValue("HUBSPOT_PRIVATE_APP_TOKEN", { HUBSPOT_PRIVATE_APP_TOKEN: "   " })).toBe("");
   });
 });
