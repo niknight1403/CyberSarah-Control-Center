@@ -45,4 +45,11 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     expect(result.payload.reviewFlags?.some(s=>s.includes("Rabattversprechen"))).toBe(true);
     expect(result.payload.reviewFlags?.some(s=>s.includes("Medien-/Markenrechte"))).toBe(true);
   });
+  it("Sprint 23: blocks drafts when upstream Stripe pages contain duplicate IDs", () => {
+    const duplicate=projectStripeCatalog([product,product],[price,price],true,true);
+    const result=buildProductContentBrief(duplicate,"prod_sample");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/Doppelte Stripe/);
+  });
+
 });

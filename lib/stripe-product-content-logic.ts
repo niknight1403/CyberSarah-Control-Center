@@ -24,6 +24,8 @@ export function buildProductContentBrief(
 ): ProductContentBrief {
   const product = catalog.products.find(item => item.id === productId);
   if (!catalog.complete) return { ok: false, reason: "Stripe-Katalog unvollständig – Produktzuordnung nicht nachweisbar." };
+  if (catalog.skippedDuplicateProducts > 0 || catalog.skippedDuplicatePrices > 0)
+    return { ok: false, reason: "Doppelte Stripe-Quell-IDs erkannt – Content-Freigabe bis Katalogabgleich blockiert." };
   if (!product || !product.active) return { ok: false, reason: "Produkt nicht verfügbar oder inaktiv." };
   const price = catalog.prices.find(item =>
     item.id === product.defaultPriceId && item.productId === product.id && item.active);
