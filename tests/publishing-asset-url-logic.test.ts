@@ -27,6 +27,10 @@ describe("Public publishing asset URL release gate", () => {
     expect(() => assertPublishingMediaUrls(value)).toThrow();
   });
 
+  it("rejects video URLs in image carousels even if the HTTPS URL itself is valid", () => {
+    expect(() => assertPublishingMediaUrls(undefined, ["https://cdn.example.com/a.png","https://cdn.example.com/b.mp4"])).toThrow(/Bilder/);
+  });
+
   it("enforces an absolute maximum of ten carousel URLs", () => {
     expect(() => assertPublishingMediaUrls(null, Array.from({length:11},(_,i)=>`https://cdn.example.com/${i}.jpg`))).toThrow(/zehn/);
   });
