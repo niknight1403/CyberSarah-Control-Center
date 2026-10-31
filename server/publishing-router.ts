@@ -6,18 +6,32 @@ import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
+import {publishingOpsOverviewDb} from "./publishing-ops";
+import {getPublishingModeOverview} from "./publishing-service";
+import {isAutopilotEnabled} from "../lib/publishing-queue-logic";
 import { listUncertainPublishingForAdmin, listPublishingReviewHistory, reconcileUncertainPublishingJob } from "./publishing-review";
 import {
   cancelPublishingJob,
   setPublishingJobAssets,
   setPublishingJobAsset,
   enqueueCampaignForUser,
-  getPublishingModeOverview,
   listPublishingJobsForUser,
   retryFailedPublishingJobs,
 } from "./publishing-service";
 
 export const publishingRouter = router({
+  /** Read-only monitoring; no secrets and no cross-account totals. */
+  opsOverview: adminProcedure.query(async ({ctx})=>{
+    const db=await getDb();
+    if(!db) throw new TRPCError({code:"SERVICE_UNAVAILABLE",message:"Datenbank nicht verfügbar."});
+    const counts=await publishingOpsOverviewDb(db,ctx.user.openId);
+    return {
+      ...counts,
+      autopilotConfigured:isAutopilotEnabled(process.env.PUBLISHING_AUTOPILOT),
+      modes:getPublishingModeOverview(),
+    };
+  }),
+
   /** Admin can inspect only their OWN uncertain jobs (never cross-tenant). */
   reviewQueue: adminProcedure.input(z.object({
     limit:z.number().int().min(1).max(50).optional(),
