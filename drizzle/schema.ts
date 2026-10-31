@@ -350,6 +350,22 @@ export const platformTokens = pgTable(
 export type PlatformTokenRow = typeof platformTokens.$inferSelect;
 export type InsertPlatformTokenRow = typeof platformTokens.$inferInsert;
 
+
+/** Append-only audit log for administrator decisions on uncertain social posts. */
+export const publishingReviewEvents = pgTable("publishing_review_events", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull(),
+  userOpenId: text("user_open_id").notNull(),
+  actorOpenId: text("actor_open_id").notNull(),
+  resolution: text("resolution").notNull(),
+  evidence: text("evidence").notNull(),
+  externalId: text("external_id"),
+  reviewedAt: timestamp("reviewed_at", {withTimezone: true}).notNull().defaultNow(),
+}, (table) => [
+  index("publishing_review_events_owner_idx").on(table.userOpenId, table.reviewedAt),
+  index("publishing_review_events_job_idx").on(table.jobId),
+]);
+
 export type PublishingJobRow = typeof publishingJobs.$inferSelect;
 export type InsertPublishingJobRow = typeof publishingJobs.$inferInsert;
 

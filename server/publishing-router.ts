@@ -3,7 +3,10 @@
  * Retry und Autopilot-Uebersicht. Nutzer-gescoped via ctx.user.openId.
  */
 import { z } from "zod";
-import { protectedProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
+import { getDb } from "./db";
+import { listUncertainPublishingForAdmin, listPublishingReviewHistory, reconcileUncertainPublishingJob } from "./publishing-review";
 import {
   cancelPublishingJob,
   setPublishingJobAssets,
@@ -15,6 +18,45 @@ import {
 } from "./publishing-service";
 
 export const publishingRouter = router({
+  /** Admin can inspect only their OWN uncertain jobs (never cross-tenant). */
+  reviewQueue: adminProcedure.query(async ({ctx}) => {
+    const db=await getDb();
+    if (!db) throw new TRPCError({code:"SERVICE_UNAVAILABLE",message:"Datenbank nicht verfügbar."});
+    const [jobs,events]=await Promise.all([
+      listUncertainPublishingForAdmin(db,ctx.user.openId),
+      listPublishingReviewHistory(db,ctx.user.openId),
+    ]);
+    return {
+      jobs: jobs.map(job => ({...job,updatedAt:job.updatedAt.toISOString(),scheduledFor:job.scheduledFor.toISOString()})),
+      events: events.map(event => ({...event,reviewedAt:event.reviewedAt.toISOString()})),
+    };
+  }),
+  /**
+   * Explicit human review only, never resend. The two exact confirmation
+   * tokens prevent accidental execution by an unconfirmed UI click.
+   */
+  reconcile: adminProcedure.input(z.discriminatedUnion("resolution", [
+    z.object({
+      jobId:z.number().int().positive(),
+      resolution:z.literal("confirmed_published"),
+      externalId:z.string().trim().min(4).max(300),
+      evidence:z.string().trim().min(16).max(1200),
+      confirmation:z.literal("VEROEFFENTLICHUNG_VERIFIZIERT"),
+    }),
+    z.object({
+      jobId:z.number().int().positive(),
+      resolution:z.literal("closed_without_replay"),
+      evidence:z.string().trim().min(16).max(1200),
+      confirmation:z.literal("OHNE_WIEDERHOLUNG_SCHLIESSEN"),
+    }),
+  ])).mutation(async ({ctx,input}) => {
+    const db=await getDb();
+    if (!db) throw new TRPCError({code:"SERVICE_UNAVAILABLE",message:"Datenbank nicht verfügbar."});
+    const changed=await reconcileUncertainPublishingJob(db,ctx.user.openId,ctx.user.openId,input.jobId,input);
+    if (!changed) throw new TRPCError({code:"CONFLICT",message:"Der Job wurde bereits bearbeitet oder gehört nicht zu Ihrem Konto."});
+    return {reviewed:true};
+  }),
+
   enqueueCampaign: protectedProcedure
     .input(
       z.object({
