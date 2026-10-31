@@ -18,7 +18,7 @@
  * Tabelle platform_tokens — der Autopilot frischt vor Ablauf selbst nach.
  */
 
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { create, type AxiosInstance } from "axios";
 import {
   autoCardAssetUrl,
@@ -38,15 +38,19 @@ import {
   isJobDue,
   MAX_PUBLISH_ATTEMPTS,
   publishingFailureDecision,
-  isConfirmedPublishingReceipt,
-  UNCERTAIN_PUBLISHING_MESSAGE,
   resolvePublishingMode,
   evaluatePublishingReliabilityCircuit,
   type PlatformCredentials,
   type PublishingMode,
 } from "../lib/publishing-queue-logic";
 import { getDb } from "./db";
-import { claimDuePublishingJob, quarantineStalePublishingClaimsDb } from "./publishing-claim";
+import {
+  claimDuePublishingJob,
+  quarantineStalePublishingClaimsDb,
+  armPublishingDispatch,
+  confirmPublishingReceipt,
+  quarantineAmbiguousPublishingDispatch,
+} from "./publishing-claim";
 import { resolveXToken } from "./x-token-service";
 import { assertPublishingMediaUrls, reviewPublishingMediaUrl } from "../lib/publishing-asset-url-logic";
 import { invokeLLM } from "./_core/llm";
@@ -597,68 +601,61 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
     if (!job) continue;
     outcome.processed += 1;
 
-    // Sprint 367 (Optimierung 2+5): Instagram-Job ohne Asset -> automatisch
-    // generierte, app-gehostete PNG-Karte im Persona-Stil statt manueller URL.
-    let jobAssetUrl = job.assetUrl;
-    const hasCarousel = Array.isArray(job.assetUrls) && job.assetUrls.length > 0;
-    if (job.platform === "instagram" && !jobAssetUrl && !hasCarousel) {
-      const base = publicAssetBaseUrl();
-      if (base) {
-        jobAssetUrl = autoCardAssetUrl(base, job.id);
-        await db.update(publishingJobs).set({ assetUrl: jobAssetUrl, updatedAt: new Date() }).where(eq(publishingJobs.id, job.id));
-      }
-    }
-
-    const resolution = resolvePublishingMode(job.platform, credentials, { hasAsset: Boolean(jobAssetUrl) || hasCarousel });
-
+    // Every pre-dispatch step, including optional asset generation, stays
+    // inside the error boundary so an asset-storage failure is not abandoned.
     let dispatchStarted = false;
     try {
-      const content = await generateJobContent(job);
-      if (resolution.mode !== "live") {
-        throw new Error(resolution.reason);
+      let jobAssetUrl = job.assetUrl;
+      const hasCarousel = Array.isArray(job.assetUrls) && job.assetUrls.length > 0;
+      if (job.platform === "instagram" && !jobAssetUrl && !hasCarousel) {
+        const base = publicAssetBaseUrl();
+        if (base) {
+          jobAssetUrl = autoCardAssetUrl(base, job.id);
+          await db.update(publishingJobs).set({assetUrl: jobAssetUrl, updatedAt: new Date()})
+            .where(and(eq(publishingJobs.id, job.id), eq(publishingJobs.status, "in_bearbeitung")));
+        }
       }
-      // Persist the dispatch boundary before the network request. If a
-      // worker crashes after this point, replay requires manual reconciliation.
-      const [armed] = await db.update(publishingJobs).set({
-        mode: "dispatching", updatedAt: new Date(),
-      }).where(and(
-        eq(publishingJobs.id, job.id),
-        eq(publishingJobs.userOpenId, userOpenId),
-        eq(publishingJobs.status, "in_bearbeitung"),
-      )).returning({id:publishingJobs.id});
-      if (!armed) throw new Error("Publishing-Reservierung abgelaufen.");
-      dispatchStarted = true;
-      const { externalId } = await publishLive(job.platform, content, credentials, jobAssetUrl, job.assetUrls, {
-        onXUnauthorized: () => resolveXToken({ now, force: true }).then((resolution) => resolution.token),
+
+      const resolution = resolvePublishingMode(job.platform, credentials, {
+        hasAsset: Boolean(jobAssetUrl) || hasCarousel,
       });
-      if (!isConfirmedPublishingReceipt(externalId))
-        throw new Error("Plattform lieferte keinen überprüfbaren Beitragsschlüssel.");
-      const [persisted] = await db
-        .update(publishingJobs)
-        .set({
-          status: "veroeffentlicht",
-          mode: "live",
-          externalId,
-          publishedAt: new Date(),
-          lastError: null,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(publishingJobs.id, job.id), eq(publishingJobs.status, "in_bearbeitung")))
-        .returning({id:publishingJobs.id});
+      const content = await generateJobContent(job);
+      if (resolution.mode !== "live") throw new Error(resolution.reason);
+
+      // Arm on the database BEFORE provider side effects. If the provider
+      // accepted a post but the acknowledgement is lost, never replay.
+      const armed = await armPublishingDispatch(db, job.id, userOpenId);
+      if (!armed) throw new Error("Publishing-Reservierung nicht mehr aktiv.");
+      dispatchStarted = true;
+      const { externalId } = await publishLive(
+        job.platform, content, credentials, jobAssetUrl, job.assetUrls,
+        {onXUnauthorized: () => resolveXToken({now, force:true}).then(x=>x.token)},
+      );
+      const persisted = await confirmPublishingReceipt(db, job.id, userOpenId, externalId);
       if (!persisted) throw new Error("Provider quittierte, DB-Bestätigung blieb aus.");
       outcome.live += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unbekannter Publishing-Fehler";
-      const decision = publishingFailureDecision(dispatchStarted, job.attempts, now);
-      await db
-        .update(publishingJobs)
-        .set({
+      if (dispatchStarted) {
+        // For both dropped responses and database failures after an external
+        // success, only quarantine. If even this write fails, leave the
+        // in-progress row for stale-claim quarantine; never auto-requeue.
+        await quarantineAmbiguousPublishingDispatch(db, job.id, userOpenId);
+      } else {
+        const decision = publishingFailureDecision(false, job.attempts, now);
+        await db.update(publishingJobs).set({
           status: decision.status,
-          lastError: dispatchStarted ? UNCERTAIN_PUBLISHING_MESSAGE : message,
+          lastError: message,
           scheduledFor: decision.retryAt ?? job.scheduledFor,
           updatedAt: new Date(),
-        })
-        .where(and(eq(publishingJobs.id, job.id), eq(publishingJobs.status, "in_bearbeitung")));
+        }).where(and(
+          eq(publishingJobs.id, job.id),
+          eq(publishingJobs.userOpenId, userOpenId),
+          eq(publishingJobs.status, "in_bearbeitung"),
+          // Never requeue a job if a send boundary was already armed.
+          isNull(publishingJobs.mode),
+        ));
+      }
       outcome.failed += 1;
     }
   }

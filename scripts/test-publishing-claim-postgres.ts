@@ -7,7 +7,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { claimDuePublishingJob, quarantineStalePublishingClaimsDb } from "../server/publishing-claim";
+import { claimDuePublishingJob, quarantineStalePublishingClaimsDb, armPublishingDispatch, confirmPublishingReceipt, quarantineAmbiguousPublishingDispatch } from "../server/publishing-claim";
+import { createServer } from "node:http";
+import axios from "axios";
 
 async function main(): Promise<void> {
   const value = process.env.PUBLISHING_INTEGRATION_DATABASE_URL ?? "";
@@ -96,6 +98,89 @@ async function main(): Promise<void> {
     assert.match(uncertain.last_error,/Plattform prüfen/);
     assert.equal(uncertain.attempts,1);
     assert.equal(await claimDuePublishingJob(wa,created,"owner-a",now),null);
+
+    // Controlled HTTP provider: accept the post, then drop its acknowledgement.
+    // Real Axios network I/O and the same durable transitions as production.
+    const received: string[] = [];
+    const provider = createServer((req, res) => {
+      let body = "";
+      req.on("data", (part: Buffer) => {body += part.toString("utf8");});
+      req.on("end", () => {
+        received.push(body);
+        if (req.url === "/drop-ack") {
+          req.socket.destroy(); // accepted, but client sees ECONNRESET
+        } else {
+          res.writeHead(200, {"content-type":"application/json"});
+          res.end(JSON.stringify({id: "provider-post-" + received.length}));
+        }
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      provider.once("error", reject);
+      provider.listen(0, "127.0.0.1", resolve);
+    });
+    try {
+      const address = provider.address();
+      assert(address && typeof address !== "string");
+      const baseUrl = "http://127.0.0.1:" + address.port;
+      const createJob = async (key: string): Promise<number> =>
+        (await setup.query(`INSERT INTO "publishingJobs"
+          (user_open_id,product,goal,persona,platform,campaign_day,dedupe_key,scheduled_for)
+          VALUES('owner-test','product','reach','nova','x',1,$1,$2) RETURNING id`,
+          [key,new Date(now.getTime()-60_000)])).rows[0].id as number;
+
+      const lostId = await createJob("accept-then-drop");
+      assert(await claimDuePublishingJob(wa,lostId,"owner-test",now));
+      assert.equal(await armPublishingDispatch(wa,lostId,"owner-test"),true);
+      assert.equal(await armPublishingDispatch(wb,lostId,"owner-test"),false);
+      let lostAck = false;
+      try {
+        await axios.post(baseUrl + "/drop-ack",{text:"one-post"}, {timeout:1500});
+      } catch {
+        lostAck = true;
+        assert.equal(await quarantineAmbiguousPublishingDispatch(wb,lostId,"owner-test"),true);
+      }
+      assert.equal(lostAck,true,"real network error must reach the fail-closed path");
+      assert.equal(received.length,1,"the remote provider accepted the post once");
+      assert.equal(await claimDuePublishingJob(wa,lostId,"owner-test",now),null);
+      assert.equal(await quarantineAmbiguousPublishingDispatch(wa,lostId,"owner-test"),false);
+      const ambiguous=(await setup.query('SELECT status,attempts,external_id FROM "publishingJobs" WHERE id=$1',[lostId])).rows[0];
+      assert.equal(ambiguous.status,"versand_ungeklaert");
+      assert.equal(ambiguous.external_id,null);
+      assert.equal(ambiguous.attempts,1);
+
+      // Provider response with a real ID: only an armed, matching worker
+      // can persist it as veroeffentlicht. A replay stays impossible.
+      const successId = await createJob("receipt-success");
+      assert(await claimDuePublishingJob(wb,successId,"owner-test",now));
+      assert.equal(await confirmPublishingReceipt(wa,successId,"owner-test","not-armed"),false);
+      assert.equal(await armPublishingDispatch(wa,successId,"other-owner"),false);
+      assert.equal(await armPublishingDispatch(wa,successId,"owner-test"),true);
+      const response=await axios.post<{id:string}>(baseUrl+"/success",{text:"safe-post"},{timeout:1500});
+      assert.equal(await confirmPublishingReceipt(wa,successId,"owner-test",response.data.id),true);
+      assert.equal(await confirmPublishingReceipt(wb,successId,"owner-test",response.data.id),false);
+      assert.equal(await claimDuePublishingJob(wb,successId,"owner-test",now),null);
+      const published=(await setup.query('SELECT status,external_id FROM "publishingJobs" WHERE id=$1',[successId])).rows[0];
+      assert.equal(published.status,"veroeffentlicht");
+      assert.equal(published.external_id,response.data.id);
+      assert.equal(received.length,2);
+
+      // No or fabricated provider reference: never call this a success.
+      const noReceiptId=await createJob("missing-provider-id");
+      assert(await claimDuePublishingJob(wa,noReceiptId,"owner-test",now));
+      assert.equal(await armPublishingDispatch(wa,noReceiptId,"owner-test"),true);
+      await assert.rejects(
+        () => confirmPublishingReceipt(wb,noReceiptId,"owner-test","x-unknown"),
+        /Beitragsschlüssel/,
+      );
+      assert.equal(await quarantineAmbiguousPublishingDispatch(wb,noReceiptId,"owner-test"),true);
+      assert.equal(await claimDuePublishingJob(wa,noReceiptId,"owner-test",now),null);
+      console.log("PASS: HTTP accepted-but-lost ACK is quarantined; confirmed receipt persisted once; missing receipt blocked.");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        provider.close(err => err ? reject(err) : resolve());
+      });
+    }
     console.log("PASS: PostgreSQL 24-worker CAS, tenant isolation, due-time, stale quarantine, migration replay.");
   } finally {
     await Promise.all([setup.end(),a.end(),b.end()]);
