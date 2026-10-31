@@ -1,4 +1,5 @@
 import type { StripeCatalogPage, StripeCatalogProduct } from "./stripe-catalog-projection";
+import { INFLUENCER_PERSONAS } from "./influencer-persona-logic";
 
 /** Sprint 22: do not present conflicting Stripe variant prices as one known offer. */
 export function reviewProductPriceVariants(catalog: StripeCatalogPage, productId: string): string[] {
@@ -56,4 +57,10 @@ export function buildMediaRightsChecklist(product: StripeCatalogProduct): string
     "KI-Avatar- und Markenfreigaben separat dokumentieren.",
     "Rechte-Checkliste ist keine Lizenz und keine automatische Freigabe.",
   ].join("\n");
+}
+
+/** Sprint 36: registered personas only, with an explicit AI disclosure. */
+export function resolveCampaignPersona(personaId: string): {id:string; disclosure:string; name:string}|null {
+  const persona=INFLUENCER_PERSONAS.find(p=>p.id===personaId);
+  return persona ? {id:persona.id,disclosure:persona.disclosure,name:persona.name} : null;
 }

@@ -88,4 +88,14 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     expect(result.payload.assets?.some(x=>x.format==="rendered-video")).toBe(false);
   });
 
+  it("Sprint 36: carries consistent registered AI persona identity and disclosure", () => {
+    const juno=buildProductContentBrief(catalog(),"prod_sample","juno","linkedin");
+    expect(juno.ok).toBe(true);
+    if(!juno.ok)return;
+    expect(juno.payload.personaId).toBe("juno");
+    expect(juno.payload.disclosure).toContain("Juno");
+    expect(juno.payload.disclosure).toMatch(/KI-Persönlichkeit/);
+    expect(buildProductContentBrief(catalog(),"prod_sample","fake","instagram").ok).toBe(false);
+  });
+
 });
