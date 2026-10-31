@@ -3,6 +3,7 @@
  * Nothing is published, charged, price-adjusted or rendered by this bridge.
  */
 import type { StripeCatalogPage } from "./stripe-catalog-projection";
+import { reviewProductPriceVariants } from "./commerce-draft-guards";
 import { buildReviewableProductReel } from "./reel-storyboard-logic";
 import {
   validateDraftPayload, type ContentDraftPayload,
@@ -60,7 +61,7 @@ export function buildProductContentBrief(
       ...payload,
       // Domain-specific review flags are required even without a keyword hit.
       reviewFlags: [...new Set([...(payload.reviewFlags ?? []), ...PRODUCT_CONTENT_REVIEW,
-        ...product.issues, ...price.issues])],
+        ...product.issues, ...price.issues, ...reviewProductPriceVariants(catalog, product.id)])],
       commerceSource: { provider: "stripe", productId: product.id, priceId: price.id },
     },
   };
