@@ -10,9 +10,9 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     const result=buildProductContentBrief(catalog(),"prod_sample","nova","instagram");
     expect(result.ok).toBe(true);
     if(!result.ok)throw Error(result.reason);
-    expect(result.payload.assets?.map(a=>a.format)).toEqual([
+    expect(result.payload.assets?.map(a=>a.format)).toEqual(expect.arrayContaining([
       "reel-storyboard","landing-outline","story-outline",
-    ]);
+    ]));
     expect(result.payload.content).toContain("CyberSarah Digitalpaket");
     const reel = result.payload.assets?.find(asset => asset.format === "reel-storyboard");
     expect(reel?.content).toContain("00–03 s | Sprechertext:");
@@ -45,4 +45,83 @@ describe("Admin Stripe product -> fully reviewable campaign draft",()=>{
     expect(result.payload.reviewFlags?.some(s=>s.includes("Rabattversprechen"))).toBe(true);
     expect(result.payload.reviewFlags?.some(s=>s.includes("Medien-/Markenrechte"))).toBe(true);
   });
+  it("Sprint 23: blocks drafts when upstream Stripe pages contain duplicate IDs", () => {
+    const duplicate=projectStripeCatalog([product,product],[price,price],true,true);
+    const result=buildProductContentBrief(duplicate,"prod_sample");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/Doppelte Stripe/);
+  });
+
+  it("Sprint 27: holds product campaigns for independent license and advertisement evidence", () => {
+    const brief=buildProductContentBrief(catalog(),"prod_sample");
+    expect(brief.ok).toBe(true);
+    if(!brief.ok) return;
+    expect(brief.payload.reviewFlags).toEqual(expect.arrayContaining([
+      expect.stringContaining("Rechtefreigabe offen"),expect.stringContaining("Affiliate-/Werbekennzeichnung offen"),
+    ]));
+  });
+
+  it("Sprint 28: rejects an invalid Stripe source reference instead of saving misleading attribution", () => {
+    const invalid=projectStripeCatalog([{...product,id:"prod_bad:id",default_price:"price_sample"}],
+      [{...price,product:"prod_bad:id"}],true,true);
+    const result=buildProductContentBrief(invalid,"prod_bad:id");
+    expect(result.ok).toBe(false);
+    if(!result.ok) expect(result.reason).toMatch(/Quell-IDs/);
+  });
+
+  it("Sprint 33: produces differentiated reviewable hook assets in the shared content payload", () => {
+    const result=buildProductContentBrief(catalog(),"prod_sample");
+    expect(result.ok).toBe(true);
+    if(!result.ok)return;
+    const hooks=result.payload.assets?.filter(x=>x.format==="hook-variant")??[];
+    expect(hooks).toHaveLength(3);
+    expect(hooks.map(x=>x.variant)).toEqual([1,2,3]);
+    expect(new Set(hooks.map(x=>x.content)).size).toBe(3);
+  });
+
+  it("Sprint 34: carries a pending media license checklist, never a rendered asset", () => {
+    const result=buildProductContentBrief(catalog(),"prod_sample");
+    expect(result.ok).toBe(true);
+    if(!result.ok)return;
+    const rights=result.payload.assets?.find(x=>x.format==="media-rights-checklist");
+    expect(rights?.content).toContain("RENDER-STATUS: BLOCKIERT");
+    expect(result.payload.assets?.some(x=>x.format==="rendered-video")).toBe(false);
+  });
+
+  it("Sprint 36: carries consistent registered AI persona identity and disclosure", () => {
+    const juno=buildProductContentBrief(catalog(),"prod_sample","juno","linkedin");
+    expect(juno.ok).toBe(true);
+    if(!juno.ok)return;
+    expect(juno.payload.personaId).toBe("juno");
+    expect(juno.payload.disclosure).toContain("Juno");
+    expect(juno.payload.disclosure).toMatch(/KI-Persönlichkeit/);
+    expect(buildProductContentBrief(catalog(),"prod_sample","fake","instagram").ok).toBe(false);
+  });
+
+  it("Sprint 37: adds an appropriate mobile safe-area specification to the content package", () => {
+    const ig=buildProductContentBrief(catalog(),"prod_sample");
+    const li=buildProductContentBrief(catalog(),"prod_sample","juno","linkedin");
+    expect(ig.ok && li.ok).toBe(true);
+    if(!ig.ok || !li.ok)return;
+    expect(ig.payload.assets?.find(x=>x.format==="mobile-creative-spec")?.content).toContain("1080x1920");
+    expect(li.payload.assets?.find(x=>x.format==="mobile-creative-spec")?.content).toContain("1080x1080");
+  });
+
+  it("Sprint 51: includes a machine-readable disabled CTA contract and original Stripe IDs", () => {
+    const r=buildProductContentBrief(catalog(),"prod_sample");
+    expect(r.ok).toBe(true); if(!r.ok)return;
+    const cta=r.payload.assets?.find(x=>x.format==="landing-cta-contract");
+    expect(cta).toBeDefined();
+    const data=JSON.parse(cta!.content);
+    expect(data).toMatchObject({enabled:false,destination:null,productId:"prod_sample",priceId:"price_sample"});
+  });
+
+  it("Sprint 53: landing privacy gate defaults to no tracking until owner consent review", () => {
+    const r=buildProductContentBrief(catalog(),"prod_sample");
+    expect(r.ok).toBe(true); if(!r.ok)return;
+    const gate=r.payload.assets?.find(x=>x.format==="landing-privacy-gate");
+    expect(gate).toBeDefined();
+    expect(JSON.parse(gate!.content)).toMatchObject({trackingEnabled:false,consentState:"unverified",analyticsTags:[]});
+  });
+
 });
