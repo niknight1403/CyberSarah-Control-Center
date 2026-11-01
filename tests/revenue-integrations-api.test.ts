@@ -15,6 +15,9 @@ describe("revenue admin API integration",()=>{
   await expect(caller.schedulePreview({now:"2026-11-01T11:00:00Z"}))
    .rejects.toMatchObject({code:"FORBIDDEN"});
  });
+ it("protects live PostgreSQL meter health behind admin role",async()=>{
+  await expect(makeCaller("user").meterQueueHealth()).rejects.toMatchObject({code:"FORBIDDEN"});
+ });
  it("blocks non-admin users from policy previews",async()=>{
   const caller=makeCaller("user");
   await expect(caller.outreachWindowPreview({now:"2026-11-01T11:00:00Z"}))
