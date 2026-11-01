@@ -51,8 +51,12 @@ async function checkWrite(client: HubspotClient, objectType: string): Promise<Ca
     return { name, ok: true, detail: "erlaubt (Testobjekt existierte)" };
   } catch (error) {
     if (error instanceof HubspotApiError) {
-      if (error.status === 404) return { name, ok: true, detail: "erlaubt" };
       if (error.status === 403) return { name, ok: false, detail: "Scope fehlt (403)" };
+      // 400/404 heissen: die Autorisierung hat stattgefunden, nur der Probesatz
+      // war unbrauchbar (400) oder die ID existiert nicht (404).
+      if (error.status === 400 || error.status === 404 || error.status === 409) {
+        return { name, ok: true, detail: "erlaubt" };
+      }
       return { name, ok: false, detail: `HTTP ${error.status}` };
     }
     return { name, ok: false, detail: "Netzwerkfehler" };

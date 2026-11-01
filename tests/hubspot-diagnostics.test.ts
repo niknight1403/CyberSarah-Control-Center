@@ -77,3 +77,13 @@ describe("HubSpot: Rechtepruefung", () => {
     for (const url of seen) expect(url).toMatch(/999999999999999999$/);
   });
 });
+describe("HubSpot: 400 bei der Schreibprobe", () => {
+  it("wertet eine Inhaltspruefung als vorhandenes Schreibrecht", async () => {
+    const badRequest = () => new Response(JSON.stringify({ message: "invalid input" }), { status: 400 });
+    const impl = async (input: any, init?: any) =>
+      (init?.method ?? "GET") === "PATCH" ? badRequest() : ok();
+    const summary = summarizeCapabilities(await probeHubspotCapabilities(client(impl as any)));
+    expect(summary.writable).toBe(true);
+    expect(summary.missing).toEqual([]);
+  });
+});

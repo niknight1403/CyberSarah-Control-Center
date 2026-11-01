@@ -29,7 +29,8 @@
     "postinstall": "node -e \"const fs=require('fs');if(fs.existsSync('workspace-service/package.json')){require('child_process').execSync('npm --prefix workspace-service install --omit=dev --no-audit --no-fund',{stdio:'inherit'})}else{console.log('[postinstall] workspace-service nicht vorhanden - skip (Docker-Layer)')}\"",
     "smoke": "node scripts/smoke-live.mjs",
     "audit:growth": "node scripts/growth-release-audit.mjs",
-    "hubspot:check": "tsx scripts/hubspot-live-check.ts"
+    "hubspot:check": "tsx scripts/hubspot-live-check.ts",
+    "hubspot:write-check": "tsx scripts/hubspot-write-roundtrip.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
