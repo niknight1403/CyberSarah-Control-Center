@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - ports-rebind
           - ports-lockdown
           - ports-audit
           - dns-verify
@@ -202,6 +203,21 @@ jobs:
                   echo "  Port $port: zu"
                 fi
               done
+              ;;
+            ports-rebind)
+              # Bindet die Container-Ports an localhost und prueft danach
+              # die Erreichbarkeit von aussen.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ports-rebind.sh 2>&1 | tail -45'
+              echo "== Erreichbarkeit von aussen nach dem Umbau =="
+              for port in 3000 3001 3002 12000; do
+                if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
+                  echo "  Port $port: OFFEN"
+                else
+                  echo "  Port $port: zu"
+                fi
+              done
+              echo "== Oeffentlicher Zugang ueber TLS =="
+              curl -s -o /dev/null -w "  sslip /api/ready: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
