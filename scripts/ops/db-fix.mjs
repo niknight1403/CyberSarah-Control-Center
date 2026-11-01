@@ -4,7 +4,7 @@
  * prueft die Verbindung danach. Gibt niemals das Passwort aus.
  * Aufruf auf dem Server: node scripts/ops/db-fix.mjs
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, appendFileSync, chmodSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { Client } from "pg";
 
@@ -17,7 +17,24 @@ try {
   process.exit(1);
 }
 
-const line = raw.split(/\r?\n/).find((entry) => entry.startsWith("DATABASE_URL"));
+let line = raw.split(/\r?\n/).find((entry) => entry.startsWith("DATABASE_URL"));
+
+// Fehlt die Zeile in der .env, kommt der Wert aus der laufenden App
+// (Datei mit der URL-Zeile, per root aus /proc/<pid>/environ gezogen).
+if (!line && process.env.DATABASE_URL_FILE) {
+  try {
+    const fromProc = readFileSync(process.env.DATABASE_URL_FILE, "utf8").trim();
+    if (fromProc.startsWith("DATABASE_URL=")) {
+      line = fromProc;
+      appendFileSync(envPath, `\n${fromProc}\n`);
+      chmodSync(envPath, 0o600);
+      console.log("DATABASE_URL war in der .env nicht vorhanden und wurde aus dem App-Prozess uebernommen.");
+    }
+  } catch (error) {
+    console.log(`Hinweis: Prozess-Env nicht lesbar (${error.code}).`);
+  }
+}
+
 if (!line) {
   console.log("FEHLER: keine DATABASE_URL-Zeile gefunden.");
   const names = raw
