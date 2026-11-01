@@ -3,7 +3,7 @@
 # Aufruf: bash scripts/ops/caddy-site.sh <hostname>
 set -uo pipefail
 
-HOST="${1:-167.233.196.20.sslip.io}"
+HOSTS=("${@:-167.233.196.20.sslip.io}")
 CADDYFILE="${CADDYFILE:-/etc/caddy/Caddyfile}"
 
 echo "== Caddy-Status =="
@@ -11,19 +11,22 @@ systemctl is-active caddy 2>/dev/null || echo "caddy nicht als Dienst erkannt"
 echo "== Aktuelle Konfiguration =="
 cat "$CADDYFILE" 2>/dev/null || { echo "FEHLER: $CADDYFILE fehlt"; exit 1; }
 
+HOST="${HOSTS[0]}"
 if grep -qE "^[^#]*${HOST//./\\.}" "$CADDYFILE" 2>/dev/null; then
   echo "== Site fuer $HOST existiert bereits =="
 else
   echo "== Site fuer $HOST anlegen =="
   cp "$CADDYFILE" "${CADDYFILE}.bak-$(date +%Y%m%d%H%M%S)"
+  ADDRESSES=$(printf '%s, ' "${HOSTS[@]}")
+  ADDRESSES=${ADDRESSES%, }
   cat >> "$CADDYFILE" <<EOF
 
-${HOST} {
+${ADDRESSES} {
     encode gzip
     reverse_proxy 127.0.0.1:3000
 }
 EOF
-  echo "Block ergaenzt."
+  echo "Block fuer ${ADDRESSES} ergaenzt."
 fi
 
 echo "== Konfiguration pruefen =="

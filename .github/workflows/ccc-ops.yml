@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - dns-prep
           - dns-fix
           - net-fix
           - ram-boost
@@ -139,6 +140,17 @@ jobs:
                 [ "$code" = "200" ] && break
                 sleep 12
               done
+              ;;
+            dns-prep)
+              # Legt die Site-Bloecke fuer beide Domains an und zeigt, was
+              # aktuell auf den bestehenden Records laeuft.
+              $SSH_CMD "cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/caddy-site.sh cybersarah-control-center.de www.cybersarah-control-center.de" 2>&1 | tail -25
+              echo "== Was laeuft aktuell auf cybersarah-ki.com (130.61.73.72)? =="
+              curl -s -o /dev/null -w "https://cybersarah-ki.com -> %{http_code}\n" --max-time 12 https://cybersarah-ki.com || echo "https nicht erreichbar"
+              curl -s --max-time 12 https://cybersarah-ki.com | head -c 200 | tr -d '\n'; echo
+              curl -s -o /dev/null -w "http://cybersarah-ki.com -> %{http_code}\n" --max-time 12 http://cybersarah-ki.com || echo "http nicht erreichbar"
+              echo "== Bestehender HTTPS-Zugang =="
+              curl -s -o /dev/null -w "https://167.233.196.20.sslip.io/api/ready -> %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
