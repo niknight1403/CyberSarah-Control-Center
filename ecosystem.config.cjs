@@ -10,6 +10,7 @@ module.exports = {
     min_uptime: "10s",
     max_restarts: 10,
     restart_delay: 5000,
-    env: {NODE_ENV: "production", PORT: process.env.PORT || "8000"},
+    cwd: "/home/ubuntu/CyberSarah-Control-Center",
+    env: {NODE_ENV: "production", PORT: process.env.PORT || "3000"},
   }],
 };

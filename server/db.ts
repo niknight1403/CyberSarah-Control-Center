@@ -24,9 +24,9 @@ import { ENV } from "./_core/env";
 import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
 import { resolvePgSslConfig, stripSslModeParam } from "../lib/db-ssl-logic";
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
-  .trim()
-  .toLowerCase();
+// The owner account is always an administrator; environment configuration may
+// document the same value but must not be able to remove this access.
+const ADMIN_EMAIL = "niko.oeben@gmail.com";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
