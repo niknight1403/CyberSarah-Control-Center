@@ -21,6 +21,8 @@ describe("revenue throughput supervisor",()=>{
     expect(out.revenueVelocity.monthlyRunRateEur).toBe(3000);
     expect(out.grossMrrAcquisition.avgDailyNewMrr7dEur).toBe(30);
     expect(out.grossMrrAcquisition.gross30dAcquisitionRunRateEur).toBe(900);
+    expect(out.checkoutFriction.status).toBe("healthy");
+    expect(out.checkoutFriction.source).toBe("stripe-checkout");
     expect(out.mrrVelocity.available).toBe(false);
     expect(out.mrrVelocity.projectedMrrEur).toBeNull();
     expect(out.status).toBe("scale");
@@ -39,6 +41,7 @@ describe("revenue throughput supervisor",()=>{
       checkoutStarts:20,
       upgrades:5,
       invoiceSuccessRate:80,
+      stripeCheckoutSuccessRate:35,
       stripeWebhookConsecutiveFailures:4,
       digistoreWebhookConsecutiveFailures:3,
     });
@@ -47,6 +50,7 @@ describe("revenue throughput supervisor",()=>{
     expect(out.blockers.join(" ")).toContain("Stripe");
     expect(out.blockers.join(" ")).toContain("Digistore24");
     expect(out.blockers.join(" ")).toContain("LLM-Provider");
+    expect(out.checkoutFriction.status).toBe("critical");
     expect(out.blockers.join(" ")).toContain("Invoice");
     expect(out.blockers.join(" ")).toContain("Stripe-Webhook");
     expect(out.blockers.join(" ")).toContain("Digistore24-IPN");
