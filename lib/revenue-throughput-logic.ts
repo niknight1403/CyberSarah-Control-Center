@@ -18,6 +18,8 @@ export type RevenueThroughputInput={
   databaseReady:boolean;
   providerCircuitsOpen:number;
   providerCircuitsTotal:number;
+  stripeWebhookConsecutiveFailures:number;
+  digistoreWebhookConsecutiveFailures:number;
 };
 
 const pct=(n:number,d:number)=>d>0?Number((n/d*100).toFixed(2)):null;
@@ -47,6 +49,8 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
   if(!input.stripeWebhookConfigured)blockers.push("Stripe-Webhook-Secret fehlt oder ist ungültig");
   if(!input.digistoreIpnConfigured)blockers.push("Digistore24-IPN nicht konfiguriert");
   if(input.providerCircuitsTotal>0&&input.providerCircuitsOpen===input.providerCircuitsTotal)blockers.push("Alle LLM-Provider-Circuits offen");
+  if(input.stripeWebhookConsecutiveFailures>=3)blockers.push(`Stripe-Webhook ${input.stripeWebhookConsecutiveFailures} Fehler in Folge`);
+  if(input.digistoreWebhookConsecutiveFailures>=3)blockers.push(`Digistore24-IPN ${input.digistoreWebhookConsecutiveFailures} Fehler in Folge`);
   if(bottleneck&&bottleneck.dropOffPct!==null&&bottleneck.dropOffPct>=50)blockers.push(`Funnel-Engpass ${bottleneck.key}: ${bottleneck.dropOffPct}% Drop-off`);
   if(input.invoiceSuccessRate!==null&&input.invoiceSuccessRate<95)blockers.push(`Invoice-Erfolgsrate nur ${input.invoiceSuccessRate.toFixed(1)}%`);
 
@@ -81,6 +85,8 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
       digistoreApiConfigured:input.digistoreApiConfigured,
       stripeCheckoutSuccessRate:input.stripeCheckoutSuccessRate,
       invoiceSuccessRate:input.invoiceSuccessRate,
+      stripeWebhookConsecutiveFailures:input.stripeWebhookConsecutiveFailures,
+      digistoreWebhookConsecutiveFailures:input.digistoreWebhookConsecutiveFailures,
     },
     infrastructure:{
       databaseReady:input.databaseReady,
