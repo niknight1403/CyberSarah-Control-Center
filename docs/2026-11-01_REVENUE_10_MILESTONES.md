@@ -30,3 +30,14 @@ npm test
 npm run check
 npm run build
 ```
+
+## Admin tRPC integration (follow-up)
+The existing `revenueIntegrations` tRPC router now exposes six admin-only endpoints:
+`safetyStatus`, `schedulePreview`, `outreachWindowPreview`,
+`outreachPolicyPreview`, `crmPaginationPreview`,
+`meterQueuePreview`, and `attributedMetricsPreview`.
+All are queries and accept caller-provided preview data; they make no
+outbound requests, charge no customers and send no messages. The returned
+policy decision is **not** authorization for sending until durable consent,
+suppression and approved records are checked server-side. Do not advertise
+preview metrics as measured MRR.
