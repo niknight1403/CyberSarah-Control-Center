@@ -73,6 +73,16 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="ai-influenza-team"
+          options={{
+            title: "AI Influenza Team",
+            href: null,
+            tabBarIcon: ({ color, focused }) => (
+              <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="person.crop.circle" color={color} /></GlassTabIcon>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="revenue-os"
           options={{
             title: CYBERSARAH_ASSET_PACK.navigation[1].label,

@@ -46,6 +46,7 @@ import { revenueOsV2Router } from "./revenue-os-v2-router";
 import { revenueIntegrationsRouter } from "./revenue-integrations-router";
 import { growthNetworkRouter } from "./growth-network-router";
 import { facelessChannelRouter } from "./faceless-channel-router";
+import { aiInfluenzaTeamRouter } from "./ai-influenza-team-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -102,6 +103,7 @@ export const appRouter = router({
   growthNetwork: growthNetworkRouter,
   revenueIntegrations: revenueIntegrationsRouter,
   facelessChannel: facelessChannelRouter,
+  aiInfluenzaTeam: aiInfluenzaTeamRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.

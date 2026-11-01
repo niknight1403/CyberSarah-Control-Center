@@ -4,6 +4,19 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 01.11.2026 — v2.8.0 (geplant): AI Influenza Team · Phase 7
+
+- **Neue Business-Unit:** AI Influenza Team als integrierte KI-Agentur in CyberSarah Control Center.
+- **3 Servicepakete:** Starter 299 €/Monat, Growth 999 €/Monat, Business 2.499 €/Monat; Preise ausdrücklich als zu validierende Start-Hypothesen.
+- **8 spezialisierte Agenten:** CEO/Orchestrator, Market Intelligence, Lead Discovery, Sales & Conversion, Content Production, Video & Creative Studio, Customer Success, Revenue & Profit Optimizer.
+- **Persistenter Kundenprozess:** B2B-CRM auf `b2b_network_nodes`, Aufträge/Tasks/Events auf `revenue_jobs`, bestehende Draft-/Publishing-Queues für Freigabe und Auslieferung.
+- **Stripe:** Authentifizierter Paket-Checkout + Kundenportal; echte Aufträge werden ausschließlich über signaturverifizierte Stripe-Subscription/Webhook-Ereignisse auf `paid` gesetzt. Bezahlt-Revenue wird nur aus verifizierten paid Invoices in der Attribution erkannt.
+- **Compliance:** Opt-outs, öffentliche Quellen und Kontaktbasis werden gespeichert; automatische Werbenachrichten bleiben verboten. Externe Sends/Publishing/Verträge/Geldaktionen bleiben freigabegesteuert.
+- **Content & Video:** Paket-Delivery erzeugt kundenbezogene, freigabepflichtige Content-/Video-Skripte über den bestehenden LLM-/Draft-Pfad; vorhandene Media-Pipeline rendert Video weiterhin nur nach ausdrücklicher Freigabe.
+- **Mobile UI:** eigener AI-Influenza-Team-Bereich im Cyber-Neon/Aurora-Stil mit Paketkatalog, Revenue/Lead/Order-KPIs, Agententeam, Stripe/Portal und Profit-Analytics.
+- **Profit Truth:** Revenue aus verifizierten Stripe-Invoice-Events; Kosten separat in `revenueCostEvents`; Deckungsbeitrag/Marge werden daraus berechnet, nicht aus Paketlistenpreisen.
+- **QA:** vollständige test-only Customer Journey ohne Live-Zahlung oder externen Versand; Release erst nach grüner CI/Gitleaks/Postgres/Build/Render/APK-Pipeline.
+
 ## 03.10.2026 — Postinstall-Inline-Hotfix: Vollständig inline postinstall-Hook für Docker-Layer-Builds
 
 - **Vollständig inline postinstall-Hook:** `package.json` (`postinstall`) verwendet nun ein inline `node -e` Konstrukt: `"node -e "const fs=require('fs');if(fs.existsSync('workspace-service/package.json')){require('child_process').execSync('npm --prefix workspace-service install --omit=dev --no-audit --no-fund',{stdio:'inherit'})}else{console.log('[postinstall] workspace-service nicht vorhanden - skip (Docker-Layer)')}""`

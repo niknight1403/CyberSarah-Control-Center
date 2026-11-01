@@ -17,6 +17,8 @@ import {
   type SubscriptionTier,
 } from "../lib/subscription-tiers-logic";
 import { normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-webhook-logic";
+import {buildAiInfluenzaStripeLineItem,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
+import {recordAiInfluenzaInvoice,syncAiInfluenzaSubscription} from "./ai-influenza-stripe-sync";
 
 // Sekretaere und Restricted Keys sind beide gueltig: Restricted Keys
 // (rk_live_/rk_test_) sind das empfohlene Least-Privilege-Setup fuer
@@ -320,6 +322,7 @@ export async function syncStripeSubscription(
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
   });
+  await syncAiInfluenzaSubscription(subscription);
 }
 
 async function syncInvoiceSubscription(
@@ -416,7 +419,9 @@ export async function processStripeWebhook(
       event.type === "invoice.paid" ||
       event.type === "invoice.payment_failed"
     ) {
-      await syncInvoiceSubscription(stripe, event.data.object as Stripe.Invoice);
+      const invoice=event.data.object as Stripe.Invoice;
+      await syncInvoiceSubscription(stripe, invoice);
+      await recordAiInfluenzaInvoice(invoice);
     }
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -512,6 +517,44 @@ export async function createTierCheckoutSession(user: BillingUser, tier: Subscri
   });
   if (!session.url) throw new Error("Stripe hat keine Checkout-URL zurückgegeben.");
   return { url: session.url, sessionId: session.id, tier };
+}
+
+/** Checkout for AI Influenza Team service packages. Uses the existing Stripe customer and webhook path. */
+export async function createAiInfluenzaPackageCheckoutSession(
+  user:BillingUser,
+  packageId:AiInfluenzaPackageId,
+  orderId:string,
+){
+  const stripe=assertLiveStripeConfiguration();
+  const customerId=user.stripeCustomerId||(
+    await stripe.customers.create({
+      email:user.email??undefined,
+      name:user.name??undefined,
+      metadata:{cyberSarahUserId:String(user.id)},
+    })
+  ).id;
+  if(!user.stripeCustomerId)await db.setStripeCustomerId(user.id,customerId);
+  const baseUrl=getAppBaseUrl();
+  const metadata={
+    cyberSarahUserId:String(user.id),
+    source:"cybersarah-control-center",
+    businessUnit:"ai-influenza-team",
+    packageId,
+    orderId,
+  };
+  const session=await stripe.checkout.sessions.create({
+    mode:"subscription",
+    customer:customerId,
+    client_reference_id:String(user.id),
+    line_items:[buildAiInfluenzaStripeLineItem(packageId,process.env as Record<string,string|undefined>)],
+    success_url:`${baseUrl}/ai-influenza-team?checkout=success&order=${encodeURIComponent(orderId)}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:`${baseUrl}/ai-influenza-team?checkout=cancelled&order=${encodeURIComponent(orderId)}`,
+    allow_promotion_codes:false,
+    subscription_data:{metadata},
+    metadata,
+  });
+  if(!session.url)throw new Error("Stripe hat keine Checkout-URL zurückgegeben.");
+  return {url:session.url,sessionId:session.id,packageId,orderId};
 }
 
 /** Kündigung zum Periodenende (benutzerfreundlich, jederzeit widerrufbar). */
