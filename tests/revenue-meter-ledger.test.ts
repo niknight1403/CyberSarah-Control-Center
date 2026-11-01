@@ -1,6 +1,6 @@
 import {describe,it,expect,vi} from "vitest";
 import {enqueueMeterEvent,claimMeterEvent,markMeterSent,markMeterFailure,
-  dispatchOneMeterEvent,METER_LEDGER_SCHEMA,type SqlClient} from "../server/revenue-meter-ledger";
+  dispatchOneMeterEvent,quarantineExhaustedMeterLeases,METER_LEDGER_SCHEMA,type SqlClient} from "../server/revenue-meter-ledger";
 const event={eventId:"event_000000001",customerId:"cus_123456",meterEventName:"ai_tokens",
   units:80,occurredAt:Math.floor(Date.now()/1000)};
 const db=(...responses:Record<string,unknown>[][]):SqlClient=>{
@@ -30,6 +30,10 @@ describe("durable revenue metering",()=>{
    expect(await markMeterSent(db([]),claimed!)).toBe(false);
    const failure=db([]);
    await markMeterFailure(failure,claimed!,new Error("Provider 429"));
+ });
+ it("quarantines exhausted worker leases and supports repeated cleanup",async()=>{
+  expect(await quarantineExhaustedMeterLeases(db([{event_id:"expired-a"},{event_id:"expired-b"}]))).toBe(2);
+  expect(await quarantineExhaustedMeterLeases(db([]))).toBe(0);
  });
  it("dispatches only after explicit invocation, with stable Stripe ID",async()=>{
    const row={event_id:event.eventId,customer_id:event.customerId,
