@@ -3,6 +3,7 @@ import { b2bNetworkEdges,b2bNetworkNodes,influencerLearningStates,publishingJobs
 import { INFLUENCER_PERSONAS } from "../lib/influencer-persona-logic";
 import { buildAlwaysOnInfluencerPlan,buildB2BNetworkHealth,evolveInfluencerFromEvidence,prioritizeB2BNetwork } from "../lib/b2b-influencer-network-logic";
 import { assignPersonasToB2B,buildB2BExpansionQueue,buildSaaSLoopEngineeringPlan } from "../lib/b2b-saas-loop-engineering-logic";
+import {buildB2BSalesReadiness} from "../lib/b2b-sales-readiness-logic";
 import { getDb } from "./db";
 
 const clamp=(n:number)=>Math.max(0,Math.min(100,Math.round(Number.isFinite(n)?n:0)));
@@ -37,6 +38,7 @@ export async function b2bNetworkOverview(){
   const personaAssignments=assignPersonasToB2B(priorities,50);
   const expansionQueue=buildB2BExpansionQueue(priorities,personaAssignments,20);
   const saasLoop=buildSaaSLoopEngineeringPlan(health,priorities,personaAssignments);
+  const salesReadiness=buildB2BSalesReadiness(priorities,50);
   return {
     counts:{nodes:nodes.length,edges:edges.length,qualified:edges.filter(e=>e.stage==="qualified").length,customers:nodes.filter(n=>n.kind==="customer").length,partners:nodes.filter(n=>n.kind==="partner").length,optedOut:nodes.filter(n=>n.optedOut).length},
     health,
@@ -44,6 +46,7 @@ export async function b2bNetworkOverview(){
     personaAssignments,
     expansionQueue,
     saasLoop,
+    salesReadiness,
     autonomy:{
       discoveryAndScoring:true,
       personaAssignment:true,
