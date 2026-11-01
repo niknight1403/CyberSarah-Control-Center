@@ -78,7 +78,7 @@ export default function TabLayout() {
             title: "AI Influenza Team",
             href: null,
             tabBarIcon: ({ color, focused }) => (
-              <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="person.3.fill" color={color} /></GlassTabIcon>
+              <GlassTabIcon focused={focused} accent="magenta"><IconSymbol size={22} name="person.crop.circle" color={color} /></GlassTabIcon>
             ),
           }}
         />
