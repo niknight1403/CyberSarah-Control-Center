@@ -28,6 +28,7 @@ import {
   type RevenueLoopDraftPayload,
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS, buildInfluencerPrompt } from "../lib/influencer-persona-logic";
+import { formatB2BAffinityPrompt, selectB2BAffinityBrief } from "../lib/b2b-content-affinity-logic";
 import { invokeLLM, type Message } from "./_core/llm";
 import { openAiCompatibleChatUrl } from "../lib/managed-llm-fallback-logic";
 
