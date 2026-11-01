@@ -132,6 +132,11 @@ export class SandboxHubspotService implements HubspotServiceLike {
     return { total: matches.length, results: matches.slice(0, limit) };
   }
 
+  /** Sandbox liefert keine echten Kontodaten; portalId 0 markiert den Modus. */
+  async getAccountDetails(): Promise<{ portalId?: number; timeZone?: string; currency?: string }> {
+    return { portalId: 0, timeZone: "UTC", currency: "EUR" };
+  }
+
   async getObject(objectType: string, id: string): Promise<HubspotObject> {
     const pool =
       objectType === "contacts" ? this.contacts : objectType === "companies" ? this.companies : this.deals;

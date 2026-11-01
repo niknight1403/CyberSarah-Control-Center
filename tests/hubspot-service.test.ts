@@ -351,3 +351,37 @@ describe("HubSpot: Rechenzentrum aus dem Schluessel ableiten", () => {
     }).baseUrl).toBe("https://api-eu1.hubapi.com");
   });
 });
+describe("HubSpot: Kontostammdaten", () => {
+  it("liest Portal, Zeitzone und Waehrung aus der Account-Info-API", async () => {
+    const seen: string[] = [];
+    const impl = (async (input: any) => {
+      seen.push(String(input));
+      return new Response(
+        JSON.stringify({ portalId: 148844654, timeZone: "US/Eastern", companyCurrency: "USD" }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+    const hub = createHubspotModule({ HUBSPOT_SERVICE_KEY: TOKEN }, { fetchImpl: impl });
+    const details = await hub.service.getAccountDetails();
+    expect(details).toEqual({ portalId: 148844654, timeZone: "US/Eastern", currency: "USD" });
+    expect(seen[0]).toContain("/account-info/v3/details");
+  });
+
+  it("meldet in der Sandbox keinen echten Portalkontext", async () => {
+    const hub = createHubspotModule({});
+    expect(hub.mode).toBe("sandbox");
+    expect((await hub.service.getAccountDetails()).portalId).toBe(0);
+  });
+
+  it("ignoriert einen unbrauchbaren HUBSPOT_ACCESS_TOKEN neben gueltigem Service Key", () => {
+    const env = {
+      HUBSPOT_SERVICE_KEY: TOKEN,
+      HUBSPOT_ACCESS_TOKEN: "C" + "x".repeat(106),
+      HUBSPOT_PORTAL_ID: "6aae3873-c8ca-c734-62fd-12bb00000000",
+    };
+    const status = describeHubspotEnv(env);
+    expect(status.configured).toBe(true);
+    expect(status.variable).toBe("HUBSPOT_SERVICE_KEY");
+    expect(createHubspotModule(env).mode).toBe("live");
+  });
+});

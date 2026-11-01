@@ -5,7 +5,7 @@
  * Betrieb fehlt: idempotentes Anlegen (Upsert nach Email bzw. Domain),
  * Eingabepruefung und eine klare Fehlersemantik.
  */
-import { HubspotClient } from "./client";
+import { HubspotClient, type HubspotAccountDetails } from "./client";
 import {
   HubspotApiError,
   type ContactInput,
@@ -58,6 +58,7 @@ export interface HubspotServiceLike {
   updateDealStage(dealId: string, input: Partial<DealInput> & { dealstage: string }): Promise<HubspotObject>;
   search(request: SearchRequest): Promise<SearchResult>;
   getObject(objectType: string, id: string, properties?: string[]): Promise<HubspotObject>;
+  getAccountDetails(): Promise<HubspotAccountDetails>;
 }
 
 export class HubspotService implements HubspotServiceLike {
@@ -203,6 +204,11 @@ export class HubspotService implements HubspotServiceLike {
       { method: "POST", body },
     );
     return { total: Number(data.total ?? 0), results: Array.isArray(data.results) ? data.results : [] };
+  }
+
+  /** Kontostammdaten (Portal, Zeitzone, Waehrung) fuer Auswertungen. */
+  async getAccountDetails(): Promise<Awaited<ReturnType<HubspotClient["getAccountDetails"]>>> {
+    return this.client.getAccountDetails();
   }
 
   async getObject(objectType: string, id: string, properties?: string[]): Promise<HubspotObject> {

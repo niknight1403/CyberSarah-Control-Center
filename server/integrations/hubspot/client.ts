@@ -10,6 +10,12 @@
  */
 import { HubspotApiError, HubspotConfigError } from "./types";
 
+export interface HubspotAccountDetails {
+  portalId?: number;
+  timeZone?: string;
+  currency?: string;
+}
+
 export interface HubspotClientOptions {
   token: string;
   baseUrl?: string;
@@ -78,6 +84,23 @@ export class HubspotClient {
   }
 
   /** GET/POST gegen die CRM-API; wiederholt ausschliesslich 429 und 5xx. */
+  /**
+   * Kontostammdaten aus der Account-Info-API. Nicht Teil der CRM-Objekte,
+   * deshalb ein eigener Aufruf; liefert portalId, Zeitzone und Waehrung.
+   */
+  async getAccountDetails(): Promise<HubspotAccountDetails> {
+    const payload = await this.request<Record<string, unknown>>("/account-info/v3/details");
+    const pick = (key: string): string | undefined => {
+      const value = payload[key];
+      return typeof value === "string" ? value : undefined;
+    };
+    return {
+      portalId: typeof payload.portalId === "number" ? payload.portalId : undefined,
+      timeZone: pick("timeZone"),
+      currency: pick("companyCurrency") ?? pick("currency"),
+    };
+  }
+
   async request<T>(
     path: string,
     init: { method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE"; body?: unknown } = {},
