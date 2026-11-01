@@ -62,6 +62,34 @@ export async function createAiInfluenzaOrder(input:{
   return {job,payload,package:pkg};
 }
 
+
+export async function createAiInfluenzaInboundOrder(input:{
+  customerNodeKey:string;
+  packageId:AiInfluenzaPackageId;
+  createdByOpenId:string;
+}){
+  const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
+  const [customer]=await db.select().from(b2bNetworkNodes).where(eq(b2bNetworkNodes.nodeKey,input.customerNodeKey)).limit(1);
+  if(!customer)throw new Error("B2B-Kunde wurde nicht gefunden.");
+  if(customer.optedOut)throw new Error("Opt-out-Kontakt darf keinen aktiven Auftrag erhalten.");
+  const pkg=AI_INFLUENZA_PACKAGES[input.packageId];
+  const orderId=`ait-${crypto.randomUUID()}`;
+  const payload:AiInfluenzaOrderPayload={
+    businessUnit:"ai-influenza-team",
+    orderId,customerNodeKey:customer.nodeKey,packageId:pkg.id,mode:"assisted",
+    step:"payment-pending",monthlyBudgetCents:Math.round(pkg.monthlyPriceCents*.35),
+    paymentStatus:"pending",stripeSubscriptionId:null,testOnly:false,createdByOpenId:input.createdByOpenId,
+  };
+  const [job]=await db.insert(revenueJobs).values({
+    dedupeKey:`ai-influenza-order:${orderId}`,kind:"ai-influenza-order",status:"queued",payload,
+  }).returning();
+  await db.insert(revenueJobs).values({
+    dedupeKey:`ai-influenza-event:${orderId}:inbound-checkout`,kind:"ai-influenza-event",status:"completed",
+    payload:{businessUnit:"ai-influenza-team",orderId,event:"inbound-checkout-created",step:"payment-pending",at:new Date().toISOString()},
+  }).onConflictDoNothing({target:revenueJobs.dedupeKey});
+  return {job,payload,package:pkg};
+}
+
 export async function listAiInfluenzaOrders(limit=100){
   const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
   const rows=await db.select().from(revenueJobs)
