@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - villa-check
           - agentforge-init
           - agentforge-check
           - deploy-fix
@@ -263,6 +264,10 @@ jobs:
             agentforge-init)
               # Legt die Agentforge-Tabellen an und setzt den Service-Token.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/agentforge-init.sh 2>&1 | tail -25'
+              ;;
+            villa-check)
+              # Prueft den ausgerollten VillaForge-Hub und den neuen Theme-Endpunkt.
+              $SSH_CMD 'echo "== Hub health =="; curl -s -o /dev/null -w "  /api/health: %{http_code}\n" --max-time 12 http://92.5.177.159:12000/api/health; echo "== Theme-Endpunkt =="; curl -s --max-time 12 http://92.5.177.159:12000/api/design/themes | head -c 400; echo; echo "== Statische Dateien =="; for f in /index.html /app.js; do echo -n "  $f: "; curl -s -o /dev/null -w "%{http_code}\n" --max-time 12 "http://92.5.177.159:12000$f"; done; echo -n "  Skip-Link im HTML: "; curl -s --max-time 12 http://92.5.177.159:12000/index.html | grep -c "skip-link"'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
