@@ -15,7 +15,7 @@ import os, sys, subprocess, gzip, shutil
 from datetime import datetime
 from pathlib import Path
 
-DB_URL = "postgresql://neondb_owner:npg_fW5jIqBbRvs8@ep-gentle-credit-zamfgpk9-pooler.c-2.eu-west-2.aws.neon.tech/neondb"
+DB_URL = os.environ["DATABASE_URL"]  # Secret kommt aus der Umgebung, nie aus dem Repo
 BACKUP_DIR = Path(__file__).parent / "backups"
 
 C = {'p': '\033[95m', 'g': '\033[92m', 'y': '\033[93m', 'r': '\033[91m', 'b': '\033[96m', 'n': '\033[0m', 'bold': '\033[1m'}

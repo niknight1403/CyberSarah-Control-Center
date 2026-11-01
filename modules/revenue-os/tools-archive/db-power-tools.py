@@ -14,7 +14,7 @@ Start:  python3 db-power-tools.py
 import os, sys, json, subprocess
 from datetime import datetime
 
-DB_URL = "postgresql://neondb_owner:npg_fW5jIqBbRvs8@ep-gentle-credit-zamfgpk9-pooler.c-2.eu-west-2.aws.neon.tech/neondb?sslmode=require"
+DB_URL = os.environ["DATABASE_URL"]  # Secret kommt aus der Umgebung, nie aus dem Repo
 C = {'p': '\033[95m', 'g': '\033[92m', 'y': '\033[93m', 'r': '\033[91m', 'b': '\033[96m', 'n': '\033[0m', 'bold': '\033[1m'}
 
 def clr(c, t): return f"{C.get(c, '')}{t}{C['n']}"

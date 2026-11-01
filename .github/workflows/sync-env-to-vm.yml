@@ -1,0 +1,57 @@
+name: Env-Sync (GitHub Secrets nach VM, nie ins Repo)
+on:
+  workflow_dispatch: {}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: .env aus Secrets bauen und auf die VM legen
+        env:
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          S_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          S_GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          S_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          S_STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          S_STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          S_DIGISTORE24_API_KEY: ${{ secrets.DIGISTORE24_API_KEY }}
+          S_DIGISTORE24_IPN_PASSPHRASE: ${{ secrets.DIGISTORE24_IPN_PASSPHRASE }}
+          S_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          S_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          S_HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          S_HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          # 1) Nur Variablen uebernehmen, die in .env.example als Name stehen UND als Secret gesetzt sind.
+          : > /tmp/runtime.env
+          missing=""
+          while IFS= read -r line; do
+            name="${line%%=*}"
+            [[ "$line" =~ ^[A-Z0-9_]+=$ ]] || continue
+            val="$(printenv "S_${name}" || true)"
+            if [ -n "$val" ]; then printf '%s=%s\n' "$name" "$val" >> /tmp/runtime.env; fi
+          done < .env.example
+          # Hetzner-Token liegt unter anderem Namen im Secret-Store.
+          if [ -n "${S_HETZNER_API_TOKEN:-}" ]; then printf 'HETZNER_CLOUD_TOKEN=%s\n' "$S_HETZNER_API_TOKEN" >> /tmp/runtime.env; fi
+          echo "Variablen mit Wert: $(wc -l < /tmp/runtime.env)"
+          cut -d= -f1 /tmp/runtime.env | sort | sed 's/^/  - /'
+          # 2) Auf die VM legen: ausserhalb des Repos, nur fuer root lesbar.
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/oracle_key /tmp/runtime.env ubuntu@92.5.177.159:/tmp/runtime.env.new
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/oracle_key ubuntu@92.5.177.159 "sudo bash -s" <<'EOS'
+          set -euo pipefail
+          install -d -m 700 /etc/cybersarah
+          install -m 600 -o root -g root /tmp/runtime.env.new /etc/cybersarah/ccc.env
+          rm -f /tmp/runtime.env.new
+          echo "Datei: $(stat -c '%a %U:%G %s Bytes' /etc/cybersarah/ccc.env)"
+          echo "Variablen auf VM: $(grep -c '=' /etc/cybersarah/ccc.env)"
+          # Systemd liest die Datei zusaetzlich zu bestehenden Environment=-Zeilen.
+          mkdir -p /etc/systemd/system/cybersarah-ccc.service.d
+          printf '[Service]\nEnvironmentFile=-/etc/cybersarah/ccc.env\n' > /etc/systemd/system/cybersarah-ccc.service.d/envfile.conf
+          systemctl daemon-reload
+          echo "Drop-in aktiv: $(systemctl show cybersarah-ccc -p EnvironmentFiles --value | cut -c1-60)"
+          EOS
+          rm -f /tmp/runtime.env

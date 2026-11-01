@@ -105,3 +105,10 @@ tools/free-llm-changer/aktive-anbindung.env
 # Sprint-Aufräumung: nie eincommitten
 .env.bak*
 secrets-backup*
+
+# Sicherheits-Absicherung (Phase 7): nie Secrets committen
+.env
+.env.*
+!.env.example
+*.env.bak*
+.env.bak-*
