@@ -33,7 +33,8 @@ function run(command: string, args: string[]): { ok: boolean; tail: string; outp
     stdio: ["ignore", "pipe", "pipe"],
   });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-  return { ok: result.status === 0, tail: output.split("\n").slice(-8).join("\n").trim(), output };
+  const cleanOutput = output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+  return { ok: result.status === 0, tail: cleanOutput.split("\n").slice(-8).join("\n").trim(), output: cleanOutput };
 }
 
 const checks: Check[] = [];
@@ -47,13 +48,15 @@ checks.push({
 });
 
 // --- 2) Volle Test-Suite ---
-const vitest = run("npx", ["vitest", "run"]);
-const testMatch = /Tests\s+(\d+)\s+passed/.exec(vitest.output);
+const vitest = run("npx", ["vitest", "run", "--maxWorkers=2"]);
+const testMatch = /(?:Tests|Test Files)\s+(\d+)\s+passed/.exec(vitest.output);
 const testCount = testMatch ? Number(testMatch[1]) : 0;
 checks.push({
   name: "Vitest Gesamt-Suite",
   passed: vitest.ok,
-  detail: vitest.ok ? `${testCount} Tests gruen` : vitest.tail,
+  detail: vitest.ok
+    ? `${testCount} Testdateien/Tests gruen`
+    : vitest.tail,
 });
 
 // --- 3) V4.0-Kernmodule vorhanden ---
@@ -63,6 +66,14 @@ const requiredModules: { file: string; label: string }[] = [
   { file: "lib/managed-llm-fallback-logic.ts", label: "Managed LLM-Fallback (Ollama-Notfall) " },
   { file: "lib/vector-memory-logic.ts", label: "Vector Memory" },
   { file: "server/vector-memory-store.ts", label: "Vector Memory Store-Adapter (Drizzle)" },
+  { file: "server/repo-chat-service.ts", label: "Repo-Chat-Service (Tarball-Index, GitHub)" },
+  { file: "lib/influencer-reach-logic.ts", label: "Influencer-Reichweiten-Engine (6 KI-Creator)" },
+  { file: "lib/bot-villa-logic.ts", label: "Bot-Villa (Kern-Team + Pool bis 5000)" },
+  { file: "lib/project-superagent-factory-logic.ts", label: "Projekt-Superagenten-Fabrik" },
+  { file: "server/project-superagent-factory.ts", label: "Projekt-Superagenten-Service (tRPC)" },
+  { file: "lib/publishing-queue-logic.ts", label: "Publishing-Queue (Autopilot-Logik)" },
+  { file: "server/publishing-service.ts", label: "Publishing-Autopilot (live/sandbox ehrlich)" },
+  { file: "server/publishing-router.ts", label: "Publishing-Router (tRPC, nutzer-gescoped)" },
   { file: "lib/repo-chat-logic.ts", label: "Repo Chat" },
   { file: "lib/payment-fallback-logic.ts", label: "Multi-PSP Fallback" },
   { file: "lib/mcp-client-logic.ts", label: "MCP Netzwerk-Client" },

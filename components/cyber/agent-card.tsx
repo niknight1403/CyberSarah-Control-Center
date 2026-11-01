@@ -20,6 +20,7 @@ export function CyberAgentCard({ name, role, status, metric, onPress }: CyberAge
   // sanktionierte Reanimated-API, gelten dem Compiler aber als Mutation.
   // "use no memo" ist die dokumentierte Interop-Direktive (Komponente wird
   // bewusst nicht compiler-optimiert, Verhalten unveraendert).
+  // eslint-disable-next-line no-unused-expressions -- React Compiler directive.
   "use no memo";
   const scale = useSharedValue(1);
   const glow = useSharedValue(0);

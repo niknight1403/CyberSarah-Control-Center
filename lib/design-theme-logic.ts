@@ -1,63 +1,46 @@
 /**
- * Produktive Neon-Theme-Registry für das CyberSarah Control Center.
- * Die vier Designs sind unabhängig von Hell/Dunkel und werden von
- * Onboarding, Einstellungen und ThemeProvider gemeinsam verwendet.
+ * Sprint 355 — Aurora Flow ist das EINZIGE Design der App.
+ * Die Auswahl-Registry (9 Neon-Varianten) wurde auf Wunsch des Owners
+ * entfernt: keine Design-/Farbwahl mehr in Onboarding oder Einstellungen.
+ * Alte gespeicherte Werte (Profil, AsyncStorage, Server) migrieren ueber
+ * normalizeDesignTheme automatisch und unsichtbar auf "aurora".
  */
 
-export type DesignTheme = "pulse" | "orbit" | "synthwave" | "minimal";
+export type DesignTheme = "aurora";
 
-export const DESIGN_THEMES: readonly DesignTheme[] = ["pulse", "orbit", "synthwave", "minimal"] as const;
-export const DEFAULT_DESIGN_THEME: DesignTheme = "pulse";
-export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v5";
+export const DESIGN_THEMES: readonly DesignTheme[] = ["aurora"] as const;
+export const DEFAULT_DESIGN_THEME: DesignTheme = "aurora";
+export const DESIGN_THEME_STORAGE_KEY = "cybersarah.design-theme.v6";
 
-/** Legacy-Werte werden beim Lesen sicher auf das neue Neon-Pulse-Design migriert. */
+/** Alle gespeicherten Werte (auch Legacy-Designs) landen auf Aurora Flow. */
 export function normalizeDesignTheme(value: unknown): DesignTheme {
-  return DESIGN_THEMES.includes(value as DesignTheme) ? (value as DesignTheme) : DEFAULT_DESIGN_THEME;
+  return "aurora";
 }
 
 export function designThemeLabel(theme: DesignTheme): string {
-  if (theme === "orbit") return "Cyber Orbit";
-  if (theme === "synthwave") return "Neon Synthwave";
-  if (theme === "minimal") return "Neon Minimal";
-  return "Neon Pulse";
+  return "Aurora Flow";
 }
 
 export function designThemeDescription(theme: DesignTheme): string {
-  if (theme === "orbit") return "Futuristisches Blau, Violett und Türkis mit orbitaler Systemübersicht.";
-  if (theme === "synthwave") return "Modernes Pink, Orange und Cyan mit dynamischer KI-SaaS-Energie.";
-  if (theme === "minimal") return "Reduziertes Emerald-Cyan-Design mit klarer Benutzer- und Adminübersicht.";
-  return "Modernes Cyan-, Lime- und Magenta-Neon mit Glasflächen und Superagent-Fokus.";
+  return "Polarlicht-Flow: Violett, Cyan und Petrol ziehen als lebendige Aurora ueber Nachtblau — runde Glas-Pills, weiche Ringe.";
 }
 
-export function designThemeIcon(theme: DesignTheme): "bolt.fill" | "chart.bar.fill" | "sparkles" | "wand.and.stars" {
-  if (theme === "orbit") return "chart.bar.fill";
-  if (theme === "synthwave") return "sparkles";
-  if (theme === "minimal") return "wand.and.stars";
-  return "bolt.fill";
+export function designThemeIcon(theme: DesignTheme): "sparkles" {
+  return "sparkles";
 }
 
 export function isNeonDesign(theme: DesignTheme): boolean {
-  return DESIGN_THEMES.includes(theme);
+  return theme === "aurora";
 }
 
 export function designThemeAccent(theme: DesignTheme): string {
-  if (theme === "orbit") return "#8B5CFF";
-  if (theme === "synthwave") return "#FF4FD8";
-  if (theme === "minimal") return "#00F5D4";
-  return "#52D8FF";
+  return "#7C3AED";
 }
 
 /**
- * Sprint 160 — Prioritaet beim Start: Benutzerprofil > lokaler Speicher >
- * Standardwert. Ungueltige/fehlende/kaputte Werte fallen automatisch auf
- * DEFAULT_DESIGN_THEME zurueck (ueber normalizeDesignTheme).
+ * Start-Prioritaet bleibt formal gewahrt (Profil > Speicher > Standard),
+ * aber jedes Ergebnis ist Aurora Flow — es gibt keine Wahl mehr.
  */
 export function resolveInitialDesignTheme(profileTheme: unknown, storedTheme: unknown): DesignTheme {
-  if (typeof profileTheme === "string" && DESIGN_THEMES.includes(profileTheme as DesignTheme)) {
-    return profileTheme as DesignTheme;
-  }
-  if (typeof storedTheme === "string" && DESIGN_THEMES.includes(storedTheme as DesignTheme)) {
-    return storedTheme as DesignTheme;
-  }
-  return DEFAULT_DESIGN_THEME;
+  return "aurora";
 }

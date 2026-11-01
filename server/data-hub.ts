@@ -152,23 +152,20 @@ export type RevenueSnapshot =
   | { status: "not-configured" }
   | { status: "error"; error: string };
 
-function getStripeClient(): Stripe | null {
-  const key = process.env.STRIPE_SECRET_KEY?.trim();
+function getStripeClients(): Stripe[] {
   const mode = (process.env.STRIPE_MODE ?? "live").trim().toLowerCase();
-  if (!key) return null;
-  // Restricted Keys (rk_live_/rk_test_) sind gueltige produktive Keys
-  // (Least-Privilege) und werden wie Sekretaere akzeptiert.
-  if (mode === "test" && !key.startsWith("sk_test_") && !key.startsWith("rk_test_")) return null;
-  if (mode === "live" && !key.startsWith("sk_live_") && !key.startsWith("rk_live_")) return null;
-  return new Stripe(key);
+  const keys = [process.env.STRIPE_SECRET_KEY, process.env.STRIPE_SECRET_KEY_2]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  const accepted = keys.filter((key) =>
+    mode === "test"
+      ? key.startsWith("sk_test_") || key.startsWith("rk_test_")
+      : key.startsWith("sk_live_") || key.startsWith("rk_live_"),
+  );
+  return [...new Set(accepted)].map((key) => new Stripe(key));
 }
 
-export async function fetchRevenueSnapshot(): Promise<RevenueSnapshot> {
-  const stripe = getStripeClient();
-  if (!stripe) {
-    return { status: "not-configured" };
-  }
-  try {
+async function fetchRevenueWithClient(stripe: Stripe): Promise<Extract<RevenueSnapshot, { status: "ok" }>> {
     const balance = await stripe.balance.retrieve();
     // Binance- und Stripe-Betraege: Balance ist in Cent, gemischt in Waehrungen.
     const eurAvailable = balance.available
@@ -183,18 +180,30 @@ export async function fetchRevenueSnapshot(): Promise<RevenueSnapshot> {
 
     const subscriptions = await stripe.subscriptions.list({ status: "active", limit: 100 });
 
-    console.log(`[DataHub] Revenue-Snapshot: ${subscriptions.data.length} aktive Abonnements.`);
     return {
       status: "ok",
       totalBalanceEur: Number(eurAvailable.toFixed(2)),
       revenueLast24hEur: Number(revenueLast24h.toFixed(2)),
       activeSubscriptions: subscriptions.data.length,
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 200) : "Stripe-Fehler.";
-    console.warn(`[DataHub] Revenue-Snapshot fehlgeschlagen: ${message}`);
-    return { status: "error", error: "Stripe-Daten sind derzeit nicht abrufbar." };
+}
+
+export async function fetchRevenueSnapshot(): Promise<RevenueSnapshot> {
+  const clients = getStripeClients();
+  if (clients.length === 0) return { status: "not-configured" };
+  let lastError = "Stripe-Fehler.";
+  for (let index = 0; index < clients.length; index += 1) {
+    try {
+      const snapshot = await fetchRevenueWithClient(clients[index]!);
+      console.log(`[DataHub] Revenue-Snapshot: ${snapshot.activeSubscriptions} aktive Abonnements (Key ${index + 1}/${clients.length}).`);
+      return snapshot;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message.slice(0, 200) : "Stripe-Fehler.";
+      console.warn(`[DataHub] Stripe-Key ${index + 1}/${clients.length} reicht fuer den Revenue-Snapshot nicht aus — Fallback wird versucht.`);
+    }
   }
+  console.warn(`[DataHub] Revenue-Snapshot fehlgeschlagen: ${lastError}`);
+  return { status: "error", error: "Stripe ist konfiguriert, aber die Revenue-Daten sind derzeit nicht abrufbar. Berechtigungen, Key-Status und Netzwerk werden beim naechsten Lauf erneut geprueft." };
 }
 
 
@@ -290,7 +299,20 @@ export async function fetchContentSnapshot(): Promise<ContentSnapshot> {
     status: tiktokKey ? "ok" : "not-configured",
     detail: tiktokKey ? "Content-Posting-API-Zugang konfiguriert (User-Access-Token fuer Veroeffentlichungen noetig)" : undefined,
   });
-  const instagramToken = process.env.INSTAGRAM_ACCESS_TOKEN?.trim();
+  channels.push({
+    name: "X",
+    status: process.env.X_PUBLISH_TOKEN?.trim() ? "ok" : "not-configured",
+    detail: process.env.X_PUBLISH_TOKEN?.trim() ? "Publishing-Token konfiguriert" : undefined,
+  });
+  channels.push({
+    name: "LinkedIn",
+    status: process.env.LINKEDIN_PUBLISH_TOKEN?.trim() && process.env.LINKEDIN_PUBLISH_USER_URN?.trim() ? "ok" : "not-configured",
+  });
+  channels.push({
+    name: "Threads",
+    status: process.env.THREADS_PUBLISH_TOKEN?.trim() && process.env.THREADS_PUBLISH_USER_ID?.trim() ? "ok" : "not-configured",
+  });
+  const instagramToken = (process.env.INSTAGRAM_ACCESS_TOKEN?.trim() || process.env.INSTAGRAM_PUBLISH_TOKEN?.trim()) || undefined;
   if (!instagramToken) {
     channels.push({ name: "Instagram", status: "not-configured" });
   } else {
@@ -319,10 +341,15 @@ export async function fetchContentSnapshot(): Promise<ContentSnapshot> {
 export type AiServiceStatus = { name: string; configured: boolean };
 export type AiServicesSnapshot = { services: AiServiceStatus[] };
 
-/** KI-Dienste-Status (Perplexity, ElevenLabs, TikTok Symphony) — Key-Pruefung ohne Netzaufruf. */
+/** KI-Dienste-Status — umfasst externe Spezialdienste und die bereits vorhandenen Zero-Cost/LLM-Routen. */
 export function fetchAiServicesSnapshot(): AiServicesSnapshot {
   return {
     services: [
+      { name: "Groq", configured: Boolean(process.env.AI_GROQ_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim()) },
+      { name: "OpenRouter", configured: Boolean(process.env.AI_OPENROUTER_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim()) },
+      { name: "Gemini", configured: Boolean(process.env.AI_GEMINI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()) },
+      { name: "Ollama", configured: Boolean(process.env.AI_OLLAMA_BASE_URL?.trim()) },
+      { name: "Hugging Face", configured: Boolean(process.env.AI_HUGGINGFACE_API_KEY?.trim() || process.env.HF_TOKEN?.trim()) },
       { name: "Perplexity (Recherche)", configured: Boolean(process.env.PERPLEXITY_API_KEY?.trim()) },
       { name: "ElevenLabs (Sprachausgabe)", configured: Boolean(process.env.ELEVENLABS_API_KEY?.trim()) },
       { name: "TikTok Symphony (Content-KI)", configured: Boolean(process.env.TIKTOK_SYMPHONY_API_KEY?.trim()) },

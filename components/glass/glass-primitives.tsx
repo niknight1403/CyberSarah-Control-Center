@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { type GlassAccent } from "@/lib/design/future-glass";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 
 // ---------------------------------------------------------------------------
 // GlassCard — Basis-Flaeche des gesamten Systems.
@@ -38,20 +39,21 @@ export function GlassCard({ children, accent, glow = 0, elevated = false, onPres
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const scale = useAnimatedValue(1);
+  const motionEnabled = decorativeMotionEnabled();
 
   const pressIn = () => {
-    if (!onPress) return;
+    if (!onPress || !decorativeMotionEnabled()) return;
     Animated.timing(scale, { toValue: glass.glassMotion.pressScale, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
   };
   const pressOut = () => {
-    if (!onPress) return;
+    if (!onPress || !decorativeMotionEnabled()) return;
     Animated.timing(scale, { toValue: 1, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
   };
 
   const borderColor = accent ? glass.accentAlpha(accent, glow > 0 ? 0.55 : 0.32) : glass.glassSurface.border;
-  const shadowColor = accent ? glass.glassPalette[accent] : "transparent";
-  const shadowOpacity = glow === 2 ? 0.5 : glow === 1 ? 0.3 : 0;
-  const shadowRadius = glow === 2 ? 20 : glow === 1 ? 12 : 0;
+  const shadowColor = accent ? glass.glassPalette[accent] : glass.glassOverlay.shadow;
+  const shadowOpacity = glow === 2 ? 0.42 : glow === 1 ? 0.26 : 0.14;
+  const shadowRadius = glow === 2 ? 22 : glow === 1 ? 14 : 10;
 
   const content = (
     <Animated.View
@@ -63,20 +65,31 @@ export function GlassCard({ children, accent, glow = 0, elevated = false, onPres
           borderColor,
           borderRadius: glass.glassRadii.card,
           shadowColor,
-          shadowOpacity,
-          shadowRadius,
+          shadowOpacity: motionEnabled ? shadowOpacity : 0,
+          shadowRadius: motionEnabled ? shadowRadius : 0,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: motionEnabled ? (glow === 2 ? 8 : glow === 1 ? 5 : 3) : 0,
           transform: [{ scale }],
         },
         style,
       ]}
     >
       {/* Akzent-Gradient-Wash — diagonaler Lichtschein (Sprint 192). */}
-      {accent && glow > 0 ? (
+      {motionEnabled && accent && glow > 0 ? (
         <LinearGradient
           colors={[glass.accentAlpha(accent, glow === 2 ? 0.14 : 0.07), "transparent"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      ) : null}
+      {motionEnabled && accent ? (
+        <LinearGradient
+          colors={[glass.accentAlpha(accent, 0.85), glass.accentAlpha(accent, 0.18), "transparent"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.accentRail}
           pointerEvents="none"
         />
       ) : null}
@@ -112,9 +125,10 @@ export function GlowButton({ label, onPress, accent = "purple", variant = "prima
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const scale = useAnimatedValue(1);
-  const pressIn = () => Animated.timing(scale, { toValue: glass.glassMotion.pressScale, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
-  const pressOut = () => Animated.timing(scale, { toValue: 1, duration: glass.glassMotion.fast, useNativeDriver: true }).start();
+  const pressIn = () => { if (!decorativeMotionEnabled()) return; Animated.timing(scale, { toValue: glass.glassMotion.pressScale, duration: glass.glassMotion.fast, useNativeDriver: true }).start(); };
+  const pressOut = () => { if (!decorativeMotionEnabled()) return; Animated.timing(scale, { toValue: 1, duration: glass.glassMotion.fast, useNativeDriver: true }).start(); };
 
+  const motionEnabled = decorativeMotionEnabled();
   const isPrimary = variant === "primary";
   const isSecondary = variant === "secondary";
   const background = isPrimary ? glass.accentAlpha(accent, 0.92) : isSecondary ? glass.accentAlpha(accent, 0.14) : "transparent";
@@ -130,6 +144,7 @@ export function GlowButton({ label, onPress, accent = "purple", variant = "prima
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
     >
       <Animated.View
         style={[
@@ -140,15 +155,15 @@ export function GlowButton({ label, onPress, accent = "purple", variant = "prima
             borderColor,
             opacity: disabled ? 0.5 : 1,
             shadowColor: glass.glassPalette[accent],
-            shadowOpacity: isPrimary ? 0.45 : 0,
-            shadowRadius: 14,
+            shadowOpacity: motionEnabled && isPrimary ? 0.45 : 0,
+            shadowRadius: motionEnabled ? 14 : 0,
             shadowOffset: { width: 0, height: 0 },
             transform: [{ scale }],
           },
         ]}
       >
         {/* Vertikaler Lichtschein — primaerer CTA wirkt "beleuchtet" (Sprint 192). */}
-        {isPrimary ? (
+        {motionEnabled && isPrimary ? (
           <LinearGradient
             colors={[glass.glassOverlay.whiteSheen, "transparent"]}
             start={{ x: 0.5, y: 0 }}
@@ -178,8 +193,9 @@ export function StatusChip({ label, accent = "green", live = false }: StatusChip
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const pulse = useAnimatedValue(0.5);
+  const animateLive = live && decorativeMotionEnabled();
   React.useEffect(() => {
-    if (!live) return;
+    if (!animateLive) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: glass.glassMotion.orbPulse / 2, useNativeDriver: true }),
@@ -188,11 +204,23 @@ export function StatusChip({ label, accent = "green", live = false }: StatusChip
     );
     loop.start();
     return () => loop.stop();
-  }, [glass.glassMotion.orbPulse, live, pulse]);
+  }, [glass.glassMotion.orbPulse, animateLive, pulse]);
 
   return (
     <View style={[styles.chip, { backgroundColor: glass.accentAlpha(accent, 0.14), borderColor: glass.accentAlpha(accent, 0.4) }]}>
-      <Animated.View style={[styles.chipDot, { backgroundColor: glass.glassPalette[accent], opacity: live ? pulse : 1 }]} />
+      <Animated.View
+        style={[
+          styles.chipDot,
+          {
+            backgroundColor: glass.glassPalette[accent],
+            opacity: animateLive ? pulse : 1,
+            shadowColor: glass.glassPalette[accent],
+            shadowOpacity: animateLive ? 0.8 : 0,
+            shadowRadius: animateLive ? 6 : 0,
+            shadowOffset: { width: 0, height: 0 },
+          },
+        ]}
+      />
       <Text style={[glass.glassType.label, { color: glass.glassPalette[accent] }]}>{label}</Text>
     </View>
   );
@@ -205,11 +233,19 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     overflow: "hidden",
     ...Platform.select({ web: { boxShadow: undefined } as object, default: {} }),
   },
-  highlightEdge: {
+  accentRail: {
     position: "absolute",
     top: 0,
-    left: 12,
-    right: 12,
+    left: 22,
+    right: 22,
+    height: 2,
+    borderRadius: 2,
+  },
+  highlightEdge: {
+    position: "absolute",
+    top: 1,
+    left: 18,
+    right: 18,
     height: 1,
     backgroundColor: glass.glassSurface.highlightEdge,
   },
@@ -221,7 +257,7 @@ const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
     borderRadius: glass.glassRadii.pill,
     paddingHorizontal: glass.glassSpacing.xl,
     paddingVertical: 13,
-    minHeight: 46,
+    minHeight: 48,
   },
   chip: {
     flexDirection: "row",

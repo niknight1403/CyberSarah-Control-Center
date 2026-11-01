@@ -18,6 +18,7 @@ import {
   validateBackupExport,
 } from "../lib/backup-self-service-logic";
 import { adminProcedure, publicProcedure, router } from "./_core/trpc";
+import { ENV } from "./_core/env";
 import { resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
 import { buildBackupManifest } from "../lib/db-backup-manifest-logic";
 import {
@@ -34,7 +35,7 @@ const UPTIME_PROBE_TIMEOUT_MS = 5_000;
 const UPTIME_DEFAULT_REPO = "niknight1403/CyberSarah-Control-Center";
 
 async function probeWorkspace(): Promise<OpsCheckInput> {
-  const baseUrl = process.env.WORKSPACE_SERVICE_URL?.replace(/\/$/, "");
+  const baseUrl = ENV.workspaceServiceUrl;
   if (!baseUrl) {
     return { kind: "workspace", state: "unknown" };
   }
@@ -323,12 +324,10 @@ export const opsRouter = router({
   // nutzt, ganz ohne Admin-Login auf dem Geraet. Die direkte Service-Adresse
   // (url) bleibt aus Vorsicht admin-only.
   workspaceServiceUrl: publicProcedure.query(({ ctx }) => ({
-    url:
-      ctx.user?.role === "admin"
-        ? process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "") ?? null
-        : null,
-    // Sprint 73: Render-Proxy aktiv, sobald der Server die Service-Adresse kennt.
-    proxyUrl: process.env.WORKSPACE_SERVICE_URL?.trim() ? "/api/render" : null,
+    url: ctx.user?.role === "admin" ? ENV.workspaceServiceUrl : null,
+    // Sprint 73/202: Der zentrale ENV-Service liefert immer eine validierte
+    // Adresse, daher ist der sichere Same-Origin-Proxy stets verfuegbar.
+    proxyUrl: "/api/render",
   })),
   backupManifest: adminProcedure.query(async () => {
     const tableCounts = await tableRowCounts();

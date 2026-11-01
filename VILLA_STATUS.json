@@ -1,0 +1,20 @@
+{
+  "ts": "2026-10-11T05:18:55.665Z",
+  "villa": {
+    "id": 1,
+    "name": "CyberSarah Villa",
+    "status": "RUNNING"
+  },
+  "tasks": {
+    "DONE": 14,
+    "FAILED": 3,
+    "RUNNING": 4
+  },
+  "running": true,
+  "patches": {
+    "appliedThisCycle": [],
+    "failedThisCycle": [],
+    "pendingArtefacts": 0
+  },
+  "lastTestResult": "n/a"
+}

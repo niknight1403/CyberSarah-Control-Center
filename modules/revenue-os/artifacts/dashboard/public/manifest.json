@@ -1,0 +1,27 @@
+{
+  "name": "CyberSarah Revenue OS",
+  "short_name": "CyberSarah",
+  "description": "Autonomes KI-System für Online-Umsatz — Echtzeit-Monitoring, Agenten-Steuerung, Revenue-Tracking",
+  "start_url": "/app/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#a855f7",
+  "orientation": "any",
+  "categories": ["business", "productivity", "finance"],
+  "lang": "de-DE",
+  "dir": "ltr",
+  "scope": "/app/",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" }
+  ],
+  "screenshots": [
+    { "src": "/screenshot-1.png", "sizes": "1080x1920", "type": "image/png", "form_factor": "narrow", "label": "Dashboard Übersicht" }
+  ],
+  "shortcuts": [
+    { "name": "Dashboard", "short_name": "Dashboard", "url": "/app/", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Agenten", "short_name": "Agenten", "url": "/app/agenten", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Stripe", "short_name": "Stripe", "url": "/app/stripe", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

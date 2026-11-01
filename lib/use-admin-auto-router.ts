@@ -1,16 +1,22 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef } from "react";
 
 import { useStudioSettings } from "@/lib/studio-settings";
 
 type AdminUser = { role?: string } | null | undefined;
 
+const AUTO_ROUTER_APPLIED_KEY = "custom-ai-studio.admin-auto-router-applied.v1";
+
 /**
  * Sprint 71 — Autonome Router-Aktivierung fuer Administratoren.
+ * Sprint 196 — Administrator-Vollzugriff: Der Auto-Router wird nur EINMAL
+ * pro Geraet als Startprofil gesetzt (persistierter Marker). Danach greift
+ * der Hook nie wieder ein — manuelle Provider-Wahlen des Administrators
+ * (z. B. Groq oder OpenRouter in den App-Settings) bleiben dauerhaft
+ * erhalten und werden nicht pro Sitzung auf 'auto' zurueckgesetzt.
  *
- * Sobald ein Administrator angemeldet ist, wird die manuelle Provider-Wahl
- * abgeschaltet und der autonome Auto-Router ("auto") als Standard-Profil
- * aktiviert. Idempotent: laeuft nur einmal pro App-Sitzung und nur, wenn
- * noch kein Auto-Router gesetzt ist. Normale Nutzer bleiben unberuehrt.
+ * Idempotent und Best-Effort: Schreib-/Ladefehler stoppen nur diesen Versuch,
+ * nie die App. Normale Nutzer bleiben unberuehrt.
  */
 export function useAdminAutoRouter(user: AdminUser) {
   const { settings, loading, saveSettings } = useStudioSettings();
@@ -19,13 +25,13 @@ export function useAdminAutoRouter(user: AdminUser) {
   useEffect(() => {
     if (loading || attemptedRef.current) return;
     if (user?.role !== "admin") return;
-    if (settings.provider === "auto") {
-      attemptedRef.current = true;
-      return;
-    }
     attemptedRef.current = true;
     void (async () => {
       try {
+        const alreadyApplied = await AsyncStorage.getItem(AUTO_ROUTER_APPLIED_KEY);
+        if (alreadyApplied != null) return; // Startprofil gesetzt — Admin hat volle Kontrolle.
+        await AsyncStorage.setItem(AUTO_ROUTER_APPLIED_KEY, new Date().toISOString());
+        if (settings.provider === "auto") return;
         await saveSettings({
           workspaceUrl: settings.workspaceUrl,
           repositoryUrl: settings.repositoryUrl,
@@ -33,7 +39,7 @@ export function useAdminAutoRouter(user: AdminUser) {
           provider: "auto",
         });
       } catch {
-        // Best-Effort: beim naechsten Mount wird erneut versucht.
+        // Best-Effort: Marker/Profil konnte (noch) nicht gesetzt werden.
         attemptedRef.current = false;
       }
     })();

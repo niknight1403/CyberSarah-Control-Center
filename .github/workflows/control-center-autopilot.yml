@@ -1,0 +1,49 @@
+name: control-center-autopilot
+
+on:
+  workflow_run:
+    workflows: ["Render Deploy"]
+    types: [completed]
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-center-autopilot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    name: Echter Autopilot-Lauf
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Analyse, Revenue-Scans und Entwurfsproduktion ausführen
+        env:
+          BASE_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          TOKEN: ${{ secrets.METRICS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_URL"
+          test -n "$TOKEN"
+          case "$BASE_URL" in https://*) ;; *) echo "::error::RENDER_PUBLIC_URL muss HTTPS sein"; exit 1;; esac
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+          http_code="$(curl --silent --show-error --max-time 180             --output "$body_file" --write-out '%{http_code}' --request POST             --header "Authorization: Bearer $TOKEN"             "${BASE_URL%/}/api/cron/control-center-autopilot")"
+          # Never echo raw response bodies: they may include internal revenue or customer data.
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Control-Center-Cron antwortet mit HTTP $http_code; keine Rohdaten in Actions-Logs."
+            exit 1
+          fi
+          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growthPulse != null) and (.result.growthPulse.generated >= 0) and (.result.growthPulse.externalActionsExecuted == 0) and (.result.growthPulse.plan.spendingAuthorized == false) and (.result.growthPulse.plan.publishingAuthorized == false) and (.result.growthPulse.plan.priceChangesAuthorized == false) and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
+          # Signed-in diagnostics stay in GitHub Actions: no invented reach or
+          # revenue metrics and never echo the authentication token.
+          {
+            echo "### CyberSarah 24/7 Growth Pulse"
+            jq -r '"- Fokus: \(.result.growthPulse.focus)\n- Neue Entwürfe: \(.result.growthPulse.generated)\n- Externe Aktionen: \(.result.growthPulse.externalActionsExecuted)\n- Blocker: \(.result.blocked | length)\n- Ergebnis: \(.ok)"' "$body_file"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Control-Center-Autopilot einschließlich Growth Pulse vollständig bestätigt."

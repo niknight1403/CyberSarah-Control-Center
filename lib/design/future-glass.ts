@@ -23,11 +23,12 @@
  *  Purple=KI, Green=aktiv/erfolgreich, Magenta=Automation/Kreativitaet,
  *  Blue=Daten/Analytics. */
 export const glassPalette = {
-  cyan: "#00E5FF",
-  purple: "#8B5CF6",
+  /** Sprint 355 — Aurora Flow: Violett, Cyan, Petrol als tragende Aurora-Farben. */
+  cyan: "#00F2FE",
+  purple: "#7C3AED",
   magenta: "#EC4899",
-  green: "#00FFA3",
-  blue: "#2EA7FF",
+  green: "#00E5B0",
+  blue: "#38BDF8",
   amber: "#F6BA5E",
   red: "#FF5C73",
 } as const;
@@ -82,13 +83,13 @@ export const glassSurface = {
 } as const;
 
 export const glassRadii = {
-  sm: 10,
-  md: 14,
-  lg: 20,
-  xl: 24,
+  sm: 12,
+  md: 18,
+  lg: 24,
+  xl: 28,
   pill: 999,
-  /** Standard-Card-Radius der Referenz (20-28px). */
-  card: 24,
+  /** Standard-Card-Radius der Referenz (Aurora-Flow-Pills, 28px). */
+  card: 28,
 } as const;
 
 export const glassSpacing = {

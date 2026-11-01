@@ -7,6 +7,7 @@ name: Render Deploy
 # Ausloesen: GitHub UI → Actions → "Render Deploy" → Run workflow.
 
 on:
+  # Render Git integration auto-deploys main; manual workflow prevents duplicate builds.
   workflow_dispatch:
     inputs:
       target:
@@ -28,7 +29,7 @@ jobs:
       - name: Node einrichten
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Abhaengigkeiten installieren
@@ -60,10 +61,20 @@ jobs:
           npm run check
           npm test
 
+      - name: Digistore24 read-only API gate (kein Secret in Logs)
+        if: github.event_name == 'push' || inputs.target == 'app' || inputs.target == 'domain'
+        env:
+          D24_API_KEY: ${{ secrets.DIGISTORE24_API_KEY }}
+          D24_IPN_SECRET: ${{ secrets.DIGISTORE24_IPN_SECRET || secrets.DIGISTORE24_IPN_PASSPHRASE }}
+          D24_AFFILIATE_ID: ${{ secrets.DIGISTORE24_AFFILIATE_ID }}
+        run: node scripts/digistore24-deploy-guard.mjs
+
       - name: Auf Render deployen (App, Migrationen + Health-Check)
-        if: inputs.target == 'app'
+        if: github.event_name == 'push' || inputs.target == 'app'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          # RENDER_PUBLIC_URL (echte Render-URL, s. unten) — das Skript nutzt
+          # sie als konfigurierte Basis-URL und prueft Health gegen sie.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
@@ -74,7 +85,14 @@ jobs:
           # Secrets bleiben leer, der Router ignoriert inaktive Provider.
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AI_OLLAMA_BASE_URL: ${{ secrets.AI_OLLAMA_BASE_URL }}
+          AI_OLLAMA_API_KEY: ${{ secrets.AI_OLLAMA_API_KEY }}
+          AI_OLLAMA_MODEL: ${{ secrets.AI_OLLAMA_MODEL }}
+          # Sprint 369: Hugging Face als optionaler KI-Provider (Model-Router).
+          AI_HUGGINGFACE_API_KEY: ${{ secrets.AI_HUGGINGFACE_API_KEY }}
+          HF_TOKEN: ${{ secrets.AI_HUGGINGFACE_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_SECRET_KEY_2: ${{ secrets.STRIPE_SECRET_KEY_2 }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
           OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
@@ -85,9 +103,39 @@ jobs:
           # Fallback: gleiches Token wie der Workspace-Service selbst (SERVICE_ACCESS_TOKEN)
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           RENDER_PUBLIC_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          REVENUE_OS_DATABASE_URL: ${{ secrets.REVENUE_OS_DATABASE_URL }}
+          REVENUE_OS_API_BASE_URL: ${{ secrets.REVENUE_OS_API_BASE_URL }}
+          REVENUE_OS_API_KEY: ${{ secrets.REVENUE_OS_API_KEY }}
+          RATE_LIMIT_MAX_REQUESTS: ${{ secrets.RATE_LIMIT_MAX_REQUESTS }}
+          # Sprint 112 — Integrations-Keys fuer Daten-Hub, Dev-Agent-Tools und
+          # Content-Kanaele. CCC_ADMIN_GITHUB_TOKEN wird auf den Namen gemappt,
+          # den der Server liest (ADMIN_GITHUB_TOKEN, Vorrang vor GITHUB_TOKEN).
+          ADMIN_GITHUB_TOKEN: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          # Sprint 367: Publishing-Tokens (optional — leere Secrets bleiben
+          # leer, die Modus-Aufloesung ignoriert inaktive Plattformen).
+          X_PUBLISH_TOKEN: ${{ secrets.X_PUBLISH_TOKEN }}
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
+          LINKEDIN_PUBLISH_TOKEN: ${{ secrets.LINKEDIN_PUBLISH_TOKEN }}
+          LINKEDIN_PUBLISH_USER_URN: ${{ secrets.LINKEDIN_PUBLISH_USER_URN }}
+          THREADS_PUBLISH_TOKEN: ${{ secrets.THREADS_PUBLISH_TOKEN }}
+          THREADS_PUBLISH_USER_ID: ${{ secrets.THREADS_PUBLISH_USER_ID }}
+          INSTAGRAM_PUBLISH_TOKEN: ${{ secrets.INSTAGRAM_PUBLISH_TOKEN }}
+          INSTAGRAM_PUBLISH_USER_ID: ${{ secrets.INSTAGRAM_PUBLISH_USER_ID }}
+          TIKTOK_PUBLISH_TOKEN: ${{ secrets.TIKTOK_PUBLISH_TOKEN }}
+          PUBLIC_APP_ORIGIN: ${{ secrets.PUBLIC_APP_ORIGIN }}
           STRIPE_MODE: live
           STRIPE_PRICE_LOOKUP_KEY: cybersarah-monthly
-        run: node scripts/render-deploy.mjs --migrate
+        run: |
+          node scripts/production-schema-preflight.mjs
+          node scripts/render-deploy.mjs --migrate
 
       - name: Workspace-Service auf Render deployen (Port 8787)
         if: inputs.target == 'workspace'
@@ -112,6 +160,8 @@ jobs:
         if: inputs.target == 'domain'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          # RENDER_PUBLIC_URL (echte Render-URL, s. unten) — das Skript nutzt
+          # sie als konfigurierte Basis-URL und prueft Health gegen sie.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
@@ -123,6 +173,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_SECRET_KEY_2: ${{ secrets.STRIPE_SECRET_KEY_2 }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           OAUTH_SERVER_URL: ${{ secrets.OAUTH_SERVER_URL }}
           OWNER_OPEN_ID: ${{ secrets.OWNER_OPEN_ID }}
@@ -133,4 +184,9 @@ jobs:
           WORKSPACE_SERVICE_TOKEN: ${{ secrets.WORKSPACE_SERVICE_TOKEN || secrets.SERVICE_ACCESS_TOKEN }}
           CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN || 'app.cybersarah-ki.com' }}
           CUSTOM_DOMAIN_WAIT_MINUTES: '15'
+          # Sprint 112 — gleiche Integrations-Keys wie im App-Deploy (oben).
+          ADMIN_GITHUB_TOKEN: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: node scripts/render-deploy.mjs --domain

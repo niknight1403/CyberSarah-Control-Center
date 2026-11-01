@@ -33,11 +33,14 @@ import { GlassCard } from "@/components/glass/glass-primitives";
 import { AiCore } from "@/components/glass/ai-core";
 import { accentAlpha, glassDepth, glassPalette, glassRadii, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
 import { coerceLedgerTask, type LedgerTask } from "@/lib/task-ledger-logic";
-import { buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
+import { buildConversationHistory, buildSuperagentChatRows, type SuperagentChatRow } from "@/lib/superagent-chat-logic";
+import { describeLlmError } from "@/lib/llm-error-logic";
 import { trpc } from "@/lib/trpc";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { SecretsPanel } from "@/components/secrets/secrets-panel";
+import { AgentLoopStreamPanel } from "@/components/glass/agent-loop-stream-panel";
 import { useStudioSettings } from "@/lib/studio-settings";
+import { addSoftBreakOpportunities } from "@/lib/text-wrap-logic";
 
 type TaskStatus = "pending" | "running" | "success" | "failed" | "escalated";
 
@@ -81,18 +84,35 @@ export default function SuperagentScreen() {
   const runMutation = trpc.orchestrator.run.useMutation();
   const { settings: studioSettings } = useStudioSettings();
   const [vaultOpen, setVaultOpen] = useState(false);
+  // Sprint 354 — Live-Telemetrie-Panel (SSE-Stream aus Sprint 353) einklappbar.
+  const [loopPanelOpen, setLoopPanelOpen] = useState(false);
   const toolsQuery = trpc.orchestrator.tools.useQuery(undefined, { enabled: isAdmin });
 
-  const optimizerQuery = trpc.orchestrator.optimizerStatus.useQuery(undefined, {
-    enabled: isAdmin,
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: false,
-  });
-  const optimizerTrigger = trpc.orchestrator.optimizerTrigger.useMutation();
+  // Sprint 197 — Optimizer ist NICHT mehr in der UI vertreten. Er laeuft
+  // rein im Hintergrund: einmal autonom pro App-Start (rate-limited, der
+  // Server fuehrt den Zyklus nur aus, wenn der letzte laenger als 60 Min
+  // zurueckliegt) plus im gewohnten Intervall-Loop.
+  const optimizerEnsureOnce = trpc.orchestrator.optimizerEnsureOnce.useMutation();
+  const optimizerEnsureOnceRef = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || optimizerEnsureOnceRef.current) return;
+    optimizerEnsureOnceRef.current = true;
+    // Feuer-und-vergessen: Ergebnis landet im Zyklus-Verlauf, nie im Chat.
+    optimizerEnsureOnce.mutate(undefined, {
+      onError: (e) => console.warn("[superagent] Optimizer-Start-Zyklus fehlgeschlagen:", e),
+    });
+  }, [isAdmin, optimizerEnsureOnce]);
 
   const listRef = useRef<FlatList<SuperagentChatRow> | null>(null);
   const stickToBottomRef = useRef(true);
   const rowsLengthRef = useRef(0);
+  // Sprint 199 — Antwort-zum-Anfang: Y-Offset jeder Antwort-Zeile messen,
+  // damit nach Abschluss an den ANFANG der Antwort gescrollt werden kann
+  // (lange Ergebnisse sollen von oben lesbar sein, nicht am unteren Rand).
+  const rowOffsetsRef = useRef<Map<string, number>>(new Map());
+  // Ziel-Row des bevorstehenden Antwort-Sprungs (wird im Effect ausgefuehrt —
+  // Refs sind im Render nicht lesbar, der ESLint-Rule verbietet das zurecht).
+  const [scrollToAnswerKey, setScrollToAnswerKey] = useState<string | null>(null);
 
   // Aktiven Lauf nach Abschluss aus dem Live-Polling nehmen.
   // Sprint 171: Adjust-Pattern statt Effect — Schlüssel auf id:status, weil
@@ -106,6 +126,10 @@ export default function SuperagentScreen() {
     if (activeTask && (activeTask.status === "success" || activeTask.status === "failed" || activeTask.status === "escalated")) {
       setActiveId(null);
       setExpandedIds((prev) => new Set(prev).add(`${activeTask.id}-answer`));
+      // Sprint 199: Anfang der fertigen Antwort an den oberen Bildschirmrand
+      // springen lassen — der Effect weiter unten liest die gemessenen
+      // Offsets und fuehrt den Sprung nach dem Layout aus.
+      setScrollToAnswerKey(`${activeTask.id}-answer`);
     }
   }
 
@@ -115,6 +139,26 @@ export default function SuperagentScreen() {
     [ledger, activeTask, optimisticRows],
   );
   const toolCount = useMemo(() => toolsQuery.data?.tools?.length ?? 0, [toolsQuery.data]);
+
+  // Sprint 199 — Antwort-zum-Anfang: Nach Abschluss einer Aufgabe an den
+  // ANFANG der Antwort springen (der Nutzer liest vom Start des Ergebnisses,
+  // nicht irgendwo im herausragenden Text). Doppelt rAF + Late-Retry fuer
+  // verzoegerte Android-Layout-Frames.
+  useEffect(() => {
+    if (!scrollToAnswerKey) return;
+    const jump = (animated: boolean) => {
+      const y = rowOffsetsRef.current.get(scrollToAnswerKey);
+      if (y == null) return;
+      listRef.current?.scrollToOffset({ offset: Math.max(0, y - 12), animated });
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        jump(true);
+        setTimeout(() => jump(false), 140);
+      });
+    });
+    return () => setScrollToAnswerKey(null);
+  }, [scrollToAnswerKey]);
 
   // Chat-UX: Bei neuen Nachrichten (oder waehrend ein Lauf live tickt) an
   // das Listenende scrollen — aber nur, wenn der Nutzer nicht absichtlich
@@ -175,13 +219,19 @@ export default function SuperagentScreen() {
     ]);
     setObjective("");
     try {
-      const record = (await runMutation.mutateAsync({ objective: trimmed })) as LedgerTask;
+      // Sprint 197: bisheriger Dialog-Verlauf als Kontext (wie im
+      // Entwicklungs-Chat) — der Superagent kann auf Nachfragen eingehen.
+      const record = (await runMutation.mutateAsync({
+        objective: trimmed,
+        history: buildConversationHistory(rows),
+      })) as LedgerTask;
       setOptimisticRows([]);
       setActiveId(record.id);
       setExpandedIds((prev) => new Set(prev).add(`${record.id}-answer`));
       void ledgerQuery.refetch();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Ausführung fehlgeschlagen.";
+      const raw = e instanceof Error ? e.message : "Ausführung fehlgeschlagen.";
+      const message = describeLlmError(raw);
       setError(message);
       setOptimisticRows((current) => current.map((row) => row.kind === "answer" ? {
         ...row,
@@ -232,33 +282,17 @@ export default function SuperagentScreen() {
                 </Text>
               </View>
             </View>
-            <Pressable
-              style={styles.optimizerChip}
-              onPress={() => {
-                void optimizerTrigger.mutateAsync().catch((e: unknown) =>
-                  setError(e instanceof Error ? e.message : "Optimizer-Start fehlgeschlagen."),
-                );
-              }}
-            >
-              {optimizerTrigger.isPending ? (
-                <ActivityIndicator size="small" color={optimizerQuery.data?.enabled ? glassPalette.green : glassPalette.cyan} />
-              ) : (
-                <Text
-                  style={[
-                    styles.optimizerChipText,
-                    { color: optimizerQuery.data?.enabled ? glassPalette.green : glassPalette.cyan },
-                  ]}
-                >
-                  ⟲ OPTIMIZER {optimizerQuery.data?.enabled ? "AKTIV" : "AUS"} · {toolCount > 0 ? `${toolCount} TOOLS` : "TOOLS"}
-                </Text>
-              )}
-            </Pressable>
-            {optimizerQuery.data?.lastError ? (
-              <Text style={styles.optimizerError} numberOfLines={1}>{optimizerQuery.data.lastError}</Text>
-            ) : null}
-            <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
-              <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
-            </Pressable>
+            <Text style={styles.toolCountText} numberOfLines={1}>
+              {toolCount > 0 ? `${toolCount} TOOLS BEREIT · OPTIMIZER IM HINTERGRUND` : "OPTIMIZER IM HINTERGRUND"}
+            </Text>
+            <View style={styles.chipRow}>
+              <Pressable style={styles.vaultChip} onPress={() => setLoopPanelOpen((open) => !open)}>
+                <Text style={styles.vaultChipText}>{loopPanelOpen ? "LOOP-TELEMETRIE · AN" : "LOOP-TELEMETRIE"}</Text>
+              </Pressable>
+              <Pressable style={styles.vaultChip} onPress={() => setVaultOpen(true)}>
+                <Text style={styles.vaultChipText}>VAULT · SECRETS</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Sprint 167: Secrets-Bereich des Superagenten-Chats */}
@@ -282,6 +316,9 @@ export default function SuperagentScreen() {
               </ScrollView>
             </View>
           </Modal>
+
+          {/* Sprint 354 — Live-Telemetrie des Agentic-Loop (Echtzeit-SSE). */}
+          {loopPanelOpen && <AgentLoopStreamPanel sessionId="superagent-loop-live" />}
 
           {/* Chat-Strom */}
           <FlatList
@@ -311,12 +348,17 @@ export default function SuperagentScreen() {
               <View style={styles.objectiveBubbleWrap}>
                 <GlassCard accent="cyan" style={styles.objectiveBubble}>
                   <Text style={styles.objectiveTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.objectiveText}>{item.objective}</Text>
+                  <Text style={styles.objectiveText}>{addSoftBreakOpportunities(item.objective)}</Text>
                   <Text style={styles.objectiveMeta}>{formatTime(item.createdAt)}</Text>
                 </GlassCard>
               </View>
             ) : (
-              <View style={styles.answerBubbleWrap}>
+              <View
+                style={styles.answerBubbleWrap}
+                onLayout={(e) => {
+                  rowOffsetsRef.current.set(item.key, e.nativeEvent.layout.y);
+                }}
+              >
                 <GlassCard accent="purple" onPress={() => toggleExpanded(item.key)} style={styles.answerBubble} testID="superagent-answer-bubble">
                   <View style={styles.answerHead}>
                     <Text
@@ -340,7 +382,7 @@ export default function SuperagentScreen() {
                     <View style={styles.progressRow}>
                       <ActivityIndicator size="small" color={glassPalette.cyan} />
                       <Text style={styles.progressText}>
-                        {item.steps.length > 0 ? item.steps[item.steps.length - 1].name : "Ziel wird zerlegt …"}
+                        {addSoftBreakOpportunities(item.steps.length > 0 ? item.steps[item.steps.length - 1].name : "Ziel wird zerlegt …")}
                       </Text>
                     </View>
                   ) : null}
@@ -359,15 +401,15 @@ export default function SuperagentScreen() {
                           <View key={step.id} style={styles.stepRow}>
                             <Text style={[styles.stepDot, { color: sm.color }]}>{sm.dot}</Text>
                             <View style={styles.stepMain}>
-                              <Text style={styles.stepName}>{step.name}</Text>
+                              <Text style={styles.stepName}>{addSoftBreakOpportunities(step.name)}</Text>
                               {step.attempts > 1 ? (
                                 <Text style={styles.stepMeta}>{step.attempts} Versuche</Text>
                               ) : null}
-                              {step.error ? <Text style={styles.stepError}>{step.error}</Text> : null}
+                              {step.error ? <Text style={styles.stepError}>{addSoftBreakOpportunities(step.error)}</Text> : null}
                               {step.logs.length > 0 ? (
                                 <View style={styles.logBox}>
                                   {step.logs.slice(-4).map((line, i) => (
-                                    <Text key={i} style={styles.logLine} numberOfLines={1}>{line}</Text>
+                                    <Text key={i} style={styles.logLine}>{addSoftBreakOpportunities(line)}</Text>
                                   ))}
                                 </View>
                               ) : null}
@@ -458,31 +500,29 @@ const styles = StyleSheet.create({
   headerTitleRow: { flexDirection: "row", alignItems: "center", gap: glassSpacing.sm },
   headerTitle: { ...glassType.headline, fontSize: 22, color: glassSurface.textPrimary },
   headerTitleAccent: { color: glassPalette.purple },
-  optimizerChip: { alignSelf: "flex-start", borderWidth: 1, borderColor: accentAlpha("cyan", 0.4), borderRadius: glassRadii.pill, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: glassDepth.glass },
-  optimizerChipText: { ...glassType.label, letterSpacing: 1.5 },
-  optimizerError: { ...glassType.caption, color: glassPalette.amber },
-  objectiveBubbleWrap: { flexDirection: "row", justifyContent: "flex-end" },
-  objectiveBubble: { borderBottomRightRadius: 4, padding: glassSpacing.md, maxWidth: "82%", gap: glassSpacing.xs },
+  toolCountText: { ...glassType.label, letterSpacing: 1.5, color: glassSurface.textMuted },
+  objectiveBubbleWrap: { flexDirection: "row", justifyContent: "flex-end", minWidth: 0, maxWidth: "100%" },
+  objectiveBubble: { borderBottomRightRadius: 4, padding: glassSpacing.md, maxWidth: "82%", minWidth: 0, gap: glassSpacing.xs },
   objectiveTitle: { ...glassType.label, color: glassPalette.cyan, letterSpacing: 1 },
-  objectiveText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 20 },
+  objectiveText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 20, maxWidth: "100%" },
   objectiveMeta: { ...glassType.label, color: glassSurface.textMuted, alignSelf: "flex-end" },
-  answerBubbleWrap: { flexDirection: "row", justifyContent: "flex-start" },
-  answerBubble: { borderBottomLeftRadius: 4, padding: glassSpacing.md, maxWidth: "92%", flex: 1, gap: glassSpacing.sm },
-  answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: glassSpacing.sm },
-  statusBadge: { ...glassType.label, borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, letterSpacing: 1.5 },
-  answerMeta: { ...glassType.caption, color: glassSurface.textMuted, fontSize: 11 },
+  answerBubbleWrap: { flexDirection: "row", justifyContent: "flex-start", minWidth: 0, maxWidth: "100%", width: "100%" },
+  answerBubble: { borderBottomLeftRadius: 4, padding: glassSpacing.md, maxWidth: "92%", minWidth: 0, flex: 1, gap: glassSpacing.sm },
+  answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: glassSpacing.sm, minWidth: 0, maxWidth: "100%" },
+  statusBadge: { ...glassType.label, borderWidth: 1, borderRadius: 4, flexShrink: 0, paddingHorizontal: 6, paddingVertical: 2, letterSpacing: 1.5 },
+  answerMeta: { ...glassType.caption, color: glassSurface.textMuted, fontSize: 11, flexShrink: 1, maxWidth: "100%", textAlign: "right" },
   progressRow: { flexDirection: "row", alignItems: "center", gap: glassSpacing.md },
-  progressText: { ...glassType.caption, color: glassPalette.cyan },
+  progressText: { ...glassType.caption, color: glassPalette.cyan, flexShrink: 1, maxWidth: "100%" },
   stepBox: { gap: glassSpacing.sm, borderTopWidth: 1, borderTopColor: glassSurface.border, paddingTop: glassSpacing.sm },
   stepRow: { flexDirection: "row", gap: glassSpacing.sm },
   stepDot: { fontSize: 12, lineHeight: 18 },
   stepMain: { flex: 1, gap: 2 },
-  stepName: { ...glassType.caption, color: glassSurface.textPrimary, fontWeight: "600" },
+  stepName: { ...glassType.caption, color: glassSurface.textPrimary, fontWeight: "600", flexShrink: 1, maxWidth: "100%" },
   stepMeta: { ...glassType.label, color: glassSurface.textMuted, letterSpacing: 0 },
-  stepError: { ...glassType.label, color: glassPalette.red, letterSpacing: 0 },
+  stepError: { ...glassType.label, color: glassPalette.red, letterSpacing: 0, flexShrink: 1, maxWidth: "100%" },
   logBox: { backgroundColor: glassDepth.layer, borderRadius: 6, padding: 6, gap: 2 },
-  logLine: { ...glassType.label, color: glassSurface.textMuted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), letterSpacing: 0 },
-  finalBox: { borderTopWidth: 1, borderTopColor: glassSurface.border, paddingTop: glassSpacing.sm, gap: 2 },
+  logLine: { ...glassType.label, color: glassSurface.textMuted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), letterSpacing: 0, flexShrink: 1, maxWidth: "100%" },
+  finalBox: { borderTopWidth: 1, borderTopColor: glassSurface.border, paddingTop: glassSpacing.sm, gap: 2, minWidth: 0, maxWidth: "100%", width: "100%" },
   finalLabel: { ...glassType.label, color: glassPalette.green, letterSpacing: 2 },
   finalText: { ...glassType.body, color: glassSurface.textPrimary, lineHeight: 19, fontSize: 13 },
   noAnswerText: { ...glassType.caption, color: glassSurface.textMuted, fontStyle: "italic" },
@@ -511,6 +551,10 @@ const styles = StyleSheet.create({
   githubConnectedDot: { position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: glassPalette.green },
   sendButtonDisabled: { opacity: 0.45 },
   sendButtonText: { color: glassDepth.void, fontWeight: "900", fontSize: 16 },
+  chipRow: {
+    flexDirection: "row",
+    gap: 8,
+  } as const,
   vaultChip: {
     alignSelf: "flex-start",
     borderRadius: glassRadii.pill,

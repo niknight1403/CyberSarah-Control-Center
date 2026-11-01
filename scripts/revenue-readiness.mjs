@@ -1,0 +1,168 @@
+/** Read-only GitHub-Actions-Check. Nie Secret-Werte, URLs oder Fehlerdetails ausgeben. */
+const pgModule = process.env.REVENUE_READINESS_PG_MODULE
+  ? await import(process.env.REVENUE_READINESS_PG_MODULE)
+  : await import('pg');
+const Pool = pgModule.Pool ?? pgModule.default?.Pool;
+if (typeof Pool !== 'function') throw new Error('readiness_pg_client_unavailable');
+
+const requiredTables = [
+  'hara_proposals', 'hara_performance', 'subscription_plans',
+  'customer_subscriptions', 'subscription_invoices',
+  'cross_sell_rules', 'cross_sell_recommendations', 'expansion_chancen',
+];
+const routeQueries = [
+  'SELECT id, titel, status, kanal, geschaetzter_monatsumsatz, created_at FROM hara_proposals LIMIT 0',
+  'SELECT id, resultat, created_at FROM hara_performance LIMIT 0',
+  'SELECT id, name, preis, waehrung, intervall, trial_tage, aktiv, reihenfolge FROM subscription_plans LIMIT 0',
+  'SELECT status, trial_ende, plan_id, created_at FROM customer_subscriptions LIMIT 0',
+  'SELECT betrag, status, bezahlt_am, created_at, waehrung FROM subscription_invoices LIMIT 0',
+  'SELECT id, quell_produkt, ziel_produkt, aktiv, anzahl_empfohlen, anzahl_konvertiert FROM cross_sell_rules LIMIT 0',
+  'SELECT status FROM cross_sell_recommendations LIMIT 0',
+  'SELECT id, titel, status, kategorie, geschaetzter_umsatz, validiert, prioritaet, created_at FROM expansion_chancen LIMIT 0',
+];
+function tunnelConnectionString(url) {
+  try {
+    const target = new URL(url);
+    const port = process.env.REVENUE_OS_DB_TUNNEL_PORT;
+    if (!port || !/^\d{2,5}$/.test(port)) return null;
+    target.hostname = '127.0.0.1';
+    target.port = port;
+    target.searchParams.delete('sslmode');
+    target.searchParams.delete('ssl');
+    return target.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function checkDb(label, url, forceTunnel = false) {
+  if (!url) { console.log(`${label}: NOT_CONFIGURED`); return false; }
+  let connectionString = forceTunnel ? tunnelConnectionString(url) : url;
+  if (!connectionString) { console.log(`${label}: INVALID_CONFIGURATION`); return false; }
+  // Lokale Produktions-DB nie ins Internet exponieren: GitHub Runner nutzt einen
+  // kurzlebigen SSH-Tunnel. Die Postgres-Zugangsdaten bleiben als Actions-Secret.
+  if (label === 'REVENUE_OS_DATABASE_URL') {
+    try {
+      const target = new URL(url);
+      if (['localhost', '127.0.0.1', '[::1]'].includes(target.hostname)) {
+        const port = process.env.REVENUE_OS_DB_TUNNEL_PORT;
+        if (!port || !/^\d{2,5}$/.test(port)) { console.log(`${label}: LOCAL_CONNECTION_REQUIRES_TUNNEL`); return false; }
+        target.hostname = '127.0.0.1'; target.port = port;
+        connectionString = target.toString();
+      }
+    } catch { console.log(`${label}: INVALID_CONFIGURATION`); return false; }
+  }
+  const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 5000, query_timeout: 5000 });
+  try {
+    const result = await pool.query('SELECT to_regclass($1)::text AS name', ['public.hara_proposals']);
+    if (!result.rows[0]?.name) { console.log(`${label}: REACHABLE_SCHEMA_MISMATCH`); return false; }
+    const tables = await pool.query("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename = ANY($1::text[])", [requiredTables]);
+    const found = new Set(tables.rows.map(row => row.tablename));
+    const missing = requiredTables.filter(t => !found.has(t));
+    if (missing.length) {
+      console.log(`${label}: SCHEMA_INCOMPLETE (${found.size}/${requiredTables.length} required tables)`);
+      return false;
+    }
+    for (const sql of routeQueries) await pool.query(sql);
+    console.log(`${label}: READY (${found.size}/${requiredTables.length} tables; required columns selectable)`);
+    return true;
+  } catch { console.log(`${label}: CONNECTION_OR_PERMISSION_ERROR`); return false; }
+  finally { await pool.end().catch(() => undefined); }
+}
+async function probeEngine(raw, key) {
+  try {
+    const base = new URL(raw);
+    const local = base.protocol === 'http:' && base.hostname === '127.0.0.1' && base.port === '18741';
+    if (!local && base.protocol !== 'https:') return false;
+    const health = await fetch(new URL('/api/healthz', base), { signal: AbortSignal.timeout(7000) });
+    if (!health.ok || (await health.json()).status !== 'ready') return false;
+    const overview = await fetch(new URL('/api/hara/overview', base), { headers: { 'X-Revenue-Internal-Key': key }, signal: AbortSignal.timeout(7000) });
+    if (!overview.ok) return false;
+    const rejected = await fetch(new URL('/api/hara/scan', base), { method: 'POST', signal: AbortSignal.timeout(7000) });
+    return rejected.status === 403;
+  } catch {
+    return false;
+  }
+}
+async function checkEngine() {
+  const raw = process.env.REVENUE_OS_API_BASE_URL;
+  const key = process.env.REVENUE_OS_API_KEY;
+  if (!key) { console.log('REVENUE_BRIDGE: NOT_CONFIGURED'); return false; }
+  const candidates = [raw, 'http://127.0.0.1:18741'].filter(Boolean);
+  for (const candidate of candidates) {
+    if (await probeEngine(candidate, key)) {
+      console.log('REVENUE_BRIDGE: READY (health, authenticated read, scan denied without key)');
+      return true;
+    }
+  }
+  console.log('REVENUE_BRIDGE: UNAVAILABLE_OR_UNPROTECTED');
+  return false;
+}
+async function probeBearer(label, url, key) {
+  if (!key) return false;
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(7000),
+    });
+    if (response.ok) {
+      console.log(`FREE_LLM_ROUTE: READY (${label})`);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+async function checkFreeLlm() {
+  const candidates = [
+    ['GROQ', 'https://api.groq.com/openai/v1/models', process.env.GROQ_API_KEY],
+    ['OPENROUTER', 'https://openrouter.ai/api/v1/models', process.env.OPENROUTER_API_KEY],
+    ['GEMINI', 'https://generativelanguage.googleapis.com/v1beta/openai/models', process.env.GEMINI_API_KEY],
+  ];
+  for (const [label, url, key] of candidates) {
+    if (await probeBearer(label, url, key)) return true;
+  }
+  // Paid OpenAI is only a compatibility fallback, never required for readiness.
+  const openAi = process.env.OPENAI_API_KEY;
+  if (openAi && await probeBearer('OPENAI_FALLBACK', 'https://api.openai.com/v1/models?limit=1', openAi)) {
+    console.log('FREE_LLM_ROUTE: UNAVAILABLE; paid fallback reachable');
+    return true;
+  }
+  console.log('FREE_LLM_ROUTE: UNAVAILABLE');
+  return false;
+}
+
+async function main() {
+  const dedicated = await checkDb('REVENUE_OS_DATABASE_URL', process.env.REVENUE_OS_DATABASE_URL);
+  const tunnelDb = dedicated ? false : await checkDb('PRODUCTION_DB_VIA_SSH_TUNNEL', process.env.DATABASE_URL, true);
+  const databaseReady = dedicated || tunnelDb;
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  let stripeConnected = false;
+  let stripeLive = false;
+  if (!stripeKey) console.log('STRIPE_SECRET_KEY: NOT_CONFIGURED');
+  else {
+    try {
+      const stripeResponse = await fetch('https://api.stripe.com/v1/products?limit=1', {
+        headers: { Authorization: `Bearer ${stripeKey}` },
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!stripeResponse.ok) throw new Error('stripe_unreachable');
+      stripeConnected = true;
+      stripeLive = stripeKey.startsWith('sk_live_') || stripeKey.startsWith('rk_live_');
+      const stripeRestricted = stripeKey.startsWith('rk_');
+      console.log(`STRIPE_SECRET_KEY: REACHABLE (${stripeLive ? 'LIVE' : 'TEST'}${stripeRestricted ? ', RESTRICTED' : ''})`);
+    } catch { console.log('STRIPE_SECRET_KEY: CONNECTION_OR_PERMISSION_ERROR'); }
+  }
+  const aiReady = await checkFreeLlm();
+  const bridgeReady = await checkEngine();
+  const effectiveDatabaseReady = databaseReady || bridgeReady;
+  if (!databaseReady && bridgeReady) console.log('REVENUE_DB_ACCESS: READY_VIA_PROTECTED_BRIDGE');
+  if (!effectiveDatabaseReady || !stripeConnected || !aiReady || !bridgeReady) {
+    console.log('REVENUE_INTEGRATION: NOT_READY');
+    process.exitCode = 1;
+  } else {
+    console.log(`REVENUE_COMMERCE_MODE: ${stripeLive ? 'LIVE' : 'TEST_ONLY'}`);
+    console.log('REVENUE_INTEGRATION: READY (DB + Revenue bridge + LLM route + Stripe connectivity)');
+  }
+}
+await main();

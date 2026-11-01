@@ -10,14 +10,26 @@ import {
   formatConsolidationSummary,
   type ConsolidationLearning,
 } from "../lib/agent-memory-consolidation-logic";
-import {
-  applyConsolidationPlanWrites,
-  insertMemoryConsolidationRecord,
-  listAllAgentLearningsForConsolidation,
-} from "./db";
+import * as db from "./db";
 import { getRetrievalMetrics } from "./retrieval-metrics";
 
 export type MemoryConsolidationTrigger = "cron" | "admin";
+
+// Deterministic test seam: isolate:false can preserve vi.mock module state across
+// files, so tests inject explicit DB operations rather than relying on mock order.
+type MemoryConsolidationDb = Pick<typeof db,
+  "applyConsolidationPlanWrites" | "insertMemoryConsolidationRecord" | "listAllAgentLearningsForConsolidation"
+>;
+let memoryConsolidationDb: MemoryConsolidationDb = db;
+let memoryConsolidationGetRetrievalMetrics = getRetrievalMetrics;
+
+export function setMemoryConsolidationDbForTests(override: MemoryConsolidationDb | null, retrievalMetrics: typeof getRetrievalMetrics | null = null): void {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error("Memory-Consolidation-Test-Hook ist nur im Test-Modus verfuegbar.");
+  }
+  memoryConsolidationDb = override ?? db;
+  memoryConsolidationGetRetrievalMetrics = retrievalMetrics ?? getRetrievalMetrics;
+}
 
 export type MemoryConsolidationResult = {
   summary: string;
@@ -42,7 +54,7 @@ export async function runMemoryConsolidation(
   trigger: MemoryConsolidationTrigger,
   options: { dryRun?: boolean } = {},
 ): Promise<MemoryConsolidationResult> {
-  const rows = await listAllAgentLearningsForConsolidation();
+  const rows = await memoryConsolidationDb.listAllAgentLearningsForConsolidation();
   const learnings: ConsolidationLearning[] = rows.map((row) => ({
     id: row.id,
     kind: row.kind,
@@ -54,11 +66,11 @@ export async function runMemoryConsolidation(
 
   const plan = buildConsolidationPlan(learnings, { now: Date.now() });
   const summary = formatConsolidationSummary(plan, trigger);
-  const retrieval = getRetrievalMetrics();
+  const retrieval = memoryConsolidationGetRetrievalMetrics();
 
   if (!options.dryRun) {
-    await applyConsolidationPlanWrites(plan);
-    await insertMemoryConsolidationRecord({
+    await memoryConsolidationDb.applyConsolidationPlanWrites(plan);
+    await memoryConsolidationDb.insertMemoryConsolidationRecord({
       trigger,
       inputCount: plan.stats.input,
       survivorCount: plan.stats.survivors,

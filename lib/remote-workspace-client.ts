@@ -159,6 +159,11 @@ export class RemoteWorkspaceClient {
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    if (!this.config.baseUrl) {
+      throw new Error(
+        "Kein Workspace-Service erreichbar: Server-Proxy und Workspace-URL fehlen.",
+      );
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45_000);
     try {
@@ -191,6 +196,11 @@ export class RemoteWorkspaceClient {
       if (controller.signal.aborted) {
         throw new Error(
           "Der Workspace-Service antwortet nicht. Prüfe die Service-URL und die Netzwerkverbindung.",
+        );
+      }
+      if (error instanceof TypeError) {
+        throw new Error(
+          "Workspace-Service nicht erreichbar (Netzwerk/CORS/TLS). Die URL ist möglicherweise syntaktisch gültig, aber keine Verbindung bestätigt. Prüfe Render-Service, HTTPS, erlaubte Web-Origin und Internetverbindung.",
         );
       }
       throw error;

@@ -1,0 +1,31 @@
+╔══════════════════════════════════════════════════════════════╗
+║  CyberSarah v5.2 — Einzeiler für Termux                    ║
+║  Einfach kopieren und in Termux einfügen                   ║
+╚══════════════════════════════════════════════════════════════╝
+
+🚀 DEPLOY-NOW (Zero-Config — fragt nach SSH-Passwort):
+bash deploy-now.sh
+
+🤖 DEPLOY-NOW mit Passwort (automatisch):
+bash deploy-now.sh --password=DEIN_PASSWORT
+
+🛠️ QUICK-FIX SERVER (via SSH):
+ssh root@167.233.196.20 "bash <(curl -sL https://raw.githubusercontent.com/niknight1403/cybersarah-revenue-os/main/quick-fix-server.sh)"
+
+📱 APK DOWNLOAD & MOBILE DASHBOARD:
+http://167.233.196.20:3000/apk/
+
+🚀 STATUS PRÜFEN:
+curl -s http://167.233.196.20:3000/api/quick-status | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('oneLine','?'))"
+
+💥 QUICK-START (alle Agenten aktivieren):
+curl -s -X POST http://167.233.196.20:3000/api/quick-start | python3 -c "import sys,json;[print(l) for l in json.load(sys.stdin).get('details',[])]"
+
+💰 REVENUE-DASHBOARD:
+http://167.233.196.20:3000/api/revenue
+
+📊 SYSTEM-MONITORING:
+http://167.233.196.20:3000/api/system-dashboard
+
+🎮 TERMUX MANAGER:
+bash <(curl -sL https://raw.githubusercontent.com/niknight1403/cybersarah-revenue-os/main/termux-manager.sh)

@@ -21,6 +21,7 @@ import { spawnSync } from "node:child_process";
 import {
   buildServiceCreateRequest,
   buildServiceEnv,
+  mergePersistedRenderEnvVars,
   buildWorkspaceEnv,
   findServiceByName,
   maskSecrets,
@@ -29,6 +30,8 @@ import {
   renderApiError,
   validateDatabaseUrl,
   validateRenderApiKey,
+  verifyRenderLiveCommit,
+
 } from "../lib/render-deploy-logic.mjs";
 
 const API = "https://api.render.com/v1";
@@ -44,6 +47,27 @@ function env(name, fallback) {
 }
 
 async function apiFetch(path, options = {}) {
+  // A Render env-vars PUT REPLACES all settings. Preserve existing credentials
+  // in every deployment path, including custom domain/workspace updates.
+  if (options.method === "PUT" && /^\/services\/[^/]+\/env-vars$/.test(path)) {
+    const current = [];
+    let cursor = "";
+    for (let page = 0; page < 20; page++) {
+      const suffix = "?limit=100" + (cursor ? "&cursor=" + encodeURIComponent(cursor) : "");
+      const fetched = await apiFetch(path + suffix);
+      if (!Array.isArray(fetched)) throw new Error("Render ENV-Abfrage fehlerhaft: Deploy abgebrochen.");
+      current.push(...fetched);
+      if (fetched.length < 100) break;
+      const next = fetched.at(-1)?.cursor;
+      if (typeof next !== "string" || !next || next === cursor || page === 19) {
+        throw new Error("Render ENV-Pagination unvollstaendig: Deploy aus Sicherheitsgruenden abgebrochen.");
+      }
+      cursor = next;
+    }
+    options = { ...options, body: JSON.stringify(
+      mergePersistedRenderEnvVars(current, JSON.parse(String(options.body))),
+    ) };
+  }
   const key = env("RENDER_API_KEY");
   const response = await fetch(`${API}${path}`, {
     ...options,
@@ -209,7 +233,12 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
     });
     const liveDeploy = await waitForLive(existing.id, priorDeployIds);
     if (liveDeploy) log(`Deploy ${liveDeploy.id ?? ""} live.`);
-    let publicUrl = publicServiceUrl((await apiFetch(`/services/${existing.id}`)).service ?? {}) ?? assumedUrl;
+    // GET /services/{id} liefert das Service-Objekt direkt (kein .service-Wrapper).
+    // Der fruehere .service-Zugriff lieferte undefined und fiel auf die
+    // angenommene URL zurueck — Render vergibt Suffixe (z. B. "-hmlc"), wenn
+    // der Name bereits vergeben ist. Immer die ECHTE serviceDetails.url nutzen.
+    const serviceById = await apiFetch(`/services/${existing.id}`);
+    let publicUrl = publicServiceUrl(serviceById?.service ?? serviceById ?? {}) ?? assumedUrl;
     log(`Oeffentliche URL: ${publicUrl}`);
     return { service: existing, publicUrl };
   }
@@ -226,8 +255,9 @@ async function upsertService({ serviceName, envLines, rootDir, healthCheckPath }
   const liveDeploy = await waitForLive(service.id);
   if (liveDeploy) log(`Deploy ${liveDeploy.id ?? ""} live.`);
 
+  const serviceById = await apiFetch(`/services/${service.id}`);
   let publicUrl = publicServiceUrl(
-    (await apiFetch(`/services/${service.id}`)).service ?? {},
+    serviceById?.service ?? serviceById ?? {},
   ) ?? assumedUrl;
   log(`Oeffentliche URL: ${publicUrl}`);
   return { service, publicUrl };
@@ -246,6 +276,74 @@ function makeAppEnvBuilder(databaseUrl) {
   const workspaceExtra = [];
   if (workspaceServiceUrl) workspaceExtra.push(`WORKSPACE_SERVICE_URL=${workspaceServiceUrl}`);
   if (workspaceServiceToken) workspaceExtra.push(`WORKSPACE_SERVICE_TOKEN=${workspaceServiceToken}`);
+
+  // Sprint 367: Publishing-Tokens via GitHub Secrets — nur gesetzt, wenn das
+  // Secret existiert (Modus-Aufloesung laesst Plattformen ohne Token im
+  // ehrlichen Sandbox-Modus statt mit leerem Token zu scheitern).
+  // Sprint 369: Optionale KI-Provider-Keys (z. B. Hugging Face fuer den
+  // Model-Router) — nur gesetzt, wenn das GitHub-Secret existiert.
+  const aiProviderExtra = [];
+  // Ollama-First: eigene Oracle-VM-Route (OpenAI-kompatibel, Bearer-Token).
+  for (const key of ["AI_HUGGINGFACE_API_KEY", "HF_TOKEN", "AI_OLLAMA_BASE_URL", "AI_OLLAMA_API_KEY", "AI_OLLAMA_MODEL"]) {
+    const value = env(key, "").trim();
+    if (value) aiProviderExtra.push(`${key}=${value}`);
+  }
+
+  // Sprint 112 — Daten- und Integrations-Keys, die der Server liest
+  // (Dev-Agent-Tools, Content-Kanaele, E-Mail). Wie bei den Publishing-Tokens:
+  // nur gesetzt, wenn das GitHub-Secret existiert; fehlende Keys bleiben leer
+  // und der Server meldet ehrlich "nicht konfiguriert".
+  const integrationExtra = [];
+  for (const key of [
+    "STRIPE_SECRET_KEY_2",
+    "ADMIN_GITHUB_TOKEN",
+    "TIKTOK_CLIENT_KEY",
+    "TIKTOK_CLIENT_SECRET",
+    "TIKTOK_ACCESS_TOKEN",
+    "GA4_PROPERTY_ID",
+    "GA4_ACCESS_TOKEN",
+    "HUBSPOT_ACCESS_TOKEN",
+    "FIRECRAWL_API_KEY",
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
+    "PERPLEXITY_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "TIKTOK_SYMPHONY_API_KEY",
+    "DIGISTORE24_API_KEY",
+    "DIGISTORE24_IPN_SECRET",
+    "DIGISTORE24_IPN_PASSPHRASE",
+    "DIGISTORE24_AFFILIATE_ID",
+    // Sprint 372 — Revenue-OS-Anbindung (VM-Spiegel-DB + Scan-Relay) und
+    // Rate-Limit-Tuning; nur gesetzt, wenn das zugehoerige Secret existiert.
+    "REVENUE_OS_DATABASE_URL",
+    "REVENUE_OS_API_BASE_URL",
+    "REVENUE_OS_API_KEY",
+    "RATE_LIMIT_MAX_REQUESTS",
+  ]) {
+    const value = env(key, "").trim();
+    if (value) integrationExtra.push(`${key}=${value}`);
+  }
+
+  const publishingExtra = [];
+  for (const key of [
+    "X_PUBLISH_TOKEN",
+    "X_CLIENT_ID",
+    "X_CLIENT_SECRET",
+    "X_REFRESH_TOKEN",
+    "LINKEDIN_PUBLISH_TOKEN",
+    "LINKEDIN_PUBLISH_USER_URN",
+    "THREADS_PUBLISH_TOKEN",
+    "THREADS_PUBLISH_USER_ID",
+    "INSTAGRAM_PUBLISH_TOKEN",
+    "INSTAGRAM_PUBLISH_USER_ID",
+    "TIKTOK_PUBLISH_TOKEN",
+    "BLUESKY_APP_PASSWORD",
+    "BLUESKY_IDENTIFIER",
+    "PUBLIC_APP_ORIGIN",
+  ]) {
+    const value = env(key, "").trim();
+    if (value) publishingExtra.push(`${key}=${value}`);
+  }
 
   return (baseUrl) =>
     buildServiceEnv({
@@ -270,7 +368,7 @@ function makeAppEnvBuilder(databaseUrl) {
       stripePriceLookupKey: env("STRIPE_PRICE_LOOKUP_KEY"),
       stripeProductId: env("STRIPE_PRICE_ID"),
       trustProxy: env("TRUST_PROXY", "1"),
-      extra: workspaceExtra,
+      extra: [...workspaceExtra, ...aiProviderExtra, ...integrationExtra, ...publishingExtra],
     });
 }
 
@@ -288,15 +386,33 @@ async function deployApp() {
   log("DATABASE_URL-Format gueltig (Fail-Fast-Check).");
 
   if (migrate) {
-    log("Fuehre Drizzle-Migrationen gegen DATABASE_URL aus …");
-    const result = spawnSync("npx", ["drizzle-kit", "migrate"], {
-      stdio: "inherit",
+    log("Verifiziere/repairiere Produktionsschema vor Drizzle-Migration …");
+    const preflight = spawnSync("node", ["scripts/production-schema-preflight.mjs"], {
+      encoding: "utf8",
       env: { ...process.env, DATABASE_URL: dbCheck.url },
     });
-    if (result.status !== 0) {
-      console.error("[render-deploy] Migrationen fehlgeschlagen.");
+    if (preflight.stdout) process.stdout.write(preflight.stdout);
+    if (preflight.status !== 0) {
+      console.error("[render-deploy] Schema-Preflight fehlgeschlagen.");
+      if (preflight.stderr) console.error(maskSecrets(preflight.stderr));
       process.exit(1);
     }
+    log("Fuehre Drizzle-Migrationen gegen DATABASE_URL aus …");
+    const result = spawnSync("node", ["scripts/run-drizzle-migrations.mjs"], {
+      encoding: "utf8",
+      env: { ...process.env, DATABASE_URL: dbCheck.url, MIGRATION_PREFLIGHT_VERIFIED: "1" },
+    });
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.status !== 0) {
+      console.error("[render-deploy] Migrationen fehlgeschlagen.");
+      if (result.stderr) {
+        // Drizzle/pg errors contain schema/query diagnostics; mask any accidental env values.
+        console.error(maskSecrets(result.stderr));
+      }
+      if (result.error) console.error(maskSecrets(String(result.error)));
+      process.exit(1);
+    }
+    if (result.stderr) process.stderr.write(maskSecrets(result.stderr));
   }
 
   const serviceName = env("RENDER_SERVICE_NAME", "cybersarah-control-center");
@@ -339,6 +455,17 @@ async function deployApp() {
   const verifiedPublicUrl = configuredPublicUrl || publicUrl;
 
   await verifyPublic(verifiedPublicUrl, "/api/health");
+  // The HTTP health response might be from a stale revision. Compare the exact
+  // latest Render deploy commit against GitHub Actions' checked-out SHA.
+  const expectedSha = env("GITHUB_SHA", "");
+  if (expectedSha) {
+    const rawDeploys = await apiFetch(`/services/${service.id}/deploys?limit=1`);
+    const latest = Array.isArray(rawDeploys) ? rawDeploys[0] : null;
+    const result = verifyRenderLiveCommit(latest, expectedSha);
+    log(result.reason);
+  } else {
+    log("GITHUB_SHA fehlt: Render-Commit-Gate nur bei GitHub-Deployment aktiv.");
+  }
   log(`Deployment abgeschlossen: ${verifiedPublicUrl} (Web + API)`);
   log("Naechste Schritte: Custom Domain app.cybersarah-ki.com (Phase 5).");
 }

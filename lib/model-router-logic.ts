@@ -201,8 +201,12 @@ export function buildProviderOrder(input: BuildOrderInput): RouteScore[] {
     if (capabilities[input.taskType] < COMPLEXITY_MIN_STRENGTH[input.complexity]) {
       score -= 3;
     }
-    if (input.complexity === "heavy" && capabilities.local) {
-      score -= 1; // schwere Auftraege bevorzugt in die Cloud
+    // Local-first 80/20: Routinearbeit bleibt standardmaessig lokal.
+    // Heavy-Aufgaben eskalieren dagegen bewusst zu staerkeren Cloud-Modellen.
+    if (capabilities.local) {
+      if (input.complexity === "light") score += 4;
+      else if (input.complexity === "medium") score += 1;
+      else score -= 1;
     }
     const preferredRank = preferred.get(provider);
     if (preferredRank != null) score += Math.max(0, 4 - preferredRank); // bevorzugte ReihenfoLge

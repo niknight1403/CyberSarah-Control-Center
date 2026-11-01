@@ -68,3 +68,13 @@ describe("Rollen-Labels", () => {
     expect(avatarInitialsForRole("agent")).toBe("CS");
   });
 });
+
+describe("Rollen-Label-Overrides (Superagent-Chat)", () => {
+  it("Default bleibt unveraendert, Override wirkt nur bei agent", () => {
+    expect(senderLabelForRole("agent")).toBe("Sarah · KI-Operations");
+    expect(senderLabelForRole("agent", "Superagent")).toBe("Superagent");
+    expect(senderLabelForRole("user", "Superagent")).toBe("Du");
+    expect(avatarInitialsForRole("agent", "SA")).toBe("SA");
+    expect(avatarInitialsForRole("user", "SA")).toBe("HN");
+  });
+});

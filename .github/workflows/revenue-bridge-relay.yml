@@ -1,0 +1,37 @@
+name: Revenue-Bridge Relay (Hetzner Diagnose)
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+    steps:
+      - name: Firewall und socat-Kette auf Produktion pruefen
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/relay_key
+          chmod 600 ~/.ssh/relay_key
+          ssh -i ~/.ssh/relay_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 "$SSH_USER@$SSH_HOST" "sudo bash -s" <<'EOS'
+          set -uo pipefail
+          echo "== socat lokal (403 erwartet) =="
+          curl -s -o /tmp/lrt -w "HTTP=%{http_code}\n" -m 15 -X POST "http://127.0.0.1:18742/api/hara/scan" -H "Content-Type: application/json" -d "{}" || true
+          head -c 150 /tmp/lrt; echo
+          echo "== iptables INPUT =="
+          iptables -L INPUT -n --line-numbers 2>/dev/null | head -25 || echo keine-iptables
+          echo "== nft ruleset (Kopf) =="
+          nft list ruleset 2>/dev/null | head -40 || echo kein-nft
+          echo "== Policy =="
+          iptables -S INPUT 2>/dev/null | head -5
+          echo "== UFW-Ausnahme fuer VM-IP =="
+          ufw allow from 92.5.177.159 to any port 18742 proto tcp comment "VM Revenue-Relay"
+          ufw status | grep 18742 || true
+          echo "== iptables danach =="
+          iptables -L INPUT -n --line-numbers 2>/dev/null | grep -E "18742|Chain" || true
+          EOS

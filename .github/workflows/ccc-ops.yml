@@ -1,0 +1,315 @@
+name: CCC-Ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Operation"
+        required: true
+        type: choice
+        options:
+          - deploy
+          - deploy-cc
+          - prepare-host
+          - dns-hetzner
+          - villa-check
+          - agentforge-init
+          - agentforge-check
+          - deploy-fix
+          - migrate-diag
+          - ports-deny
+          - ports-verify
+          - ports-rebind
+          - ports-lockdown
+          - ports-audit
+          - dns-verify
+          - dns-prep
+          - dns-fix
+          - net-fix
+          - ram-boost
+          - space-audit
+          - add-memory
+          - pm2-redeploy
+          - revenue-os-db-url
+          - hubspot-env
+          - git-status
+          - app-boot
+          - diag
+          - db-diag
+          - db-fix
+          - payment-status
+          - migrate
+          - repair-schema
+          - db-probe
+          - health
+        default: deploy
+
+concurrency:
+  group: ccc-ops
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ops:
+    name: "CCC-Ops: ${{ github.event.inputs.operation }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+      - name: SSH-Zugang einrichten
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+          ssh-keyscan -H 167.233.196.20 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Operation ausfuehren
+        env:
+          OP: ${{ github.event.inputs.operation }}
+          HS_KEY: ${{ secrets.HUBSPOT_SERVICE_KEY }}
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_DNS_API_TOKEN: ${{ secrets.HETZNER_DNS_API_TOKEN }}
+          SSH_CMD: "ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new root@167.233.196.20"
+        run: |
+          echo "OP: $OP"
+          case "$OP" in
+            deploy)
+              $SSH_CMD 'cd /opt/cybersarah-control-center && echo "== Git vorher =="; git log --oneline -2; echo "== Arbeitskopie pruefen =="; if ! git diff-index --quiet HEAD --; then echo "ABBRUCH: modifizierte Dateien"; git status --porcelain | grep -v "^??"; exit 1; else echo "OK: sauber, untracked ignoriert"; fi; echo "== Pull =="; git pull --ff-only origin main && echo "== Git nachher =="; git log --oneline -2 && echo "== Abhaengigkeiten (inkl. dev, fuer drizzle-kit) =="; npm ci --include=dev --no-audit --no-fund 2>&1 | tail -3 && echo "== Build =="; npm run build 2>&1 | tail -5 && echo "== Migration =="; set -a; . ./.env 2>/dev/null; set +a; ./node_modules/.bin/drizzle-kit migrate 2>&1 | tail -5 && echo "== PM2 Neustart =="; pm2 stop all; sleep 2; fuser -k 3000/tcp 2>/dev/null && echo "Alte Prozesse beendet" || echo "Port 3000 war frei"; sleep 2; pm2 start all; sleep 6; echo "== Status =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000 → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready || true; echo "== Letzte App-Logzeilen =="; tail -8 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -8 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
+              ;;
+            pm2-redeploy)
+              $SSH_CMD 'echo "== Port 3000 vorher =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "frei"; echo "== PM2 stop =="; pm2 stop all; sleep 2; echo "== Port-Inhaber killen (fuser) =="; fuser -k 3000/tcp 2>/dev/null && echo "Prozess auf 3000 beendet" || echo "Port 3000 war bereits frei"; sleep 2; echo "== PM2 start =="; pm2 start all; sleep 5; echo "== Status =="; pm2 list; echo "== Port nachher =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "nicht gebunden"; echo "== HTTP-Check =="; curl -s -o /dev/null -w "localhost:3000/ → HTTP %{http_code}\n" --max-time 5 http://localhost:3000/ || true; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 5 http://localhost:3000/api/ready || true; echo "== Letzte App-Logzeilen =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
+              ;;
+            revenue-os-db-url)
+              $SSH_CMD 'SRC=/opt/cybersarah-revenue-os/.env; DST=/opt/cybersarah-control-center/.env; if [ ! -f "$SRC" ]; then echo "FEHLER: $SRC existiert nicht"; exit 1; fi; URL=$(grep -m1 "^DATABASE_URL=" "$SRC" | cut -d= -f2- | tr -d "\r"); if [ -z "$URL" ]; then echo "FEHLER: Keine DATABASE_URL in der Revenue-OS-.env"; exit 1; fi; if grep -q "^REVENUE_OS_DATABASE_URL=" "$DST" 2>/dev/null; then sed -i "s|^REVENUE_OS_DATABASE_URL=.*|REVENUE_OS_DATABASE_URL=$URL|" "$DST"; else printf "\nREVENUE_OS_DATABASE_URL=%s\n" "$URL" >> "$DST"; fi; chmod 600 "$DST"; echo "== .env: REVENUE_OS_DATABASE_URL gesetzt (Wert nie ausgeben) =="; echo "== Verbindungstest (psql, read-only SELECT 1) =="; if command -v psql >/dev/null; then PGPASSWORD=$(echo "$URL" | sed -E "s|.*:([^:@]+)@.*|\1|") psql "$(echo "$URL" | sed -E "s|^[a-z]+://||")" -c "SELECT 1" >/dev/null 2>&1 && echo "DB erreichbar: ja" || echo "DB erreichbar: pruefen (psql-Test nicht eindeutig)"; else echo "psql nicht verfuegbar — App-Test nach Sync"; fi; echo "== PM2-Env-Sync =="; cd /opt/cybersarah-control-center && node -e "const fs=require(\"fs\");const cp=require(\"child_process\");const lines=fs.readFileSync(\".env\",\"utf8\").split(/\r?\n/);const o={};for(const l of lines){const m=l.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);if(m)o[m[1]]=m[2];}cp.execSync(\"pm2 restart cybersarah-control-center --update-env\",{env:Object.assign({},process.env,o)});console.log(\"PM2 mit .env neu gestartet\");" && sleep 6; echo "== Health =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready'
+              ;;
+            hubspot-env)
+              # Schreibt den HubSpot-Service-Key aus dem GitHub-Secret in die
+              # Server-.env (600), startet PM2 mit den neuen Variablen und
+              # prueft danach die Rechte. Der Wert wird nie ausgegeben.
+              printf '%s' "$HS_KEY" | $SSH_CMD 'set -e; ENVF=/opt/cybersarah-control-center/.env; [ -f "$ENVF" ] || { echo "FEHLER: $ENVF fehlt"; exit 1; }; KEY=$(cat); case "$KEY" in pat-*) : ;; *) echo "FEHLER: Key hat kein pat-Praefix (Laenge ${#KEY})"; exit 1;; esac; if grep -q "^HUBSPOT_SERVICE_KEY=" "$ENVF" 2>/dev/null; then sed -i "s|^HUBSPOT_SERVICE_KEY=.*|HUBSPOT_SERVICE_KEY=$KEY|" "$ENVF"; else printf "\nHUBSPOT_SERVICE_KEY=%s\n" "$KEY" >> "$ENVF"; fi; if grep -q "^HUBSPOT_PORTAL_ID=" "$ENVF" 2>/dev/null; then sed -i "s|^HUBSPOT_PORTAL_ID=.*|HUBSPOT_PORTAL_ID=148844654|" "$ENVF"; else printf "HUBSPOT_PORTAL_ID=148844654\n" >> "$ENVF"; fi; chmod 600 "$ENVF"; echo "== .env aktualisiert: HUBSPOT_SERVICE_KEY (${#KEY} Zeichen), HUBSPOT_PORTAL_ID=148844654 =="; cd /opt/cybersarah-control-center; node -e "const fs=require(\"fs\");const cp=require(\"child_process\");const lines=fs.readFileSync(\".env\",\"utf8\").split(/\\r?\\n/);const o={};for(const l of lines){const m=l.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);if(m)o[m[1]]=m[2];}cp.execSync(\"pm2 restart cybersarah-control-center --update-env\",{env:Object.assign({},process.env,o)});console.log(\"PM2 mit .env neu gestartet\");"; sleep 6; curl -s -o /dev/null -w "localhost:3000/api/ready -> HTTP %{http_code}\\n" --max-time 8 http://localhost:3000/api/ready || true; echo "== .env in die Pruefung laden =="; set -a; . ./.env 2>/dev/null; set +a; echo "Key gesetzt: ${#HUBSPOT_SERVICE_KEY} Zeichen"; echo "== HubSpot-Rechtepruefung auf dem Server =="; npx tsx scripts/hubspot-live-check.ts 2>&1 | tail -18 || echo "Pruefung nicht ausfuehrbar (tsx fehlt?)"'
+              ;;
+            deploy-cc)
+              # Fuehrt den sicheren Bootstrapper auf dem Server aus.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/deploy-cc.sh --apply 2>&1 | tail -40'
+              ;;
+            prepare-host)
+              # Zustand pruefen, Swap aktivieren, ungenutzte Images freigeben.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/prepare-host.sh 2>&1 | tail -40'
+              ;;
+            add-memory)
+              # Schafft Disk- und Swapspeicher und installiert danach neu.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/add-memory.sh 2>&1 | tail -55'
+              ;;
+            space-audit)
+              # Zeigt Platzverbrauch und raeumt Caches sowie rotierte Logs weg.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/space-audit.sh 2>&1 | tail -50'
+              ;;
+            ram-boost)
+              # Gibt RAM aus ephemere Sandbox-Containern frei und erweitert Swap.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ram-boost.sh 2>&1 | tail -45'
+              ;;
+            net-fix)
+              # Oeffnet 80/443 in der Hetzner-Firewall (falls noetig) und prueft
+              # danach die Erreichbarkeit von aussen und den Host-Filter.
+              node scripts/ops/hetzner-fw.mjs --apply
+              echo "== Erreichbarkeit von aussen (Runner) =="
+              for target in http://167.233.196.20 https://167.233.196.20 http://167.233.196.20/api/health; do
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$target" || echo 000)
+                echo "$target -> $code"
+              done
+              echo "== Host-Filter =="
+              $SSH_CMD 'ufw status 2>/dev/null | head -12; echo "--- iptables INPUT ---"; iptables -L INPUT -n 2>/dev/null | head -12; echo "--- Listener 80/443/3000 ---"; ss -tlnp | grep -E ":80 |:443 |:3000 " || echo keine'
+              ;;
+            dns-fix)
+              # Setzt einen kostenlosen, sofort aufloesbaren Hostnamen auf
+              # Caddy auf und prueft HTTPS von aussen.
+              HOSTNAME_FREE="167.233.196.20.sslip.io"
+              $SSH_CMD "cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/caddy-site.sh $HOSTNAME_FREE" 2>&1 | tail -30
+              echo "== DNS-Aufloesung des freien Namens =="
+              getent hosts "$HOSTNAME_FREE" || echo "keine Aufloesung"
+              echo "== HTTPS von aussen (Zertifikat kann 30s brauchen) =="
+              for i in 1 2 3 4 5 6; do
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 "https://$HOSTNAME_FREE/api/ready" || echo 000)
+                echo "Versuch $i: $code"
+                [ "$code" = "200" ] && break
+                sleep 10
+              done
+              ;;
+            dns-hetzner)
+              # Zieht die A-Records der Zone auf den CCC-Server um.
+              node scripts/ops/hetzner-dns.mjs "$@"
+              echo "== Aufloesung nach Umstellung =="
+              sleep 5
+              getent hosts cybersarah-ki.com || echo "noch keine Aufloesung"
+              echo "== HTTPS-Test =="
+              for i in 1 2 3 4 5; do
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 "https://cybersarah-ki.com/api/ready" || echo 000)
+                echo "Versuch $i: $code"
+                [ "$code" = "200" ] && break
+                sleep 12
+              done
+              ;;
+            dns-prep)
+              # Legt die Site-Bloecke fuer beide Domains an und zeigt, was
+              # aktuell auf den bestehenden Records laeuft.
+              $SSH_CMD "cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/caddy-site.sh cybersarah-control-center.de www.cybersarah-control-center.de" 2>&1 | tail -25
+              echo "== Was laeuft aktuell auf cybersarah-ki.com (130.61.73.72)? =="
+              curl -s -o /dev/null -w "https://cybersarah-ki.com -> %{http_code}\n" --max-time 12 https://cybersarah-ki.com || echo "https nicht erreichbar"
+              curl -s --max-time 12 https://cybersarah-ki.com | head -c 200 | tr -d '\n'; echo
+              curl -s -o /dev/null -w "http://cybersarah-ki.com -> %{http_code}\n" --max-time 12 http://cybersarah-ki.com || echo "http nicht erreichbar"
+              echo "== Bestehender HTTPS-Zugang =="
+              curl -s -o /dev/null -w "https://167.233.196.20.sslip.io/api/ready -> %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
+              ;;
+            dns-verify)
+              # Prueft nach dem DNS-Umzug Aufloesung, Zertifikat und Health
+              # fuer beide Domains und den freien Ausweichnamen.
+              echo "== Aufloesung =="
+              for host in cybersarah-control-center.de cybersarah-ki.com www.cybersarah-ki.com 167.233.196.20.sslip.io; do
+                ip=$(getent hosts "$host" | awk '{print $1}' | head -1)
+                echo "  $host -> ${ip:-keine Aufloesung}"
+              done
+              echo "== HTTPS und Health =="
+              for host in cybersarah-control-center.de cybersarah-ki.com 167.233.196.20.sslip.io; do
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 "https://$host/api/ready" || echo 000)
+                echo "  https://$host/api/ready -> $code"
+              done
+              ;;
+            ports-audit)
+              # Read-only Audit der Ports und Firewall. Zusaetzlich prueft der
+              # Runner, welche Ports wirklich von aussen erreichbar sind.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ports-audit.sh 2>&1 | tail -60'
+              echo "== 9. Erreichbarkeit von aussen (Runner) =="
+              for port in 22 80 443 3000 3389 8081 8888 12000 18742; do
+                if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
+                  echo "  Port $port: OFFEN"
+                else
+                  echo "  Port $port: zu"
+                fi
+              done
+              echo "== 10. Was antwortet auf 3000/3001/12000? =="
+              for p in 3000 3001 12000; do
+                code=$(curl -s -o /tmp/body.txt -w "%{http_code}" --max-time 8 "http://167.233.196.20:$p/" || echo 000)
+                echo "  Port $p -> HTTP $code"
+                head -c 120 /tmp/body.txt 2>/dev/null | tr -d '\n'; echo
+              done
+              echo "== 11. App direkt und ueber TLS =="
+              curl -s -o /dev/null -w "  sslip HTTPS: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
+              ;;
+            ports-lockdown)
+              # Zeigt die Startkonfiguration der Container und entfernt die
+              # toten beziehungsweise unerwuenschten ufw-Regeln.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ports-lockdown.sh --inspect 2>&1 | tail -30; bash scripts/ops/ports-lockdown.sh --ufw 2>&1 | tail -30'
+              echo "== Erreichbarkeit nach der Aenderung =="
+              for port in 3000 3001 3389 8081 8888 12000; do
+                if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
+                  echo "  Port $port: OFFEN"
+                else
+                  echo "  Port $port: zu"
+                fi
+              done
+              ;;
+            ports-rebind)
+              # Bindet die Container-Ports an localhost und prueft danach
+              # die Erreichbarkeit von aussen.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ports-rebind.sh 2>&1 | tail -50'
+              echo "== Erreichbarkeit von aussen nach dem Umbau =="
+              for port in 3000 3001 3002 12000; do
+                if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
+                  echo "  Port $port: OFFEN"
+                else
+                  echo "  Port $port: zu"
+                fi
+              done
+              echo "== Oeffentlicher Zugang ueber TLS =="
+              curl -s -o /dev/null -w "  sslip /api/ready: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
+              ;;
+            ports-verify)
+              # Prueft nach dem Umbau, ob alle Dienste lokal gesund sind und
+              # ob der Villa-Hub die Villa noch erreicht.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== Container-Status =="; docker ps --format "{{.Names}} | {{.Status}} | {{.Ports}}"; echo "== OpenHands (3001) mit Nachlauf =="; for i in 1 2 3 4 5 6; do code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 http://127.0.0.1:3001/ || echo 000); echo "  Versuch $i: $code"; [ "$code" = "200" ] && break; sleep 10; done; echo "== OpenHands Log =="; docker logs --tail 8 openhands-autonomous-app 2>&1 | tail -8; echo "== Villa (3002) =="; curl -s -o /dev/null -w "  3002: %{http_code}\n" --max-time 12 http://127.0.0.1:3002/; echo "== Villa-Hub (12000) lokal =="; curl -s -o /dev/null -w "  12000: %{http_code}\n" --max-time 10 http://127.0.0.1:12000/; echo "== Verweise auf Port 3000 in VillaForge-Konfiguration =="; grep -rn "localhost:3000\|127.0.0.1:3000" /opt/villaforge/.env /opt/villaforge/docker-compose*.yml 2>/dev/null | head -5 || echo "  keine Treffer"; echo "== App =="; curl -s -o /dev/null -w "  3000: %{http_code}\n" --max-time 10 http://127.0.0.1:3000/api/ready'
+              ;;
+            ports-deny)
+              # Setzt eine explizite ufw-Regel gegen direkten Zugriff auf 3000
+              # und prueft danach noch einmal von aussen.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/ports-lockdown.sh --deny-3000 2>&1 | tail -20; echo "== DNAT-Regeln fuer 3000 =="; iptables -t nat -S DOCKER 2>/dev/null | grep -E "dport 3000" || echo "  keine DNAT-Regel auf 3000"; echo "== App lokal =="; curl -s -o /dev/null -w "  localhost:3000/api/ready: %{http_code}\n" --max-time 8 http://localhost:3000/api/ready'
+              echo "== Erreichbarkeit von aussen =="
+              for port in 22 80 443 3000 3001 3002 12000; do
+                if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
+                  echo "  Port $port: OFFEN"
+                else
+                  echo "  Port $port: zu"
+                fi
+              done
+              curl -s -o /dev/null -w "  oeffentlich via TLS: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
+              ;;
+            migrate-diag)
+              # Zeigt App-Zustand und den vollstaendigen Migrationsfehler.
+              $SSH_CMD 'echo "== PM2 =="; pm2 list | tail -5; echo "== Health =="; curl -s -o /dev/null -w "localhost:3000/api/ready: %{http_code}\n" --max-time 10 http://localhost:3000/api/ready; echo "== Migrationslog (letzte 40 Zeilen) =="; tail -40 /tmp/ccc-migrate.log 2>/dev/null || echo "kein Log"; echo "== Git-Stand =="; cd /opt/cybersarah-control-center && git log --oneline -2; echo "== Drizzle-Journal =="; psql "$DATABASE_URL" -tAc "select count(*) from drizzle.__drizzle_migrations" 2>/dev/null || echo "Journal nicht lesbar (DATABASE_URL nicht in dieser Shell)"; echo "== Fehlerlog der App =="; tail -8 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null | tail -8'
+              ;;
+            deploy-fix)
+              # Stempelt die Migrationen (Schema existiert, Journal leer),
+              # deployt anschliessend und prueft die Agentforge-Endpunkte.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== Journal stempeln =="; set -a; . ./.env 2>/dev/null; set +a; node scripts/ops/stamp-migrations.mjs --apply 2>&1 | tail -12; echo "== Migrationslauf =="; npx drizzle-kit migrate 2>&1 | tail -5'
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; bash scripts/ops/deploy-cc.sh --apply 2>&1 | tail -22'
+              echo "== PM2 und Endpunkte =="
+              $SSH_CMD 'pm2 list | tail -6; echo "--- Health ---"; curl -s -o /dev/null -w "ready: %{http_code}\n" --max-time 10 http://localhost:3000/api/ready; echo "--- Agentforge ---"; for ep in "POST /api/agentforge/events" "POST /api/agentforge/checkpoints" "GET /api/agentforge/stream"; do m=${ep%% *}; u=${ep#* }; code=$(curl -s -o /dev/null -w "%{http_code}" -X $m --max-time 8 -H "Content-Type: application/json" -d "{}" "http://localhost:3000$u"); echo "  $m $u -> $code"; done; echo "--- Git ---"; cd /opt/cybersarah-control-center && git log --oneline -1'
+              ;;
+            agentforge-check)
+              # Prueft PM2, die Agentforge-Tabellen und die Token-Lage.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/agentforge-check.sh 2>&1 | tail -25'
+              ;;
+            agentforge-init)
+              # Legt die Agentforge-Tabellen an und setzt den Service-Token.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/agentforge-init.sh 2>&1 | tail -25'
+              ;;
+            villa-check)
+              # Prueft den ausgerollten VillaForge-Hub und den neuen Theme-Endpunkt.
+              $SSH_CMD 'echo "== Hub health =="; curl -s -o /dev/null -w "  /api/health: %{http_code}\n" --max-time 12 http://92.5.177.159:12000/api/health; echo "== Theme-Endpunkt =="; curl -s --max-time 12 http://92.5.177.159:12000/api/design/themes | head -c 400; echo; echo "== Statische Dateien =="; for f in /index.html /app.js; do echo -n "  $f: "; curl -s -o /dev/null -w "%{http_code}\n" --max-time 12 "http://92.5.177.159:12000$f"; done; echo -n "  Skip-Link im HTML: "; curl -s --max-time 12 http://92.5.177.159:12000/index.html | grep -c "skip-link"'
+              ;;
+            git-status)
+              # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== HEAD =="; git rev-parse --abbrev-ref HEAD; git log --oneline -3; echo "== Fetch =="; git fetch origin main 2>&1 | tail -2; echo "== Abstand HEAD...origin/main (links=server, rechts=remote) =="; git rev-list --left-right --count HEAD...origin/main 2>/dev/null || echo "kein origin/main"; echo "== Status =="; git status --porcelain | head -40; echo "== Anzahl =="; git status --porcelain | wc -l; echo "== Diff-Stat =="; git diff --stat | tail -15'
+              ;;
+            app-boot)
+              # Startet die App aus dem Ecosystem neu, nachdem pm2 start all
+              # nichts mehr findet. Zeigt vorher Ressourcen und Fehlerlog.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== Ressourcen =="; df -h / | tail -1; free -m | head -2; echo "== Ecosystem-Dateien =="; ls -1 ecosystem.config.* 2>/dev/null; echo "== PM2 vorher =="; pm2 list | tail -6; echo "== Letzter Fehlerlog =="; tail -12 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null || echo "(kein Fehlerlog)"; echo "== Start =="; node -e "const fs=require(\"fs\");const cp=require(\"child_process\");const env={};try{for(const l of fs.readFileSync(\".env\",\"utf8\").split(/\\r?\\n/)){const m=l.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);if(m)env[m[1]]=m[2];}}catch(e){console.log(\"Warnung: keine .env lesbar\");}cp.execSync(\"pm2 start ecosystem.config.cjs --update-env\",{env:Object.assign({},process.env,env),stdio:\"inherit\"});" 2>&1 | tail -8; sleep 10; pm2 save 2>&1 | tail -2; echo "== Status nachher =="; pm2 list | tail -6; echo "== HTTP =="; curl -s -o /dev/null -w "ready: HTTP %{http_code}\\n" --max-time 10 http://localhost:3000/api/ready || true; echo "== Fehlerlog nach Start =="; tail -15 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null || echo "(leer)"; echo "== Ausgabelog =="; tail -8 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || echo "(leer)"'
+              ;;
+            diag)
+              # Read-only Bestandsaufnahme: wer lauscht, was laeuft, wo geht Platz verloren.
+              $SSH_CMD 'echo "== Port 3000 =="; ss -tlnp 2>/dev/null | grep ":3000" || echo "niemand lauscht auf 3000"; echo "== PM2 (jlist) =="; pm2 jlist 2>/dev/null | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{try{const j=JSON.parse(s);console.log(j.length+\" Eintraege: \"+j.map(p=>p.name+\":\"+p.pm2_env.status).join(\", \"))}catch(e){console.log(\"jlist nicht lesbar\")}})"; echo "== PM2_HOME / User =="; echo "HOME=$HOME PM2_HOME=${PM2_HOME:-unset}"; ls -la /root/.pm2/dump.pm2 2>/dev/null; echo "== Docker =="; (docker ps --format "{{.Names}} {{.Status}} {{.Ports}}" 2>/dev/null | head -10) || echo "kein Docker"; echo "== systemd =="; systemctl list-units --type=service --state=running 2>/dev/null | grep -iE "cyber|revenue|node|app" | head -10 || echo "keine passenden Units"; echo "== /api/ready Antwort =="; curl -s --max-time 8 http://localhost:3000/api/ready | head -c 400; echo; echo "== Ecosystem cjs (Kopf) =="; head -25 ecosystem.config.cjs 2>/dev/null; echo "== Platz: Top-Verbraucher =="; du -sh /opt/* 2>/dev/null | sort -h | tail -8; du -sh /root/.pm2/logs /var/log /var/lib/docker 2>/dev/null; echo "== Letzter Deploy-Rest =="; ls -la /opt/cybersarah-control-center | head -5'
+              ;;
+            db-diag)
+              # Zieht den Code nach (ohne Build) und startet die read-only Diagnose.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== /api/ready =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 1500; echo; echo "== Datenbank =="; node scripts/ops/db-diag.mjs 2>&1 | head -20; echo "== App-Fehlerlog =="; tail -20 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null || echo "(leer)"; echo "== Docker-Platz =="; docker system df 2>/dev/null | head -6'
+              ;;
+            db-fix)
+              # Holt die DATABASE_URL notfalls aus dem laufenden App-Prozess,
+              # gleicht das Rollenpasswort an und prueft die Verbindung.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== .env-Dateien =="; ls -la .env* 2>/dev/null | head -6; PID=$(pgrep -f "node .*cybersarah-control-center" | head -1); echo "App-PID: ${PID:-keine}"; if [ -n "$PID" ]; then tr "\\000" "\\n" < /proc/$PID/environ | grep -m1 "^DATABASE_URL=" > /tmp/dburl.tmp; chmod 600 /tmp/dburl.tmp; echo "URL aus Prozess: $(wc -c < /tmp/dburl.tmp) Byte"; fi; echo "== DB-Fix =="; DATABASE_URL_FILE=/tmp/dburl.tmp node scripts/ops/db-fix.mjs; echo "exit=$?"; rm -f /tmp/dburl.tmp; echo "== App neu starten =="; pm2 restart cybersarah-control-center --update-env > /dev/null 2>&1; sleep 12; echo "== Readiness =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 700; echo; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
+              ;;
+            migrate)
+              # Spielt ausstehende Migrationen ein, prueft die Tabellen und
+              # gibt ungenutzten Docker-Platz frei (Images aelter als 7 Tage).
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== Platz vorher =="; df -h / | tail -1; echo "== Migration =="; ./node_modules/.bin/drizzle-kit migrate 2>&1 | tail -10; echo "== Datenbank danach =="; node scripts/ops/db-diag.mjs 2>&1 | head -10; echo "== Platz freigeben =="; docker container prune -f 2>&1 | tail -1; docker image prune -f --filter "until=168h" 2>&1 | tail -2; echo "== Platz nachher =="; df -h / | tail -1; echo "== Readiness =="; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
+              ;;
+            repair-schema)
+              # Spielt die fehlenden Revenue-Tabellen idempotent ein.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; set -a; . ./.env 2>/dev/null; set +a; echo "== DDL =="; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/repair-revenue-schema.sql 2>&1 | tail -8; echo "== Datenbank =="; node scripts/ops/db-diag.mjs 2>&1 | head -8; echo "== App neu starten =="; pm2 restart cybersarah-control-center --update-env > /dev/null 2>&1; sleep 12; echo "== Readiness =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 700; echo; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
+              ;;
+            payment-status)
+              # Zeigt nur, ob Zahlungs-Variablen gesetzt sind (Namen und Laenge,
+              # niemals Werte) und was die App dazu meldet.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== Zahlungs-Variablen =="; for V in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_ID DIGISTORE24_API_KEY DIGISTORE24_IPN_TOKEN; do L=$(grep -m1 "^$V=" .env 2>/dev/null | wc -c); if [ "$L" -gt 0 ]; then echo "$V: gesetzt"; else echo "$V: fehlt"; fi; done; echo "== Billing-Status der App =="; curl -s --max-time 10 http://localhost:3000/api/billing/health 2>/dev/null | head -c 400; echo; echo "== Webhook-Routen erreichbar? =="; for U in /api/v1/webhooks/digistore24 /api/billing/webhook /api/stripe/webhook; do C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 6 -X POST -H "Content-Type: application/json" -d "{}" http://localhost:3000$U); echo "$U -> $C"; done'
+              ;;
+            health)
+              $SSH_CMD 'echo "== PM2 =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready; echo "== Revenue-OS-Env in PM2? =="; pm2 env $(pm2 jlist | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{const j=JSON.parse(s);const p=j.find(x=>x.name.includes(\"cybersarah-control-center\"));console.log(p?p.pm_id:1)})") 2>/dev/null | grep -c "^REVENUE_OS_DATABASE_URL:" ; echo "== App-Log =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
+              ;;
+            *)
+              echo "Unbekannte Operation: $OP" >&2
+              exit 1
+              ;;
+          esac

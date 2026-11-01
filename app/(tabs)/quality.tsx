@@ -7,6 +7,7 @@
  * GlowButton, StatusChip und Typography/Token aus lib/design/future-glass.
  */
 import { ScreenContainer } from "@/components/screen-container";
+import { TopNavigation } from "@/components/responsive/top-navigation";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
@@ -64,6 +65,7 @@ export default function QualityScreen() {
     return (
       <GlassBackdrop accent="cyan">
         <ScreenContainer style={styles.transparent} containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
+          <TopNavigation />
           <Text style={styles.eyebrow}>QUALITÄTSZENTRALE</Text>
           <Text style={styles.title}>Qualität</Text>
           <GlassCard accent="cyan" style={styles.emptyCard}>
@@ -81,6 +83,7 @@ export default function QualityScreen() {
   return (
     <GlassBackdrop accent="cyan">
       <ScreenContainer style={styles.transparent} containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
+        <TopNavigation />
         <FlatList
           contentContainerStyle={styles.content}
           data={quality?.ci.checks ?? []}

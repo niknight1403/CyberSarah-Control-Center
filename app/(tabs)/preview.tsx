@@ -10,6 +10,7 @@ import { GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import type { GlassAccent } from "@/lib/design/future-glass";
 import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/future-glass";
 import { ScreenContainer } from "@/components/screen-container";
+import { TopNavigation } from "@/components/responsive/top-navigation";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useLiveRuntimeLogs, useLiveRuntimeStatus, useClearRuntimeLogs, usePreviewTargetUrl } from "@/lib/live-runtime-client";
 import { buildPreviewViewModel } from "@/lib/live-runtime-view-logic";
@@ -65,6 +66,7 @@ export default function PreviewScreen() {
   return (
     <GlassBackdrop accent="green">
       <ScreenContainer className="px-5" containerClassName="bg-transparent" edges={["top", "left", "right", "bottom"]}>
+      <TopNavigation />
       <FlatList
                 initialNumToRender={12}
                 maxToRenderPerBatch={8}

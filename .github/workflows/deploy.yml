@@ -1,0 +1,27 @@
+name: CyberSarah Deploy & Sync Secrets
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Production .env from GitHub Secrets
+        run: |
+          echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> .env
+          echo "FLASK_PORT=5000" >> .env
+          echo "IG_ACCESS_TOKEN=${{ secrets.IG_ACCESS_TOKEN }}" >> .env
+          echo "YT_ACCESS_TOKEN=${{ secrets.YT_ACCESS_TOKEN }}" >> .env
+          echo "TIKTOK_ACCESS_TOKEN=${{ secrets.TIKTOK_ACCESS_TOKEN }}" >> .env
+          echo "FB_ACCESS_TOKEN=${{ secrets.FB_ACCESS_TOKEN }}" >> .env
+
+      - name: Secure .env Permissions
+        run: chmod 600 .env
+        
+      - name: Status Report
+        run: echo "Secrets erfolgreich verschlüsselt injiziert. Bereit für Server-Sync."

@@ -28,7 +28,18 @@ const REACT_COMPILER_RULES = {
 export default defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*", "web-dist/*", "coverage/*", "workspace-service/node_modules/*", "workspace-service/dist/*"],
+    ignores: [
+      "dist/*",
+      "web-dist/*",
+      "coverage/*",
+      // Revenue OS ist ein eigenständiger pnpm-Workspace mit eigener
+      // TypeScript-/ESLint-Konfiguration und wird separat validiert.
+      "modules/revenue-os/**/*",
+      "workspace-service/node_modules/*",
+      "workspace-service/dist/*",
+      // Generierte Expo/Capacitor-Bundles sind Build-Artefakte, kein Quellcode.
+      "android/app/src/main/assets/public/**/*",
+    ],
   },
   {
     // Node-Kontext (Server, Skripte, Workspace-Service): Node-Globals und

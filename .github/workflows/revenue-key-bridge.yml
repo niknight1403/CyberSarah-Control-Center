@@ -1,0 +1,32 @@
+name: Revenue-Key-Bridge (Hetzner -> AF2-Secret)
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Engine-Key extrahieren und als AF2-Secret setzen
+        env:
+          GH_PAT: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/rk_key
+          chmod 600 ~/.ssh/rk_key
+          SCP="scp -i ~/.ssh/rk_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+          SSH="ssh -i ~/.ssh/rk_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 $SSH_USER@$SSH_HOST"
+          $SCP scripts/extract-engine-key.py "$SSH_USER@$SSH_HOST":/tmp/extract-engine-key.py
+          VAL=$($SSH "python3 /tmp/extract-engine-key.py 2>/tmp/ek-diag.log" || true)
+          $SSH "cat /tmp/ek-diag.log; rm -f /tmp/ek-diag.log /tmp/extract-engine-key.py" || true
+          if [ -z "$VAL" ]; then echo "Key-Extraktion fehlgeschlagen"; exit 1; fi
+          echo "Key-Laenge: ${#VAL}"
+          pip3 install pynacl --quiet
+          GH_PAT="$GH_PAT" python3 scripts/set-af2-secret.py "$VAL"

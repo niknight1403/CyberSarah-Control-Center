@@ -22,10 +22,11 @@ import {
 
 import { ENV } from "./_core/env";
 import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
+import { resolvePgSslConfig, stripSslModeParam } from "../lib/db-ssl-logic";
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
-  .trim()
-  .toLowerCase();
+// The owner account is always an administrator; environment configuration may
+// document the same value but must not be able to remove this access.
+const ADMIN_EMAIL = "niko.oeben@gmail.com";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -49,7 +50,12 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
+        // sslmode wird aus der URL entfernt (pg's interne sslmode-Aufloesung
+        // wendet sonst eine zusaetzliche Hostnamen-Pruefung an, die bei
+        // SNI-Stream-Routing/IP-Hosts scheitert). Die SSL-Semantik liegt
+        // allein im expliziten ssl-Objekt (Sprint 112).
+        connectionString: stripSslModeParam(process.env.DATABASE_URL),
+        ssl: resolvePgSslConfig(process.env.DATABASE_URL),
         max: 10,
         idleTimeoutMillis: 30_000,
         connectionTimeoutMillis: 10_000,
@@ -740,6 +746,34 @@ export async function insertSuperAgentRecords(inputs: InsertSuperAgentRow[]) {
   if (!db) throw new Error("Datenbank nicht verfuegbar — Superagenten nicht speicherbar.");
   if (inputs.length === 0) return [];
   return db.insert(superAgents).values(inputs).returning();
+}
+
+/**
+ * Built-in-Spezialisten atomar nachziehen. Ein nutzerbezogener Postgres
+ * Advisory-Lock serialisiert parallele list-Aufrufe, ohne globale Locks oder
+ * Schema-Migration. Bereits vorhandene Namen werden nie dupliziert.
+ */
+export async function insertMissingSuperAgentRecords(
+  userOpenId: string,
+  inputs: InsertSuperAgentRow[],
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — Superagenten nicht speicherbar.");
+  if (inputs.length === 0) return [];
+
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userOpenId}))`);
+    const existing = await tx
+      .select({ name: superAgents.name })
+      .from(superAgents)
+      .where(eq(superAgents.userOpenId, userOpenId));
+    const names = new Set(existing.map((row) => row.name.trim().toLocaleLowerCase("de-DE")));
+    const missing = inputs.filter(
+      (row) => !names.has(String(row.name).trim().toLocaleLowerCase("de-DE")),
+    );
+    if (missing.length === 0) return [];
+    return tx.insert(superAgents).values(missing).returning();
+  });
 }
 
 export async function updateSuperAgentRecord(

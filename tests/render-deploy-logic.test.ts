@@ -11,6 +11,8 @@ import {
   renderApiError,
   validateDatabaseUrl,
   validateRenderApiKey,
+  normalizePgCliSslSemantics,
+  deployPgPoolConfig,
 } from "../lib/render-deploy-logic.mjs";
 
 describe("render-deploy-logic: validateRenderApiKey", () => {
@@ -52,8 +54,8 @@ describe("render-deploy-logic: validateDatabaseUrl", () => {
 describe("render-deploy-logic: buildServiceEnv", () => {
   const base = {
     databaseUrl: "postgresql://u:p@ep-x.neon.tech/db",
-    appBaseUrl: "https://cybersarah-control-center.onrender.com",
-    allowedOrigins: "https://cybersarah-control-center.onrender.com",
+    appBaseUrl: "https://cybersarah-control-center-hmlc.onrender.com",
+    allowedOrigins: "https://cybersarah-control-center-hmlc.onrender.com",
     jwtSecret: "jwt-geheim",
   };
 
@@ -228,10 +230,10 @@ describe("render-deploy-logic: Workspace-CORS & Render-Proxy (Sprint 73)", () =>
   it("buildWorkspaceEnv uebernimmt komma-separierte ALLOWED_ORIGIN-Werte", () => {
     const lines = buildWorkspaceEnv({
       serviceAccessToken: "tok",
-      allowedOrigin: "https://app.cybersarah-ki.com,https://cybersarah-control-center.onrender.com",
+      allowedOrigin: "https://app.cybersarah-ki.com,https://cybersarah-control-center-hmlc.onrender.com",
     });
     expect(lines).toContain(
-      "ALLOWED_ORIGIN=https://app.cybersarah-ki.com,https://cybersarah-control-center.onrender.com",
+      "ALLOWED_ORIGIN=https://app.cybersarah-ki.com,https://cybersarah-control-center-hmlc.onrender.com",
     );
   });
 
@@ -292,5 +294,22 @@ describe("pickFreshDeploy (Sprint-85-Follow-up: False-Green-Fix)", () => {
 
   it("filtert Eintraege ohne ID defensiv heraus", () => {
     expect(pickFreshDeploy([{ status: "live" }, { id: "dep-z", status: "created" }], new Set(["dep-known"]))?.id).toBe("dep-z");
+  });
+
+  it("normalisiert sslmode=require fuer drizzle CLI auf libpq-Semantik", () => {
+    const value = normalizePgCliSslSemantics("postgresql://u:p@hub.example:443/db?sslmode=require");
+    const parsed = new URL(value);
+    expect(parsed.searchParams.get("sslmode")).toBe("require");
+    expect(parsed.searchParams.get("uselibpqcompat")).toBe("true");
+  });
+
+  it("behaelt verify-full strikt und richtet Preflight-Pool wie Runtime aus", () => {
+    const strict = normalizePgCliSslSemantics("postgresql://u:p@db.example/db?sslmode=verify-full");
+    expect(new URL(strict).searchParams.has("uselibpqcompat")).toBe(false);
+    expect(deployPgPoolConfig("postgresql://u:p@hub.example:443/db?sslmode=require")).toEqual({
+      connectionString: "postgresql://u:p@hub.example:443/db",
+      ssl: { rejectUnauthorized: false },
+    });
+    expect(deployPgPoolConfig("postgresql://u:p@db.example/db?sslmode=verify-full").ssl).toEqual({ rejectUnauthorized: true });
   });
 });

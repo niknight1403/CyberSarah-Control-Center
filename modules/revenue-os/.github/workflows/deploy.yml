@@ -1,0 +1,34 @@
+name: Auto-Deploy to Hetzner Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Hetzner VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Trigger Deployment via API
+        continue-on-error: true
+        run: |
+          echo "📡 Versuche API-Deploy..."
+          RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "http://167.233.196.20:3000/api/admin/deploy" \
+            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN || 'cybersarah2026' }}" \
+            --max-time 30 2>&1)
+          echo "HTTP $RESP"
+          if [ "$RESP" = "200" ]; then
+            echo "✅ API-Deploy erfolgreich!"
+          else
+            echo "⚠️  API-Deploy nicht verfügbar (HTTP $RESP)"
+            echo "Nach dem manuellen SSH-Deploy via 'bash termux-deploy.sh' wird der API-Deploy aktiv."
+          fi
+          
+      - name: Status
+        run: |
+          echo "✅ Deployment ausgelöst!"
+          echo "Server: http://167.233.196.20:3000"

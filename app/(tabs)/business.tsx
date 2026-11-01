@@ -15,6 +15,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton } from "@/components/glass/glass-primitives";
 import { AiCore } from "@/components/glass/ai-core";
+import { RevenueAutopilotCard } from "@/components/glass/revenue-autopilot-card";
 import { trpc } from "@/lib/trpc";
 import { useOfflineDashboard } from "@/hooks/use-offline-dashboard";
 import { summarizeBackupExport, type BackupExport } from "@/lib/backup-self-service-logic";
@@ -396,7 +397,9 @@ export default function BusinessDashboardScreen() {
             detail={
               revenue?.status === "ok"
                 ? `24 h: ${(revenue.revenueLast24hEur ?? 0).toLocaleString("de-DE")} € · ${revenue.activeSubscriptions ?? 0} aktive Abos`
-                : "STRIPE_SECRET_KEY im Server hinterlegen für Live-Einnahmen."
+                : data?.revenue?.status === "error"
+                  ? ((data.revenue as { error?: string }).error ?? "Stripe ist verbunden, aber der Revenue-Lesezugriff ist eingeschränkt.")
+                  : "Stripe-Live-Key im Server hinterlegen für Live-Einnahmen."
             }
           />
 
@@ -437,7 +440,7 @@ export default function BusinessDashboardScreen() {
             title="Content & KI-Dienste"
             tone={activeChannels > 0 || activeAiServices > 0 ? "ok" : "warn"}
             value={`${activeChannels}/${channels.length} Kanäle · ${activeAiServices}/${aiServices.length} KI-Dienste`}
-            detail={integrationsDetail || "TikTok/Instagram-Keys und Perplexity/ElevenLabs hinterlegen."}
+            detail={integrationsDetail || "Noch keine Social- oder KI-Route aktiv. Zero-Cost-LLM-Routen und Publishing-Verbindungen werden hier automatisch mitgezählt."}
           />
 
           <Tile
@@ -456,6 +459,7 @@ export default function BusinessDashboardScreen() {
           ) : null}
 
           {data?.revenueOs ? <RevenueOsTile data={data.revenueOs} /> : null}
+          <RevenueAutopilotCard />
 
           {isAdmin && meteringQuery.data ? <MeteringTile overview={meteringQuery.data} /> : null}
 

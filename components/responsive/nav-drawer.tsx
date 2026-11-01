@@ -1,68 +1,188 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { AiCore } from "@/components/glass/ai-core";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-/** Sprint 184 — Glass-Tokens statt useColors. */
-import { glassDepth, glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { useGlassTheme, type RuntimeGlassTheme } from "@/lib/design/future-glass-runtime";
 import { DRAWER_ITEMS, resolveActiveDrawerItem } from "@/lib/nav-drawer-logic";
+import { groupDrawerItems } from "@/lib/drawer-sections-logic";
+import { filterDrawerItems } from "@/lib/drawer-search-logic";
+import { isDrawerSectionCollapsed, toggleDrawerSection, type DrawerCollapseState } from "@/lib/drawer-collapse-logic";
+import { RECENT_DRAWER_STORAGE_KEY, parseRecentRoutes, recordRecentRoute } from "@/lib/drawer-recent-logic";
+import type { DrawerRoute } from "@/lib/nav-drawer-logic";
+import { useMobileReadiness } from "@/hooks/use-mobile-readiness";
 
 export function NavDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   const activeItem = useMemo(() => resolveActiveDrawerItem(pathname), [pathname]);
+  const readiness = useMobileReadiness();
+  const [search, setSearch] = useState("");
+  const [collapsedSections, setCollapsedSections] = useState<DrawerCollapseState>({});
+  const [recentRoutes, setRecentRoutes] = useState<DrawerRoute[]>([]);
+  const sections = useMemo(() => groupDrawerItems(filterDrawerItems(search)), [search]);
+  const dismiss = useCallback(() => {
+    setSearch("");
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    let mounted = true;
+    void AsyncStorage.getItem(RECENT_DRAWER_STORAGE_KEY)
+      .then((raw) => { if (mounted) setRecentRoutes(parseRecentRoutes(raw)); })
+      .catch(() => { if (mounted) setRecentRoutes([]); });
+    return () => { mounted = false; };
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return undefined;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
+      dismiss();
       return true;
     });
     return () => subscription.remove();
-  }, [visible, onClose]);
+  }, [visible, dismiss]);
 
   const select = useCallback(
     (route: string) => {
-      onClose();
+      const nextRecent = recordRecentRoute(recentRoutes, route);
+      setRecentRoutes(nextRecent);
+      void AsyncStorage.setItem(RECENT_DRAWER_STORAGE_KEY, JSON.stringify(nextRecent)).catch(() => {});
+      dismiss();
       if (route !== pathname) router.push(route as never);
     },
-    [onClose, pathname, router],
+    [dismiss, pathname, recentRoutes, router],
   );
 
   return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose} accessibilityLabel="Navigationsmenü">
-      <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={onClose} style={styles.backdrop}>
-        <View style={[styles.panel, { paddingTop: Math.max(insets.top, 18), paddingBottom: Math.max(insets.bottom, 18) }]}>
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={dismiss} accessibilityLabel="Navigationsmenü">
+      <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={dismiss} style={styles.backdrop}>
+        <Pressable
+          accessibilityRole="none"
+          onPress={(event) => event.stopPropagation()}
+          style={[styles.panel, { paddingTop: Math.max(insets.top, 18), paddingBottom: Math.max(insets.bottom, 18) }]}
+        >
           <View style={styles.brandRow}>
-            <View style={styles.brandBadge}><Text style={styles.brandBadgeText}>CS</Text></View>
+            <AiCore size={40} state="idle" />
             <View style={styles.brandCopy}>
-              <Text style={styles.brandTitle}>CYBER<Text style={{ color: glassPalette.cyan }}>SARAH</Text></Text>
-              <Text style={styles.brandSubtitle}>Control Center</Text>
+              <Text style={styles.brandEyebrow}>AI CONTROL CENTER</Text>
+              <Text style={styles.brandTitle}>Cyber<Text style={{ color: glass.glassPalette.cyan }}>Sarah</Text></Text>
+              <Text style={styles.brandSubtitle}>Autonomous Operations</Text>
             </View>
+            <Pressable accessibilityLabel="Menü schließen" accessibilityRole="button" onPress={dismiss} hitSlop={8} style={styles.closeButton}>
+              <IconSymbol name="xmark" size={18} color={glass.glassSurface.textSecondary} />
+            </Pressable>
           </View>
+
           <View style={styles.divider} />
-          {DRAWER_ITEMS.map((item) => {
-            const active = activeItem?.route === item.route;
-            return (
-              <Pressable key={item.route} accessibilityLabel={`${item.title} öffnen`} accessibilityRole="link" onPress={() => select(item.route)} style={({ pressed }) => [styles.item, active && styles.itemActive, pressed && { opacity: 0.7 }]}>
-                <IconSymbol name={item.icon} size={20} color={active ? glassPalette.cyan : glassSurface.textSecondary} />
-                <Text numberOfLines={1} style={[styles.itemTitle, active && { color: glassPalette.cyan }]}>{item.title}</Text>
-                {item.badge ? <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View> : null}
-              </Pressable>
-            );
-          })}
-        </View>
+          <TextInput
+            accessibilityLabel="Menüpunkte durchsuchen"
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            placeholder="Bereich suchen …"
+            placeholderTextColor={glass.glassSurface.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            style={styles.searchInput}
+          />
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {!search.trim() && recentRoutes.length > 0 ? (
+              <View style={styles.sectionBlock}>
+                <Text accessibilityRole="header" style={styles.sectionLabel}>ZULETZT GEÖFFNET</Text>
+                <View style={styles.quickLinks}>
+                  {recentRoutes.map((route) => {
+                    const item = DRAWER_ITEMS.find((candidate) => candidate.route === route);
+                    if (!item) return null;
+                    return (
+                      <Pressable key={route} onPress={() => select(route)} accessibilityRole="link"
+                        accessibilityLabel={`${item.title} erneut öffnen`}
+                        style={({ pressed }) => [styles.quickLink, pressed && styles.itemPressed]}>
+                        <IconSymbol name={item.icon} color={glass.glassPalette.cyan} size={16} />
+                        <Text numberOfLines={1} style={styles.quickLinkText}>{item.title}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+            {sections.length === 0 ? (
+              <Text accessibilityRole="text" style={styles.emptyMessage}>Keine Bereiche gefunden. Andere Suche versuchen.</Text>
+            ) : null}
+            {sections.map((section) => (
+              <View key={section.key} style={styles.sectionBlock}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${section.title} ${isDrawerSectionCollapsed(collapsedSections, section.key, search) ? "aufklappen" : "einklappen"}`}
+                  accessibilityState={{ expanded: !isDrawerSectionCollapsed(collapsedSections, section.key, search) }}
+                  disabled={Boolean(search.trim())}
+                  onPress={() => setCollapsedSections((current) => toggleDrawerSection(current, section.key))}
+                  style={styles.sectionHeader}
+                >
+                  <Text style={styles.sectionLabel}>{section.title}</Text>
+                  <IconSymbol name="chevron.right" size={18} color={glass.glassSurface.textMuted}
+                    style={{ transform: [{ rotate: isDrawerSectionCollapsed(collapsedSections, section.key, search) ? "0deg" : "90deg" }] }} />
+                </Pressable>
+                {!isDrawerSectionCollapsed(collapsedSections, section.key, search) ? (
+                <View style={styles.sectionItems}>
+                {section.items.map((item) => {
+              const active = activeItem?.route === item.route;
+              return (
+                <Pressable
+                  key={item.route}
+                  accessibilityLabel={`${item.title} öffnen`}
+                  accessibilityRole="link"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => select(item.route)}
+                  style={({ pressed }) => [styles.item, active && styles.itemActive, pressed && styles.itemPressed]}
+                >
+                  {active ? <View style={styles.activeRail} /> : null}
+                  <View style={[styles.iconWrap, active && styles.iconWrapActive]}>
+                    <IconSymbol name={item.icon} size={19} color={active ? glass.glassPalette.cyan : glass.glassSurface.textSecondary} />
+                  </View>
+                  <Text numberOfLines={1} style={[styles.itemTitle, active && styles.itemTitleActive]}>{item.title}</Text>
+                  {item.badge ? <View style={styles.badge}><Text style={styles.badgeText}>{item.badge}</Text></View> : null}
+                </Pressable>
+              );
+                })}
+                </View>
+                ) : null}
+              </View>
+            ))}
+          </ScrollView>
+
+          <Pressable
+            style={styles.footer}
+            accessibilityRole="button"
+            accessibilityLabel={`API- und Datenbankstatus: ${readiness.view.detail} ${readiness.isChecking ? "Prüfung läuft." : "Erneut prüfen."}`}
+            accessibilityState={{ busy: readiness.isChecking, disabled: readiness.isChecking }}
+            disabled={readiness.isChecking}
+            onPress={readiness.refresh}
+          >
+            <View style={[styles.footerDot, { backgroundColor: glass.glassPalette[readiness.view.accent] }]} />
+            <Text style={styles.footerText}>API + Datenbank · {readiness.view.label}</Text>
+            <IconSymbol name="arrow.clockwise" size={16} color={glass.glassSurface.textSecondary} />
+          </Pressable>
+        </Pressable>
       </Pressable>
     </Modal>
   );
 }
 
 export function NavDrawerButton({ onPress, tint }: { onPress: () => void; tint?: string }) {
+  const glass = useGlassTheme();
+  const styles = useMemo(() => createStyles(glass), [glass]);
   return (
-    <Pressable accessibilityLabel="Menü öffnen" accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.hamburger, pressed && { opacity: 0.6 }]}>
-      <IconSymbol name="line.3.horizontal" size={22} color={tint ?? glassSurface.textPrimary} />
+    <Pressable accessibilityLabel="Menü öffnen" accessibilityHint="Öffnet die Navigation mit allen App-Bereichen" accessibilityRole="button" onPress={onPress} hitSlop={4} style={({ pressed }) => [styles.hamburger, pressed && styles.itemPressed]}>
+      <IconSymbol name="line.3.horizontal" size={21} color={tint ?? glass.glassSurface.textPrimary} />
     </Pressable>
   );
 }
@@ -74,24 +194,119 @@ export function useNavDrawer() {
   return { visible, open, close, hamburgerProps: { onPress: open } as const, drawerProps: { visible, onClose: close } as const };
 }
 
-function createStyles() {
-  return StyleSheet.create({
-    backdrop: { flex: 1, backgroundColor: `${glassDepth.void}B8`, flexDirection: "row" },
-    panel: { backgroundColor: glassDepth.void, borderRightColor: glassSurface.border, borderRightWidth: 1, maxWidth: 300, shadowColor: glassPalette.cyan, shadowOpacity: 0.45, shadowRadius: 28, width: "82%" },
-    brandRow: { alignItems: "center", flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 8 },
-    brandBadge: { alignItems: "center", backgroundColor: `${glassPalette.cyan}22`, borderColor: `${glassPalette.cyan}88`, borderRadius: 14, borderWidth: 1, height: 38, justifyContent: "center", width: 38 },
-    brandBadgeText: { color: glassPalette.cyan, fontSize: 14, fontWeight: "900" },
-    brandCopy: { flex: 1 },
-    brandTitle: { color: glassSurface.textPrimary, fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
-    brandSubtitle: { color: glassSurface.textSecondary, fontSize: 10, fontWeight: "600", letterSpacing: 1.2, marginTop: 1 },
-    divider: { backgroundColor: glassSurface.border, height: 1, marginHorizontal: 14, marginVertical: 10 },
-    item: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 46, paddingHorizontal: 18 },
-    itemActive: { backgroundColor: `${glassPalette.cyan}14`, borderLeftColor: glassPalette.cyan, borderLeftWidth: 2 },
-    itemTitle: { color: glassSurface.textSecondary, flex: 1, fontSize: 14, fontWeight: "600" },
-    badge: { backgroundColor: `${glassPalette.cyan}22`, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-    badgeText: { color: glassPalette.cyan, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
-    hamburger: { alignItems: "center", backgroundColor: `${glassPalette.cyan}24`, borderColor: `${glassPalette.cyan}59`, borderRadius: 12, borderWidth: 1, height: 40, justifyContent: "center", width: 40 },
-  });
-}
-
-const styles = createStyles();
+const createStyles = (glass: RuntimeGlassTheme) => StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: glass.glassOverlay.dark,
+    flexDirection: "row",
+  },
+  panel: {
+    backgroundColor: glass.glassDepth.abyss,
+    borderRightColor: glass.glassSurface.border,
+    borderRightWidth: 1,
+    maxWidth: 330,
+    shadowColor: glass.glassPalette.cyan,
+    shadowOpacity: 0.28,
+    shadowRadius: 28,
+    shadowOffset: { width: 8, height: 0 },
+    width: "88%",
+  },
+  brandRow: { alignItems: "center", flexDirection: "row", gap: 11, paddingHorizontal: 16, paddingVertical: 10 },
+  brandCopy: { flex: 1 },
+  brandEyebrow: { color: glass.glassPalette.cyan, fontSize: 8, fontWeight: "900", letterSpacing: 1.3 },
+  brandTitle: { color: glass.glassSurface.textPrimary, fontSize: 17, fontWeight: "900", letterSpacing: 0.3, marginTop: 1 },
+  brandSubtitle: { color: glass.glassSurface.textSecondary, fontSize: 10, fontWeight: "600", marginTop: 1 },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: glass.glassSurface.card,
+    borderWidth: 1,
+    borderColor: glass.glassSurface.border,
+  },
+  divider: { backgroundColor: glass.glassSurface.border, height: 1, marginHorizontal: 16, marginVertical: 10 },
+  sectionLabel: {
+    color: glass.glassSurface.textMuted,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+    paddingHorizontal: 18,
+    marginBottom: 6,
+  },
+  searchInput: {
+    backgroundColor: glass.glassSurface.card,
+    borderColor: glass.glassSurface.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    color: glass.glassSurface.textPrimary,
+    fontSize: 14,
+    minHeight: 44,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+  },
+  emptyMessage: { color: glass.glassSurface.textSecondary, fontSize: 13, padding: 14, lineHeight: 20 },
+  list: { gap: 12, paddingHorizontal: 10, paddingBottom: 18 },
+  sectionBlock: { gap: 5 },
+  quickLinks: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingHorizontal: 7 },
+  quickLink: { minHeight: 44, maxWidth: "100%", paddingHorizontal: 10, flexDirection: "row", gap: 6, alignItems: "center", borderRadius: 11, borderWidth: 1, borderColor: glass.accentAlpha("cyan", 0.24), backgroundColor: glass.accentAlpha("cyan", 0.07) },
+  quickLinkText: { color: glass.glassSurface.textPrimary, fontSize: 12, fontWeight: "700", flexShrink: 1 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44, paddingRight: 12 },
+  sectionItems: { gap: 5 },
+  item: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 48,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
+    borderRadius: 14,
+    position: "relative",
+    overflow: "hidden",
+  },
+  itemActive: {
+    backgroundColor: glass.accentAlpha("cyan", 0.09),
+    borderColor: glass.accentAlpha("cyan", 0.22),
+  },
+  itemPressed: { opacity: 0.72 },
+  activeRail: {
+    position: "absolute",
+    left: 0,
+    top: 10,
+    bottom: 10,
+    width: 3,
+    borderRadius: 3,
+    backgroundColor: glass.glassPalette.cyan,
+  },
+  iconWrap: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  iconWrapActive: { backgroundColor: glass.accentAlpha("cyan", 0.1) },
+  itemTitle: { color: glass.glassSurface.textSecondary, flex: 1, fontSize: 13, fontWeight: "600" },
+  itemTitleActive: { color: glass.glassSurface.textPrimary, fontWeight: "800" },
+  badge: { backgroundColor: glass.accentAlpha("purple", 0.14), borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { color: glass.glassPalette.purple, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+  footer: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: glass.glassSurface.border,
+  },
+  footerDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: glass.glassPalette.cyan },
+  footerText: { color: glass.glassSurface.textMuted, fontSize: 9, fontWeight: "700" },
+  hamburger: {
+    alignItems: "center",
+    backgroundColor: glass.accentAlpha("cyan", 0.08),
+    borderColor: glass.accentAlpha("cyan", 0.22),
+    borderRadius: 13,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    minWidth: 44,
+  },
+});

@@ -9,6 +9,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { invokeLLM, resetManagedKeyPoolForTests } from "../server/_core/llm";
+// Root-Cause-Fix (Serie G): Modul-Spiegel des Rotations-Agenten und Quarantaene-
+// Registry muessen JEDEM Test-Start sauber sein — bei isolate:false leaken
+// sonst Zustaende aus Parallel-Dateien in diese Suite (Sprint-85-Flaky).
+import { resetRouteRotationStateForTests } from "../server/_core/route-rotation-state";
+import { resetProviderQuarantineForTests } from "../lib/live-fix-logic";
 
 type Call = { url: string; body: Record<string, unknown> };
 
@@ -26,7 +31,12 @@ const fakeResponse = (status: number, body: unknown) =>
 const GEMINI_URL = "generativelanguage.googleapis.com";
 const OPENAI_URL = "api.openai.com";
 
-describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
+describe(
+  "invokeLLM mit autonomem Key-Pool (Sprint 85)",
+  // Echtes Exponential-Backoff in invokeLLM + parallele Suite-Last
+  // sprengten den 5s-Default-Timeout (Flaky unter Last, solo gruen).
+  { timeout: 30_000 },
+  () => {
   // Test-Isolation: invokeLLM sendet seit Sprint 196/210 bei Provider-
   // Failover Telegram-Warnungen — sobald Token + Chat-ID in der Env
   // stehen, wuerden diese zusaetzlichen Fetches die Call-Zaehler
@@ -39,6 +49,17 @@ describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
 
   beforeEach(() => {
     resetManagedKeyPoolForTests();
+    resetRouteRotationStateForTests();
+    resetProviderQuarantineForTests();
+    // Env-Reste aus Parallel-Dateien (z. B. AI_GROQ_API_KEY aus der
+    // Rotations-Agent-Suite) wuerden die Kette verlaengern — hier ehrlich
+    // loeschen statt nur im afterEach (das bereinigt nur EIGENE Sets).
+    delete process.env.AI_GROQ_API_KEY;
+    delete process.env.AI_OPENROUTER_API_KEY;
+    delete process.env.GROQ_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.AI_CUSTOM_API_KEY;
+    delete process.env.AI_CUSTOM_BASE_URL;
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.BUILT_IN_FORGE_API_URL;
     delete process.env.TELEGRAM_BOT_TOKEN;
@@ -58,6 +79,10 @@ describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
     delete process.env.AI_ALLOW_PAID_LLM_FALLBACK;
     delete process.env.GROQ_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
+    delete process.env.AI_GROQ_API_KEY;
+    delete process.env.AI_OPENROUTER_API_KEY;
+    delete process.env.AI_OLLAMA_BASE_URL;
+    delete process.env.AI_OLLAMA_MODEL;
     // Telegram-Env wiederherstellen, damit andere Suites/Host-Prozesse
     // unbeeinflusst bleiben.
     if (savedTelegramEnv.botToken !== undefined) {
@@ -143,8 +168,51 @@ describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
     expect(calls[0].url).toContain("api.groq.com");
     expect(calls[0].body.model).toBe("openai/gpt-oss-20b");
     expect(calls[1].url).toContain("openrouter.ai");
-    expect(calls[1].body.model).toBe("meta-llama/llama-3.3-70b-instruct:free");
+    expect(calls[1].body.model).toBe("openrouter/free"); // dynamischer Free-Router waehlt ein aktuell verfuegbares kompatibles Modell
     expect(calls.every((call) => !call.url.includes("api.openai.com"))).toBe(true);
+  });
+
+  it("faellt nach erschöpften Cloud-Free-Routen auf erreichbares Ollama zurück", async () => {
+    const calls: string[] = [];
+    delete process.env.AI_ALLOW_PAID_LLM_FALLBACK;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.AI_OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.AI_GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    process.env.AI_GROQ_API_KEY = "groq-cloud-exhausted";
+    process.env.AI_OLLAMA_BASE_URL = "http://ollama.test/v1";
+    process.env.AI_OLLAMA_MODEL = "qwen3.6:27b";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls.push(String(url));
+        if (String(url).includes("api.groq.com")) {
+          return fakeResponse(429, { error: { message: "quota exhausted" } });
+        }
+        if (String(url).endsWith("/models")) {
+          return fakeResponse(200, { data: [{ id: "qwen2.5:1.5b" }] });
+        }
+        if (String(url).includes("ollama.test")) {
+          return fakeResponse(200, {
+            model: "qwen2.5:1.5b",
+            choices: [{ index: 0, message: { role: "assistant", content: "lokal ok" }, finish_reason: "stop" }],
+          });
+        }
+        return fakeResponse(500, { error: "unexpected" });
+      }),
+    );
+
+    const result = await invokeLLM({ messages: [{ role: "user", content: "hi" }] });
+
+    expect(result).toMatchObject({ model: "qwen2.5:1.5b" });
+    expect(calls.some((url) => url.includes("api.groq.com"))).toBe(true);
+    expect(calls.some((url) => url === "http://ollama.test/v1/models")).toBe(true);
+    expect(calls.some((url) => url === "http://ollama.test/v1/chat/completions")).toBe(true);
+
+    delete process.env.AI_OLLAMA_BASE_URL;
+    delete process.env.AI_OLLAMA_MODEL;
   });
 
   it("wirft den letzten Fehler, wenn alle Keys der Kette scheitern", async () => {
@@ -160,6 +228,11 @@ describe("invokeLLM mit autonomem Key-Pool (Sprint 85)", () => {
     await expect(invokeLLM({ messages: [{ role: "user", content: "hi" }] })).rejects.toThrow(
       /LLM invoke failed: 429/,
     );
-    expect(calls.length).toBe(2);
+    // Cloud-Kette bleibt zuerst Gemini -> OpenAI. Danach darf Sprint 3
+    // zusaetzlich die kostenfreien lokalen Endpoints per /models pruefen.
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls[0].url).toContain(GEMINI_URL);
+    expect(calls[1].url).toContain(OPENAI_URL);
+    expect(calls.slice(2).every((call) => call.url.endsWith("/models"))).toBe(true);
   });
 });

@@ -1,3 +1,12 @@
+export const DEFAULT_WORKSPACE_SERVICE_URL = "https://cybersarah-workspace.onrender.com";
+
+function resolveWorkspaceServiceUrl(): string {
+  const configured = process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/+$/, "");
+  return configured && /^https?:\/\//.test(configured)
+    ? configured
+    : DEFAULT_WORKSPACE_SERVICE_URL;
+}
+
 /**
  * Laufzeit-Umgebung (Sprint 187: dynamische Getter).
  *
@@ -34,6 +43,10 @@ export const ENV = {
   },
   get forgeApiKey() {
     return process.env.BUILT_IN_FORGE_API_KEY ?? "";
+  },
+  /** Sprint 84/202 — zentrale, validierte Workspace-Service-Adresse. */
+  get workspaceServiceUrl() {
+    return resolveWorkspaceServiceUrl();
   },
   /** Sprint 196 — Telegram-Bot-Token fuer Betriebsmeldungen (optional). */
   get telegramBotToken() {

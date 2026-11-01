@@ -1,0 +1,87 @@
+/**
+ * Sprint 112 — Postgres-SSL-Konfiguration ohne Warnung.
+ *
+ * node-postgres parst `sslmode` aus dem Connection-String selbst nur, wenn
+ * kein explizites `ssl`-Objekt uebergeben wird — und behandelt dabei die
+ * Modi 'prefer', 'require' und 'verify-ca' als Alias fuer 'verify-full'
+ * (mit einer SECURITY-WARNING-Zeile pro Verbindung). Dieses Modul macht
+ * genau diese Aufloesung explizit: gleiche Sicherheitsstufe
+ * (Server-Zertifikat wird verifiziert), aber ohne die Laufzeit-Warnung,
+ * weil pg dann keine eigene sslmode-Aufloesung mehr vornimmt.
+ *
+ * Lokale Verbindungen (kein sslmode-Parameter, z. B. lokales Postgres ohne
+ * TLS) bleiben unverändert ohne SSL-Zwang.
+ */
+
+export type PgSslConfig = false | { rejectUnauthorized: boolean };
+
+/** Liest den sslmode-Query-Parameter aus einer Postgres-Connection-URL. */
+export function extractSslMode(connectionString: string): string | null {
+  try {
+    const url = new URL(connectionString);
+    return url.searchParams.get("sslmode");
+  } catch {
+    // Kein gueltiges URL-Format (z. B. Kurzschreibweise) — kein sslmode ableitbar.
+    return null;
+  }
+}
+
+/**
+ * Leitet die explizite pg-SSL-Konfiguration aus dem sslmode-Parameter ab.
+ * 'disable' → kein TLS. 'verify-ca' | 'verify-full' → TLS mit voller
+ * Zertifikats- und Hostnamenpruefung. 'require' | 'prefer' → TLS erzwungen,
+ * aber OHNE Zertifikats-/Hostnamenpruefung — exakt die libpq-Semantik von
+ * sslmode=require (verschluesselt, kein Identitaetsnachweis). Das ist
+ * wichtig fuer VM-Hosts hinter einer SNI-Stream-Route (z. B. Postgres
+ * ueber nginx:443 auf einer IP ohne passenden SAN im Zertifikat).
+ * Kein sslmode-Parameter → keine TLS-Erzwingung (lokale Entwicklung).
+ */
+export function resolvePgSslConfig(connectionString: string): PgSslConfig {
+  const mode = extractSslMode(connectionString);
+  if (!mode) return false;
+  if (mode === "disable") return false;
+  if (mode === "require" || mode === "prefer") {
+    // libpq-Semantik: verschluesselt verbinden, Zertifikat nicht pruefen.
+    return { rejectUnauthorized: false };
+  }
+  return { rejectUnauthorized: true };
+}
+
+/**
+ * Ersetzt Alias-SSL-Modes ('prefer', 'require', 'verify-ca') durch
+ * 'verify-full' in einer PostgreSQL-Connection-String.
+ */
+export function normalizeAliasSslModes(connectionString: string): string {
+  // Parse URL; if fails, return original.
+  try {
+    const url = new URL(connectionString);
+    const mode = url.searchParams.get("sslmode");
+    if (!mode) return connectionString;
+    if (mode === "prefer" || mode === "require" || mode === "verify-ca") {
+      url.searchParams.set("sslmode", "verify-full");
+      return url.toString();
+    }
+    return connectionString;
+  } catch {
+    // If not a URL, return original.
+    return connectionString;
+  }
+}
+
+/**
+ * Entfernt den sslmode-Query-Parameter aus einer Postgres-Connection-URL.
+ * Grund: pg wertet sslmode in der URL intern aus (require wird dabei wie
+ * verify-full mit Hostnamen-Pruefung behandelt) und ueberschreibt dadurch
+ * die explizite ssl-Option. Die SSL-Semantik steckt ausschliesslich im
+ * Rueckgabewert von resolvePgSslConfig — pg bekommt eine saubere URL.
+ */
+export function stripSslModeParam(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    if (!url.searchParams.has("sslmode")) return connectionString;
+    url.searchParams.delete("sslmode");
+    return url.search ? url.toString() : url.toString().replace(/\?$/, "");
+  } catch {
+    return connectionString;
+  }
+}

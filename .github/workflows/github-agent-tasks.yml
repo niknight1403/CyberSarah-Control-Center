@@ -1,0 +1,33 @@
+name: GitHub-Agenten-Tasks
+
+# Nachtmission 2026-10-03: Der stündliche Schedule ist deaktiviert.
+# Begründung: Der Workflow referenziert modules/github-agent/agent-tasks,
+# das in diesem Repository nie existiert hat, und installiert pnpm auf
+# Runner-Images ohne pnpm — er fiel dadurch jede Stunde aus (CI rot,
+# verschwendete Actions-Minuten). Der stündliche Cron bleibt aus, bis das
+# Modul tatsächlich gebaut ist. Manuell auslösbar bleibt der Workflow.
+on:
+  workflow_dispatch:     # Manuelle Auslösung
+
+jobs:
+  run-agent-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Run Agent Tasks
+        run: node -e "require('./modules/github-agent/agent-tasks').assignTasks();"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

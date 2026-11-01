@@ -57,7 +57,15 @@ function containsAllTerms(haystack: string, terms: string[]): boolean {
   return terms.every((term) => haystack.includes(term));
 }
 
-/** Bewertet einen Treffer: Termanzahl > Vorkommnisse > Aktualitaet. */
+/**
+ * Bewertet einen Treffer: Termanzahl > Vorkommnisse > Term-Naehe > Titel > Aktualitaet.
+ *
+ * Sprint 201: Der reine Aktualitaets-Bonus liess aeltere Treffer nach ~5 Wochen
+ * gleich aufpunkten (datumsabhaengiger Test-Fail am 18.10.2026). Die Bewertung
+ * ist jetzt durch den Naehe-Bonus deterministisch: Terme, die im Text dicht
+ * beieinanderstehen ("Render und Neon zusammen"), sind staerkere Treffer als
+ * weit verstreute ("Render kurz. Neon.").
+ */
 export function scoreMessage(message: SearchableMessage, terms: string[]): number {
   const content = message.content.toLowerCase();
   const title = message.title.toLowerCase();
@@ -66,12 +74,31 @@ export function scoreMessage(message: SearchableMessage, terms: string[]): numbe
     0,
   );
   const titleBonus = terms.some((term) => title.includes(term)) ? 8 : 0;
+
+  // Term-Naehe: minimaler Abstand zwischen den ersten Vorkommnissen je Termepaar.
+  let naeheBonus = 0;
+  if (terms.length >= 2) {
+    const positionen = terms
+      .map((term) => content.indexOf(term))
+      .filter((index) => index >= 0);
+    if (positionen.length >= 2) {
+      let minAbstand = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < positionen.length; i++) {
+        for (let j = i + 1; j < positionen.length; j++) {
+          const abstand = Math.abs(positionen[i]! - positionen[j]!);
+          if (abstand < minAbstand) minAbstand = abstand;
+        }
+      }
+      naeheBonus = Math.max(0, 20 - minAbstand);
+    }
+  }
+
   const ageDays = Math.max(
     0,
     (Date.now() - new Date(message.createdAt).getTime()) / 86_400_000,
   );
   const recencyBonus = Math.max(0, 5 - ageDays / 7);
-  return terms.length * 4 + occurrenceCount + titleBonus + recencyBonus;
+  return terms.length * 4 + occurrenceCount + naeheBonus + titleBonus + recencyBonus;
 }
 
 /** Kompakter Schnipsel um den ersten Treffer (woerterbewusst, deterministisch). */

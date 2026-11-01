@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
+import { ENV } from "./_core/env";
 import { detectConfiguredProviders, type RouterProviderId } from "../lib/model-router-logic";
 import { getRouterHealth , getRouterSnapshot } from "./model-router";
 import {
@@ -14,6 +15,10 @@ import {
 } from "./runtime-logger";
 import { getTelegramStatus } from "./_core/telegram";
 import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
+import { getRouteRotationStatus } from "./route-rotation-agent";
+import { getAdministratorStripeHealth } from "./stripe-admin-health";
+import { readStripeAdminCatalog } from "./stripe-catalog-readonly";
+import { queueStripeProductCampaign } from "./stripe-product-content-bridge";
 
 /**
  * Sprint 66 — appStatusRouter: Laufzeit-Status und Konsolen-Logs als
@@ -27,7 +32,7 @@ import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 const BOOT_AT = Date.now();
 
 async function pingWorkspace(): Promise<number | null> {
-  const baseUrl = process.env.WORKSPACE_SERVICE_URL?.replace(/\/$/, "");
+  const baseUrl = ENV.workspaceServiceUrl;
   if (!baseUrl) return null;
   const started = Date.now();
   try {
@@ -42,6 +47,15 @@ async function pingWorkspace(): Promise<number | null> {
 }
 
 export const appStatusRouter = router({
+  stripeCampaignDraft: adminProcedure.input(z.object({
+    productId: z.string().regex(/^prod_[A-Za-z0-9]+$/).max(90),
+    personaId: z.enum(["nova","mira","juno","lina","kaya","zara"]).default("nova"),
+    platform: z.enum(["instagram","tiktok","linkedin","x","threads","bluesky"]).default("instagram"),
+  })).mutation(({input}) => queueStripeProductCampaign(input)),
+  stripeCatalog: adminProcedure.query(async () => {
+    try { return await readStripeAdminCatalog(); }
+    catch { throw new Error("Stripe-Produktkatalog derzeit nicht lesbar. Admin-Konfiguration und Rechte pruefen."); }
+  }),
   /**
    * Sprint 196 — Aggregierter Integrations-Status fuer die Admin-UI:
    * LLM-Routen (Health/Reihenfolge), Telegram-Bruecke (maskiert) und
@@ -51,6 +65,10 @@ export const appStatusRouter = router({
     const snapshot = await getRouterSnapshot();
     const telegram = getTelegramStatus();
     const queue = getToolProxyQueueMetrics();
+    const rotation = await getRouteRotationStatus();
+    const stripe = await getAdministratorStripeHealth();
+    const configuredRoutes = rotation.routes.filter((route) => route.configured);
+    const healthyRoutes = configuredRoutes.filter((route) => route.healthy);
     return {
       llm: {
         healthy: snapshot.health.filter((provider) => provider.status === "ready").length,
@@ -59,7 +77,18 @@ export const appStatusRouter = router({
         preferredOrder: snapshot.preferredOrder,
         checkedAt: snapshot.now,
       },
+      routeRotation: {
+        enabled: rotation.enabled,
+        primary: rotation.primary,
+        forced: rotation.forced,
+        lastTickAt: rotation.lastTickAt,
+        configured: configuredRoutes.length,
+        healthy: healthyRoutes.length,
+        recentAction: rotation.ledger[0]?.action ?? "keep",
+        recentReason: rotation.ledger[0]?.reason ?? null,
+      },
       telegram,
+      stripe,
       queue,
       mcp: {
         configured: Boolean(process.env.MCP_SERVER_URL?.trim()),

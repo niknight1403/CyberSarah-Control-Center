@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberSarah — Design-Auswahl</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', system-ui, sans-serif; background: #111; color: #fff; padding: 16px; }
+h1 { text-align: center; margin: 16px 0 24px; font-size: 20px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 800px; margin: 0 auto; }
+.card { border-radius: 20px; overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; text-decoration: none; color: inherit; }
+.card:hover { transform: scale(1.03); box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+.card img { width: 100%; height: auto; display: block; }
+.card .label { padding: 12px 16px; font-weight: 600; font-size: 14px; text-align: center; }
+.phone { width: 100%; aspect-ratio: 9/16; border-radius: 32px; padding: 12px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+/* DESIGN 1: Clean Blue */
+.d1 { background: #f8fafc; }
+.d1 .top { background: #2563eb; color: #fff; padding: 16px; border-radius: 16px; margin-bottom: 12px; }
+.d1 .kpi-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.d1 .kpi { flex: 1; background: #fff; border-radius: 12px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.d1 .kpi .num { font-size: 18px; font-weight: 700; color: #1e293b; }
+.d1 .kpi .lbl { font-size: 9px; color: #64748b; margin-top: 2px; }
+.d1 .chart { flex: 1; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); position: relative; overflow: hidden; }
+.d1 .chart svg { width: 100%; height: 80%; }
+.d1 .nav { display: flex; justify-content: space-around; background: #fff; border-radius: 16px; padding: 10px 0; margin-top: 12px; box-shadow: 0 -2px 8px rgba(0,0,0,0.04); }
+.d1 .nav-item { text-align: center; font-size: 8px; color: #94a3b8; }
+.d1 .nav-item.active { color: #2563eb; }
+.d1 .nav-item svg { display: block; margin: 0 auto 2px; }
+
+/* DESIGN 2: Dark Elegant */
+.d2 { background: #0c0a1a; color: #e2e8f0; }
+.d2 .top { background: linear-gradient(135deg, #1a1040, #0c2340); padding: 16px; border-radius: 16px; margin-bottom: 12px; border: 1px solid rgba(99,102,241,0.2); }
+.d2 .kpi-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.d2 .kpi { flex: 1; background: rgba(30,27,50,0.8); border-radius: 12px; padding: 12px 8px; text-align: center; border: 1px solid rgba(99,102,241,0.15); }
+.d2 .kpi .num { font-size: 18px; font-weight: 700; color: #818cf8; }
+.d2 .kpi .lbl { font-size: 9px; color: #64748b; margin-top: 2px; }
+.d2 .chart { flex: 1; background: rgba(30,27,50,0.8); border-radius: 16px; padding: 16px; border: 1px solid rgba(99,102,241,0.15); }
+.d2 .chart svg { width: 100%; height: 80%; }
+.d2 .nav { display: flex; justify-content: space-around; background: rgba(30,27,50,0.9); border-radius: 16px; padding: 10px 0; margin-top: 12px; border: 1px solid rgba(99,102,241,0.15); }
+.d2 .nav-item { text-align: center; font-size: 8px; color: #64748b; }
+.d2 .nav-item.active { color: #818cf8; }
+
+/* DESIGN 3: Warm Orange */
+.d3 { background: #fffbf5; color: #1c1917; }
+.d3 .top { background: linear-gradient(135deg, #ea580c, #f97316); color: #fff; padding: 16px; border-radius: 16px; margin-bottom: 12px; }
+.d3 .kpi-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.d3 .kpi { flex: 1; background: #fff; border-radius: 12px; padding: 12px 8px; text-align: center; box-shadow: 0 2px 8px rgba(234,88,12,0.08); }
+.d3 .kpi .num { font-size: 18px; font-weight: 700; color: #ea580c; }
+.d3 .kpi .lbl { font-size: 9px; color: #a8a29e; margin-top: 2px; }
+.d3 .chart { flex: 1; background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(234,88,12,0.08); }
+.d3 .chart svg { width: 100%; height: 80%; }
+.d3 .nav { display: flex; justify-content: space-around; background: #fff; border-radius: 16px; padding: 10px 0; margin-top: 12px; box-shadow: 0 -2px 8px rgba(234,88,12,0.04); }
+.d3 .nav-item { text-align: center; font-size: 8px; color: #a8a29e; }
+.d3 .nav-item.active { color: #ea580c; }
+
+/* DESIGN 4: Glassmorphism Dark */
+.d4 { background: linear-gradient(180deg, #0a0a0a, #1a0a2e); color: #f0f0f0; }
+.d4 .top { background: rgba(255,255,255,0.06); backdrop-filter: blur(20px); padding: 16px; border-radius: 16px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1); }
+.d4 .kpi-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.d4 .kpi { flex: 1; background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-radius: 12px; padding: 12px 8px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.d4 .kpi .num { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.d4 .kpi .lbl { font-size: 9px; color: #888; margin-top: 2px; }
+.d4 .chart { flex: 1; background: rgba(255,255,255,0.04); backdrop-filter: blur(10px); border-radius: 16px; padding: 16px; border: 1px solid rgba(255,255,255,0.08); }
+.d4 .chart svg { width: 100%; height: 80%; }
+.d4 .nav { display: flex; justify-content: space-around; background: rgba(255,255,255,0.06); backdrop-filter: blur(20px); border-radius: 16px; padding: 10px 0; margin-top: 12px; border: 1px solid rgba(255,255,255,0.1); }
+.d4 .nav-item { text-align: center; font-size: 8px; color: #888; }
+.d4 .nav-item.active { color: #06b6d4; }
+
+.name { font-size: 11px; color: #888; text-align: center; margin-top: 8px; }
+@media (max-width: 500px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>🎨 CyberSarah — Design-Auswahl</h1>
+<p style="text-align:center;color:#888;margin-bottom:24px;font-size:13px;">Tippe auf ein Design, um es groß zu sehen</p>
+
+<div class="grid">
+<!-- Design 1: Clean Blue -->
+<div class="card" onclick="this.querySelector('.phone').requestFullscreen?.()">
+  <div class="phone d1">
+    <div class="top">
+      <div style="font-size:11px;opacity:0.7">Willkommen zurück</div>
+      <div style="font-size:20px;font-weight:700">Dashboard</div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="num">€1.247</div><div class="lbl">Umsatz</div></div>
+      <div class="kpi"><div class="num">12</div><div class="lbl">Agenten</div></div>
+      <div class="kpi"><div class="num">89%</div><div class="lbl">Erfolg</div></div>
+    </div>
+    <div class="chart">
+      <svg viewBox="0 0 200 100"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2563eb" stop-opacity="0.3"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10 L200,100 L0,100Z" fill="url(#g1)"/><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10" fill="none" stroke="#2563eb" stroke-width="2"/></svg>
+      <div style="font-size:10px;color:#64748b;margin-top:4px">📈 Umsatzentwicklung</div>
+    </div>
+    <div class="nav">
+      <div class="nav-item active">🏠<br>Start</div>
+      <div class="nav-item">⚡<br>Sofort</div>
+      <div class="nav-item">🤖<br>HARA</div>
+      <div class="nav-item">📊<br>Stats</div>
+      <div class="nav-item">⚙️<br>Mehr</div>
+    </div>
+  </div>
+  <div class="label" style="background:#1e293b;color:#2563eb">1️⃣ Clean Blue — Stripe-Stil</div>
+</div>
+
+<!-- Design 2: Dark Elegant -->
+<div class="card" onclick="this.querySelector('.phone').requestFullscreen?.()">
+  <div class="phone d2">
+    <div class="top">
+      <div style="font-size:11px;opacity:0.6">Willkommen zurück</div>
+      <div style="font-size:20px;font-weight:700">Dashboard</div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="num">€1.247</div><div class="lbl">Umsatz</div></div>
+      <div class="kpi"><div class="num">12</div><div class="lbl">Agenten</div></div>
+      <div class="kpi"><div class="num">89%</div><div class="lbl">Erfolg</div></div>
+    </div>
+    <div class="chart">
+      <svg viewBox="0 0 200 100"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#818cf8" stop-opacity="0.3"/><stop offset="100%" stop-color="#818cf8" stop-opacity="0"/></linearGradient></defs><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10 L200,100 L0,100Z" fill="url(#g2)"/><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10" fill="none" stroke="#818cf8" stroke-width="2"/></svg>
+      <div style="font-size:10px;color:#64748b;margin-top:4px">📈 Umsatzentwicklung</div>
+    </div>
+    <div class="nav">
+      <div class="nav-item active">🏠<br>Start</div>
+      <div class="nav-item">⚡<br>Sofort</div>
+      <div class="nav-item">🤖<br>HARA</div>
+      <div class="nav-item">📊<br>Stats</div>
+      <div class="nav-item">⚙️<br>Mehr</div>
+    </div>
+  </div>
+  <div class="label" style="background:#1e1b3a;color:#818cf8">2️⃣ Dark Elegant — Indigo</div>
+</div>
+
+<!-- Design 3: Warm Orange -->
+<div class="card" onclick="this.querySelector('.phone').requestFullscreen?.()">
+  <div class="phone d3">
+    <div class="top">
+      <div style="font-size:11px;opacity:0.8">Willkommen zurück</div>
+      <div style="font-size:20px;font-weight:700">Dashboard</div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="num">€1.247</div><div class="lbl">Umsatz</div></div>
+      <div class="kpi"><div class="num">12</div><div class="lbl">Agenten</div></div>
+      <div class="kpi"><div class="num">89%</div><div class="lbl">Erfolg</div></div>
+    </div>
+    <div class="chart">
+      <svg viewBox="0 0 200 100"><defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ea580c" stop-opacity="0.3"/><stop offset="100%" stop-color="#ea580c" stop-opacity="0"/></linearGradient></defs><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10 L200,100 L0,100Z" fill="url(#g3)"/><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10" fill="none" stroke="#ea580c" stroke-width="2"/></svg>
+      <div style="font-size:10px;color:#a8a29e;margin-top:4px">📈 Umsatzentwicklung</div>
+    </div>
+    <div class="nav">
+      <div class="nav-item active">🏠<br>Start</div>
+      <div class="nav-item">⚡<br>Sofort</div>
+      <div class="nav-item">🤖<br>HARA</div>
+      <div class="nav-item">📊<br>Stats</div>
+      <div class="nav-item">⚙️<br>Mehr</div>
+    </div>
+  </div>
+  <div class="label" style="background:#292524;color:#ea580c">3️⃣ Warm Orange — Energetisch</div>
+</div>
+
+<!-- Design 4: Glass Dark -->
+<div class="card" onclick="this.querySelector('.phone').requestFullscreen?.()">
+  <div class="phone d4">
+    <div class="top">
+      <div style="font-size:11px;opacity:0.5">Willkommen zurück</div>
+      <div style="font-size:20px;font-weight:700">Dashboard</div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="num">€1.247</div><div class="lbl">Umsatz</div></div>
+      <div class="kpi"><div class="num">12</div><div class="lbl">Agenten</div></div>
+      <div class="kpi"><div class="num">89%</div><div class="lbl">Erfolg</div></div>
+    </div>
+    <div class="chart">
+      <svg viewBox="0 0 200 100"><defs><linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#06b6d4" stop-opacity="0.3"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10 L200,100 L0,100Z" fill="url(#g4)"/><path d="M0,80 Q30,60 50,55 T100,30 T150,20 T200,10" fill="none" stroke="url(#g4)" stroke-width="2"/></svg>
+      <div style="font-size:10px;color:#888;margin-top:4px">📈 Umsatzentwicklung</div>
+    </div>
+    <div class="nav">
+      <div class="nav-item active">🏠<br>Start</div>
+      <div class="nav-item">⚡<br>Sofort</div>
+      <div class="nav-item">🤖<br>HARA</div>
+      <div class="nav-item">📊<br>Stats</div>
+      <div class="nav-item">⚙️<br>Mehr</div>
+    </div>
+  </div>
+  <div class="label" style="background:#1a0a2e;color:#06b6d4">4️⃣ Glass Dark — Modern</div>
+</div>
+</div>
+
+<p style="text-align:center;color:#555;margin-top:32px;font-size:12px;">Sag mir die Nummer (1-4) deines Lieblings → Ich baue es dann ein!</p>
+</body>
+</html>

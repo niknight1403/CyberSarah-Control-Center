@@ -1,3 +1,4 @@
+import { resolveDeploymentInfo } from "../../lib/deployment-info";
 import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
 import compression from "compression";
@@ -5,6 +6,10 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { attachAnomalyDetector } from "../self-healing";
 import { startOptimizerLoop } from "../orchestrator/optimizer-loop";
+import { startPublishingAutopilot, getPublishingJobCard } from "../publishing-service";
+import { startChannelAutopilot } from "../channel-autopilot";
+import { getInfluencerLearningLoopStatus, startInfluencerLearningLoop } from "../influencer-learning-loop";
+import { buildPublishingCardPng, type IgRatioKey } from "../../lib/asset-card-logic";
 import {
   isWebFallbackCandidate,
   mapUrlPathToWebFile,
@@ -19,16 +24,30 @@ import { handleRotationWebhook , initProviderAdmin } from "../provider-admin";
 import { providerAdminIdSchema } from "../provider-admin-router";
 import { registerRenderProxy } from "./renderProxy";
 import { appRouter } from "../routers";
+import { getDb } from "../db";
+import { funnelCampaigns } from "../../drizzle/schema";
+import { eq, sql } from "drizzle-orm";
+import { renderLandingHtml, type LandingFunnelPayload } from "../../lib/digistore24-launch-logic";
 import { createContext } from "./context";
 import {
   createLiveBillingPortalSession,
   createLiveCheckoutSession,
   processStripeWebhook,
+  StripeWebhookSignatureError,
 } from "../billing";
 import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
+import { handleDigistore24Ipn } from "../digistore24-ipn";
+import { syncDigistore24Commissions } from "../digistore24-api";
+import { resolveDigistore24IpnSecret } from "../../lib/digistore24-ipn-config";
 import { checkDatabaseHealth } from "../db";
 import { restoreRouterState } from "../model-router";
+// Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
+import { restoreRouteRotationState } from "../route-rotation-agent";
+import { runDraftEngine } from "../draft-engine";
+import { runRevenueAutopilot } from "../revenue-autopilot";
+import { runControlCenterAutopilot } from "../control-center-autopilot";
+import { redactAutopilotLog } from "../../lib/autopilot-log-safety";
 import { metricsHandler, requestMetricsMiddleware } from "./observability";
 import {
   buildRuntimeStatusSnapshot,
@@ -39,6 +58,9 @@ import {
   installRuntimeLogger,
   subscribeRuntimeLogs,
 } from "../runtime-logger";
+import { agenticLoopTelemetryBus } from "../agentic-loop-telemetry";
+import { isValidLoopSessionId } from "../../lib/agentic-loop-telemetry-logic";
+import { registerAgentforgeTelemetryRoutes } from "../agentforge-telemetry";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
   try {
@@ -76,8 +98,16 @@ async function startServer() {
           "[Stripe] Webhook-Verarbeitung fehlgeschlagen:",
           error instanceof Error ? error.message : "Unbekannter Fehler",
         );
-        res.status(400).json({
-          error: "Webhook konnte nicht verifiziert oder verarbeitet werden.",
+        // Signatur-Fehler: 400 (Stripe kann dieses Event nie liefern).
+        // Verarbeitungs-Fehler: 500 — Stripe wiederholt die Zustellung.
+        if (error instanceof StripeWebhookSignatureError) {
+          res.status(400).json({
+            error: "Webhook-Signatur ungültig.",
+          });
+          return;
+        }
+        res.status(500).json({
+          error: "Webhook-Verarbeitung vorübergehend fehlgeschlagen — Stripe wird erneut zustellen.",
         });
       }
     },
@@ -118,6 +148,10 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Agentforge-Telemetrie: POST /api/agentforge/events,
+  // POST /api/agentforge/checkpoints, GET /api/agentforge/stream
+  registerAgentforgeTelemetryRoutes(app);
+
   registerStorageProxy(app);
   registerRenderProxy(app);
   registerOAuthRoutes(app);
@@ -145,19 +179,263 @@ async function startServer() {
     }
   });
 
+  // Sprint 367: App-gehostete Auto-Karten fuer Instagram-Jobs (public, da die
+  // Graph-API die URL serverseitig abrufen muss). Deterministisch aus dem Job.
+  app.get("/api/publishing/assets/:jobId.png", async (req, res) => {
+    const jobId = Number(req.params.jobId);
+    if (!Number.isInteger(jobId) || jobId <= 0) {
+      res.status(400).json({ error: "Ungueltige Job-ID." });
+      return;
+    }
+    try {
+      const card = await getPublishingJobCard(jobId);
+      if (!card) {
+        res.status(404).json({ error: "Job nicht gefunden." });
+        return;
+      }
+      const png = buildPublishingCardPng({ ...card, ratio: (req.query.ratio as IgRatioKey) ?? "square" });
+      res.setHeader("content-type", "image/png");
+      res.setHeader("cache-control", "public, max-age=86400");
+      res.status(200).send(png);
+    } catch (error) {
+      console.error("[Publishing] Auto-Karte fehlgeschlagen:", error instanceof Error ? error.message : "unbekannt");
+      res.status(500).json({ error: "Karte konnte nicht generiert werden." });
+    }
+  });
+
+  // Block 2 (2026-10-21): Digistore24-IPN — Signatur-validiert, idempotent,
+  // Auto-Discovery, aggregiert in affiliate_products/revenue_daily_stats.
+  app.post("/api/v1/webhooks/digistore24", (req, res) => {
+    void handleDigistore24Ipn(req, res);
+  });
+
+  // Digistore24-API-Sync (2026-10-21): Manuelter/Automatischer Pull der
+  // Commissionen via REST-API — geschuetzt durch die IPN-Passphrase als
+  // X-Sync-Key (kein offener Trigger). Idempotent wie der IPN-Pfad.
+  app.post("/api/v1/webhooks/digistore24-sync", async (req, res) => {
+    const expectedKey = resolveDigistore24IpnSecret();
+    const providedKey = (req.header("x-sync-key") ?? "").trim();
+    if (!expectedKey || providedKey !== expectedKey) {
+      res.status(401).json({ ok: false, detail: "Ungültiger Sync-Key." });
+      return;
+    }
+    const days = Math.min(90, Math.max(1, Number.parseInt(String(req.query.days ?? "30"), 10) || 30));
+    const result = await syncDigistore24Commissions(days);
+    res.status(result.ok ? 200 : 502).json(result);
+  });
+
+  // Block 4 (2026-10-21): Oeffentliche Affiliate-Landingpages aus der
+  // Funnel-Kampagnen-Tabelle. Nur status='live' wird ausgeliefert, alles
+  // andere erhaelt 404 + noindex. HTML wird serverseitig aus dem geprueften
+  // Payload gerendert und komplett escaped (kein XSS aus LLM-Texten).
+  /**
+   * Block-4-Performance-Tracking: Getrackter Affiliate-Klick.
+   * Zaehlt den Klick und leitet mit 302 auf den Affiliate-Link weiter.
+   * Nur live-Kampagnen; alles andere 404 + noindex (Ehrlichkeit statt Loop).
+   */
+  app.get("/landings/:slug/click", async (req, res) => {
+    try {
+      const db = await getDb();
+      if (!db) throw new Error("Tracking-Datenbank nicht verfuegbar.");
+      const slug = String(req.params.slug ?? "").slice(0, 120);
+      const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.slug, slug)).limit(1);
+      const campaign = rows[0];
+      if (!campaign || campaign.status !== "live" || !campaign.affiliateUrl) {
+        res.status(404).setHeader("X-Robots-Tag", "noindex").type("html")
+          .send("<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"utf-8\"><title>Nicht gefunden</title></head><body style=\"font-family:sans-serif;text-align:center;padding-top:12vh;background:#080c16;color:#9aa6c2\"><h1 style=\"color:#e8ecf7\">Angebot nicht verfuegbar</h1></body></html>");
+        return;
+      }
+      await db.update(funnelCampaigns).set({ clickCount: sql`${funnelCampaigns.clickCount} + 1` })
+        .where(eq(funnelCampaigns.id, campaign.id));
+      res.status(302).setHeader("Cache-Control", "no-store").setHeader("Referrer-Policy", "no-referrer-when-downgrade")
+        .redirect(campaign.affiliateUrl);
+    } catch {
+      res.status(503).json({ ok: false, detail: "Tracking-Datenbank nicht verfuegbar." });
+    }
+  });
+
+  app.get("/landings/:slug", async (req, res) => {
+    try {
+      const db = await getDb();
+      if (!db) throw new Error("Tracking-Datenbank nicht verfuegbar.");
+      const slug = String(req.params.slug ?? "").slice(0, 120);
+      const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.slug, slug)).limit(1);
+      const campaign = rows[0];
+      if (!campaign || campaign.status !== "live") {
+        res.status(404).setHeader("X-Robots-Tag", "noindex");
+        res.type("html").send(
+          "<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"utf-8\"><title>Nicht gefunden</title></head><body style=\"font-family:sans-serif;text-align:center;padding-top:12vh;background:#080c16;color:#9aa6c2\"><h1 style=\"color:#e8ecf7\">Seite nicht gefunden</h1><p>Dieses Angebot ist aktuell nicht verfuegbar.</p></body></html>"
+        );
+        return;
+      }
+      if (!campaign.affiliateUrl) {
+        res.status(404).setHeader("X-Robots-Tag", "noindex");
+        res.type("html").send("<!-- Kampagne ohne Affiliate-Link: nicht auslieferbar -->");
+        return;
+      }
+      const funnel = (campaign.landingJson ?? {}) as LandingFunnelPayload;
+      const publicBase = (process.env.LANDING_PUBLIC_BASE ?? "").trim().replace(/\/+$/, "");
+      const clickUrl = publicBase ? `${publicBase}/landings/${slug}/click` : "";
+      const html = renderLandingHtml({
+        campaignName: campaign.name,
+        productTitle: campaign.name,
+        affiliateUrl: campaign.affiliateUrl,
+        ...(clickUrl ? { clickUrl } : {}),
+        funnel,
+      });
+      // Block-4-Tracking: Views zaehlen (best effort, kein Ausfallgrund).
+      db.update(funnelCampaigns).set({ viewCount: sql`${funnelCampaigns.viewCount} + 1` })
+        .where(eq(funnelCampaigns.id, campaign.id)).catch(() => {});
+      res.status(200).setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      res.type("html").send(html);
+    } catch (error) {
+      res.status(503).json({ ok: false, detail: "Landing-Datenbank nicht verfuegbar." });
+    }
+  });
+
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
   app.get("/api/ready", async (_req, res) => {
     const database = await checkDatabaseHealth();
+    const deployment = resolveDeploymentInfo();
+    const influencerLearning = getInfluencerLearningLoopStatus();
     res.status(database ? 200 : 503).json({
       ok: database,
-      checks: { database },
+      checks: {
+        database,
+        influencerLearningEnabled: influencerLearning.enabled,
+        influencerLearningRunning: influencerLearning.running,
+        influencerLearningLastCompletedAt: influencerLearning.lastCompletedAt,
+        influencerLearningLastError: influencerLearning.lastError,
+      },
+      gitCommitSha: deployment.gitCommitSha,
+      gitCommitShaReason: deployment.gitCommitShaReason,
+      deployedAt: deployment.deployedAt,
       timestamp: Date.now(),
     });
   });
 
+  // Ops-Debug (Sprint VM-Migration): Zeigt NUR Host/Port/DB (Passwort bleibt
+  //_maskiert) und fuehrt einen echten Verbindungsauftrag mit kurzem Timeout
+  // aus, damit die exakte Fehlerursache ohne Dashboard-Log-Zugang sichtbar wird.
+  // Ops-Debug (Sprint VM-Migration): testet alle Host/SSL-Varianten fuer den
+  // VM-Postgres ueber die nginx-SNI-443-Route in einem Durchlauf. NUR Host/
+  // Port/DB + Erfolgsmeldung — Passwoerter bleiben garantiert maskiert.
+  app.get("/api/db-debug", async (req, res) => {
+    const token = process.env.METRICS_TOKEN?.trim();
+    if (!token || req.header("authorization") !== `Bearer ${token}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    const url = process.env.DATABASE_URL ?? "";
+    let user = "";
+    let database = "";
+    let password = "";
+    try {
+      const u = new URL(url);
+      user = u.username;
+      database = u.pathname.replace(/^\//, "");
+      password = u.password;
+    } catch {
+      // ungueltige URL — Varianten laufen mit leeren Credentials
+    }
+    const { Pool } = await import("pg");
+    const variants: Array<{ name: string; config: Record<string, unknown> }> = [
+      { name: "ip_no_verify", config: { host: "92.5.177.159", port: 443, user, database, password, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "ip_sni_www_no_verify", config: { host: "92.5.177.159", port: 443, user, database, password, ssl: { rejectUnauthorized: false, servername: "www.cybersarah-ki.com" }, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "www_no_verify", config: { host: "www.cybersarah-ki.com", port: 443, user, database, password, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "www_sslmode_require_url", config: { connectionString: url, ssl: undefined, connectionTimeoutMillis: 6000, max: 1 } },
+      { name: "ip_no_verify_disabled", config: { host: "92.5.177.159", port: 443, user, database, password, ssl: false, connectionTimeoutMillis: 6000, max: 1 } },
+    ];
+    const results: Array<Record<string, unknown>> = [];
+    for (const variant of variants) {
+      let pool: import("pg").Pool | null = null;
+      const startedAt = Date.now();
+      try {
+        pool = new Pool(variant.config as never);
+        const r = await pool.query("SELECT current_database() AS db, now() AS ts");
+        results.push({ name: variant.name, ok: true, ms: Date.now() - startedAt, db: r.rows[0]?.db ?? null });
+      } catch (error) {
+        results.push({
+          name: variant.name,
+          ok: false,
+          ms: Date.now() - startedAt,
+          error: error instanceof Error ? error.message.slice(0, 220) : String(error).slice(0, 220),
+        });
+      } finally {
+        try { await pool?.end(); } catch { /* Pool-Ende ist best effort */ }
+      }
+    }
+    res.json({ ok: results.some((r) => r.ok === true), database, results });
+  });
+
   app.get("/api/metrics", metricsHandler);
+
+  // Sprint 346 — Autonome Draft-Engine: taeglicher Cron-Endpoint. Nutzt
+  // bewusst METRICS_TOKEN als gemeinsames Ops-Token (bereits auf Render UND
+  // als GitHub-Secret konfiguriert) — kein neues Secret noetig. Erzeugt
+  // NUR pending-Entwuerfe; Freigabe bleibt dem Menschen vorbehalten.
+  app.post("/api/cron/draft-engine", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runDraftEngine();
+      console.info("[Draft-Engine] Lauf abgeschlossen:", JSON.stringify(result));
+      res.json({ ok: true, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Draft-Engine] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
+  // Revenue-Autopilot: bewertet reale Funnel-/Stripe-/Affiliate-Signale
+  // und legt nur deduplizierte, messbare Experimente als pending Drafts ab.
+  app.post("/api/cron/revenue-autopilot", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runRevenueAutopilot(3);
+      console.info("[Revenue-Autopilot] Lauf abgeschlossen:", JSON.stringify({
+        status: result.status,
+        generated: result.generated,
+        skipped: result.skipped,
+      }));
+      res.json({ ok: true, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Revenue-Autopilot] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
+
+  // Zentraler Autopilot: echte Revenue-Scans + datenbasierte Optimierung +
+  // Creator-/Ideen-Entwuerfe in einem idempotenten, authentifizierten Lauf.
+  app.post("/api/cron/control-center-autopilot", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runControlCenterAutopilot();
+      console.info("[Control-Center-Autopilot] Lauf abgeschlossen:", JSON.stringify({
+        ok: result.ok,
+        realActions: result.realActions.map(redactAutopilotLog),
+        blocked: result.blocked.map(redactAutopilotLog),
+      }));
+      res.status(result.ok ? 200 : 207).json({ ok: result.ok, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Control-Center-Autopilot] Lauf fehlgeschlagen:", redactAutopilotLog(error));
+      res.status(500).json({ ok: false, error: "Autopilot-Lauf fehlgeschlagen. Administrator-Log pruefen." });
+    }
+  });
 
   // Sprint 66 — Live-Runtime-Endpunkte fuer das Preview-Panel (auth-pflichtig).
   installRuntimeLogger();
@@ -210,6 +488,38 @@ async function startServer() {
       query: typeof req.query.query === "string" ? req.query.query : undefined,
     });
     res.json({ entries: filtered.slice(-limit).reverse(), total: filtered.length });
+  });
+
+  // Sprint 353 — Agentic-Loop-Telemetrie: SSE-Stream pro Session-ID.
+  // Reconnect-Sicherheit: Last-Event-ID wird nachgeliefert (atomares
+  // subscribeWithReplay), danach folgt der Live-Stream; Heartbeat haelt
+  // Proxies waerme, close raeumt Abonnenten und Timer ab.
+  app.get("/api/agentic-loops/:sessionId/stream", async (req, res) => {
+    const sessionId = String(req.params.sessionId ?? "");
+    if (!isValidLoopSessionId(sessionId)) {
+      res.status(400).json({ error: "Ungueltige Session-ID (4-64 Zeichen, [A-Za-z0-9_-])." });
+      return;
+    }
+    if (!(await requireRuntimeUser(req, res))) return;
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.write(": loop-telemetrie verbunden\n\n");
+    const sinceHeader = req.headers["last-event-id"];
+    const sinceEventId = Number.isFinite(Number(sinceHeader)) ? Number(sinceHeader) : 0;
+    const { unsubscribe } = agenticLoopTelemetryBus.subscribeWithReplay(sessionId, (event) => {
+      res.write(`id: ${event.id}\nevent: ${event.event}\ndata: ${JSON.stringify(event)}\n\n`);
+    }, sinceEventId);
+    const heartbeat = setInterval(() => {
+      res.write(`: ping ${Date.now()}\n\n`);
+    }, 15_000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
   });
 
   app.get("/api/runtime/logs/stream", async (req, res) => {
@@ -291,6 +601,12 @@ async function startServer() {
   const port = parseInt(process.env.PORT || "3000", 10);
   void restoreRouterState().catch(() => undefined);
   void initProviderAdmin().catch(() => undefined);
+  // Sprint 196 + Sprint 2/10 — Autonomer Route-Rotations-Agent:
+  // Zustand UND erster Health-Tick werden vor dem Listener abgeschlossen.
+  // So kann kein erster produktiver Request eine persistierte, inzwischen
+  // degradierte Primärroute überholen. restoreRouteRotationState behandelt
+  // DB-/Probe-Probleme intern best-effort; der Server bleibt startfähig.
+  await restoreRouteRotationState();
 
   // Sprint 169 — Port-Konflikt-Haertung (EADDRINUSE): Ohne diesen Handler
   // wirft der Listener eine unbehandelte Exception mit rohem Stack-Trace und
@@ -312,6 +628,21 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
     startOptimizerLoop();
+    startPublishingAutopilot();
+    startChannelAutopilot();
+    startInfluencerLearningLoop();
+    if (process.env.DIGISTORE24_API_KEY?.trim()) {
+      const pullOnce = async (reason: string) => {
+        const r = await syncDigistore24Commissions(30);
+        if (r.ok) {
+          console.log(`[d24-sync] ${reason}: ${r.inserted} neu, ${r.duplicates} dupliziert (${r.paymentsFetched} Zahlungen, ${r.refundsFetched} Rueckerstattungen)`);
+        } else {
+          console.error(`[d24-sync] ${reason} fehlgeschlagen: ${r.detail ?? "unbekannt"}`);
+        }
+      };
+      setTimeout(() => void pullOnce("initial"), 45_000);
+      setInterval(() => void pullOnce("alle 6h"), 6 * 60 * 60 * 1000);
+    }
   });
 }
 

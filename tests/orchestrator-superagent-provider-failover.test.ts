@@ -55,7 +55,7 @@ describe("runOrchestratorTask — Zero-Cost-Multi-Provider-Failover (Sprint 150)
     delete process.env.ORCHESTRATOR_MODEL;
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.AI_GEMINI_API_KEY;
-    process.env.AI_GROQ_API_KEY = "groq-test-key-1234"; // gitleaks:allow — Test-Fixture, kein echtes Secret
+    process.env.AI_GROQ_API_KEY = "x"; // gitleaks:allow — Test-Fixture, kein echtes Secret
     process.env.OPENAI_API_KEY = "sk-openai-test-exhausted";
   });
 
@@ -120,6 +120,36 @@ describe("runOrchestratorTask — Zero-Cost-Multi-Provider-Failover (Sprint 150)
    * ohne content-Feld, Runde 2 (nach Tool-Ausfuehrung) muss die Historie
    * inkl. dieser Nachricht erneut normalisieren und darf nicht abstuerzen.
    */
+  it("nutzt keinen zweiten localhost-Fallback, wenn die zentrale LLM-Kette bereits gescheitert ist", async () => {
+    const calledUrls: string[] = [];
+    delete process.env.OLLAMA_BASE_URL;
+    delete process.env.AI_OLLAMA_BASE_URL;
+    delete process.env.OPENAI_API_KEY;
+    process.env.AI_GROQ_API_KEY = "x";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calledUrls.push(String(url));
+        if (String(url).includes(GROQ_URL)) {
+          return fakeResponse(429, { error: { message: "quota exhausted" } });
+        }
+        if (String(url).includes("127.0.0.1:11434") || String(url).includes("localhost:11434")) {
+          throw new Error("local unavailable");
+        }
+        return fakeResponse(503, { error: "unavailable" });
+      }),
+    );
+
+    const task = await runOrchestratorTask({ objective: "Pruefe die Providerkette", maxRounds: 1 });
+
+    expect(task.status).not.toBe("success");
+    const localCalls = calledUrls.filter((url) => url.includes("11434"));
+    // invokeLLM darf die lokale Route einmal als zentralen Endfallback pro
+    // Versuch prüfen; der Superagent darf danach keinen zweiten Sonderpfad starten.
+    expect(localCalls.length).toBeLessThanOrEqual(1);
+  });
+
   it("eskaliert NICHT, wenn eine Tool-Call-Antwort ohne Text-Content in Runde 2 erneut normalisiert wird", async () => {
     let round = 0;
     vi.stubGlobal(

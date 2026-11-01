@@ -1,0 +1,150 @@
+<!DOCTYPE html><html lang="de"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CyberSarah — KI-gestütztes Revenue Operating System</title>
+<meta name="description" content="KI-gestützte digitale Produkte für Unternehmer, Freelancer und Kreative. Steigere deinen Umsatz mit AI-Powered Tools.">
+<meta name="keywords" content="KI, künstliche Intelligenz, digitale Produkte, Stripe, Coaching, Prompts, Business">
+<meta property="og:title" content="CyberSarah Revenue OS">
+<meta property="og:description" content="100+ KI-Produkte für dein Business">
+<meta property="og:image" content="icon-512.png">
+<meta name="theme-color" content="#08080f">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;scroll-behavior:smooth}
+:root{--bg:#08080f;--accent:#a855f7;--accent2:#06b6d4;--text:#e8e8ed;--text2:#9ca3af}
+body{background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(8,8,15,0.95);backdrop-filter:blur(20px);border-bottom:1px solid rgba(168,85,247,0.1);padding:0 1rem}
+.nav-inner{max-width:1100px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;height:60px}
+.nav-logo{font-size:1.1rem;font-weight:800;background:linear-gradient(135deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;gap:1.5rem;align-items:center}
+.nav-links a{color:var(--text2);text-decoration:none;font-size:0.85rem;transition:color .2s}
+.nav-links a:hover{color:var(--accent)}
+.nav-cta{padding:0.4rem 1rem;background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.8rem}
+.hero{min-height:90vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;background:radial-gradient(ellipse at 50% 0%,rgba(168,85,247,0.08),transparent 70%)}
+.hero h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:800;line-height:1.2;background:linear-gradient(135deg,#a855f7,#06b6d4,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-size:200% auto;max-width:700px}
+.hero p{font-size:clamp(1rem,2vw,1.2rem);color:var(--text2);margin:1.5rem 0 2rem;max-width:550px;line-height:1.6}
+.hero-badge{display:inline-flex;gap:0.5rem;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);border-radius:99px;padding:0.4rem 1rem;font-size:0.8rem;color:var(--accent);margin-bottom:1.5rem}
+.hero-actions{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:0.5rem;padding:0.8rem 2rem;border-radius:12px;font-weight:600;font-size:0.95rem;text-decoration:none;transition:all .3s;border:none;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;box-shadow:0 4px 20px rgba(168,85,247,0.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(168,85,247,0.4)}
+.btn-secondary{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid rgba(255,255,255,0.1)}
+.btn-secondary:hover{background:rgba(255,255,255,0.08)}
+section{padding:4rem 1rem}
+.section-title{text-align:center;font-size:2rem;font-weight:800;margin-bottom:0.5rem}
+.section-sub{text-align:center;color:var(--text2);font-size:1rem;margin-bottom:3rem;max-width:500px;margin-left:auto;margin-right:auto}
+.products-grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.product-card{background:rgba(255,255,255,0.03);border:1px solid rgba(168,85,247,0.1);border-radius:16px;padding:1.5rem;transition:all .3s}
+.product-card:hover{transform:translateY(-4px);border-color:#a855f7;box-shadow:0 8px 30px rgba(168,85,247,0.1)}
+.product-card h3{font-size:1.1rem;margin-bottom:0.5rem}
+.product-card p{color:var(--text2);font-size:0.85rem;line-height:1.5;margin-bottom:1rem}
+.product-price{font-size:1.5rem;font-weight:800;color:var(--accent);margin-bottom:0.5rem}
+.product-link{color:var(--accent2);text-decoration:none;font-weight:600;font-size:0.9rem}
+.features{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1.5rem}
+.feature-card{text-align:center;padding:2rem}
+.feature-icon{font-size:2rem;margin-bottom:1rem}
+.feature-card h3{font-size:1.1rem;margin-bottom:0.5rem}
+.feature-card p{color:var(--text2);font-size:0.85rem;line-height:1.5}
+.stats{display:flex;justify-content:center;gap:3rem;flex-wrap:wrap;padding:2rem 0}
+.stat{text-align:center}
+.stat-num{font-size:2.5rem;font-weight:800;background:linear-gradient(135deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{color:var(--text2);font-size:0.85rem;margin-top:0.3rem}
+.newsletter{text-align:center;background:radial-gradient(ellipse at 50% 50%,rgba(168,85,247,0.05),transparent);padding:4rem 1rem}
+.newsletter h2{font-size:1.8rem;font-weight:800;margin-bottom:0.5rem}
+.newsletter p{color:var(--text2);margin-bottom:1.5rem}
+.newsletter-form{display:flex;gap:0.5rem;max-width:400px;margin:0 auto}
+.newsletter-form input{flex:1;padding:0.8rem 1rem;border-radius:10px;border:1px solid rgba(168,85,247,0.2);background:rgba(255,255,255,0.05);color:var(--text);font-size:0.9rem}
+.newsletter-form input::placeholder{color:var(--text2)}
+.newsletter-form button{padding:0.8rem 1.5rem;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;border:none;font-weight:600;cursor:pointer}
+footer{text-align:center;padding:2rem;color:var(--text2);font-size:0.8rem;border-top:1px solid rgba(255,255,255,0.05)}
+footer a{color:var(--accent);text-decoration:none}
+</style></head><body>
+<nav>
+<div class="nav-inner">
+<a href="/" class="nav-logo">🚀 CyberSarah</a>
+<div class="nav-links">
+<a href="#produkte">Produkte</a>
+<a href="#features">Features</a>
+<a href="products.html">Store</a>
+<a href="checkout.html">Kaufen</a>
+<a href="https://github.com/niknight1403/cybersarah-revenue-os" target="_blank">GitHub</a>
+<a href="products.html" class="nav-cta">🛒 Store</a>
+</div></div></nav>
+
+<section class="hero">
+<div class="hero-badge">🔒 Stripe LIVE · 100+ KI-Produkte · SSL</div>
+<h1>Dein KI-gestütztes<br>Revenue Operating System</h1>
+<p>100+ KI-generierte Premium-Produkte für Unternehmer, Freelancer und Kreative. Sicher bezahlen mit Stripe. Sofortiger Download.</p>
+<div class="hero-actions">
+<a href="products.html" class="btn btn-primary">🛍️ Produkte entdecken</a>
+<a href="#features" class="btn btn-secondary">Mehr erfahren</a>
+</div>
+<div class="stats">
+<div class="stat"><div class="stat-num">100+</div><div class="stat-label">Produkte</div></div>
+<div class="stat"><div class="stat-num">35</div><div class="stat-label">KI-Agenten</div></div>
+<div class="stat"><div class="stat-num">🔒</div><div class="stat-label">Stripe LIVE</div></div>
+</div></section>
+
+<section id="features">
+<h2 class="section-title">Warum CyberSarah?</h2>
+<p class="section-sub">KI-generierte Premium-Inhalte, die dein Business auf das nächste Level bringen</p>
+<div class="features">
+<div class="feature-card feature-card"><div class="feature-icon">🤖</div><h3>KI-generiert</h3><p>Alle Produkte werden von 35 spezialisierten KI-Agenten erstellt und optimiert</p></div>
+<div class="feature-card"><div class="feature-icon">💳</div><h3>Stripe LIVE</h3><p>Sichere Zahlungen via Stripe — SSL-verschlüsselt, sofortige Lieferung</p></div>
+<div class="feature-card"><div class="feature-icon">📱</div><h3>Mobile App</h3><p>Vollständige Steuerung via Android-App. Dashboard, Store, Agenten in einer Hand</p></div>
+<div class="feature-card"><div class="feature-icon">🎯</div><h3>Für Unternehmer</h3><p>Von KI-Prompts bis Coaching — alles was du für dein Online-Business brauchst</p></div>
+<div class="feature-card"><div class="feature-icon">🔄</div><h3>Autonome Updates</h3><p>Das System optimiert sich selbst — neue Produkte und Features automatisch</p></div>
+<div class="feature-card"><div class="feature-icon">🌐</div><h3>Sofort nutzbar</h3><p>Keine Einrichtung, kein Warten. Kaufen + sofort downloaden</p></div>
+</div></section>
+
+<section id="produkte" style="background:rgba(168,85,247,0.02)">
+<h2 class="section-title">Beliebte Produkte</h2>
+<p class="section-sub">Handverlesene KI-Produkte für deinen Erfolg</p>
+<div class="products-grid" id="productGrid">
+<div class="product-card">
+<div style="font-size:2rem;margin-bottom:0.5rem">🤖</div>
+<h3>KI-Prompt Paket Basic</h3>
+<p>50 bewährte ChatGPT-Prompts für Selbstständige — sofort einsetzbar für Content, Marketing und Automatisierung</p>
+<div class="product-price">€19,00</div>
+<a href="https://buy.stripe.com/price_1Tyu9cAuUge07PL9aHKO90rh" target="_blank" class="product-link">Jetzt kaufen →</a>
+</div>
+<div class="product-card">
+<div style="font-size:2rem;margin-bottom:0.5rem">🚀</div>
+<h3>KI-Prompt Paket Pro</h3>
+<p>150 Premium ChatGPT-Prompts + 10 Automatisierungs-Workflows — für ernsthafte Online-Unternehmer</p>
+<div class="product-price">€49,00</div>
+<a href="https://buy.stripe.com/price_1Tyu9iAuUge07PL9MVS2RdFi" target="_blank" class="product-link">Jetzt kaufen →</a>
+</div>
+<div class="product-card">
+<div style="font-size:2rem;margin-bottom:0.5rem">🏆</div>
+<h3>KI-Business Masterclass Bundle</h3>
+<p>Komplettes KI-Business-System: 300 Prompts + Video-Skripte + E-Mail-Sequenzen + 30-Tage-Aktionsplan</p>
+<div class="product-price">€97,00</div>
+<a href="https://buy.stripe.com/price_1Tyu9mAuUge07PL9Ik10HdU7" target="_blank" class="product-link">Jetzt kaufen →</a>
+</div>
+<div class="product-card">
+<div style="font-size:2rem;margin-bottom:0.5rem">🎯</div>
+<h3>1:1 KI-Business Coaching (60min)</h3>
+<p>Persönliche KI-Business-Session: Dein KI-Umsatzsystem aufbauen — von Null auf erste €1.000/Monat</p>
+<div class="product-price">€197,00</div>
+<a href="https://buy.stripe.com/price_1Tyu9rAuUge07PL9DYKQzuag" target="_blank" class="product-link">Jetzt kaufen →</a>
+</div>
+</div>
+<div style="text-align:center;margin-top:2rem">
+<a href="products.html" class="btn btn-primary">🛍️ Alle 100+ Produkte anzeigen</a>
+</div></section>
+
+<section class="newsletter">
+<h2>📬 Bleib auf dem Laufenden</h2>
+<p>Erhalte exklusive Angebote und neue KI-Produkte direkt in dein Postfach</p>
+<form class="newsletter-form" action="https://formspree.io/f/xvglwvrg" method="POST">
+<input type="email" name="email" placeholder="Deine E-Mail-Adresse" required>
+<button type="submit">Anmelden</button>
+</form>
+<p style="font-size:0.75rem;color:var(--text2);margin-top:0.5rem">Kein Spam. Jederzeit abbestellbar.</p>
+</section>
+
+<footer>
+<p>© 2026 CyberSarah Revenue OS · <a href="products.html">Store</a> · <a href="https://github.com/niknight1403/cybersarah-revenue-os">GitHub</a></p>
+<p style="margin-top:0.3rem">Stripe LIVE-Modus · SSL-geschützt · 14 Tage Geld-zurück-Garantie</p>
+</footer>
+</body></html>

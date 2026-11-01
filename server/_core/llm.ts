@@ -1,13 +1,18 @@
 import { ENV } from "./env";
 
 import {
+  isFreeManagedSource,
   MANAGED_LLM_NO_KEY_MESSAGE,
   resolveManagedLlmEndpoint,
   resolveManagedLlmEndpoints,
   type ManagedLlmEndpoint,
 } from "../../lib/managed-llm-fallback-logic";
+// Sprint 196 — Synchroner Spiegel des autonomen Route-Rotations-Agenten
+// (server/route-rotation-agent.ts). Bewusst NUR das winzige Zustandsmodul:
+// kein Import-Zyklus zum Agenten selbst.
+import { getRouteRotationPrimary } from "./route-rotation-state";
 import { isProviderQuarantined } from "../../lib/live-fix-logic";
-import { resolveManagedModel } from "../../lib/managed-model-logic";
+import { prioritizeDiscoveredLocalModels, resolveManagedModelCandidates } from "../../lib/managed-model-logic";
 import {
   createKeyPoolEntry,
   recordKeyObservation,
@@ -19,6 +24,7 @@ import { evaluateAndNotifyQuotaWarnings, recordProviderCall, recordProviderFailo
 import { diagnoseLlmPoolFailure, type LlmEndpointAttempt } from "../../lib/llm-failure-diagnostics";
 import { sendOpsDiscordAlert } from "../ops-alerts";
 import { notifyTelegram } from "./telegram";
+import { providerCircuitAllows, recordProviderCircuitFailure, recordProviderCircuitSuccess, resetProviderCircuits } from "../../lib/provider-circuit-breaker-logic";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -312,7 +318,7 @@ const localLlmCandidates = (): LocalLlmCandidate[] => {
     {
       source: "local-ollama",
       baseUrl: base(process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL, "http://127.0.0.1:11434/v1"),
-      apiKey: "ollama",
+      apiKey: trim(process.env.AI_OLLAMA_API_KEY ?? process.env.OLLAMA_API_KEY) ?? "ollama",
     },
     {
       source: "local-lmstudio",
@@ -323,22 +329,43 @@ const localLlmCandidates = (): LocalLlmCandidate[] => {
 };
 
 /** Erreichbarkeits-Probe gegen den OpenAI-kompatiblen /models-Endpoint. */
-async function probeLocalLlmEndpoint(baseUrl: string): Promise<boolean> {
+async function probeLocalLlmEndpoint(baseUrl: string, apiKey?: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4_000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1_500);
-    const response = await fetch(`${baseUrl}/models`, { signal: controller.signal });
-    clearTimeout(timer);
+    const response = await fetch(`${baseUrl}/models`, {
+      signal: controller.signal,
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+    });
     return response.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Modell-IDs eines OpenAI-kompatiblen lokalen Endpoints lesen. */
+async function listLocalLlmModelIds(baseUrl: string, apiKey?: string): Promise<string[]> {
+  try {
+    const response = await fetch(`${baseUrl}/models`, {
+      signal: AbortSignal.timeout(4_000),
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+    });
+    if (!response.ok) return [];
+    const payload = (await response.json()) as { data?: { id?: unknown }[] };
+    return Array.isArray(payload.data)
+      ? payload.data.map((entry) => (typeof entry?.id === "string" ? entry.id.trim() : "")).filter(Boolean)
+      : [];
+  } catch {
+    return [];
   }
 }
 
 /** Ersten erreichbaren lokalen Endpoint liefern (oder null). */
 async function resolveLocalManagedEndpoint(): Promise<ManagedLlmEndpoint | null> {
   for (const candidate of localLlmCandidates()) {
-    if (await probeLocalLlmEndpoint(candidate.baseUrl)) {
+    if (await probeLocalLlmEndpoint(candidate.baseUrl, candidate.apiKey)) {
       return { url: `${candidate.baseUrl}/chat/completions`, apiKey: candidate.apiKey, source: candidate.source };
     }
   }
@@ -400,6 +427,7 @@ const recordPoolObservation = (source: string, observation: KeyObservation): voi
 export function resetManagedKeyPoolForTests(): void {
   managedEndpoints.clear();
   managedPool.clear();
+  resetProviderCircuits();
 };
 
 /** Sprint 115: Quota-Warnschwelle hoechstens einmal pro Minute pruefen (Hot-Pfad-Schutz). */
@@ -508,7 +536,7 @@ const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response>
 
   for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(20_000) });
       if (response.ok || attempt === RETRY_MAX_RETRIES) {
         return response;
       }
@@ -608,8 +636,24 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // rotiert sofort auf den naechsten Endpoint. Sind ALLE in Quarantaene,
   // wird trotzdem Best-Effort weitergearbeitet (Service bleibt nie stumm).
   const notQuarantined = ordered.filter((endpoint) => !isProviderQuarantined(endpoint.source));
-  if (notQuarantined.length > 0) {
-    ordered = notQuarantined;
+  if (notQuarantined.length > 0) ordered = notQuarantined;
+  const circuitEligible = ordered.filter((endpoint) => providerCircuitAllows(endpoint.source));
+  // Sprint 3/10 — Sind alle Cloud-Circuits offen, den Request nicht sofort
+  // abbrechen: der nachgelagerte lokale/Remote-Ollama-Fallback darf noch
+  // übernehmen. Damit bleibt die Gratis-Kette auch bei kollektivem Cloud-
+  // Cooldown funktionsfähig.
+  ordered = circuitEligible;
+
+  // Sprint 196 — Autonomer Rotations-Agent: Die agentenseitig gewaehlte
+  // gesunde Gratis-Route (bzw. die vom Administrator erzwungene) fuehrt die
+  // Kette an. Nur die Reihenfolge aendert sich — der per-Aufruf-Failover
+  // bleibt als zweite Verteidigungslinie vollstaendig erhalten.
+  const rotationPrimary = getRouteRotationPrimary();
+  if (rotationPrimary) {
+    const primaryIndex = ordered.findIndex((endpoint) => endpoint.source === rotationPrimary);
+    if (primaryIndex > 0) {
+      ordered = [ordered[primaryIndex], ...ordered.slice(0, primaryIndex), ...ordered.slice(primaryIndex + 1)];
+    }
   }
 
   const payload: Record<string, unknown> = {
@@ -653,10 +697,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   for (const endpoint of ordered) {
     // Sprint 85: model ist Pflicht und muss zum jeweiligen Endpoint passen
     // (Gemini-Endpoint → Gemini-Modell, Forge/OpenAI → OpenAI-Modell).
-    const attemptPayload = {
-      ...payload,
-      model: model ?? resolveManagedModel(undefined, endpoint.source),
-    };
+    // Sprint 385: Auto-aufgeloeste Modelle kommen als geordnete Kandidaten;
+    // bei 404/400 (Modell-Ruhestand) wird der naechste Kandidat desselben
+    // Endpoints probiert, bevor die Provider-Kette weiterschaltet.
+    const candidateModels = model ? [model] : resolveManagedModelCandidates(endpoint.source);
+    for (let modelIdx = 0; modelIdx < candidateModels.length; modelIdx += 1) {
+      const attemptPayload = {
+        ...payload,
+        model: candidateModels[modelIdx],
+      };
+      const isLastModelCandidate = modelIdx === candidateModels.length - 1;
     const startedAt = Date.now();
     try {
       const response = await fetchWithBackoff(endpoint.url, {
@@ -673,6 +723,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         const errorText = await response.text();
         lastError = new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
         attempts.push({ source: endpoint.source, httpStatus: response.status, message: errorText });
+        recordProviderCircuitFailure(endpoint.source, response.status, latencyMs);
         // Sprint 115: Aufruf ins Metering-Ledger (429/Auth/sonstige).
         recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
         runQuotaWarningCheck();
@@ -682,6 +733,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
           recordPoolObservation(endpoint.source, { httpStatus: response.status, latencyMs });
         } else {
           recordPoolObservation(endpoint.source, { latencyMs });
+        }
+        // Sprint 385 — Modell-Ruhestand: 404/400 mit auto-aufgeloestem
+        // Modell → naechsten Modell-Kandidaten probieren (gleicher Endpoint,
+        // gleicher Key, kein Provider-Failover noetig).
+        if ((response.status === 404 || response.status === 400) && !isLastModelCandidate) {
+          continue;
         }
         // Sprint 115: Failover auf den naechsten Kandidaten protokollieren.
         recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
@@ -694,18 +751,74 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
             `HTTP ${response.status} bei ${endpoint.source}. Rotiert automatisch auf die naechste Route.`,
           );
         }
-        continue;
+        break;
       }
       recordPoolObservation(endpoint.source, { latencyMs });
+      recordProviderCircuitSuccess(endpoint.source, latencyMs);
       recordProviderCall({ source: endpoint.source, httpStatus: response.status, networkError: false, latencyMs });
       runQuotaWarningCheck();
       return (await response.json()) as InvokeResult;
-    } catch (error) {
-      lastError = error;
-      attempts.push({ source: endpoint.source, httpStatus: null, message: error instanceof Error ? error.message : String(error) });
-      recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
-      recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
-      continue;
+      } catch (error) {
+        lastError = error;
+        attempts.push({ source: endpoint.source, httpStatus: null, message: error instanceof Error ? error.message : String(error) });
+        recordProviderCircuitFailure(endpoint.source, null, Date.now() - startedAt);
+        recordProviderCall({ source: endpoint.source, httpStatus: null, networkError: true, latencyMs: Date.now() - startedAt });
+        recordProviderFailover({ source: endpoint.source, failoverTo: nextSource(ordered, endpoint.source) });
+        break;
+      }
+    }
+  }
+
+  // Sprint 3/10 — Letzte kostenfreie Verteidigungslinie: Nach dem
+  // Ausschöpfen der Cloud-Kette einen erreichbaren Ollama-/LM-Studio-
+  // Endpoint probieren. Das gilt auch dann, wenn Cloud-Circuit-Breaker alle
+  // offen sind. Lokale Quellen werden nicht doppelt versucht, falls der
+  // Aufruf bereits im Zero-Config-Modus direkt lokal gestartet ist.
+  if (!attempts.some((attempt) => attempt.source === "local-ollama" || attempt.source === "local-lmstudio")) {
+    const localEndpoint = await resolveLocalManagedEndpoint();
+    if (localEndpoint) {
+      const configuredLocalModels = model ? [model] : resolveManagedModelCandidates(localEndpoint.source);
+      const discoveredLocalModels = model
+        ? []
+        : await listLocalLlmModelIds(localEndpoint.url.replace(/\/chat\/completions$/, ""), localEndpoint.apiKey);
+      const localModels = model
+        ? configuredLocalModels
+        : prioritizeDiscoveredLocalModels(configuredLocalModels, discoveredLocalModels);
+      for (let modelIdx = 0; modelIdx < localModels.length; modelIdx += 1) {
+        const startedAt = Date.now();
+        try {
+          const response = await fetchWithBackoff(localEndpoint.url, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${localEndpoint.apiKey}`,
+            },
+            body: JSON.stringify({ ...payload, model: localModels[modelIdx] }),
+          });
+          const latencyMs = Date.now() - startedAt;
+          if (response.ok) {
+            recordProviderCall({ source: localEndpoint.source, httpStatus: response.status, networkError: false, latencyMs });
+            return (await response.json()) as InvokeResult;
+          }
+          const errorText = await response.text();
+          lastError = new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+          attempts.push({ source: localEndpoint.source, httpStatus: response.status, message: errorText });
+          recordProviderCall({ source: localEndpoint.source, httpStatus: response.status, networkError: false, latencyMs });
+        } catch (error) {
+          lastError = error;
+          attempts.push({
+            source: localEndpoint.source,
+            httpStatus: null,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          recordProviderCall({
+            source: localEndpoint.source,
+            httpStatus: null,
+            networkError: true,
+            latencyMs: Date.now() - startedAt,
+          });
+        }
+      }
     }
   }
 
@@ -726,6 +839,35 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   throw lastError instanceof Error
     ? lastError
     : new Error("LLM invoke failed: alle Managed-Keys im Cooldown oder erschöpft");
+}
+
+/**
+ * Sprint 196 — Konfigurierte Gratis-Routen (URL + Key) fuer den autonomen
+ * Rotations-Agenten: Erreichbarkeits-Probes gegen /models. Enthaelt ausschliess-
+ * lich KOSTENFREIE Quellen der Managed-Kette (Custom > Groq > OpenRouter >
+ * Gemini) plus die lokalen Kandidaten (Ollama, LM Studio). Die API-Keys
+ * bleiben strikt serverintern: Der Agent braucht sie allein fuer den
+ * Bearer-Header der Erreichbarkeits-Probe (GET /models).
+ */
+export function listManagedFreeRoutes(): { source: ManagedLlmEndpoint["source"]; url: string; apiKey: string; headers?: Record<string, string> }[] {
+  let chain: ManagedLlmEndpoint[] = [];
+  try {
+    chain = resolveManagedLlmEndpoints(managedLlmEnv()).filter((endpoint) => isFreeManagedSource(endpoint.source));
+  } catch {
+    chain = [];
+  }
+  const cloudRoutes = chain.map((endpoint) => ({
+    source: endpoint.source,
+    url: endpoint.url.replace(/\/chat\/completions$/, ""),
+    apiKey: endpoint.apiKey,
+    ...(endpoint.headers ? { headers: endpoint.headers } : {}),
+  }));
+  const localRoutes = localLlmCandidates().map((candidate) => ({
+    source: candidate.source,
+    url: candidate.baseUrl,
+    apiKey: candidate.apiKey,
+  }));
+  return [...cloudRoutes, ...localRoutes];
 }
 
 export type ModelInfo = {

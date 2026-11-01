@@ -17,7 +17,6 @@ import { getProviderKeyStatusLabel } from "@/lib/provider-key-logic";
 import { cloudProviderIds, defaultLocalProviderEndpoints, type CloudProviderId } from "@/lib/studio-settings-logic";
 import { type FieldValidation, validateLocalProviderEndpoint, validateServiceAccessToken, validateWorkspaceUrl } from "@/lib/settings-validation";
 import { useThemeContext } from "@/lib/theme-provider";
-import { DESIGN_THEMES, designThemeDescription, designThemeIcon, designThemeLabel } from "@/lib/design-theme-logic";
 import { getSettingsBackupRestoreConfirmation, getSettingsBackupShareConfirmation, isValidSettingsBackupPassword, pickEncryptedSettingsBackup, previewEncryptedSettingsBackup, type SettingsBackupImportCandidate, type SettingsBackupPreview } from "@/lib/settings-backup";
 import { useWorkspace } from "@/lib/workspace-context";
 import { resolveDesignPalette } from "@/lib/_core/design-theme-palettes";
@@ -273,35 +272,28 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.sectionSpacer}>
+          <Text style={styles.sectionLabel}>FÄHIGKEITEN</Text>
+          <Text style={styles.sectionTitle}>Skills</Text>
+          <Text style={styles.fieldHint}>Agent-Vorschläge, Code-Diff-Prüfung und CI-Qualitätsprüfung — die Prüfläufe des Superagenten bei jedem Auftrag.</Text>
+          <TouchableOpacity
+            accessibilityLabel="Skills verwalten"
+            accessibilityRole="button"
+            activeOpacity={0.75}
+            onPress={() => router.push("/settings/skills" as never)}
+            style={[styles.providerRow, styles.skillsEntryRow]}
+          >
+            <IconSymbol name="sparkles" size={18} color={glassPalette.cyan} />
+            <View style={styles.providerText}>
+              <Text style={styles.providerLabel}>Skills verwalten</Text>
+              <Text style={styles.providerDetail}>Auswahl, Beschreibungen und Sammelaktionen — wirken sofort im Optimizer-Chat.</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={16} color={glassSurface.textMuted} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.sectionSpacer}>
           <Text style={styles.sectionLabel}>DARSTELLUNG</Text>
           <Text style={styles.sectionTitle}>Erscheinungsbild</Text>
-          <Text style={styles.fieldHint}>Das Design wirkt auf die gesamte App — Palette, Glow- und Glas-Effekte wechseln mit.</Text>
-          <View style={styles.designOptionStack}>
-            {DESIGN_THEMES.map((theme) => {
-              const active = designTheme === theme;
-              const preview = resolveDesignPalette(theme, colorScheme);
-              return (
-                <TouchableOpacity
-                  accessibilityLabel={`Design ${designThemeLabel(theme)} aktivieren`}
-                  accessibilityRole="button"
-                  activeOpacity={0.75}
-                  key={theme}
-                  onPress={() => setDesignTheme(theme)}
-                  style={[styles.designOption, active ? { borderColor: palette.primary } : null]}
-                >
-                  <IconSymbol name={designThemeIcon(theme)} size={17} color={palette.primary} />
-                  <View style={styles.palettePreview} accessibilityLabel={`${designThemeLabel(theme)} Farbpalette`}>
-                    {[preview.primary, preview.success, preview.warning, preview.error].map((color) => <View key={color} style={[styles.paletteSwatch, { backgroundColor: color }]} />)}
-                  </View>
-                  <View style={styles.designOptionTextArea}>
-                    <Text style={styles.designOptionTitle}>{designThemeLabel(theme)}</Text>
-                    <Text style={styles.designOptionDescription}>{designThemeDescription(theme)}</Text>
-                  </View>
-                  {active ? <IconSymbol name="checkmark.circle.fill" size={19} color={palette.success} /> : null}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <Text style={styles.fieldHint}>Design: Aurora Flow — Palette, Aurora-Verlauf und Glas-Effekte sind fest eingestellt und wirken auf die gesamte App.</Text>
         </View>
         <View style={styles.emptyGlass}>
           <View style={styles.emptyGlassIcon}>
@@ -354,15 +346,14 @@ export default function SettingsScreen() {
               <View style={[styles.radio, styles.radioSelected]}><View style={styles.radioDot} /></View>
               <View style={styles.providerText}>
                 <Text style={styles.providerLabel}>Autonomes Routing aktiv</Text>
-                <Text style={styles.providerDetail}>Optimale KI wird automatisch zugewiesen — die manuelle Provider-Wahl ist für Administratoren deaktiviert.</Text>
+                <Text style={styles.providerDetail}>Optimale KI wird automatisch zugewiesen — du kannst darunter jederzeit manuell einen Provider wählen (z. B. Groq oder OpenRouter).</Text>
               </View>
             </View>
           ) : null}
           {providerOptions.map((option) => {
             const selected = option.id === provider;
-            const locked = isAdmin && option.id !== "auto";
             return (
-              <TouchableOpacity key={option.id} activeOpacity={0.75} disabled={locked} onPress={() => { setProvider(option.id); setProviderApiKey(""); setCloudTestState("idle"); setCloudTestMessage(""); setSaveState("idle"); }} style={[styles.providerRow, selected && styles.providerRowSelected, locked && { opacity: 0.55 }]}>
+              <TouchableOpacity key={option.id} activeOpacity={0.75} onPress={() => { setProvider(option.id); setProviderApiKey(""); setCloudTestState("idle"); setCloudTestMessage(""); setSaveState("idle"); }} style={[styles.providerRow, selected && styles.providerRowSelected]}>
                 <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioDot} /> : null}</View>
                 <View style={styles.providerText}>
                   <Text style={styles.providerLabel}>{option.label}</Text>
@@ -593,6 +584,7 @@ const styles = StyleSheet.create({
   clearActionText: { color: glassPalette.red, fontSize: 12, fontWeight: "800" },
   providerRow: { alignItems: "center", backgroundColor: glassDepth.layer, borderColor: glassSurface.border, borderRadius: 15, borderWidth: 1, flexDirection: "row", gap: 11, marginBottom: 8, padding: 12 },
   providerRowSelected: { backgroundColor: glassDepth.layer, borderColor: glassSurface.border },
+  skillsEntryRow: { marginBottom: 0 },
   radio: { alignItems: "center", borderColor: glassSurface.textSecondary, borderRadius: 10, borderWidth: 1.5, height: 20, justifyContent: "center", width: 20 },
   radioSelected: { borderColor: glassPalette.cyan },
   radioDot: { backgroundColor: glassPalette.cyan, borderRadius: 5, height: 10, width: 10 },

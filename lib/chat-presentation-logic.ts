@@ -50,11 +50,11 @@ export function shouldShowDayDivider(previous: TimestampedChatMessage | null, cu
 }
 
 /** Anzeige-Label je Rolle. */
-export function senderLabelForRole(role: "user" | "agent"): string {
-  return role === "user" ? "Du" : "Sarah · KI-Operations";
+export function senderLabelForRole(role: "user" | "agent", agentLabel = "Sarah · KI-Operations"): string {
+  return role === "user" ? "Du" : agentLabel;
 }
 
 /** Avatar-Kürzel je Rolle. */
-export function avatarInitialsForRole(role: "user" | "agent"): string {
-  return role === "user" ? "HN" : "CS";
+export function avatarInitialsForRole(role: "user" | "agent", agentInitials = "CS"): string {
+  return role === "user" ? "HN" : agentInitials;
 }

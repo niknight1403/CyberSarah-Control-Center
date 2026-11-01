@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { insertChatTurn, insertAgentLearningRecord, listChatMessages, listChatSessions, listRecentAgentLearnings } from "./db";
+import { ENV } from "./_core/env";
+import { insertChatTurn, insertAgentLearningRecord, listChatMessages, listChatSessions, listRecentAgentLearnings, listSuperAgentsForUser } from "./db";
 import {
   buildLearningRecord,
   deriveLearningFromTurn,
@@ -17,6 +18,10 @@ import {
   countMessagesToday,
   evaluateChatQuota,
 } from "../lib/chat-quota-logic";
+import { buildQuotaUpgradePrompt } from "../lib/upgrade-prompt-logic";
+import { tierPriceId } from "../lib/subscription-tiers-logic";
+import { guardFileWrite } from "../lib/code-safety-logic";
+import { getMonetizationAccount } from "./monetization";
 import {
   isFeatureEnabled,
   parseFeatureFlagOverrides,
@@ -61,6 +66,7 @@ import {
   type RouterProviderId,
 } from "../lib/model-router-logic";
 import { buildSuperagentBrief, shouldAttachSuperagentBrief } from "../lib/superagent-brief-logic";
+import { buildSpecialistAgentContext } from "../lib/specialist-agents-logic";
 import { getRuntimeLogs } from "./runtime-logger";
 import { classifyRuntimeState } from "../lib/live-status-logic";
 import {
@@ -74,6 +80,13 @@ import {
 } from "./model-router";
 
 import { autonomousKeyRecovery, getRuntimeApiKey, isProviderDisabledRuntime } from "./provider-admin";
+// Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette unterbrechungsfrei).
+import {
+  forceRouteRotation,
+  getRouteRotationStatus,
+  setRouteRotationEnabled,
+} from "./route-rotation-agent";
+import { FREE_ROUTE_SOURCES } from "../lib/route-rotation-agent-logic";
 
 const providerSchema = z.enum([
   "auto",
@@ -282,9 +295,22 @@ async function callManaged(messages: ChatMessage[], requestedModel?: string) {
 function isTransientChatError(error: unknown) {
   if (error instanceof TRPCError) return false;
   const message = error instanceof Error ? error.message : String(error);
-  return /\b(408|425|429|500|502|503|504)\b/.test(message) ||
+  // Auth/key failures are not retryable against the SAME provider, but they
+  // are recoverable by provider rotation. Treat them as failover-eligible.
+  return /\b(401|403|408|425|429|500|502|503|504)\b/.test(message) ||
+    /invalid[_ -]?api[_ -]?key|incorrect api key|unauthorized|expired key/i.test(message) ||
     (error instanceof TypeError) ||
     (error instanceof Error && error.name === "AbortError");
+}
+
+/**
+ * Auth-Fehler bedeuten strukturell defekte Zugangsdaten (Key abgelaufen oder
+ * ungueltig, Guthaben aufgebraucht, Provider gesperrt) — vom Handy aus nicht
+ * behebbar. Der Chat self-healt auf die Managed-Gratis-Kette statt zu blockieren.
+ */
+function isFatalProviderAuthError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(401|402|403)\b/.test(message) || /invalid_api_key|incorrect api key|unauthorized/i.test(message);
 }
 
 function getFallbackProviders(provider: ProviderId) {
@@ -299,7 +325,8 @@ function getFallbackProviders(provider: ProviderId) {
   const providers: ProviderId[] = parsed
     .filter((result): result is { success: true; data: ProviderId } => result.success && Boolean(result.data))
     .map((result) => result.data);
-  return providers.filter(
+  const withManagedSafetyNet: ProviderId[] = [...providers, "managed"];
+  return withManagedSafetyNet.filter(
     (candidate, index, all): candidate is Exclude<ProviderId, "auto"> =>
       candidate !== provider && candidate !== "auto" && all.indexOf(candidate) === index,
   );
@@ -387,6 +414,19 @@ export const developmentChatRouter = router({
   /** Sprint 71 — Lokale Endpoints (Ollama/LM Studio) aktiv anpingen. */
   probeLocalProviders: adminProcedure.mutation(async () => probeLocalProviders()),
 
+  /** Sprint 196 — Rotations-Agent: vollstaendiger Status-Snapshot (Admin). */
+  routeRotationStatus: adminProcedure.query(async () => getRouteRotationStatus()),
+
+  /** Sprint 196 — Rotations-Agent pausieren/fortsetzen (Admin-Vollzugriff). */
+  setRouteRotationEnabled: adminProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ input }) => ({ enabled: await setRouteRotationEnabled(input.enabled) })),
+
+  /** Sprint 196 — Primaerroute erzwingen oder Zwang aufheben ('auto'). */
+  forceRouteRotation: adminProcedure
+    .input(z.object({ to: z.enum([...FREE_ROUTE_SOURCES, "auto"]) }))
+    .mutation(async ({ input }) => forceRouteRotation({ to: input.to })),
+
   send: protectedProcedure
     .input(chatInputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -406,7 +446,15 @@ export const developmentChatRouter = router({
             new Date(),
           );
           if (!quota.allowed) {
-            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: quota.reason ?? "Tageslimit erreicht." });
+            // Sprint 262: Ehrlicher Upgrade-Prompt statt nacktem Fehler —
+            // Zahlen, Reset-Zeitpunkt, Checkout nur wenn ein Preis konfiguriert ist.
+            const plan = await getMonetizationAccount(ctx.user.openId).then((account) => account.plan).catch(() => "free" as const);
+            const gate = buildQuotaUpgradePrompt(
+              { usedToday, dailyLimit: quota.dailyLimit, resetsAt: quota.resetsAt, plan, quotaExempt: quota.quotaExempt },
+              (tier) => tierPriceId(tier, process.env) !== null,
+            );
+            const detail = gate.prompt?.detail ?? quota.reason ?? "Tageslimit erreicht.";
+            throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: detail });
           }
         } catch (error) {
           if (error instanceof TRPCError) throw error;
@@ -634,6 +682,12 @@ async function executeAgentTool(
   args: Record<string, unknown>,
   githubToken?: string,
 ): Promise<string> {
+  // Sprint 270: Selbstheilende Schreib-Grenze — Validierung VOR dem
+  // Schreiben; Fehler gehen als behebbare Meldung an das Modell zurueck.
+  if (tool === "write_repo_file") {
+    const guard = guardFileWrite(String(args.path ?? ""), typeof args.content === "string" ? args.content : "");
+    if (!guard.ok) return `FEHLER: ${guard.reason} Korrekturhinweis: ${guard.fixHint}`;
+  }
   const built = buildWorkspaceToolRequest(tool, workspaceId, args);
   if (!built.ok) return `FEHLER: ${built.error}`;
   const { method, path, body } = built.request;
@@ -750,6 +804,23 @@ async function loadLearningContext(userOpenId: string | undefined, prompt: strin
   }
 }
 
+/**
+ * Runtime-Profil des ausgewaehlten Superagenten laden. Benannte Agenten
+ * erhalten damit nicht nur eine isolierte Session, sondern ein echtes
+ * spezialisiertes Arbeitsprofil.
+ */
+async function loadSpecialistAgentContext(userOpenId?: string, sessionId?: string): Promise<string> {
+  if (!userOpenId || !sessionId) return "";
+  try {
+    const agents = await listSuperAgentsForUser(userOpenId);
+    const agent = agents.find((row) => row.sessionId === sessionId && row.status === "aktiv");
+    return buildSpecialistAgentContext(agent);
+  } catch (error) {
+    console.warn("[specialistAgent] Profil nicht geladen:", error instanceof Error ? error.message.slice(0, 120) : error);
+    return "";
+  }
+}
+
 /** Sprint 94 — save_learning ausfuehren (Datenbank statt Workspace-Service). */
 async function executeSaveLearningTool(userOpenId: string | undefined, args: Record<string, unknown>): Promise<string> {
   const title = typeof args.title === "string" ? args.title : "";
@@ -792,9 +863,12 @@ async function storeAutoLearning(input: AgentToolChatInput, userMessage: string,
 async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput): Promise<DevelopmentChatResult> {
   const githubToken = resolveAgentGithubToken(input.role, input.githubToken);
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
-  const learningContext = await loadLearningContext(input.userOpenId, lastUserMessage, input.sessionId);
+  const [learningContext, specialistContext] = await Promise.all([
+    loadLearningContext(input.userOpenId, lastUserMessage, input.sessionId),
+    loadSpecialistAgentContext(input.userOpenId, input.sessionId),
+  ]);
   const conversation: Message[] = [
-    { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main", provider)}${learningContext}` },
+    { role: "system", content: `${buildAgentSystemPrompt(input.branch ?? "main", provider)}${specialistContext}${learningContext}` },
     ...input.messages.map((message) => ({ role: message.role, content: message.content })),
   ];
   const businessTools = BUSINESS_TOOL_NAMES.map((name) => ({
@@ -814,7 +888,21 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   const devTrace: { tool: string; args: string; resultSummary: string }[] = [];
 
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
-    const payload = await callProviderWithTools(provider, conversation, input.model, tools);
+    let payload: InvokeResult;
+    try {
+      payload = await callProviderWithTools(provider, conversation, input.model, tools);
+    } catch (error) {
+      // Sobald ein Tool bereits erfolgreich/fehlgeschlagen ausgefuehrt wurde,
+      // darf ein Providerwechsel den Loop nicht vom Originalprompt neu starten:
+      // Commit/Write/Send koennten sonst doppelt ausgefuehrt werden.
+      if (toolsUsedInTurn.size > 0) {
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: "KI-Provider nach bereits ausgefuehrten Werkzeugschritten ausgefallen. Fortschritt bleibt erhalten; automatischer Neustart wurde zum Schutz vor Doppelaktionen gestoppt.",
+        });
+      }
+      throw error;
+    }
     const choice = payload?.choices?.[0];
     const toolCalls: ToolCall[] = choice?.message?.tool_calls ?? [];
     if (!toolCalls.length) {
@@ -847,8 +935,20 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
     }
   }
 
-  // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen.
-  const payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+  // Iterationslimit erreicht: finale Antwort ohne Tools erzwingen. Nach
+  // Tool-Side-Effects kein Provider-Restart vom Originalzustand zulassen.
+  let payload: InvokeResult;
+  try {
+    payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+  } catch (error) {
+    if (toolsUsedInTurn.size > 0) {
+      throw new TRPCError({
+        code: "BAD_GATEWAY",
+        message: "KI-Provider nach bereits ausgefuehrten Werkzeugschritten ausgefallen. Fortschritt bleibt erhalten; automatischer Neustart wurde zum Schutz vor Doppelaktionen gestoppt.",
+      });
+    }
+    throw error;
+  }
   const finalContent = extractContent(payload);
   await storeAutoLearning(input, lastUserMessage, finalContent, [...toolsUsedInTurn]);
   return { content: finalContent, model: payload.model, providerUsed: provider, fallbackUsed: false, receivedAt: new Date().toISOString(), devTrace: devTrace.length ? devTrace : undefined };
@@ -859,7 +959,7 @@ async function handleAgentToolChat(input: AgentToolChatInput): Promise<Developme
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const providers = input.provider === "auto"
     ? await resolveAgentProviderCandidates(lastUserMessage, input.role)
-    : [input.provider];
+    : [input.provider, ...getFallbackProviders(input.provider)];
 
   let lastError: unknown = new Error("Kein verfuegbarer KI-Provider fuer die Werkzeug-Route.");
   for (const provider of providers) {
@@ -902,7 +1002,7 @@ async function buildSuperagentContext() {
     .slice(-5)
     .map((entry) => `${entry.level}: ${entry.message}`.slice(0, 300));
   let workspaceConnected = false;
-  const workspaceUrl = process.env.WORKSPACE_SERVICE_URL?.trim().replace(/\/$/, "");
+  const workspaceUrl = ENV.workspaceServiceUrl;
   if (workspaceUrl) {
     try {
       const controller = new AbortController();
@@ -1033,12 +1133,21 @@ export async function handleDevelopmentChat(input: {
   if (input.workspaceId) {
     return handleAgentToolChat(input);
   }
+
+  // Auch ohne verbundenes Repository/Workspace muss die gewaehlte
+  // Superagenten-Persoenlichkeit wirksam sein. Eingabevalidierung bleibt
+  // user/assistant-only; der Systemkontext entsteht ausschliesslich serverseitig.
+  const specialistContext = await loadSpecialistAgentContext(input.userOpenId, input.sessionId);
+  const runtimeMessages = specialistContext
+    ? ([{ role: "system", content: specialistContext }, ...input.messages] as ChatMessage[])
+    : input.messages;
+
   if (input.provider === "auto") {
-    return handleAutoRoutedChat({ messages: input.messages, model: input.model, role: input.role });
+    return handleAutoRoutedChat({ messages: runtimeMessages, model: input.model, role: input.role });
   }
   const primaryStartedAt = Date.now();
   try {
-    const reply = await callProvider(input.provider, input.messages, input.model);
+    const reply = await callProvider(input.provider, runtimeMessages, input.model);
     recordRouterOutcome(input.provider, { kind: "success", latencyMs: Date.now() - primaryStartedAt }, Date.now());
     return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
   } catch (error) {
@@ -1051,12 +1160,28 @@ export async function handleDevelopmentChat(input: {
         : { kind: "failure", retryable: isTransientChatError(error), rateLimited: /\b429\b/.test(primaryMessage) },
       Date.now(),
     );
+    if (isFatalProviderAuthError(error)) {
+      const managedStartedAt = Date.now();
+      try {
+        const reply = await callProvider("managed", input.messages, input.model);
+        recordRouterOutcome("managed", { kind: "success", latencyMs: Date.now() - managedStartedAt }, Date.now());
+        return { ...reply, providerUsed: "managed", fallbackUsed: true, receivedAt: new Date().toISOString() };
+      } catch (managedError) {
+        recordRouterOutcome(
+          "managed",
+          managedError instanceof Error && managedError.name === "AbortError"
+            ? { kind: "timeout" }
+            : { kind: "failure", retryable: isTransientChatError(managedError), rateLimited: /\b429\b/.test(String((managedError as Error)?.message ?? managedError)) },
+          Date.now(),
+        );
+      }
+    }
     if (isTransientChatError(error)) {
       let lastFallbackError: unknown = error;
       for (const fallbackProvider of getFallbackProviders(input.provider)) {
         const fallbackStartedAt = Date.now();
         try {
-          const reply = await callProvider(fallbackProvider, input.messages, input.model);
+          const reply = await callProvider(fallbackProvider, runtimeMessages, input.model);
           recordRouterOutcome(fallbackProvider, { kind: "success", latencyMs: Date.now() - fallbackStartedAt }, Date.now());
           return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
         } catch (fallbackError) {

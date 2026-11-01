@@ -5,7 +5,7 @@ import { buildSecretStoredNotice } from "../lib/secret-vault-logic";
 import { runOrchestratorTask, SUPERAGENT_SYSTEM_PROMPT } from "./orchestrator/superagent";
 import { getTask, listTasks } from "./orchestrator/state-store";
 import { getToolDefinitions } from "./orchestrator/tool-registry";
-import { getOptimizerStatus, listOptimizerCycles, runOptimizerCycle } from "./orchestrator/optimizer-loop";
+import { getOptimizerStatus, listOptimizerCycles, runOptimizerCycle, runOptimizerCycleIfStale } from "./orchestrator/optimizer-loop";
 
 /**
  * Sprint 123 — Leitender-Superagent-Orchestrator (Admin-gated).
@@ -23,6 +23,16 @@ export const orchestratorRouter = router({
         objective: z.string().min(3).max(4000),
         title: z.string().min(1).max(200).optional(),
         maxRounds: z.number().int().min(1).max(24).optional(),
+        /** Dialog-Verlauf fuer kontextuelle Antworten (wie im Entwicklungs-Chat). */
+        history: z
+          .array(
+            z.object({
+              role: z.enum(["user", "assistant"]),
+              content: z.string().min(1).max(4000),
+            }),
+          )
+          .max(12)
+          .optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -104,5 +114,16 @@ export const orchestratorRouter = router({
   optimizerTrigger: adminProcedure.mutation(async () => {
     const record = await runOptimizerCycle("manual");
     return record;
+  }),
+
+  /**
+   * Sprint 197 — Optimizer einmal pro App-Start autonom im Hintergrund
+   * ausfuehren (feuer-und-vergessen vom Client). Serverseitig rate-limited:
+   * laeuft nur, wenn der letzte Zyklus laenger als 60 Minuten zurueckliegt,
+   * damit haeufige App-Starts keine Zyklen-Schwemme ausloesen.
+   */
+  optimizerEnsureOnce: adminProcedure.mutation(async () => {
+    const record = await runOptimizerCycleIfStale(60);
+    return { ran: record != null, status: record?.status ?? null, id: record?.id ?? null };
   }),
 });

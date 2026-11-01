@@ -77,7 +77,8 @@ export const billingRouter = router({
   /** Sprint 70 — Rechnungshistorie (Stripe-Invoices als Nachweis). */
   invoices: protectedProcedure.query(async ({ ctx }) => {
     if (ctx.user.role === "admin") {
-      return { invoices: [] };
+      return {
+      paymentLink: (process.env.STRIPE_PAYMENT_LINK ?? "").trim() || null, invoices: [] };
     }
     try {
       return await listUserInvoices({

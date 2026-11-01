@@ -176,6 +176,7 @@ export function mergeIncident(
     existing.occurrenceCount += 1;
     existing.lastSeenAt = now.toISOString();
     existing.evidence = [...existing.evidence, ...input.evidence]
+      .map((line) => String(line).slice(0, 500))
       .slice(-MAX_EVIDENCE_PER_INCIDENT);
     existing.severity = input.severity; // Severity nachfuehren (kann steigen)
     return { incidents: [...incidents], incident: existing, isNew: false };

@@ -8,6 +8,14 @@
  * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
  * KOSTENFREIES Modell pro Source waehlt.
  */
+/**
+ * Sprint 349 — Ollama-Fleet-Default: Ohne explizites AI_OLLAMA_MODEL waehlt
+ * die Aufloesung das Chat-Tier der Qwen-2.5-Leiter (kleinstes ausreichendes
+ * Modell = qwen2.5:1.5b) statt blind des Coder-7B. Die Leiter liegt voll
+ * vor, wenn scripts/ollama-server-setup.sh gelaufen ist.
+ */
+import { pickQwenForTask, QWEN_LADDER } from "./ollama-fleet-logic";
+
 export type ManagedModelSource =
   | "forge"
   | "gemini"
@@ -17,6 +25,87 @@ export type ManagedModelSource =
   | "custom"
   | "local-ollama"
   | "local-lmstudio";
+
+/**
+ * Sprint 385 — Modellfrische der Gratis-Kette.
+ *
+ * Anbieter ziehen Modelle regelmaessig zurueck (OpenRouter deaktivierte
+ * llama-3.3-70b-instruct:free; Groq rotiert gpt-oss-Tiere). Auto-aufgeloeste
+ * Modelle werden deshalb als geordnete Kandidatenliste geliefert: invokeLLM
+ * probiert bei 404/400 (Modell-Ruhestand) den naechsten Kandidaten desselben
+ * Endpoints, bevor die Provider-Kette weiterschaltet.
+ *
+ * Beide Listen am 30.09.2026 gegen die Live-Modelllisten verifiziert
+ * (tools/free-llm-changer/changer-status.json).
+ */
+export const OPENROUTER_FREE_MODEL_CANDIDATES = [
+  "openrouter/free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3.5-lightning:free",
+  "recursive/flint:free",
+  "liquid/lfm-2.5-2.6b:free",
+] as const;
+
+export const GROQ_MODEL_CANDIDATES = [
+  "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b",
+  "qwen/qwen3.8-27b",
+] as const;
+
+/**
+ * Ordnet bevorzugte lokale Modelle gegen die tatsaechlich vom Endpoint
+ * gemeldete /models-Liste. Sobald Discovery-Daten vorhanden sind, werden
+ * nicht installierte Overrides verworfen statt wiederholt 404 zu produzieren.
+ * Alle zusaetzlich entdeckten Modelle bleiben als letzter Best-Effort-Fallback.
+ */
+export function prioritizeDiscoveredLocalModels(
+  preferred: readonly string[],
+  discovered: readonly string[],
+): string[] {
+  const cleanPreferred = [...new Set(preferred.map((value) => value.trim()).filter(Boolean))];
+  const cleanDiscovered = [...new Set(discovered.map((value) => value.trim()).filter(Boolean))];
+  if (cleanDiscovered.length === 0) return cleanPreferred;
+  const available = new Set(cleanDiscovered);
+  const preferredAvailable = cleanPreferred.filter((model) => available.has(model));
+  const discoveredRemainder = cleanDiscovered.filter((model) => !preferredAvailable.includes(model));
+  return [...preferredAvailable, ...discoveredRemainder];
+}
+
+/** Geordnete Kandidaten je Source; Cloud-ENV-Override fuehrt als einziger Kandidat. */
+export function resolveManagedModelCandidates(
+  source: ManagedModelSource,
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  const override =
+    source === "openrouter"
+      ? env.AI_OPENROUTER_MODEL?.trim()
+      : source === "groq"
+        ? env.AI_GROQ_MODEL?.trim()
+        : source === "gemini"
+          ? env.AI_GEMINI_MODEL?.trim()
+          : undefined;
+  if (override) return [override];
+  switch (source) {
+    case "local-ollama": {
+      const preferred = env.AI_OLLAMA_MODEL?.trim();
+      const defaults = [pickQwenForTask("chat", QWEN_LADDER) ?? "qwen2.5:1.5b", ...QWEN_LADDER];
+      return [...new Set([preferred, ...defaults].filter((value): value is string => Boolean(value)))];
+    }
+    case "local-lmstudio": {
+      const preferred = env.AI_LMSTUDIO_MODEL?.trim();
+      return [...new Set([preferred, "local-model"].filter((value): value is string => Boolean(value)))];
+    }
+    case "openrouter":
+      return [...OPENROUTER_FREE_MODEL_CANDIDATES];
+    case "groq":
+      return [...GROQ_MODEL_CANDIDATES];
+    case "gemini":
+      // Google-Alias: routet serverseitig immer auf ein aktuelles Flash-Modell.
+      return ["gemini-flash-latest"];
+    default:
+      return [resolveManagedModel(undefined, source, env)];
+  }
+}
 
 export function resolveManagedModel(
   requestedModel: string | undefined,
@@ -35,7 +124,7 @@ export function resolveManagedModel(
   }
 
   if (source === "local-ollama") {
-    return env.AI_OLLAMA_MODEL?.trim() || "qwen2.5-coder:7b";
+    return env.AI_OLLAMA_MODEL?.trim() || (pickQwenForTask("chat", QWEN_LADDER) ?? "qwen2.5:1.5b");
   }
 
   if (source === "local-lmstudio") {
@@ -50,8 +139,10 @@ export function resolveManagedModel(
   }
 
   if (source === "openrouter") {
-    // OpenRouter Free-Tier-Modell (kostenlos, ENV ueberschreibbar).
-    return env.AI_OPENROUTER_MODEL?.trim() || "meta-llama/llama-3.3-70b-instruct:free";
+    // Sprint 385 — Modellfrische: altes Default (llama-3.3-70b-instruct:free)
+    // wurde von OpenRouter zurueckgezogen; erster Kandidat der am
+    // 30.09.2026 live verifizierten Gratis-Liste.
+    return env.AI_OPENROUTER_MODEL?.trim() || OPENROUTER_FREE_MODEL_CANDIDATES[0];
   }
 
   const candidates = [

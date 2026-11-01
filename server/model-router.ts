@@ -102,10 +102,11 @@ export async function getRouterSnapshot() {
  * ergibt sich aus den realen Chat-Aufrufen (Erfolg/Fehler/Timeout).
  */
 export async function probeLocalProviders(): Promise<{ provider: RouterProviderId; reachable: boolean }[]> {
-  const targets: { provider: RouterProviderId; baseUrl: string }[] = [
+  const targets: { provider: RouterProviderId; baseUrl: string; apiKey?: string }[] = [
     {
       provider: "ollama",
       baseUrl: (process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434/v1").replace(/\/+$/, ""),
+      apiKey: (process.env.AI_OLLAMA_API_KEY ?? process.env.OLLAMA_API_KEY)?.trim() || undefined,
     },
     {
       provider: "lmstudio",
@@ -117,8 +118,11 @@ export async function probeLocalProviders(): Promise<{ provider: RouterProviderI
       const startedAt = Date.now();
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 2_000);
-        const response = await fetch(`${target.baseUrl}/models`, { signal: controller.signal });
+        const timer = setTimeout(() => controller.abort(), 4_000);
+        const response = await fetch(`${target.baseUrl}/models`, {
+          signal: controller.signal,
+          headers: target.apiKey ? { Authorization: `Bearer ${target.apiKey}` } : undefined,
+        });
         clearTimeout(timer);
         const reachable = response.ok;
         recordRouterOutcome(target.provider, { kind: "success", latencyMs: Date.now() - startedAt }, Date.now());

@@ -135,6 +135,38 @@ describe("development chat server chain", () => {
     await server.close();
   });
 
+  it("self-healt bei abgelaufenem Provider-Key (401) auf die Managed-Gratis-Kette", async () => {
+    const failing = await startMockServer((_body, res) => {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: {
+            message: "Incorrect API key provided: sk-svcac***",
+            type: "invalid_request_error",
+            code: "invalid_api_key",
+          },
+        }),
+      );
+    });
+    process.env.AI_CUSTOM_BASE_URL = endpoint(failing);
+    process.env.AI_CUSTOM_API_KEY = "stale-key";
+    invokeLLMMock.mockResolvedValue({
+      choices: [{ message: { role: "assistant", content: "Antwort der Gratis-Kette." } }],
+      model: "groq/openai/gpt-oss-120b",
+    });
+
+    const result = await handleDevelopmentChat({
+      provider: "custom",
+      messages: [{ role: "user", content: "Status?" }],
+    });
+
+    expect(result.content).toBe("Antwort der Gratis-Kette.");
+    expect(result.model).toBe("groq/openai/gpt-oss-120b");
+    expect(result.providerUsed).toBe("managed");
+    expect(result.fallbackUsed).toBe(true);
+    await failing.close();
+  });
+
   it("weicht bei transienten Fehlern auf den konfigurierten Fallback aus", async () => {
     const failing = await startMockServer((_body, res) => {
       res.writeHead(503);
@@ -163,26 +195,29 @@ describe("development chat server chain", () => {
     await fallback.close();
   });
 
-  it("übergibt permanente Fehler ohne Fallback-Versuch", async () => {
+  it("rotiert bei ungueltigem Provider-Key autonom zum Fallback", async () => {
     const primary = await startMockServer((_body, res) => {
       res.writeHead(401);
-      res.end("Unauthorized");
+      res.end("Incorrect API key");
     });
     const fallback = await startMockServer((_body, res) =>
-      replyWithContent(res, "darf nicht erreicht werden"),
+      replyWithContent(res, "Auth-Fallback aktiv.", "fallback-model"),
     );
     process.env.AI_CUSTOM_BASE_URL = endpoint(primary);
-    process.env.AI_CUSTOM_API_KEY = "test-key";
+    process.env.AI_CUSTOM_API_KEY = "invalid-test-key";
     process.env.AI_LMSTUDIO_BASE_URL = endpoint(fallback);
+    process.env.AI_LMSTUDIO_MODEL = "fallback-model";
     process.env.AI_FALLBACK_PROVIDERS = "lmstudio";
 
-    await expect(
-      handleDevelopmentChat({
-        provider: "custom",
-        messages: [{ role: "user", content: "Status?" }],
-      }),
-    ).rejects.toMatchObject({ code: "BAD_GATEWAY" });
-    expect(fallback.requests).toHaveLength(0);
+    const result = await handleDevelopmentChat({
+      provider: "custom",
+      messages: [{ role: "user", content: "Status?" }],
+    });
+
+    expect(result.content).toBe("Auth-Fallback aktiv.");
+    expect(result.providerUsed).toBe("lmstudio");
+    expect(result.fallbackUsed).toBe(true);
+    expect(fallback.requests).toHaveLength(1);
     await primary.close();
     await fallback.close();
   });

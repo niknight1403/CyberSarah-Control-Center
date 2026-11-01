@@ -1,0 +1,62 @@
+name: Live-Verifikation (App + DB + Login)
+
+# Prueft nach dem VM-DB-Umzug den Livestand: Ready-Status, Admin-Konto in der
+# DB und den tRPC-Login-Pfad (bewusst falsches Passwort => strukturierte
+# UNAUTHORIZED-Antwort beweist Routing + DB-Lookup + scrypt-Compare).
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: ["Render Deploy"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Ready + Admin-Row + Login-Smoke
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "== /api/ready =="
+          curl -s --max-time 90 "https://app.cybersarah-ki.com/api/ready" | head -c 300; echo
+          echo "== Admin-Zeile in der VM-DB =="
+          psql "$DATABASE_URL" -tA -c "SELECT email, role FROM users WHERE lower(email)='niko.oeben@gmail.com';" 2>&1 | head -3
+          echo "== Login-Smoke (falsches Passwort erwartet) =="
+          CODE=$(curl -s -o /tmp/login.json -w "%{http_code}" --max-time 90 -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"0":{"json":{"email":"niko.oeben@gmail.com","password":"definitiv-falsches-passwort"}}}' \
+            "https://app.cybersarah-ki.com/api/trpc/account.login?batch=1")
+          echo "HTTP=$CODE"
+          head -c 400 /tmp/login.json; echo
+          echo "== Draft-Queue (Autonome Entwuerfe) =="
+          psql "$DATABASE_URL" -tA -c "SELECT kind, status, COUNT(*) FROM \"draftQueue\" GROUP BY kind, status ORDER BY kind;" 2>&1 | head -10
+          echo "== Revenue-Spiegel (VM revenue_os) =="
+          REV_URL=$(python3 -c "import os; u=os.environ['DATABASE_URL']; print(u.replace('/cybersarah','/revenue_os',1))" 2>/dev/null || true)
+          if [ -n "$REV_URL" ]; then
+            psql "$REV_URL" -tA -c "SELECT COUNT(*) FROM hara_proposals;" 2>&1 | head -2
+            psql "$REV_URL" -tA -c "SELECT COUNT(*) FROM cross_sell_rules;" 2>&1 | head -2
+            psql "$REV_URL" -tA -c "SELECT COUNT(*) FROM customer_subscriptions;" 2>&1 | head -2
+          else
+            echo "DATABASE_URL fehlt im Env"
+          fi
+          echo "== Scan-Relay (403 erwartet: Key noetig) =="
+          RC=$(curl -s -o /tmp/relay.json -w "%{http_code}" --max-time 40 -X POST "https://hub.cybersarah-ki.com/revenue-api/api/hara/scan" -H "Content-Type: application/json" -d "{}")
+          echo "Relay-HTTP=$RC"
+          test "$RC" = "403"
+          echo "== Engine authentifiziert (echter Scan, 200/202 erwartet) =="
+          test -n "${{ secrets.REVENUE_OS_API_KEY }}"
+          AUTH=$(curl -s -o /tmp/authscan.json -w "%{http_code}" --max-time 120 -X POST \
+            -H "X-Revenue-Internal-Key: ${{ secrets.REVENUE_OS_API_KEY }}" \
+            -H "Content-Type: application/json" -d '{}' \
+            "https://hub.cybersarah-ki.com/revenue-api/api/hara/scan")
+          echo "Engine-Scan-HTTP=$AUTH"
+          test "$AUTH" = "200" -o "$AUTH" = "202"
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/authscan.json','utf8'));if(d.success!==true&&d.background!==true)process.exit(1)"
+          rm -f /tmp/authscan.json
+          echo "== App-Wurzel (static web) =="
+          curl -s -o /dev/null -w "HTTP=%{http_code} type=%{content_type}\n" --max-time 60 "https://app.cybersarah-ki.com/"

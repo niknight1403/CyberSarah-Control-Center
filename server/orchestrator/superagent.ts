@@ -25,6 +25,7 @@
  *                         (leer = automatische Modellwahl je Anbieter)
  */
 
+import { describeLlmError } from "../../lib/llm-error-logic";
 import { invokeLLM, type Message as LlmMessage, type Tool as LlmTool } from "../_core/llm";
 import { executeTool, getToolDefinitions } from "./tool-registry";
 import {
@@ -47,6 +48,7 @@ Arbeitsweise:
 3. SELBSTKORREKTUR: Bei Fehlern analysiere die Fehlermeldung, korrigiere eigenstaendig und verifiziere erneut. Maximal 3 Korrektur-Iterationen pro Schritt, danach eskaliere (Status "escalated" mit klarer Fehlerbeschreibung).
 4. SICHERHEIT: Destruktive Operationen (Reboots, Container-Neustarts) nur mit explizitem confirm=true-Parameter. Keine unsicheren oder unvalidierten destruktiven Aktionen.
 5. TOOL-NUTZUNG: Nutze ausschliesslich die bereitgestellten Tools. Pruefe Fehler von Tools und reagiere strukturiert — nie blind wiederholen.
+6. AUTONOME REPO-ENTWICKLUNG (Sprint 198): Du entwickelst das eigene Projekt (CyberSarah-Control-Center) selbststaendig weiter — wie ein Senior-Engineer im Chat. Ablauf bei Entwicklungs- oder Fix-Auftraegen: (a) git.getFileContents zum Lesen relevanter Dateien, (b) Aenderung ueberlegen, (c) git.commitFile mit Konventions-Commit (feat/fix/chore(scope): ...), (d) bei groesseren Arbeiten git.createBranch + git.createPullRequest, (e) Infrastruktur-Operationen (Deploy, DB-Migration, PM2) ueber git.dispatchServerOps anstossen und danach den Status verifizieren. Stelle KEINE Rückfragen, wenn du mit den Tools selbststaendig zum Ziel kommst — integriere fehlende Zugriffe autonom (Repo-Zugriff steht dir serverseitig zur Verfuegung).
 
 Abschluss: Wenn das Ziel erreicht ist, antworte OHNE Tool-Aufruf mit einer klaren, freundlichen Zusammenfassung direkt fuer den Nutzer (Deutsch).
 
@@ -133,16 +135,26 @@ async function callOllama(config: LlmConfig, messages: ChatMessage[]): Promise<C
  * Credits) blockiert damit nicht mehr den gesamten Superagenten.
  */
 async function callManagedCloud(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
-  const result = await invokeLLM({
-    messages: messages as unknown as LlmMessage[],
-    tools: getToolDefinitions() as unknown as LlmTool[],
-    toolChoice: "auto",
-    maxTokens: 1_800,
-    ...(config.model ? { model: config.model } : {}),
-  });
-  const choice = result.choices?.[0]?.message;
-  if (!choice) throw new Error("LLM-API: keine Antwort-Message erhalten.");
-  return choice as ChatMessage;
+  try {
+    const result = await invokeLLM({
+      messages: messages as unknown as LlmMessage[],
+      tools: getToolDefinitions() as unknown as LlmTool[],
+      toolChoice: "auto",
+      maxTokens: 1_800,
+      ...(config.model ? { model: config.model } : {}),
+    });
+    const choice = result.choices?.[0]?.message;
+    if (!choice) throw new Error("LLM-API: keine Antwort-Message erhalten.");
+    return choice as ChatMessage;
+  } catch (error: any) {
+    // Sprint 4/10 — Der zentrale invokeLLM-Pfad besitzt bereits Cloud-
+    // Rotation UND Ollama/LM-Studio-Endfallback. Kein zweiter, abweichender
+    // localhost-Fallback mehr im Superagenten: sonst würden Remote-Ollama-
+    // Konfigurationen umgangen und derselbe Fehler doppelt produziert.
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[superagent] LLM-Kette nicht verfügbar: ${describeLlmError(message)}`);
+    throw new Error(describeLlmError(message));
+  }
 }
 
 async function callLlm(config: LlmConfig, messages: ChatMessage[]): Promise<ChatMessage> {
@@ -208,6 +220,9 @@ export async function runOrchestratorTask(input: {
   objective: string;
   title?: string;
   maxRounds?: number;
+  /** Sprint 197 — bisheriger Dialog-Verlauf (wie im Entwicklungs-Chat), damit
+   * der Superagent auf Nachfragen und Folgeaufgaben kontextuell antwortet. */
+  history?: { role: "user" | "assistant"; content: string }[];
 }): Promise<TaskRecord> {
   const task = await createTask({
     title: input.title ?? input.objective.slice(0, 120),
@@ -219,6 +234,7 @@ export async function runOrchestratorTask(input: {
   const maxRounds = Math.min(Math.max(input.maxRounds ?? MAX_ROUNDS_DEFAULT, 1), 24);
   const messages: ChatMessage[] = [
     { role: "system", content: SUPERAGENT_SYSTEM_PROMPT },
+    ...(input.history ?? []).map((entry): ChatMessage => ({ role: entry.role, content: entry.content })),
     { role: "user", content: input.objective },
   ];
 
@@ -294,7 +310,7 @@ export async function runOrchestratorTask(input: {
         await finishTask(
           task.id,
           "escalated",
-          `Ich konnte die Aufgabe nicht abschließen: Wiederholter Laufzeitfehler nach ${iterations} Iterationen (${message}). Ich habe eskaliert, damit ein Administrator eingreifen kann.`,
+          `Ich konnte die Aufgabe nicht abschließen: Wiederholter Laufzeitfehler nach ${iterations} Iterationen (${describeLlmError(message)}). Ich habe eskaliert, damit ein Administrator eingreifen kann.`,
         );
         break;
       }

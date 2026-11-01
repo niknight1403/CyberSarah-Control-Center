@@ -1,0 +1,36 @@
+name: Render Villa Ops (Agenten-Villa)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Operation (read | set-env)"
+        required: true
+        default: read
+      service_id:
+        description: "Render-Service-ID des Agenten-Villa-Service (fuer set-env)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  render-villa-ops:
+    name: "Render Villa Ops: ${{ github.event.inputs.operation }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Operation ausfuehren
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          OP: ${{ github.event.inputs.operation }}
+          SERVICE_ID: ${{ github.event.inputs.service_id }}
+          AGENT_ADMIN_EMAIL: ${{ secrets.AGENTEN_VILLA_AGENT_ADMIN_EMAIL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.AGENTEN_VILLA_GOOGLE_CLIENT_ID }}
+          JWT_SECRET: ${{ secrets.AGENTEN_VILLA_JWT_SECRET }}
+          OPENROUTER_API_KEY: ${{ secrets.AGENTEN_VILLA_OPENROUTER_API_KEY }}
+          DATABASE_URL_VALUE: ${{ secrets.AGENTEN_VILLA_DATABASE_URL }}
+          GOOGLE_CLIENT_SECRET_VALUE: ${{ secrets.AGENTEN_VILLA_GOOGLE_CLIENT_SECRET }}
+        run: node scripts/render-villa-ops.mjs

@@ -11,10 +11,13 @@ import {
   deleteSuperAgentRecord,
   insertSuperAgentRecord,
   insertSuperAgentRecords,
+  insertMissingSuperAgentRecords,
   listSuperAgentsForUser,
   touchSuperAgentLastActive,
   updateSuperAgentRecord,
 } from "./db";
+import { createProjectSuperagent } from "./project-superagent-factory";
+import { isBuiltInSpecialistName, missingSpecialistAgentSeeds } from "../lib/specialist-agents-logic";
 import {
   assertSuperAgentRemovable,
   defaultSeedSuperAgent,
@@ -37,7 +40,32 @@ function serialize<T extends { lastActiveAt: Date; createdAt: Date }>(row: T) {
 }
 
 export const superAgentsRouter = router({
-  /** Superagenten des Nutzers — seedet einmalig den Standard-Agenten ("Elara"), wenn leer. */
+  /** Sprint 364 — dedizierter Projekt-Superagent inkl. Bot-Villa aus einem Aufruf. */
+  createFromProject: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().trim().min(2).max(80),
+        kind: z.enum(["web-app", "mobile-app", "saas", "content", "automation", "forschung"]),
+        goal: z.string().trim().min(3).max(400),
+        poolSize: z.number().int().min(0).max(5000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const creation = await createProjectSuperagent(ctx.user.openId, input);
+      return {
+        superagent: creation.superagent,
+        villa: {
+          projectKind: creation.blueprint.project.kind,
+          coreTeam: creation.blueprint.villa.coreTeam.length,
+          pool: creation.blueprint.villa.pool.length,
+          poolCapacity: creation.blueprint.villa.poolCapacity,
+          liveWorkerCap: creation.blueprint.villa.liveWorkerCap,
+        },
+        toolGrants: creation.blueprint.toolGrants,
+        autonomy: creation.blueprint.autonomy,
+      };
+    }),
+  /** Superagenten des Nutzers — seedet Elara und die eingebauten Spezialisten idempotent. */
   list: protectedProcedure.query(async ({ ctx }) => {
     let rows = await listSuperAgentsForUser(ctx.user.openId);
     if (rows.length === 0) {
@@ -45,6 +73,22 @@ export const superAgentsRouter = router({
       await insertSuperAgentRecords([{ ...seed, userOpenId: ctx.user.openId }]);
       rows = await listSuperAgentsForUser(ctx.user.openId);
     }
+
+    const missing = missingSpecialistAgentSeeds(rows.map((row) => row.name));
+    if (missing.length > 0) {
+      await insertMissingSuperAgentRecords(
+        ctx.user.openId,
+        missing.map((seed) => ({
+          ...seed,
+          purpose: seed.purpose.slice(0, 400),
+          sessionId: generateSuperAgentSessionId(randomUUID()),
+          userOpenId: ctx.user.openId,
+          isDefault: false,
+        })),
+      );
+      rows = await listSuperAgentsForUser(ctx.user.openId);
+    }
+
     return sortSuperAgentsByActivity(rows.map(serialize));
   }),
 
@@ -89,6 +133,10 @@ export const superAgentsRouter = router({
   /** Loescht einen Superagenten dauerhaft. Der Standard-Agent kann nicht geloescht werden. */
   remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const rows = await listSuperAgentsForUser(ctx.user.openId);
+    const target = rows.find((row) => row.id === input.id);
+    if (target && isBuiltInSpecialistName(target.name)) {
+      throw new Error("Integrierte Spezialagenten bleiben als Systemfaehigkeit erhalten — pausiere oder archiviere sie stattdessen.");
+    }
     assertSuperAgentRemovable(rows, input.id);
     await deleteSuperAgentRecord(input.id, ctx.user.openId);
     return { success: true } as const;

@@ -1,0 +1,30 @@
+name: DB Debug (Live)
+
+# Ruft nach dem Deploy den token-geschuetzten Debug-Endpoint auf und zeigt
+# Host/Port/DB + das exakte Verbindungs-Ergebnis (Passwort bleibt maskiert).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Warte auf Deployment + Debug-Call
+        env:
+          METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+        run: |
+          sleep 30
+          for i in $(seq 1 8); do
+            CODE=$(curl -s -o /tmp/dbg.json -w "%{http_code}" --max-time 60 -H "Authorization: Bearer $METRICS_TOKEN" "https://app.cybersarah-ki.com/api/db-debug?cb=$RANDOM")
+            echo "Versuch $i: HTTP=$CODE"
+            if [ "$CODE" = "200" ] || [ "$CODE" = "502" ]; then
+              cat /tmp/dbg.json | python3 -m json.tool 2>/dev/null || cat /tmp/dbg.json
+              exit 0
+            fi
+            sleep 60
+          done
+          echo "== Letzte Antwort =="; cat /tmp/dbg.json 2>/dev/null; echo

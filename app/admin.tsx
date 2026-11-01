@@ -15,7 +15,10 @@ import { glassDepth, glassPalette, glassSurface, glassType } from "@/lib/design/
 import { useAdminAutonomousAgent } from "@/lib/use-admin-autonomous-agent";
 import { AdminLiveStatusCard } from "@/components/studio/admin-live-status-card";
 import { ProviderAdminCard } from "@/components/studio/provider-admin-card";
+import { PublishingReviewAdminCard } from "@/components/studio/publishing-review-admin-card";
+import { PublishingOpsAdminCard } from "@/components/studio/publishing-ops-admin-card";
 import { IntegrationStatusCard } from "@/components/studio/integration-status-card";
+import { HubspotMrrCard } from "@/components/studio/hubspot-mrr-card";
 import { WixCard } from "@/components/studio/wix-card";
 import { AutonomousDevCard } from "@/components/studio/autonomous-dev-card";
 import { trpc } from "@/lib/trpc";
@@ -108,6 +111,10 @@ export default function AdminDashboardScreen() {
         <Text style={styles.sectionLabel}>LIVE</Text>
         <Text style={styles.sectionTitle}>Backend-Live-Status</Text>
         <AdminLiveStatusCard isAdmin={isAdmin} />
+        <Text style={styles.sectionLabel}>PUBLISHING-SICHERHEIT</Text>
+        <Text style={styles.sectionTitle}>Ungeklärte Veröffentlichungen</Text>
+        <PublishingOpsAdminCard isAdmin={isAdmin} />
+        <PublishingReviewAdminCard isAdmin={isAdmin} />
 
         <Text style={styles.sectionLabel}>PROVIDER</Text>
         <Text style={styles.sectionTitle}>LLM-Provider & API-Keys</Text>
@@ -116,6 +123,10 @@ export default function AdminDashboardScreen() {
         <Text style={styles.sectionTitle}>Integrations-Status (Sprint 196)</Text>
         <IntegrationStatusCard isAdmin={isAdmin} />
         <WixCard isAdmin={isAdmin} />
+
+        <Text style={styles.sectionLabel}>UMSATZ</Text>
+        <Text style={styles.sectionTitle}>MRR aus HubSpot-Deals</Text>
+        <HubspotMrrCard isAdmin={isAdmin} />
 
         <Text style={styles.sectionLabel}>ENTWICKLUNG</Text>
         <Text style={styles.sectionTitle}>Autonome Entwicklung (0 EUR)</Text>

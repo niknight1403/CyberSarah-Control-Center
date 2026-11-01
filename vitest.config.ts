@@ -64,13 +64,13 @@ export default defineConfig({
     // damit langsame CI-Runner nicht an der 5-s-Vorgabe scheitern.
     isolate: false,
     testTimeout: 180_000,
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/**/*.test.{ts,tsx}", "tests/*.test.{ts,tsx}"],
     watch: false,
     coverage: {
       provider: "v8",
       reportsDirectory: "coverage",
       reporter: ["text", "json-summary", "lcov"],
-      include: ["lib/**", "server/**", "shared/**", "scripts/**"],
+      include: ["lib/**", "server/**", "shared/**", "scripts/**/*.{js,mjs,cjs,ts,tsx}"],
       exclude: ["tests/**", "**/*.test.*", "**/*.d.ts", "**/__mocks__/**"],
       reportOnFailure: false,
     },

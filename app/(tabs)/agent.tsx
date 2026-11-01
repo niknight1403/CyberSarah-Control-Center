@@ -15,6 +15,7 @@ import { MarkdownLiteContent } from "@/components/chat/message-bubble";
 import { AgentAvatar } from "@/components/living/agent-avatar";
 import { resolveAvatarMood } from "@/lib/agent-avatar-logic";
 import { ScreenContainer } from "@/components/screen-container";
+import { TopNavigation } from "@/components/responsive/top-navigation";
 import { StudioErrorBoundary } from "@/components/studio/studio-error-boundary";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import {
@@ -83,6 +84,7 @@ import {
   type SkillId,
   type SkillPreferences,
 } from "@/lib/skill-preferences-logic";
+import { enabledSkillLabels } from "@/lib/skill-catalog";
 import {
   Alert,
   ActivityIndicator,
@@ -97,7 +99,7 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { darken, lighten, withAlpha } from "@/lib/theme-color-utils";
-import { useNow } from "@/hooks/use-now";
+import { useNowEvery } from "@/hooks/use-now";
 
 type ChatMessage = DevelopmentChatHistoryMessage & { proposal?: AgentProposal };
 type ChatAttachment = MediaAttachment;
@@ -144,7 +146,9 @@ export default function AgentScreen() {
   const [chatError, setChatError] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   // Sprint 172: Aktuelle Zeit im Render ueber die Tick-Uhr (kein Date.now waehrend des Renderns).
-  const nowMs = useNow();
+  // Sprint 347 — Flacker-Fix: 30-Sekunden-Takt statt Sekundentakt. Der
+  // Sekundentakt re-renderte den kompletten Agent-Tab (inkl. Animationen).
+  const nowMs = useNowEvery(30_000);
   const [backupPassword, setBackupPassword] = useState("");
   const [backupPasswordRepeat, setBackupPasswordRepeat] = useState("");
   const [backupState, setBackupState] = useState<
@@ -469,13 +473,7 @@ export default function AgentScreen() {
     setIsThinking(true);
     try {
       const projectContext = await readProjectContext(attachments);
-      const enabledSkills = [
-        skillPreferences.agent ? "Agent-Vorschläge" : "",
-        skillPreferences.diff ? "Code-Diff-Prüfung" : "",
-        skillPreferences.quality ? "CI-Qualitätsprüfung" : "",
-      ]
-        .filter(Boolean)
-        .join(", ");
+      const enabledSkills = enabledSkillLabels(skillPreferences);
       const projectContextText = formatProjectContext(projectContext.files);
       const contextNotice = projectContext.skipped.length
         ? `\n\nNicht übernommen: ${projectContext.skipped.join(", ")}`
@@ -835,6 +833,7 @@ export default function AgentScreen() {
         containerClassName="bg-transparent"
         edges={["top", "left", "right", "bottom"]}
       >
+        <TopNavigation />
         <StudioErrorBoundary section="Agent">
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -1297,6 +1296,17 @@ export default function AgentScreen() {
                           />
                         </TouchableOpacity>
                       </View>
+                      <TouchableOpacity
+                        accessibilityLabel="Skills in den Einstellungen verwalten"
+                        accessibilityRole="button"
+                        activeOpacity={0.75}
+                        onPress={() => router.push("/settings/skills" as never)}
+                        style={styles.toolsManageLink}
+                      >
+                        <Text style={styles.toolsManageLinkText}>
+                          Skills in den Einstellungen verwalten ›
+                        </Text>
+                      </TouchableOpacity>
                       <View style={styles.toolStatusRow}>
                         <View style={styles.toolNameBlock}>
                           <Text style={styles.toolName}>Workspace-Service</Text>
@@ -2317,6 +2327,15 @@ function createStyles() {
     fontWeight: "900",
     letterSpacing: 1,
     marginBottom: 8,
+  },
+  toolsManageLink: {
+    marginBottom: 10,
+  },
+  toolsManageLinkText: {
+    color: glassPalette.cyan,
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "right",
   },
   toolStatusRow: {
     alignItems: "center",

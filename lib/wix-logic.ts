@@ -400,3 +400,20 @@ export function buildWixStatusSnapshot(input: {
     nextStep: "Bereit — Site-Properties und Orders über die Karte abrufbar.",
   };
 }
+
+/**
+ * Reine Auswahl-Logik fuer die automatische Site-Erkennung (testbar ohne Netz).
+ * found = genau eine brauchbare Site, ambiguous = Auswahl noetig, empty = keine.
+ */
+export type WixSiteSelection =
+  | { status: "found"; site: WixSiteSummary }
+  | { status: "ambiguous"; candidates: WixSiteSummary[] }
+  | { status: "empty" };
+
+export function selectWixSite(sites: unknown): WixSiteSelection {
+  const list = normalizeWixSites({ sites });
+  const usable = list.filter((site) => site.id.length > 0);
+  if (usable.length === 0) return { status: "empty" };
+  if (usable.length > 1) return { status: "ambiguous", candidates: usable };
+  return { status: "found", site: usable[0] };
+}

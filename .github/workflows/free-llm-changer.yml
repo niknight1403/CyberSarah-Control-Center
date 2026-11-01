@@ -1,0 +1,77 @@
+# Sprint 202b — Autonomer Free-LLM Key-Changer (GitHub-Secrets-basiert).
+# Prueft alle 30 Minuten die hinterlegten Free-Tier-Keys (Secrets), rotiert
+# bei Limits automatisch auf den naechsten freien Anbieter und committet den
+# Zustandsbericht. Kein Key verlaesst dabei die Secrets-Umgebung: Es wird nur
+# die statusseitige changer-status.json committet, NIE aktive-anbindung.env.
+name: Free-LLM Key-Changer
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: free-llm-changer
+  cancel-in-progress: false
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Changer ausfuehren (alle Free-Tier-Anbieter pingen)
+        id: changer
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_BACKUP_KEY: ${{ secrets.GEMINI_BACKUP_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: bash tools/free-llm-changer/key-changer.sh
+
+      - name: Zustandsbericht ins Job-Summary
+        if: always()
+        run: |
+          {
+            echo "## Free-LLM Key-Changer"
+            echo '```'
+            cat tools/free-llm-changer/changer-status.json 2>/dev/null || echo "Kein Status"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Status committen (nur bei Aenderung)
+        if: always()
+        run: |
+          git config user.name "CyberSarah Agent"
+          git config user.email "agent@cybersarah.local"
+          git add tools/free-llm-changer/changer-status.json
+          if git diff --cached --quiet; then
+            echo "Keine Statusaenderung — kein Commit."
+            exit 0
+          fi
+          git commit -m "chore(llm-changer): Status aktualisiert [skip ci]"
+          git push
+
+      - name: Discord-Alarm, wenn kein kostenloser Anbieter verfuegbar
+        if: steps.changer.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          MESSAGE=":rotating_light: **Free-LLM Key-Changer**: Kein kostenloser Anbieter verfuegbar — alle Free-Tier-Kontingente sind am Limit oder die Keys fehlen. https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -sS -m 10 -H "Content-Type: application/json" \
+              -d "{\"content\":\"$MESSAGE\"}" "$DISCORD_WEBHOOK_URL" || true
+          else
+            echo "$MESSAGE"
+          fi
+          exit 1
+
+      - name: Job explizit rot markieren, wenn der Changer scheiterte
+        if: steps.changer.outcome == 'failure'
+        run: exit 1

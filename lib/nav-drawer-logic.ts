@@ -7,7 +7,30 @@
  * Einträge zeigt als die kompakte Bottom-Tab-Leiste.
  */
 
-export type DrawerRoute = "/chat" | "/superagent" | "/designer" | "/plugins" | "/meetings" | "/" | "/memory" | "/data" | "/settings";
+export type DrawerRoute =
+  | "/dashboard"
+  | "/business"
+  | "/media-studio"
+  | "/account"
+  | "/chat"
+  | "/revenue-os"
+  | "/micro-trading"
+  | "/loop-engineering"
+  | "/focus"
+  | "/ideas"
+  | "/decisions"
+  | "/superagent"
+  | "/designer"
+  | "/plugins"
+  | "/meetings"
+  | "/cyber-terminal"
+  | "/agent"
+  | "/preview"
+  | "/quality"
+  | "/"
+  | "/memory"
+  | "/data"
+  | "/settings";
 
 export type DrawerItem = {
   route: DrawerRoute;
@@ -21,21 +44,35 @@ export type DrawerItem = {
     | "folder.fill"
     | "brain.head.profile"
     | "tablecells.fill"
-    | "gearshape.fill";
+    | "gearshape.fill"
+    | "chevron.left.forwardslash.chevron.right"
+    | "sparkles"
+    | "play.rectangle.fill"
+    | "hourglass"
+    | "chart.bar.fill";
   badge?: string;
+  keywords?: readonly string[];
+  group: "start" | "revenue" | "studio" | "development" | "system";
 };
 
 /** Reihenfolge deckungsgleich mit dem Base44-Vorbild (Chat oben, Settings unten). */
+/** Operatives Menü: Revenue zuerst, Admin- und Utility-Routen bleiben direkt erreichbar. */
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
-  { route: "/chat", title: "Chat", icon: "message.fill" },
-  { route: "/superagent", title: "Workflows", icon: "wand.and.stars" },
-  { route: "/designer", title: "Designer", icon: "paintpalette.fill", badge: "KI" },
-  { route: "/plugins", title: "Plugins", icon: "puzzlepiece.fill" },
-  { route: "/meetings", title: "Meetings", icon: "video.fill", badge: "Neu" },
-  { route: "/", title: "Dateien", icon: "folder.fill" },
-  { route: "/memory", title: "Gedächtnis", icon: "brain.head.profile" },
-  { route: "/data", title: "Daten", icon: "tablecells.fill" },
-  { route: "/settings", title: "Agenteneinstellungen", icon: "gearshape.fill" },
+  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill", group: "start", keywords: ["status","gesundheit","betrieb","startseite"] },
+  { route: "/chat", title: "KI-Chat", icon: "message.fill", group: "start", keywords: ["ki","assistent","prompt","fragen"] },
+  { route: "/superagent", title: "Superagent & Workflows", icon: "wand.and.stars", group: "start", keywords: ["autopilot","orchestrierung","workflow"] },
+  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", group: "revenue", keywords: ["umsatz","geld","stripe","monetarisierung"] },
+  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill", group: "revenue", keywords: ["analyse","kunden","statistik"] },
+  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "revenue", keywords: ["prioritaeten","aufgaben"] },
+  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "revenue", keywords: ["ideen","entwurf"] },
+  { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "revenue", keywords: ["entscheidung","protokoll"] },
+  { route: "/media-studio", title: "Media Studio", icon: "video.fill", group: "studio", keywords: ["videos","reels","content","film"] },
+  { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "development", keywords: ["programmierung","automation","entwicklung"] },
+  { route: "/", title: "Workspace", icon: "folder.fill", group: "development", keywords: ["dateien","repository","github","code"] },
+  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill", group: "development", keywords: ["vorschau","website","testen"] },
+  { route: "/quality", title: "Qualität & Builds", icon: "chart.bar.fill", group: "development", keywords: ["apk","android","build","tests","release"] },
+  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right", group: "development", keywords: ["logs","diagnose","terminal"] },
+  { route: "/account", title: "Konto & Einstellungen", icon: "gearshape.fill", group: "system", keywords: ["profil","einstellungen","konto"] },
 ] as const;
 
 /** Aktives Item anhand des Pfades auflösen — "/" nur bei exaktem Root-Treffer,

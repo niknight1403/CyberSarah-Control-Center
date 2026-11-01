@@ -50,11 +50,20 @@ function makeStub(name) {
   return new Proxy(callable, handler);
 }
 
-export default makeStub("react-native-stub");
+export const asyncStorageValues = new Map();
+export const secureStorageValues = new Map();
+export let useTestStorageValues = false;
+export const setUseTestStorageValues = (enabled) => { useTestStorageValues = enabled; };
+export const Platform = { OS: "web", select: (options) => options.default };
+const asyncStorage = {
+  getItem: async (key) => useTestStorageValues ? (asyncStorageValues.get(key) ?? null) : "[stub:AsyncStorage.getItem]",
+  setItem: async (key, value) => { asyncStorageValues.set(key, value); },
+  removeItem: async (key) => { asyncStorageValues.delete(key); },
+};
+export default asyncStorage;
 
 // --- Statisch importierte react-native-Namen (vgl. lib/, lib/_core/) ---
 export const Appearance = makeStub("Appearance");
-export const Platform = makeStub("Platform");
 export const Pressable = makeStub("Pressable");
 export const View = makeStub("View");
 export const useColorScheme = () => "light";
@@ -62,14 +71,14 @@ export const useColorScheme = () => "light";
 // --- @react-native-async-storage/async-storage (Default-Import) ---
 // AsyncStorage selbst ist der default-Export (Proxy); diese Namen dienen
 // nur der Vollstaendigkeit, falls ein Test explizit named importiert.
-export const getItem = makeStub("AsyncStorage.getItem");
-export const setItem = makeStub("AsyncStorage.setItem");
-export const removeItem = makeStub("AsyncStorage.removeItem");
+export const getItem = asyncStorage.getItem;
+export const setItem = asyncStorage.setItem;
+export const removeItem = asyncStorage.removeItem;
 
 // --- expo-secure-store (import * as SecureStore) ---
-export const setItemAsync = makeStub("SecureStore.setItemAsync");
-export const getItemAsync = makeStub("SecureStore.getItemAsync");
-export const deleteItemAsync = makeStub("SecureStore.deleteItemAsync");
+export const setItemAsync = async (key, value) => { secureStorageValues.set(key, value); };
+export const getItemAsync = async (key) => useTestStorageValues ? (secureStorageValues.get(key) ?? null) : "[stub:SecureStore.getItemAsync]";
+export const deleteItemAsync = async (key) => { secureStorageValues.delete(key); };
 export const isAvailableAsync = makeStub("SecureStore.isAvailableAsync");
 export const WHEN_UNLOCKED_THIS_DEVICE_ONLY = makeStub("SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY");
 

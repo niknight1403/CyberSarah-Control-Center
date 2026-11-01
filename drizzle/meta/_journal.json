@@ -57,6 +57,111 @@
       "when": 1789801109642,
       "tag": "0007_sharp_sage",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790292424313,
+      "tag": "0008_crazy_guardsmen",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790302375704,
+      "tag": "0009_nifty_machine_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790304087679,
+      "tag": "0010_bumpy_shard",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790305752206,
+      "tag": "0011_silky_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790315786754,
+      "tag": "0012_exotic_romulus",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792590000000,
+      "tag": "0013_affiliate_revenue",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792592056990,
+      "tag": "0014_affiliate_landing",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792593677837,
+      "tag": "0015_landing_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793157000000,
+      "tag": "0016_revenue_autopilot_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793160000000,
+      "tag": "0017_agentforge_mesh",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793188000000,
+      "tag": "0018_b2b_influencer_learning",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793190000000,
+      "tag": "0019_repair_growth_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793191000000,
+      "tag": "0020_draft_queue_dedupe",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793470000000,
+      "tag": "0021_publishing_atomic_dispatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793471000000,
+      "tag": "0022_publishing_manual_review_audit",
+      "breakpoints": true
     }
   ]
 }

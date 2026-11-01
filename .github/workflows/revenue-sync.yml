@@ -1,0 +1,92 @@
+name: Revenue-OS Sync (Hetzner -> VM)
+
+# Sprint 372 — Autonome 30-Minuten-Spiegelung der Revenue-OS-Datenbank
+# (Produktionsmuster auf 127.0.0.1:5432, DB "cybersarah") in die VM-
+# Spiegel-DB "revenue_os" (Oracle-VM, oeffentlich via nginx-SNI-443).
+# Das Control Center auf Render liest NUR aus dem Spiegel; schreibende
+# Scans laufen ueber das Relay auf hub.cybersarah-ki.com/revenue-api
+# gegen die Origin-Engine. Die Render-URL (REVENUE_OS_DATABASE_URL) wird
+# bei jedem Lauf aus DATABASE_URL abgeleitet und als Secret aktualisiert,
+# damit Passwort-Rotationen automatisch nachziehen.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/revenue-sync.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revenue-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
+      SSH_USER: ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}
+      SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY2 || secrets.PRODUCTION_SSH_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GH_TOKEN: ${{ secrets.CCC_ADMIN_GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Dump von Produktion holen und in VM-Spiegel einspielen
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$SSH_HOST" && test -n "$SSH_USER"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/sync_key
+          chmod 600 ~/.ssh/sync_key
+          SSH="ssh -i ~/.ssh/sync_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=12 $SSH_USER@$SSH_HOST"
+
+          # 1) Ableiten der Render-Spiegel-URL aus DATABASE_URL (DB-Name tauschen)
+          python3 - <<'PY' > /tmp/revenue_url
+          import os
+          u = os.environ["DATABASE_URL"].strip()
+          assert "/cybersarah" in u, "DATABASE_URL enthaelt nicht den erwarteten DB-Namen"
+          print(u.replace("/cybersarah", "/revenue_os", 1), end="")
+          PY
+          REV_URL=$(cat /tmp/revenue_url)
+          test -n "$REV_URL"
+          echo "::add-mask::$REV_URL"
+
+          # 2) Read-only Dump des Revenue-Schemas von der Produktion
+          echo "Erzeuge Dump auf dem Produktionsserver …"
+          # Manche Remote-Shell-Profile schreiben Environment-Zeilen auf stdout.
+          # Nur der eigentliche pg_dump ab seiner eindeutigen Kopfzeile darf in
+          # die SQL-Datei gelangen; sonst wird der Spiegel durch Shell-Text zerstoert.
+          $SSH 'sudo -n -u postgres pg_dump --schema=public --no-owner --no-privileges --clean --if-exists --quote-all-identifiers cybersarah' \
+            | sed -n '/^-- PostgreSQL database dump/,$p' > /tmp/revenue_dump.sql
+          grep -q '^-- PostgreSQL database dump' /tmp/revenue_dump.sql
+          DUMP_BYTES=$(wc -c < /tmp/revenue_dump.sql)
+          echo "Dump-Groesse: $DUMP_BYTES Bytes"
+          test "$DUMP_BYTES" -gt 1000
+
+          # 3) Einspielen in den VM-Spiegel (psql ueber die oeffentliche SNI-443-Route)
+          echo "Spiele Dump in die VM-Spiegel-DB ein …"
+          # PG18-Dumps enthalten SET transaction_timeout (PG16 kennt es nicht) — filtern.
+          grep -v 'transaction_timeout' /tmp/revenue_dump.sql > /tmp/revenue_dump16.sql || true
+          psql "$REV_URL" -v ON_ERROR_STOP=1 -q -f /tmp/revenue_dump16.sql
+          rm -f /tmp/revenue_dump.sql /tmp/revenue_url
+
+          # 4) Zeilenzaehlung als Synchronisationsnachweis
+          echo "== Tabellen im Spiegel =="
+          psql "$REV_URL" -tA -c "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename;" | head -40
+          for T in hara_proposals customer_subscriptions cross_sell_rules expansion_chancen; do
+            C=$(psql "$REV_URL" -tA -c "SELECT COUNT(*) FROM \"$T\";" 2>/dev/null || echo -1)
+            echo "Tabelle $T: $C Zeilen"
+          done
+
+          # 5) Render-Secret aktuell halten (Passwort-Rotation zieht automatisch nach)
+          gh secret set REVENUE_OS_DATABASE_URL --repo "$REPO" --body "$REV_URL" >/dev/null
+          echo "REVENUE_OS_DATABASE_URL aktualisiert."
+          unset REV_URL
+      - name: Kein Dump im Artefakt-Cache
+        if: always()
+        run: rm -f /tmp/revenue_dump.sql /tmp/revenue_url || true

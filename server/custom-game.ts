@@ -23,7 +23,12 @@ import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { isFreeManagedSource, resolveManagedLlmEndpoint, type ManagedLlmEnv } from "../lib/managed-llm-fallback-logic";
+import { isFreeManagedSource, managedLlmEnvFromProcess, openAiCompatibleChatUrl, resolveManagedLlmEndpoint } from "../lib/managed-llm-fallback-logic";
+import {
+  calculateQualityGate,
+  scoreStandaloneHtmlPerformance,
+  scoreStandaloneHtmlSecurity,
+} from "../lib/quality-gate-logic";
 import {
   buildCustomLabel,
   buildCustomGamePrompt,
@@ -35,6 +40,7 @@ import {
 } from "../lib/custom-game-logic";
 import {
   buildArtifact,
+  evaluateArtifact,
   extractScript,
   planProject,
   type ProjectSpec,
@@ -110,8 +116,17 @@ async function generateCustomGame(idea: string, fixIssues: string[]): Promise<Ge
         .join("\n")}`
     : buildCustomGamePrompt(idea);
 
-  // Stufe 1: Kostenloser Managed-Endpoint (Groq > OpenRouter :free > Gemini).
-  const endpoint = resolveManagedLlmEndpoint(process.env as unknown as ManagedLlmEnv);
+  // Stufe 1: Lokales Ollama — Codegen bleibt standardmaessig lokal.
+  const localHtml = await generateFromEndpoint(
+    openAiCompatibleChatUrl(OLLAMA_BASE()),
+    {},
+    process.env.OLLAMA_CODEGEN_MODEL ?? "qwen2.5-coder:7b",
+    prompt,
+  );
+  if (localHtml) return { html: localHtml, source: "local_ollama", issues: [] };
+
+  // Stufe 2: kostenlose Cloud-Eskalation bei lokalem Timeout/Ausfall.
+  const endpoint = resolveManagedLlmEndpoint(managedLlmEnvFromProcess(process.env));
   if (endpoint && isFreeManagedSource(endpoint.source)) {
     const html = await generateFromEndpoint(
       endpoint.url,
@@ -122,15 +137,6 @@ async function generateCustomGame(idea: string, fixIssues: string[]): Promise<Ge
     );
     if (html) return { html, source: "free_cloud_llm", issues: [] };
   }
-
-  // Stufe 2: Lokales Ollama — unbegrenzt, offline, 0 EUR.
-  const localHtml = await generateFromEndpoint(
-    `${OLLAMA_BASE()}/v1/chat/completions`,
-    {},
-    process.env.OLLAMA_CODEGEN_MODEL ?? "qwen2.5-coder:7b",
-    prompt,
-  );
-  if (localHtml) return { html: localHtml, source: "local_ollama", issues: [] };
 
   return { html: null, source: "template_fallback", issues: ["Kein freier LLM-Endpoint erreichbar"] };
 }
@@ -180,7 +186,22 @@ export async function runCustomGameDevelopment(input: { idea: string; wish?: str
     const plan = planProject(spec);
     deliveredHtml = buildArtifact(spec, {});
     codeSource = "template_fallback";
+    const fallbackVerification = evaluateArtifact(deliveredHtml, verifyScriptSyntax(deliveredHtml));
+    if (!fallbackVerification.ok) {
+      throw new Error(`FALLBACK_VERIFIKATION_GESCHEITERT: ${JSON.stringify(fallbackVerification.issues)}`);
+    }
     validation = { ok: true, issues: [`Kein freier LLM verfuegbar — ehrlicher Fallback auf Template '${match.label}' (${plan.slug}).`] };
+  }
+
+  const htmlBytes = Buffer.byteLength(deliveredHtml, "utf-8");
+  const quality = calculateQualityGate({
+    syntax: validation.ok ? 100 : 0,
+    tests: validation.ok ? 100 : 0,
+    security: scoreStandaloneHtmlSecurity(deliveredHtml),
+    performance: scoreStandaloneHtmlPerformance(htmlBytes),
+  });
+  if (!quality.passed) {
+    throw new Error(`QUALITY_GATE_GESCHEITERT: Score ${quality.score}/100 < ${quality.threshold}.`);
   }
 
   const artifactDir = join(process.cwd(), "artifacts", "autonomous-dev", slug);
@@ -195,8 +216,10 @@ export async function runCustomGameDevelopment(input: { idea: string; wish?: str
     wish: idea.slice(0, 500),
     slug,
     artifactPath: relativeToCwd(artifactPath),
-    htmlBytes: Buffer.byteLength(deliveredHtml, "utf-8"),
+    htmlBytes,
     verificationOk: validation.ok,
+    qualityScore: quality.score,
+    qualityGatePassed: quality.passed,
     enhancementSource: codeSource === "template_fallback" ? "template_defaults" : codeSource,
     llmProviderUsed: codeSource,
     iterations,

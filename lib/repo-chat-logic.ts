@@ -54,6 +54,38 @@ export const DEFAULT_REPO_EXCLUDES = [
   "android/app/build",
 ];
 
+/** Code-Dateiendungen, die der Symbol-Scanner versteht. */
+export const INDEXABLE_EXTENSIONS = [".ts", ".tsx", ".js", ".mjs"];
+
+/** Maximale Anzahl Dateien im Index (Budget-Deckel fuer Grosse-Indices). */
+export const INDEXABLE_FILE_LIMIT = 1500;
+
+/** Maximale Dateigroesse je indexierter Datei (Bytes). */
+export const INDEXABLE_MAX_FILE_BYTES = 256 * 1024;
+
+/** Prueft, ob eine Datei fuer den Code-Index infrage kommt (Endung + Ausschluesse). */
+export function isIndexableCodeFile(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, "/").trim();
+  if (isExcludedPath(normalized)) return false;
+  return INDEXABLE_EXTENSIONS.some((extension) => normalized.toLowerCase().endsWith(extension));
+}
+
+/** Baut die indexfaehige Dateiliste aus Roh-Eintraegen (Tarball-Glob-Form). */
+export function collectIndexableFiles(
+  entries: { path: string; size: number }[],
+  limit: number = INDEXABLE_FILE_LIMIT
+): { path: string; size: number }[] {
+  const collected: { path: string; size: number }[] = [];
+  for (const entry of entries) {
+    if (collected.length >= limit) break;
+    const normalizedPath = entry.path.replace(/\\/g, "/").trim();
+    if (!isIndexableCodeFile(normalizedPath)) continue;
+    if (!Number.isFinite(entry.size) || entry.size > INDEXABLE_MAX_FILE_BYTES || entry.size < 0) continue;
+    collected.push({ path: normalizedPath, size: entry.size });
+  }
+  return collected;
+}
+
 /** Prueft, ob ein relativer Pfad von den Ausschlusssen betroffen ist. */
 export function isExcludedPath(relativePath: string, excludes: string[] = DEFAULT_REPO_EXCLUDES): boolean {
   const normalized = relativePath.replace(/\\/g, "/").trim();

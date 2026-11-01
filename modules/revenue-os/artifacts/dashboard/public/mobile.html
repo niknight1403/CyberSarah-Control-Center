@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<title>CyberSarah Mobile</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
+body{background:#0a0a0f;color:#e0e0e0;padding:0;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a0a2e,#0d0d1a);padding:16px;text-align:center;border-bottom:1px solid #2a1a4e}
+.header h1{font-size:1.2rem;background:linear-gradient(135deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header p{color:#6b7280;font-size:0.7rem;margin-top:2px}
+.container{padding:12px;max-width:500px;margin:0 auto}
+.card{background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;margin-bottom:10px}
+.card-title{font-size:0.75rem;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0}
+.stat{background:rgba(255,255,255,0.03);border-radius:10px;padding:12px;text-align:center}
+.stat .num{font-size:1.3rem;font-weight:700}
+.stat .lbl{font-size:0.6rem;color:#6b7280;margin-top:2px}
+.green{color:#22c55e}.yellow{color:#eab308}.red{color:#ef4444}.purple{color:#a855f7}.blue{color:#06b6d4}
+.product-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.8rem}
+.product-item:last-child{border-bottom:none}
+.product-name{flex:1;color:#d1d5db}
+.product-price{color:#a855f7;font-weight:600}
+.buy-btn{padding:4px 12px;background:linear-gradient(135deg,#a855f7,#7c3aed);border:none;border-radius:8px;color:#fff;font-size:0.7rem;font-weight:600;cursor:pointer;text-decoration:none}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{flex:1;padding:10px;border:none;border-radius:10px;font-size:0.8rem;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;min-width:80px;transition:all 0.2s}
+.btn-primary{background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff}
+.btn-success{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3)}
+.btn-outline{background:rgba(255,255,255,0.08);color:#e0e0e0;border:1px solid rgba(255,255,255,0.15)}
+.btn:active{transform:scale(0.95)}
+.log-item{font-size:0.7rem;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;justify-content:space-between;color:#9ca3af}
+.log-status{font-size:0.6rem;padding:1px 8px;border-radius:8px;font-weight:600}
+.log-ok{background:rgba(34,197,94,0.15);color:#22c55e}
+.log-err{background:rgba(239,68,68,0.15);color:#ef4444}
+#loading{text-align:center;padding:40px;color:#6b7280}
+.refresh-btn{background:none;border:none;color:#6b7280;font-size:0.7rem;cursor:pointer;float:right}
+.refresh-btn:hover{color:#a855f7}
+.apk-btn{display:flex;align-items:center;justify-content:center;gap:6px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚡ CyberSarah</h1>
+  <p id="statusTime">Live • Laden...</p>
+</div>
+<div class="container" id="app">
+  <div id="loading">📡 Verbinde zum Server...</div>
+  <div id="content" style="display:none">
+    <div class="grid" id="kpiGrid"></div>
+    <div class="card" id="agentCard">
+      <div class="card-title">🤖 Agenten</div>
+      <div id="agentContent"></div>
+    </div>
+    <div class="card" id="productCard">
+      <div class="card-title">🛍️ Store <button class="refresh-btn" onclick="loadData()">↻</button></div>
+      <div id="productContent"></div>
+    </div>
+    <div class="card" id="actionCard">
+      <div class="card-title">🎮 Aktionen</div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="loadData()">🔄 Refresh</button>
+        <button class="btn btn-success apk-btn" onclick="openAPK()">📱 APK</button>
+        <a class="btn btn-outline" href="/api/store" target="_blank">🛍️ Store</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin + '/api';
+const SERVER = window.location.origin;
+
+async function loadData() {
+  try {
+    const [sys, stripe, logs] = await Promise.all([
+      fetch(API+'/system-status').then(r=>r.json()).catch(()=>({})),
+      fetch(API+'/stripe/products').then(r=>r.json()).catch(()=>({products:[]})),
+      fetch(API+'/admin/logs?limit=8').then(r=>r.json()).catch(()=>({logs:[]}))
+    ]);
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    document.getElementById('statusTime').textContent = 'Live • '+new Date().toLocaleTimeString('de-DE');
+
+    const health = sys.systemGesundheit || 0;
+    const rate = sys.erfolgsrate24h || 0;
+    const agents = sys.agentenGesamt || 0;
+    const status = sys.agentenNachStatus || {};
+    const products = stripe.products || [];
+    const logList = logs.logs || [];
+
+    document.getElementById('kpiGrid').innerHTML = `
+      <div class="stat"><div class="num ${health>80?'green':health>50?'yellow':'red'}">${health}%</div><div class="lbl">Gesundheit</div></div>
+      <div class="stat"><div class="num ${rate>80?'green':rate>50?'yellow':'red'}">${rate}%</div><div class="lbl">Erfolgsrate</div></div>
+      <div class="stat"><div class="num purple">${agents}</div><div class="lbl">Agenten</div></div>
+      <div class="stat"><div class="num blue">${products.length}</div><div class="lbl">Produkte</div></div>
+    `;
+
+    // Agent breakdown
+    const a = status.aktiv || 0;
+    const w = status.wartend || 0;
+    const f = status.fehler || 0;
+    document.getElementById('agentContent').innerHTML = `
+      <div style="display:flex;gap:12px;justify-content:center;padding:8px 0">
+        ${a ? `<span>🟢 ${a} aktiv</span>` : ''}
+        ${w ? `<span>🟡 ${w} wartend</span>` : ''}
+        ${f ? `<span style="color:#ef4444">🔴 ${f} fehler</span>` : ''}
+      </div>
+      <div style="font-size:0.7rem;color:#6b7280;text-align:center">
+        ${sys.systemGesund ? '✅ System läuft stabil' : '❌ System hat Probleme'}
+        ${sys.stripeLiveKey ? ' | 💰 Stripe LIVE' : ''}
+      </div>
+    `;
+
+    // Products
+    document.getElementById('productContent').innerHTML = products.length > 0
+      ? products.slice(0,5).map(p => {
+          const price = ((p.price||{}).unitAmount||0)/100;
+          return `<div class="product-item">
+            <span class="product-name">${(p.name||'?').substring(0,32)}</span>
+            <span class="product-price">€${price.toFixed(2)}</span>
+            <a class="buy-btn" href="${p.url||'#'}" target="_blank">Kaufen</a>
+          </div>`;
+        }).join('') + (products.length>5 ? `<div style="text-align:center;padding:8px;font-size:0.7rem;color:#6b7280">+${products.length-5} weitere</div>` : '')
+      : '<div style="text-align:center;padding:16px;color:#6b7280;font-size:0.8rem">📦 Keine Produkte verfügbar</div>';
+      
+  } catch(e) {
+    document.getElementById('loading').innerHTML = '❌ Server nicht erreichbar - versuche erneut...';
+    setTimeout(loadData, 3000);
+  }
+}
+
+function openAPK() {
+  // Try to find APK files
+  window.open(SERVER+'/apk/', '_blank');
+}
+
+loadData();
+setInterval(loadData, 20000);
+</script>
+</body>
+</html>

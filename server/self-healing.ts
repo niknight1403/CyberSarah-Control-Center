@@ -93,7 +93,19 @@ async function loadIndex(): Promise<SelfHealingIncident[]> {
 }
 
 async function persist(incidents: SelfHealingIncident[]): Promise<void> {
-  await db.setModelRouterSetting(INDEX_KEY, incidents.slice(0, MAX_INCIDENTS));
+  // Sprint 170: Ledger-Payload hart begrenzen (Evidenz kappen, max. 5 Eintraege a 500 Zeichen),
+  // damit ein Fehlerfeedback-Loop nicht exponentiell wachsen kann.
+  const slim = incidents.slice(0, MAX_INCIDENTS).map((incident) => ({
+    ...incident,
+    evidence: incident.evidence.slice(-5).map((line) => String(line).slice(0, 500)),
+  }));
+  try {
+    await db.setModelRouterSetting(INDEX_KEY, slim);
+  } catch (err) {
+    // Persistenz-Ausfaelle bewusst schlucken: kein Log-Eintrag, damit sich das
+    // Selbstheilungssystem nicht selbst mit Fehlern faeuttern kann.
+    void err;
+  }
 }
 
 async function recordIncident(
@@ -141,7 +153,7 @@ export function attachAnomalyDetector(): void {
   subscribeRuntimeLogs((entry) => {
     const match = classifyLogLine(entry.level, entry.message);
     if (!match) return;
-    void handleAnomaly(match.signature, match.severity, match.finding, [entry.message]);
+    void handleAnomaly(match.signature, match.severity, match.finding, [entry.message.slice(0, 600)]);
   });
 }
 
@@ -205,7 +217,7 @@ export async function scanRuntimeLogsNow(): Promise<{ scanned: number; newIncide
       signature: match.signature,
       severity: match.severity,
       finding: match.finding,
-      evidence: [entry.message],
+      evidence: [entry.message.slice(0, 600)],
     });
     if (isNew) newIncidents += 1;
   }

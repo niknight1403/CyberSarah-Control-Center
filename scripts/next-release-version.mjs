@@ -34,5 +34,8 @@ function ghReleaseTags() {
 }
 
 const tags = ghReleaseTags();
-const version = nextReleaseVersion(tags, process.argv[2]);
+const candidate = nextReleaseVersion(tags, process.argv[2], "2.7.0");
+const [major, minor, patch] = candidate.split(".").map(Number);
+const belowMinimum = major < 2 || (major === 2 && minor < 7);
+const version = belowMinimum ? "2.7.0" : `${major}.${minor}.${patch}`;
 console.log(version);

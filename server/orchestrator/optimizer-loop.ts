@@ -29,7 +29,7 @@ import {
   shouldRunCycle,
   type OptimizerSnapshot,
 } from "../../lib/optimizer-logic";
-import { extractJsonObject } from "../../lib/designer-logic";
+import { extractJsonObject } from "../../lib/json-extract-logic";
 
 const CYCLES_KEY = "orchestrator.optimizerCycles";
 const MAX_CYCLE_ENTRIES = 30;
@@ -276,4 +276,25 @@ export function startOptimizerLoop(): void {
     }
   };
   globalState.timer = setInterval(() => void tick(), 60_000); // Jede Minute cadence pruefen; Intervall steuert die Ausfuehrung.
+}
+
+/**
+ * Sprint 197 — Start-Zyklus: genau EIN autonomer Optimierungs-Zyklus pro
+ * App-Start, im Hintergrund, ohne UI-Praesenz. Rate-limited:
+ *  - laeuft nicht, wenn bereits ein Zyklus laeuft
+ *  - laeuft nicht, wenn der letzte Zyklus juenger als minAgeMinutes ist
+ *  - laeuft nicht in den ersten 60 Sekunden nach Server-Boot (DB/PM2-Ruhe)
+ * Gibt null zurueck, wenn kein Zyklus noetig war (Idempotenz).
+ */
+export async function runOptimizerCycleIfStale(minAgeMinutes = 60): Promise<OptimizerCycleRecord | null> {
+  if (globalState.running) return null;
+  const nowMs = Date.now();
+  if (nowMs - globalState.bootedAtMs < 60_000) return null;
+  if (globalState.lastCycleAtMs != null && nowMs - globalState.lastCycleAtMs < minAgeMinutes * 60_000) return null;
+  try {
+    return await runOptimizerCycle("loop");
+  } catch {
+    // Bereits im Status (lastError) dokumentiert — kein App-Start blockieren.
+    return null;
+  }
 }

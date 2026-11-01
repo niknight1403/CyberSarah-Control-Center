@@ -11,6 +11,10 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -27,7 +31,16 @@ jobs:
 
       - name: Install dependencies (striktes Lockfile)
         if: github.actor != 'dependabot[bot]'
-        run: npm ci
+        env:
+          NPM_CONFIG_FETCH_RETRIES: 2
+          NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: 1000
+          NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 10000
+        run: |
+          set -e
+          timeout 300 npm ci --no-audit --no-fund && exit 0
+          echo "Erster npm-ci-Lauf hing oder schlug fehl — einmaliger sauberer Retry."
+          rm -rf node_modules
+          timeout 300 npm ci --no-audit --no-fund
 
       # Dependabot generiert Lockfiles mit seiner eigenen npm-Version; deren
       # Ideal-Baum-Rekonstruktion kann vom Runner-npm abweichen (z. B. yaml-
@@ -58,9 +71,9 @@ jobs:
           cd workspace-service
           echo "--- A: plain node"; timeout 8 node -e "console.log('node ok')"; echo "A exit=$?"
           echo "--- B: deps import"; timeout 20 node -e "await import('cors'); await import('express'); await import('http-proxy'); await import('zod'); console.log('imports ok')"; echo "B exit=$?"
-          echo "--- C: fallback-dir"; timeout 8 node -e "const fsSync=require('node:fs'); try { fsSync.mkdirSync('/proc/cybersarah-unwritable',{recursive:true}); console.log('primary created?!'); } catch (e) { console.log('primary failed (expected):', e.code); } fsSync.mkdirSync(process.cwd()+'/workspaces',{recursive:true}); console.log('fallback ok')"; echo "C exit=$?"
+          echo "--- C: fallback-dir"; timeout 8 node -e "const fsSync=require('node:fs'); try { fsSync.mkdirSync('/dev/null/cybersarah-unwritable',{recursive:true}); console.log('primary created?!'); } catch (e) { console.log('primary failed (expected):', e.code); } fsSync.mkdirSync(process.cwd()+'/workspaces',{recursive:true}); console.log('fallback ok')"; echo "C exit=$?"
           echo "--- D: full service (20s, Output direkt im Log)"
-          ( PORT=29787 WORKSPACES_DIR=/proc/cybersarah-unwritable NODE_ENV=production timeout 20 node src/index.js; echo "D exit=$?" ) &
+          ( PORT=29787 WORKSPACES_DIR=/dev/null/cybersarah-unwritable NODE_ENV=production timeout 20 node src/index.js; echo "D exit=$?" ) &
           for i in $(seq 1 20); do
             if curl -sf http://127.0.0.1:29787/api/v1/health > /dev/null 2>&1; then
               echo "Health-Check OK (Fallback-Workspaces)"; pkill -f "node src/index.js" 2>/dev/null; exit 0
@@ -68,6 +81,9 @@ jobs:
             sleep 1
           done
           echo "Service nicht healthy nach 20s — Deploy laeuft weiter, Render-Health-Check ist der verbindliche Gate."; pkill -f "node src/index.js" 2>/dev/null; exit 0
+
+      - name: Growth Pulse release safety gate
+        run: npm run audit:growth
 
       - name: Deterministic test suite mit Coverage
         run: npm run test:coverage
@@ -111,7 +127,7 @@ jobs:
         env:
           CI_STATUS: ${{ job.status == 'success' && 'passed' || 'failed' }}
           RELEASE_APP_NAME: CyberSarah Control Center
-          RELEASE_ANDROID_PACKAGE: com.app.customaistudiomobile
+          RELEASE_ANDROID_PACKAGE: com.cybersarah.controlcenter
         run: npx tsx scripts/write-release-handoff.ts
 
       - name: Upload release handoff artifact
@@ -131,3 +147,34 @@ jobs:
           EXTERNAL_ACTION_AUDIT_URL: ${{ secrets.EXTERNAL_ACTION_AUDIT_URL }}
           AUDIT_AUTH_TOKEN: ${{ secrets.SERVICE_ACCESS_TOKEN }}
         run: node scripts/ci-audit.mjs
+
+  publishing-postgres-concurrency:
+    name: PostgreSQL Publishing Multi-Worker Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: publishing_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d publishing_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PUBLISHING_INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/publishing_ci
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Assert live CAS and quarantine transitions with 24 concurrent claims
+        run: npx tsx scripts/test-publishing-claim-postgres.ts
