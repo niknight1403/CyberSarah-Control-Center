@@ -27,6 +27,9 @@ export default function AccountScreen() {
   const [message, setMessage] = useState("");
   const [stripeProductQuery, setStripeProductQuery] = useState("");
   const [stripeShowInactive, setStripeShowInactive] = useState(false);
+  // Sprint 30 — mobile Katalogpruefung: Filter, Befunde, manuelle Freigabe.
+  const [stripeOnlyWithIssues, setStripeOnlyWithIssues] = useState(false);
+  const [stripeVerdict, setStripeVerdict] = useState<"freigabefaehig" | "pruefen" | "blockiert" | undefined>(undefined);
   const [localUser, setLocalUser] = useState<Awaited<ReturnType<typeof Auth.getUserInfo>>>(null);
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const registerMutation = trpc.account.register.useMutation();
@@ -74,6 +77,22 @@ export default function AccountScreen() {
   const stripeAdminQuery = trpc.appStatus.integrationStatus.useQuery(undefined, { enabled: accountQuery.data?.role === "admin", retry: false, staleTime: 120_000 });
   const stripeCatalog = trpc.appStatus.stripeCatalog.useQuery(undefined, { enabled: false, retry: false });
   const stripeCampaign = trpc.appStatus.stripeCampaignDraft.useMutation();
+  const stripeCatalogView = trpc.appStatus.stripeCatalogView.useQuery(
+    {
+      search: stripeProductQuery.trim() || undefined,
+      activeOnly: !stripeShowInactive,
+      onlyWithIssues: stripeOnlyWithIssues,
+      verdict: stripeVerdict,
+      limit: 20,
+    },
+    { enabled: false, retry: false },
+  );
+  const stripeProductRelease = trpc.appStatus.stripeProductRelease.useMutation();
+  const stripeReleases = trpc.appStatus.stripeProductReleases.useQuery(undefined, {
+    enabled: accountQuery.data?.role === "admin",
+    retry: false,
+    staleTime: 60_000,
+  });
   const busy = registerMutation.isPending || loginMutation.isPending || logoutMutation.isPending;
 
   const persistAccount = async (result: { sessionToken: string; user: NonNullable<typeof user> }) => {
@@ -201,29 +220,99 @@ export default function AccountScreen() {
                           accent="cyan" variant="secondary"
                           onPress={() => setStripeShowInactive(!stripeShowInactive)}
                         />
-                        {stripeCatalog.data.products.filter(product =>
-                          (stripeShowInactive || product.active) &&
-                          (product.name.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()) ||
-                           product.id.toLowerCase().includes(stripeProductQuery.trim().toLowerCase()))
-                        ).slice(0, 12).map(product => (
-                          <View key={product.id} style={{ gap: 6, marginBottom: 10 }}>
+                        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                          <GlowButton
+                            label="Katalog mobil pruefen"
+                            accent="cyan" variant="secondary"
+                            disabled={stripeCatalogView.isFetching}
+                            testID="stripe-catalog-view"
+                            onPress={() => void stripeCatalogView.refetch()}
+                          />
+                          <GlowButton
+                            label={stripeOnlyWithIssues ? "Alle Produkte" : "Nur mit Befunden"}
+                            accent="cyan" variant="ghost"
+                            onPress={() => setStripeOnlyWithIssues(!stripeOnlyWithIssues)}
+                          />
+                          <GlowButton
+                            label="Filter: blockiert"
+                            accent="red" variant={stripeVerdict === "blockiert" ? "primary" : "ghost"}
+                            onPress={() => setStripeVerdict(stripeVerdict === "blockiert" ? undefined : "blockiert")}
+                          />
+                          <GlowButton
+                            label="Filter: freigabefaehig"
+                            accent="green" variant={stripeVerdict === "freigabefaehig" ? "primary" : "ghost"}
+                            onPress={() => setStripeVerdict(stripeVerdict === "freigabefaehig" ? undefined : "freigabefaehig")}
+                          />
+                        </View>
+                        {stripeCatalogView.isFetching ? <Text style={styles.billingCopy}>Pruefe Katalog …</Text> : null}
+                        {stripeCatalogView.error ? <Text style={styles.billingCopy}>Katalogpruefung nicht verfuegbar.</Text> : null}
+                        {stripeCatalogView.data ? (
+                          <>
                             <Text style={styles.billingCopy}>
-                              {product.name} · {product.priceCount} Preise ·
-                              {product.active ? " aktiv" : " inaktiv"}
-                              {product.issues.length ? " · " + product.issues.join(", ") : ""}
+                              {stripeCatalogView.data.matched} Treffer · freigabefaehig {stripeCatalogView.data.facets.freigabefaehig} ·
+                              {" "}Pruefung {stripeCatalogView.data.facets.pruefen} · blockiert {stripeCatalogView.data.facets.blockiert}
+                              {" · "}{stripeCatalogView.data.mode === "test" ? "TESTDATEN" : "LIVE-DATEN"}
                             </Text>
-                            <GlowButton
-                              label={stripeCampaign.isPending && stripeCampaign.variables?.productId === product.id
-                                ? "Erstelle Prüfling …" : "Content-Paket als Entwurf vorbereiten"}
-                              accent="cyan"
-                              variant="secondary"
-                              disabled={stripeCampaign.isPending || !product.active || !stripeCatalog.data.complete}
-                              onPress={() => void stripeCampaign.mutateAsync({ productId: product.id }).then(result => {
-                                setMessage(result.reason);
-                              }).catch(() => setMessage("Produktkampagnen-Entwurf konnte nicht gespeichert werden."))}
-                            />
-                          </View>
-                        ))}
+                            {stripeCatalogView.data.note ? <Text style={styles.billingCopy}>{stripeCatalogView.data.note}</Text> : null}
+                            {stripeCatalogView.data.rows.map(row => (
+                              <View key={row.id} style={{ gap: 6, marginBottom: 12 }}>
+                                <Text style={styles.billingCopy}>
+                                  {row.name} · {row.priceCount} Preise · {row.active ? "aktiv" : "inaktiv"} ·
+                                  {" "}{row.verdict}
+                                  {row.defaultPrice ? ` · ${row.defaultPrice.currency.toUpperCase()} ${row.defaultPrice.amountMinor ?? "?"}` : ""}
+                                </Text>
+                                {row.blockers.slice(0, 3).map(blocker => (
+                                  <Text key={`${row.id}-b-${blocker}`} style={styles.billingCopy}>Blockiert: {blocker}</Text>
+                                ))}
+                                {row.warnings.slice(0, 2).map(warning => (
+                                  <Text key={`${row.id}-w-${warning}`} style={styles.billingCopy}>Pruefen: {warning}</Text>
+                                ))}
+                                <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                                  <GlowButton
+                                    label={
+                                      stripeProductRelease.isPending && stripeProductRelease.variables?.productId === row.id
+                                        ? "Speichere …"
+                                        : row.verdict === "freigabefaehig"
+                                          ? "Manuell freigeben"
+                                          : "Freigabe blockiert"
+                                    }
+                                    accent="green"
+                                    variant={row.verdict === "freigabefaehig" ? "primary" : "ghost"}
+                                    disabled={!row.active || row.verdict === "blockiert" || stripeProductRelease.isPending}
+                                    testID={`stripe-release-${row.id}`}
+                                    onPress={() => void stripeProductRelease
+                                      .mutateAsync({ productId: row.id, action: "approved" })
+                                      .then(result => setMessage(`Freigabe gespeichert: ${result.verdict}. ${result.evidenceNote}`))
+                                      .catch(error => setMessage(error instanceof Error ? error.message : "Freigabe nicht moeglich."))}
+                                  />
+                                  <GlowButton
+                                    label="Freigabe zurueckziehen"
+                                    accent="red" variant="ghost"
+                                    disabled={stripeProductRelease.isPending}
+                                    onPress={() => void stripeProductRelease
+                                      .mutateAsync({ productId: row.id, action: "withdrawn" })
+                                      .then(() => setMessage("Freigabe zurueckgezogen. Ereignis bleibt im Verlauf."))
+                                      .catch(() => setMessage("Ruecknahme nicht moeglich."))}
+                                  />
+                                  <GlowButton
+                                    label="Content-Paket vorbereiten"
+                                    accent="cyan" variant="ghost"
+                                    disabled={stripeCampaign.isPending || !row.active}
+                                    onPress={() => void stripeCampaign.mutateAsync({ productId: row.id }).then(result => {
+                                      setMessage(result.reason);
+                                    }).catch(() => setMessage("Produktkampagnen-Entwurf konnte nicht gespeichert werden."))}
+                                  />
+                                </View>
+                              </View>
+                            ))}
+                            {stripeReleases.data?.available && stripeReleases.data.events.length > 0 ? (
+                              <Text style={styles.billingCopy}>
+                                Letzte Freigaben: {stripeReleases.data.events.slice(0, 3)
+                                  .map(event => `${event.productName} (${event.action}, ${event.verdict})`).join(" · ")}
+                              </Text>
+                            ) : null}
+                          </>
+                        ) : null}
                         <Text style={styles.billingCopy}>
                           Stripe bleibt read-only; Medienrechte und Affiliate-Freigabe sind nicht automatisch verifiziert.
                           {stripeCatalog.data.productCount > 12 ? " Es werden maximal zwölf passende Produkte angezeigt." : ""}

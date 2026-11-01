@@ -162,6 +162,13 @@
       "when": 1793471000000,
       "tag": "0022_publishing_manual_review_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793472000000,
+      "tag": "0023_product_release_events",
+      "breakpoints": true
     }
   ]
 }
