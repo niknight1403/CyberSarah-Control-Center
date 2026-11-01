@@ -17,6 +17,7 @@ export function RevenueAutopilotCard() {
     staleTime: 30_000,
     refetchInterval: 120_000,
   });
+  const throughput = trpc.revenueOsV2.throughput.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 60_000 });
   const b2b = trpc.growthNetwork.b2bOverview.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
   const learning = trpc.growthNetwork.influencerLearning.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 30_000, refetchInterval: 120_000 });
   const learningLoop = trpc.growthNetwork.learningLoopStatus.useQuery(undefined, { enabled: isAdmin, retry: false, staleTime: 15_000, refetchInterval: 60_000 });
@@ -63,6 +64,7 @@ export function RevenueAutopilotCard() {
         <>
           <View style={styles.metrics}>
             <Metric label="MRR" value={data.snapshot.mrrEur === null ? "—" : `${data.snapshot.mrrEur.toLocaleString("de-DE", { maximumFractionDigits: 0 })} €`} />
+            <Metric label="30d Revenue Run-Rate" value={throughput.data ? `${throughput.data.revenueVelocity.monthlyRunRateEur.toLocaleString("de-DE")} €` : "—"} />
             <Metric label="Aktive Abos" value={data.snapshot.activeSubscriptions ?? "—"} />
             <Metric label="Prioritäten" value={data.opportunities.length} />
             <Metric label="B2B Health" value={b2b.data ? `${b2b.data.health.healthScore}/100` : "—"} />
@@ -70,6 +72,48 @@ export function RevenueAutopilotCard() {
             <Metric label="Persona-Zuordnungen" value={b2b.data?.personaAssignments?.length ?? "—"} />
             <Metric label="Expansion Queue" value={b2b.data?.expansionQueue?.length ?? "—"} />
             <Metric label="KI Personas" value={learning.data?.states.length ?? "—"} />
+          </View>
+
+          <View style={styles.learningStrip}>
+            <Text style={styles.opportunityTitle}>Core Revenue Supervisor</Text>
+            <StatusChip
+              label={throughput.isError ? "Supervisor-Fehler" : throughput.isLoading ? "Prüft" : throughput.data?.status === "scale" ? "Revenue-Pfade stabil" : "Revenue-Reparatur"}
+              accent={throughput.isError ? "red" : throughput.data?.status === "scale" ? "green" : "amber"}
+              live={Boolean(throughput.data && throughput.data.status === "scale")}
+            />
+            {throughput.data ? (
+              <>
+                <Text style={styles.note}>
+                  Revenue Velocity 7d: {throughput.data.revenueVelocity.changePct === null ? "—" : throughput.data.revenueVelocity.changePct + "%"}
+                  {" · "}Conversions: {throughput.data.revenueVelocity.recent7Conversions}
+                  {" · "}MRR-Projektion: {throughput.data.mrrVelocity.available ? String(throughput.data.mrrVelocity.projectedMrrEur) : "noch nicht belastbar"}
+                </Text>
+                <Text style={styles.note}>
+                  Payments: Stripe {throughput.data.payments.stripeConnected ? "✓" : "✕"}
+                  {" · "}Stripe Webhook {throughput.data.payments.stripeWebhookConfigured ? "✓" : "✕"}
+                  {" · "}Digistore24 IPN {throughput.data.payments.digistoreIpnConfigured ? "✓" : "✕"}
+                  {" · "}DB {throughput.data.infrastructure.databaseReady ? "✓" : "✕"}
+                </Text>
+                <Text style={styles.note}>
+                  Webhook-Laufzeit: Stripe Fehlerfolge {throughput.data.payments.stripeWebhookConsecutiveFailures}
+                  {" · "}Digistore24 Fehlerfolge {throughput.data.payments.digistoreWebhookConsecutiveFailures}
+                </Text>
+                {throughput.data.bottleneck ? (
+                  <Text style={styles.note}>
+                    Funnel-Engpass: {throughput.data.bottleneck.key} · Conversion {throughput.data.bottleneck.ratePct ?? "—"}%
+                  </Text>
+                ) : null}
+                {throughput.data.blockers.length ? (
+                  <Text style={styles.error}>Revenue-Blocker: {throughput.data.blockers.slice(0, 3).join(" · ")}</Text>
+                ) : (
+                  <Text style={styles.note}>Keine kritischen Revenue-Blocker erkannt. Nächste Priorität: bestes messbares Experiment skalieren.</Text>
+                )}
+              </>
+            ) : throughput.isError ? (
+              <Text style={styles.error}>Revenue Supervisor nicht verfügbar: {throughput.error.message}</Text>
+            ) : (
+              <Text style={styles.note}>Prüfe Funnel, Payments, Datenbank und Provider-Kapazität …</Text>
+            )}
           </View>
 
           <View style={styles.learningStrip}>
@@ -220,6 +264,7 @@ export function RevenueAutopilotCard() {
                     : "Autopilot-Lauf abgeschlossen; aktuell war keine neue Aktion erforderlich.");
               await Promise.all([
                 utils.controlCenterAutopilot.overview.invalidate(),
+                utils.revenueOsV2.throughput.invalidate(),
                 utils.draftEngine.queue.invalidate(),
                 utils.growthNetwork.b2bOverview.invalidate(),
                 utils.growthNetwork.influencerLearning.invalidate(),

@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { createHash } from "node:crypto";
 import * as db from "./db";
+import {markRevenueWebhookFailure,markRevenueWebhookSuccess} from "./revenue-webhook-runtime";
 
 // ---------------------------------------------------------------------------
 // Sprint 70 — Abonnement-Stufen (Lite, Pro, Expert), Webhooks, Verwaltung
@@ -379,7 +380,10 @@ export async function processStripeWebhook(
   },
 ) {
   const stripe = assertLiveStripeConfiguration();
-  if (!signature) throw new StripeWebhookSignatureError("Stripe-Signatur fehlt.");
+  if (!signature) {
+    markRevenueWebhookFailure("stripe","signature_missing");
+    throw new StripeWebhookSignatureError("Stripe-Signatur fehlt.");
+  }
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(
@@ -388,6 +392,7 @@ export async function processStripeWebhook(
       requiredEnvironment("STRIPE_WEBHOOK_SECRET"),
     );
   } catch (error) {
+    markRevenueWebhookFailure("stripe","signature_invalid");
     throw new StripeWebhookSignatureError(
       error instanceof Error ? error.message : "Signaturprüfung fehlgeschlagen.",
     );
@@ -438,6 +443,7 @@ export async function processStripeWebhook(
       );
     }
   } catch (error) {
+    markRevenueWebhookFailure("stripe","processing",event.type);
     throw new StripeWebhookProcessingError(
       error instanceof Error ? error.message : "Verarbeitung fehlgeschlagen.",
     );
@@ -445,6 +451,7 @@ export async function processStripeWebhook(
     if (event.id) processingEventIds.delete(event.id);
   }
   const firstDelivery = event.id ? seen(event.id) : true;
+  markRevenueWebhookSuccess("stripe",event.type);
   return { received: true, eventType: event.type, duplicate: !firstDelivery };
 }
 

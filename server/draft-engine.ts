@@ -28,6 +28,7 @@ import {
   type RevenueLoopDraftPayload,
 } from "../lib/draft-engine-logic";
 import { INFLUENCER_PERSONAS, buildInfluencerPrompt } from "../lib/influencer-persona-logic";
+import { formatB2BAffinityPrompt, selectB2BAffinityBrief } from "../lib/b2b-content-affinity-logic";
 import { invokeLLM, type Message } from "./_core/llm";
 import { openAiCompatibleChatUrl } from "../lib/managed-llm-fallback-logic";
 
@@ -175,8 +176,10 @@ async function generateContentDraft(llm: (messages: Message[]) => Promise<string
   const platformRound = Math.floor(slotOffset / INFLUENCER_PERSONAS.length);
   const platform = CONTENT_PLATFORMS[(slotOffset + platformRound) % CONTENT_PLATFORMS.length];
   const topic = CONTENT_TOPIC_SEEDS[seedIndexForDay(nowMs, slotOffset)];
+  const b2bBrief=selectB2BAffinityBrief(persona.id,slotOffset);
   const prompt = [
     buildInfluencerPrompt(persona, topic, platform),
+    ...(b2bBrief?[formatB2BAffinityPrompt(b2bBrief)]:[]),
     "Der Content muss den KI-Charakter transparent halten und darf keine erfundenen persoenlichen Erlebnisse enthalten.",
     'Antworte NUR mit einem JSON-Objekt: {"personaId": "' + persona.id + '", "platform": "' + platform + '", "topic": "<Thema>", "content": "<fertiger Content>"}',
   ].join("\\n");
