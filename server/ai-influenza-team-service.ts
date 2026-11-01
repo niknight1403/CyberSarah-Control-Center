@@ -10,6 +10,7 @@ import {
   type AiInfluenzaPackageId,
 } from "../lib/ai-influenza-team-logic";
 import {getDb} from "./db";
+import {upsertB2BNode} from "./growth-network-service";
 
 function parseOrderPayload(value:unknown):AiInfluenzaOrderPayload{
   if(!value||typeof value!=="object")throw new Error("Ungültiger AI-Influenza-Auftrag.");
@@ -62,6 +63,27 @@ export async function createAiInfluenzaOrder(input:{
   return {job,payload,package:pkg};
 }
 
+
+export async function ensureAiInfluenzaCustomerNode(input:{
+  openId:string;name:string|null;email:string|null;packageId:AiInfluenzaPackageId;
+}){
+  const pkg=AI_INFLUENZA_PACKAGES[input.packageId];
+  return upsertB2BNode({
+    nodeKey:`ccc-user:${input.openId}`,
+    kind:"customer",
+    name:input.name?.trim()||"CyberSarah Kunde",
+    fit:100,intent:100,trust:60,relationshipStrength:35,
+    estimatedValueCents:pkg.monthlyPriceCents,
+    optedOut:false,
+    metadata:{
+      businessUnit:"ai-influenza-team",
+      source:"authenticated-inbound-checkout",
+      contactBasis:"customer-initiated",
+      accountEmailPresent:Boolean(input.email),
+      packageId:input.packageId,
+    },
+  });
+}
 
 export async function createAiInfluenzaInboundOrder(input:{
   customerNodeKey:string;
