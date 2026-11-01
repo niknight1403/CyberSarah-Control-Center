@@ -2,6 +2,7 @@
  * Read-only Stripe product inventory projection. No credentials, raw metadata,
  * billing identities, file URLs, or write permissions appear in this output.
  */
+import { compareProductVariants } from "./stripe-variant-validity-logic";
 export type StripeCatalogProduct = {
   id: string;
   name: string;
@@ -14,6 +15,8 @@ export type StripeCatalogProduct = {
 };
 export type StripeCatalogPrice = {
   id: string;
+  /** Erstellzeitpunkt als ISO-Zeitstempel; `null`, wenn die Quelle keinen liefert. */
+  createdAt: string | null;
   productId: string;
   active: boolean;
   currency: string;
@@ -43,7 +46,9 @@ type RawPrice = {
   unit_amount?: number | null; type?: string;
   recurring?: {interval?:string;interval_count?:number} | null;
   tax_behavior?: string | null; metadata?: Record<string,string>;
+  created?: number;
 };
+
 export function projectStripeCatalog(
   rawProducts: readonly RawProduct[],
   rawPrices: readonly RawPrice[],
@@ -90,8 +95,12 @@ export function projectStripeCatalog(
     const parent = products.get(productId);
     if (!parent) issues.push("Produktverweis fehlt oder Katalog unvollstaendig");
     if (parent) parent.priceCount++;
+    const createdAt =
+      typeof price.created === "number" && Number.isFinite(price.created) && price.created > 0
+        ? new Date(price.created * 1000).toISOString()
+        : null;
     prices.set(price.id, {
-      id: price.id, productId, active: price.active === true,
+      id: price.id, createdAt, productId, active: price.active === true,
       currency: price.currency || "unknown", amountMinor, billing: type,
       interval: type === "recurring" ? interval : null,
       intervalCount: type === "recurring" ? price.recurring?.interval_count ?? null : null,
@@ -121,6 +130,26 @@ export function projectStripeCatalog(
     }
     if (assigned.some(price => price.taxBehavior === "unspecified")) {
       product.issues.push("Steuerbehandlung mindestens einer Preisvariante pruefen");
+    }
+    // Sprint 22 - steuerliche/zeitliche Gueltigkeit der Varianten vergleichen.
+    const comparison = compareProductVariants(
+      [...prices.values()]
+        .filter(price => price.productId === product.id)
+        .map(price => ({
+          id: price.id,
+          currency: price.currency,
+          amountMinor: price.amountMinor,
+          billing: price.billing,
+          interval: price.interval,
+          intervalCount: price.intervalCount,
+          taxBehavior: price.taxBehavior,
+          active: price.active,
+          createdAtMs: price.createdAt === null ? null : Date.parse(price.createdAt),
+          isDefault: price.id === product.defaultPriceId,
+        })),
+    );
+    for (const issue of comparison.issues) {
+      if (!product.issues.includes(issue)) product.issues.push(issue);
     }
     if (!product.active) product.issues.push("Stripe-Produkt inaktiv");
     if (!product.defaultPriceId) product.issues.push("Kein Standardpreis");
