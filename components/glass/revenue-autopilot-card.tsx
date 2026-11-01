@@ -94,6 +94,10 @@ export function RevenueAutopilotCard() {
                   {" · "}Digistore24 IPN {throughput.data.payments.digistoreIpnConfigured ? "✓" : "✕"}
                   {" · "}DB {throughput.data.infrastructure.databaseReady ? "✓" : "✕"}
                 </Text>
+                <Text style={styles.note}>
+                  Webhook-Laufzeit: Stripe Fehlerfolge {throughput.data.payments.stripeWebhookConsecutiveFailures}
+                  {" · "}Digistore24 Fehlerfolge {throughput.data.payments.digistoreWebhookConsecutiveFailures}
+                </Text>
                 {throughput.data.bottleneck ? (
                   <Text style={styles.note}>
                     Funnel-Engpass: {throughput.data.bottleneck.key} · Conversion {throughput.data.bottleneck.ratePct ?? "—"}%
