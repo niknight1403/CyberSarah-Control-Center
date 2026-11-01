@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - ports-deny
           - ports-verify
           - ports-rebind
           - ports-lockdown
@@ -224,6 +225,20 @@ jobs:
               # Prueft nach dem Umbau, ob alle Dienste lokal gesund sind und
               # ob der Villa-Hub die Villa noch erreicht.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== Container-Status =="; docker ps --format "{{.Names}} | {{.Status}} | {{.Ports}}"; echo "== OpenHands (3001) mit Nachlauf =="; for i in 1 2 3 4 5 6; do code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 http://127.0.0.1:3001/ || echo 000); echo "  Versuch $i: $code"; [ "$code" = "200" ] && break; sleep 10; done; echo "== OpenHands Log =="; docker logs --tail 8 openhands-autonomous-app 2>&1 | tail -8; echo "== Villa (3002) =="; curl -s -o /dev/null -w "  3002: %{http_code}\n" --max-time 12 http://127.0.0.1:3002/; echo "== Villa-Hub (12000) lokal =="; curl -s -o /dev/null -w "  12000: %{http_code}\n" --max-time 10 http://127.0.0.1:12000/; echo "== Verweise auf Port 3000 in VillaForge-Konfiguration =="; grep -rn "localhost:3000\|127.0.0.1:3000" /opt/villaforge/.env /opt/villaforge/docker-compose*.yml 2>/dev/null | head -5 || echo "  keine Treffer"; echo "== App =="; curl -s -o /dev/null -w "  3000: %{http_code}\n" --max-time 10 http://127.0.0.1:3000/api/ready'
+              ;;
+            ports-deny)
+              # Setzt eine explizite ufw-Regel gegen direkten Zugriff auf 3000
+              # und prueft danach noch einmal von aussen.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/ports-lockdown.sh --deny-3000 2>&1 | tail -20; echo "== DNAT-Regeln fuer 3000 =="; iptables -t nat -S DOCKER 2>/dev/null | grep -E "dport 3000" || echo "  keine DNAT-Regel auf 3000"; echo "== App lokal =="; curl -s -o /dev/null -w "  localhost:3000/api/ready: %{http_code}\n" --max-time 8 http://localhost:3000/api/ready'
+              echo "== Erreichbarkeit von aussen =="
+              for port in 22 80 443 3000 3001 3002 12000; do
+                if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
+                  echo "  Port $port: OFFEN"
+                else
+                  echo "  Port $port: zu"
+                fi
+              done
+              curl -s -o /dev/null -w "  oeffentlich via TLS: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.

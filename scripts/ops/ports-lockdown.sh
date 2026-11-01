@@ -36,4 +36,18 @@ if [ "${1:-}" = "--ufw" ]; then
   exit 0
 fi
 
-echo "Aufruf: ports-lockdown.sh --inspect | --ufw"
+if [ "${1:-}" = "--deny-3000" ]; then
+  # Explizite Sperre fuer die App: sie soll ausschliesslich ueber Caddy (443)
+  # erreichbar sein, nicht ueber den Node-Port direkt.
+  if ufw status | grep -qE "^3000/tcp"; then
+    echo "Regel fuer 3000 existiert bereits:"
+    ufw status | grep -E "^3000/tcp"
+  else
+    yes | ufw deny 3000/tcp > /dev/null 2>&1 && echo "ufw deny 3000/tcp gesetzt"
+  fi
+  echo "== Regeln jetzt =="
+  ufw status numbered
+  exit 0
+fi
+
+echo "Aufruf: ports-lockdown.sh --inspect | --ufw | --deny-3000"
