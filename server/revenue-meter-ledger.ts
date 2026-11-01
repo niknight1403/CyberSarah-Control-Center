@@ -73,13 +73,16 @@ export async function markMeterSent(db:SqlClient,event:ClaimedMeterEvent):Promis
   return r.rows.length===1;
 }
 export async function markMeterFailure(db:SqlClient,event:ClaimedMeterEvent,error:unknown):Promise<void>{
-  const message=error instanceof Error?error.message:String(error);
+  // Provider errors may embed request metadata or credentials. Never persist raw
+  // external error bodies in the customer billing ledger.
+  const message=error instanceof Error?error.name:"UnknownFailure";
+  const safeReason=/^[A-Za-z][A-Za-z0-9]{0,60}$/.test(message)?message:"ProviderDeliveryFailed";
   await db.query(`UPDATE revenue_meter_events SET
     state=CASE WHEN attempts>=5 THEN 'failed' ELSE 'pending' END,
     locked_until=NULL, last_error=$3,
     next_attempt_at=now()+((LEAST(3600, POWER(2,attempts)*15))::int * interval '1 second')
     WHERE event_id=$1 AND state='processing' AND attempts=$2`,
-    [event.eventId,event.attempts,message.slice(0,300)]);
+    [event.eventId,event.attempts,safeReason]);
 }
 /**
  * Recover exhausted leases after worker termination. Otherwise a fifth attempt
