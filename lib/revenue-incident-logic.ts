@@ -35,3 +35,32 @@ export function classifyRevenueIncidents(blockers:string[]):RevenueIncident[]{
     return rank[b.severity]-rank[a.severity]||a.code.localeCompare(b.code);
   });
 }
+
+
+export type RevenueRepairStep={
+  incidentCode:string;
+  mode:"auto"|"approval-required";
+  action:"health-recheck"|"defer-noncritical-llm"|"generate-cro-draft"|"generate-cross-sell-draft"|"inspect-database"|"manual-diagnosis";
+  description:string;
+};
+
+export function buildRevenueRepairPlan(incidents:RevenueIncident[]):RevenueRepairStep[]{
+  return incidents.slice(0,10).map(incident=>{
+    if(incident.code==="REV_PROVIDER_CAPACITY"){
+      return {incidentCode:incident.code,mode:"auto" as const,action:"defer-noncritical-llm" as const,description:"Nicht-kritische LLM-Generierung zurückstellen; Revenue-kritische Route/Fallback priorisieren"};
+    }
+    if(incident.code==="REV_STRIPE_WEBHOOK"||incident.code==="REV_D24_IPN"){
+      return {incidentCode:incident.code,mode:"auto" as const,action:"health-recheck" as const,description:"Konfiguration und Runtime-Health erneut prüfen; keine Secrets automatisch ersetzen"};
+    }
+    if(incident.code==="REV_FUNNEL_FRICTION"){
+      return {incidentCode:incident.code,mode:"auto" as const,action:"generate-cro-draft" as const,description:"Reversible CRO-Hypothese in bestehender Revenue-Draft-Queue priorisieren"};
+    }
+    if(incident.code==="REV_CROSS_SELL"){
+      return {incidentCode:incident.code,mode:"auto" as const,action:"generate-cross-sell-draft" as const,description:"Cross-Sell-Experiment aus gemessener Regelperformance als Draft priorisieren"};
+    }
+    if(incident.code==="REV_DB_UNAVAILABLE"){
+      return {incidentCode:incident.code,mode:"approval-required" as const,action:"inspect-database" as const,description:"Geschützten Bridge-/DB-Zugriff diagnostizieren; keine Infrastrukturmutation ohne bestätigten Zielzustand"};
+    }
+    return {incidentCode:incident.code,mode:"approval-required" as const,action:"manual-diagnosis" as const,description:"Unklassifizierten Revenue-Blocker vertieft diagnostizieren"};
+  });
+}
