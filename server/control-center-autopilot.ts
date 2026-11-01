@@ -6,6 +6,7 @@ import { b2bNetworkOverview, refreshInfluencerLearning } from "./growth-network-
 import { runGrowthPulse } from "./always-on-growth";
 import { assertControlCenterAutopilotEnabled } from "../lib/control-center-operator-policy";
 import { revenueThroughputOverview } from "./revenue-throughput-service";
+import { queueRevenueIncidents } from "./revenue-incident-queue";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -30,6 +31,7 @@ export type ControlCenterAutopilotResult = {
   };
   growthPulse: Awaited<ReturnType<typeof runGrowthPulse>> | null;
   throughput: Awaited<ReturnType<typeof revenueThroughputOverview>> | null;
+  incidentQueue: {queued:number;reused:number;ids:number[]};
   realActions: string[];
   deferred: string[];
   blocked: string[];
@@ -45,6 +47,7 @@ export type ControlCenterAutopilotDeps = {
   b2bOverview?: typeof b2bNetworkOverview;
   growth?: typeof runGrowthPulse;
   throughput?: typeof revenueThroughputOverview;
+  incidentQueue?: typeof queueRevenueIncidents;
 };
 
 async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
@@ -76,6 +79,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   const getB2BOverview = deps.b2bOverview ?? b2bNetworkOverview;
   const growthRunner = deps.growth ?? runGrowthPulse;
   const throughputRunner = deps.throughput ?? revenueThroughputOverview;
+  const incidentQueueRunner = deps.incidentQueue ?? queueRevenueIncidents;
 
   const [hara, expansion] = await Promise.all([scan("hara/scan", trigger), scan("expansion/scan", trigger)]);
   const revenue = await runRevenue(5);
@@ -98,6 +102,8 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   let throughput: Awaited<ReturnType<typeof revenueThroughputOverview>> | null = null;
   let growthError: string | null = null;
   let throughputError: string | null = null;
+  let incidentQueue={queued:0,reused:0,ids:[] as number[]};
+  let incidentQueueError:string|null=null;
   try { growthPulse = await growthRunner(); }
   catch (error) { growthError = error instanceof Error ? error.message : "Growth Pulse fehlgeschlagen"; }
   try { throughput = await throughputRunner(); }
@@ -122,7 +128,14 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (throughput) {
     if (throughput.status === "repair") blocked.push(...throughput.blockers.map(item => `Revenue: ${item}`));
     else realActions.push(`Revenue Throughput stabil · 30d Run-Rate ${throughput.revenueVelocity.monthlyRunRateEur.toLocaleString("de-DE")} EUR`);
+    const incidents=throughput.incidents??[];
+    if(incidents.length){
+      try{incidentQueue=await incidentQueueRunner(incidents);}
+      catch(error){incidentQueueError=error instanceof Error?error.message:"Incident Queue fehlgeschlagen";}
+      if(incidentQueue.queued>0)realActions.push(`${incidentQueue.queued} Revenue-Incidents persistent priorisiert`);
+    }
   }
+  if(incidentQueueError)blocked.push(`Revenue Incident Queue: ${incidentQueueError}`);
   for (const item of drafts.skipped) {
     const detail = `${item.kind}: ${item.reason}`;
     if (/\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(item.reason)) deferred.push(detail);
@@ -139,6 +152,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     growth,
     growthPulse,
     throughput,
+    incidentQueue,
     realActions,
     deferred,
     blocked,
