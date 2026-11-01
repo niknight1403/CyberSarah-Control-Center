@@ -32,7 +32,7 @@ export function nextHubSpotCursor(page:unknown,seen:ReadonlySet<string>){
 }
 export function advanceCrmCheckpoint(current:string|null,next:string|null,accepted:number){
  if(!Number.isSafeInteger(accepted)||accepted<0||accepted>10000)throw new Error("Invalid batch size");
- return {cursor:next??current,processed:accepted,complete:next===null};
+ return {cursor:next,processed:accepted,complete:next===null};
 }
 export type OutreachPolicy={approved:boolean;consentRecorded:boolean;unsubscribed:boolean;domainVerified:boolean};
 export function maySendOutreach(p:OutreachPolicy){
