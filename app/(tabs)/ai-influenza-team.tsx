@@ -16,6 +16,7 @@ export default function AiInfluenzaTeamScreen(){
   const catalog=trpc.aiInfluenzaTeam.catalog.useQuery(undefined,{retry:false});
   const overview=trpc.aiInfluenzaTeam.overview.useQuery(undefined,{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const leads=trpc.aiInfluenzaTeam.leadPipeline.useQuery(undefined,{enabled:isAdmin,retry:false,refetchInterval:60_000});
+  const profit=trpc.aiInfluenzaTeam.profit.useQuery({windowDays:30},{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const agents=trpc.aiInfluenzaTeam.agents.useQuery(undefined,{enabled:isAdmin,retry:false});
   const media=trpc.mediaPipeline.status.useQuery(undefined,{enabled:Boolean(me.data),retry:false});
   const checkout=trpc.aiInfluenzaTeam.checkout.useMutation({
@@ -76,6 +77,9 @@ export default function AiInfluenzaTeamScreen(){
             <Metric label="Leads" value={leads.data?.counts.total??"—"}/>
             <Metric label="Hot Leads" value={leads.data?.counts.hot??"—"}/>
             <Metric label="Kunden" value={leads.data?.counts.customers??"—"}/>
+            <Metric label="Revenue 30d" value={profit.data?money(profit.data.recognizedRevenueCents):"—"}/>
+            <Metric label="Kosten 30d" value={profit.data?money(profit.data.totalCostCents):"—"}/>
+            <Metric label="Deckungsbeitrag" value={profit.data?money(profit.data.contributionCents):"—"}/>
           </View>
 
           <GlassCard accent="purple" style={s.card}>
@@ -90,6 +94,12 @@ export default function AiInfluenzaTeamScreen(){
             <Text style={s.sectionTitle}>Lead Pipeline</Text>
             <Text style={s.copy}>Hot {leads.data?.counts.hot??0} · Warm {leads.data?.counts.warm??0} · Opt-out {leads.data?.counts.optedOut??0}</Text>
             <Text style={s.notice}>Externe Kontaktaufnahme ist nicht automatisch freigegeben. Quellen, Rechtsgrundlage und Opt-outs bleiben Bestandteil jedes Lead-Datensatzes.</Text>
+          </GlassCard>
+
+          <GlassCard accent="green" style={s.card}>
+            <Text style={s.sectionTitle}>Profit Analytics</Text>
+            <Text style={s.copy}>Erkannter Umsatz: {profit.data?money(profit.data.recognizedRevenueCents):"—"} · Kosten: {profit.data?money(profit.data.totalCostCents):"—"} · Marge: {profit.data?.marginPct===null||profit.data?.marginPct===undefined?"—":profit.data.marginPct+"%"}</Text>
+            <Text style={s.notice}>Quelle: verifizierte Stripe-Invoices minus separat erfasste Cost-Events. Paketpreise werden nicht als Umsatz angenommen.</Text>
           </GlassCard>
 
           <GlassCard accent="amber" style={s.card}>
