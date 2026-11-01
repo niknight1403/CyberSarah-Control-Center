@@ -13,7 +13,7 @@
 
 import axios from "axios";
 import { z } from "zod";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { desc, eq, gte, sql } from "drizzle-orm";
 import { router, adminProcedure } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";

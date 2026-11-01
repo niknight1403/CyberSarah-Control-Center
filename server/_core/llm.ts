@@ -12,7 +12,7 @@ import {
 // kein Import-Zyklus zum Agenten selbst.
 import { getRouteRotationPrimary } from "./route-rotation-state";
 import { isProviderQuarantined } from "../../lib/live-fix-logic";
-import { prioritizeDiscoveredLocalModels, resolveManagedModel, resolveManagedModelCandidates } from "../../lib/managed-model-logic";
+import { prioritizeDiscoveredLocalModels, resolveManagedModelCandidates } from "../../lib/managed-model-logic";
 import {
   createKeyPoolEntry,
   recordKeyObservation,

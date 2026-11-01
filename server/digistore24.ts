@@ -26,7 +26,6 @@ import { getDb } from "./db";
 import { affiliateProducts, conversionEvents, funnelCampaigns } from "../drizzle/schema";
 import { desc, eq } from "drizzle-orm";
 import {
-  renderLandingHtml,
   slugifyLanding,
   validateFunnelForLaunch,
   type LandingFunnelPayload,

@@ -15,7 +15,6 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { draftQueue, type DraftQueueRow, type InsertDraftQueueRow } from "../drizzle/schema";
 import {
-  DRAFT_KINDS,
   DRAFT_MAX_PENDING_BY_KIND,
   REVENUE_HUBS,
   revenueDraftHub,

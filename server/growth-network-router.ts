@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
-import { b2bNetworkOverview,influencerLearningOverview,refreshInfluencerLearning,upsertB2BEdge,upsertB2BNode } from "./growth-network-service";
+import { b2bNetworkOverview,influencerLearningOverview,upsertB2BEdge,upsertB2BNode } from "./growth-network-service";
 import { getInfluencerLearningLoopStatus, runInfluencerLearningTick } from "./influencer-learning-loop";
 
 export const growthNetworkRouter=router({

@@ -19,7 +19,6 @@ import {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const CONTACT_PROPERTIES = ["email", "firstname", "lastname", "lifecyclestage", "phone"];
 const COMPANY_PROPERTIES = ["name", "domain", "industry", "city"];
-const DEAL_PROPERTIES = ["dealname", "amount", "dealstage", "pipeline", "closedate"];
 
 function cleanProperties(input: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {};

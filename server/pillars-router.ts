@@ -11,7 +11,6 @@ import { getRouteRotationStatus, startRouteRotationAgent } from "./route-rotatio
 import {
   aggregatePillarStatus,
   DEPARTMENTS,
-  getPillar,
   listDepartmentsForPillar,
   PILLARS,
   routePillarTask,

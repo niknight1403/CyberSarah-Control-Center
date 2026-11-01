@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { desc, eq, gte, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { collectRevenueAutopilotSnapshot } from "./revenue-autopilot";

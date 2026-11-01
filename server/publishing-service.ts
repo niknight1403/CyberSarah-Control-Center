@@ -22,9 +22,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { create, type AxiosInstance } from "axios";
 import {
   autoCardAssetUrl,
-  buildPublishingCardPng,
   validateAssetUrl,
-  IMAGE_ASSET_EXTENSIONS,
   VIDEO_ASSET_EXTENSIONS,
 } from "../lib/asset-card-logic";
 
