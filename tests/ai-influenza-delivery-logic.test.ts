@@ -13,7 +13,7 @@ describe("AI Influenza delivery plans",()=>{
   it("builds truthful customer-specific creative prompts",()=>{
     const prompt=aiInfluenzaCreativePrompt({companyName:"Example GmbH",packageId:"growth",taskKind:"short-video",quantity:12});
     expect(prompt).toContain("Example GmbH");
-    expect(prompt).toContain("keine erfundenen");
+    expect(prompt).toContain("Keine erfundenen");
     expect(prompt).toContain("Freigabe");
   });
 });
