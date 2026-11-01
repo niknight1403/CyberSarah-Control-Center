@@ -40,6 +40,8 @@ export async function revenueThroughputOverview(){
   return {
     ...buildRevenueThroughputSnapshot({
       currentMrrEur:snapshot.mrrEur,
+      newMrr1dEur:snapshot.newMrr1dEur,
+      newMrr7dEur:snapshot.newMrr7dEur,
       activeSubscriptions:snapshot.activeSubscriptions,
       landingViews:snapshot.landingViews,
       signups:snapshot.signups,
