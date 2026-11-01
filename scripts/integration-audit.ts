@@ -12,6 +12,7 @@
  * Exit-Code 1 bei Fehlschlag — CI-faehig.
  */
 import { computeBackoffDelayMs, createToolProxyQueue, isRetryableTaskError } from "../lib/tool-proxy-queue-logic";
+import { shouldRetryAuditStatus } from "../lib/integration-audit-logic";
 import {
   buildTelegramMessage,
   isTelegramConfigured,
@@ -74,7 +75,8 @@ async function fetchOkWithColdStartWake(
   let last = { ok: false, status: 0 };
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     last = await fetchOk(url, attempt === 0 ? 10_000 : 15_000);
-    if (last.status !== 0) return { ...last, wokeUp: attempt > 0 };
+    if (!shouldRetryAuditStatus(last.status)) return { ...last, wokeUp: attempt > 0 };
+    if (attempt === attempts - 1) break;
     // Wartezeit: 5s, 10s, 15s, 25s (summiert ~55s zuzueglich Fetch-Zeiten).
     const delayMs = attempt === 3 ? 25_000 : (attempt + 1) * 5_000;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -197,4 +199,10 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+void main().then(
+  () => process.exit(0),
+  (error) => {
+    console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+    process.exit(1);
+  },
+);
