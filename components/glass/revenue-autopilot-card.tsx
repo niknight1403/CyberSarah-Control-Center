@@ -67,6 +67,8 @@ export function RevenueAutopilotCard() {
             <Metric label="Prioritäten" value={data.opportunities.length} />
             <Metric label="B2B Health" value={b2b.data ? `${b2b.data.health.healthScore}/100` : "—"} />
             <Metric label="B2B Beziehungen" value={b2b.data?.counts.edges ?? "—"} />
+            <Metric label="Persona-Zuordnungen" value={b2b.data?.personaAssignments?.length ?? "—"} />
+            <Metric label="Expansion Queue" value={b2b.data?.expansionQueue?.length ?? "—"} />
             <Metric label="KI Personas" value={learning.data?.states.length ?? "—"} />
           </View>
 
@@ -147,6 +149,31 @@ export function RevenueAutopilotCard() {
                 : "Always-on Learning wartet auf den ersten Messzyklus."}
             </Text>
           </View>
+
+          {b2b.data?.saasLoop ? (
+            <View style={styles.learningStrip}>
+              <Text style={styles.opportunityTitle}>B2B · Persona · SaaS Loop Engineering</Text>
+              <StatusChip
+                label={`${b2b.data.saasLoop.focus} · ${b2b.data.saasLoop.ownerPersona}`}
+                accent="magenta"
+                live
+              />
+              <Text style={styles.note}>
+                {b2b.data.saasLoop.title} · Metrik: {b2b.data.saasLoop.metric} · Aktuell: {String(b2b.data.saasLoop.current)}
+              </Text>
+              <Text style={styles.note}>
+                {b2b.data.saasLoop.stages.slice(0, 3).join(" → ")}
+              </Text>
+              {b2b.data.expansionQueue?.[0] ? (
+                <Text style={styles.note}>
+                  Nächste B2B-Aktion: {b2b.data.expansionQueue[0].nodeKey} · Persona {b2b.data.expansionQueue[0].persona} · {b2b.data.expansionQueue[0].nextStep}
+                </Text>
+              ) : null}
+              <Text style={styles.note}>
+                Externe Kontakte bleiben freigabepflichtig; Analyse, Persona-Zuordnung, Priorisierung und Loop-Entwurf laufen autonom.
+              </Text>
+            </View>
+          ) : null}
 
           {b2b.data?.health.nextActions?.[0] ? (
             <Text style={styles.note}>B2B nächster Schritt: {b2b.data.health.nextActions[0]}</Text>
