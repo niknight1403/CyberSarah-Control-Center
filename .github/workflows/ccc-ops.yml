@@ -13,6 +13,7 @@ on:
           - revenue-os-db-url
           - hubspot-env
           - git-status
+          - app-boot
           - health
         default: deploy
 
@@ -62,6 +63,11 @@ jobs:
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== HEAD =="; git rev-parse --abbrev-ref HEAD; git log --oneline -3; echo "== Fetch =="; git fetch origin main 2>&1 | tail -2; echo "== Abstand HEAD...origin/main (links=server, rechts=remote) =="; git rev-list --left-right --count HEAD...origin/main 2>/dev/null || echo "kein origin/main"; echo "== Status =="; git status --porcelain | head -40; echo "== Anzahl =="; git status --porcelain | wc -l; echo "== Diff-Stat =="; git diff --stat | tail -15'
+              ;;
+            app-boot)
+              # Startet die App aus dem Ecosystem neu, nachdem pm2 start all
+              # nichts mehr findet. Zeigt vorher Ressourcen und Fehlerlog.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== Ressourcen =="; df -h / | tail -1; free -m | head -2; echo "== Ecosystem-Dateien =="; ls -1 ecosystem.config.* 2>/dev/null; echo "== PM2 vorher =="; pm2 list | tail -6; echo "== Letzter Fehlerlog =="; tail -12 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null || echo "(kein Fehlerlog)"; echo "== Start =="; node -e "const fs=require(\"fs\");const cp=require(\"child_process\");const env={};try{for(const l of fs.readFileSync(\".env\",\"utf8\").split(/\\r?\\n/)){const m=l.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);if(m)env[m[1]]=m[2];}}catch(e){console.log(\"Warnung: keine .env lesbar\");}cp.execSync(\"pm2 start ecosystem.config.cjs --update-env\",{env:Object.assign({},process.env,env),stdio:\"inherit\"});" 2>&1 | tail -8; sleep 10; pm2 save 2>&1 | tail -2; echo "== Status nachher =="; pm2 list | tail -6; echo "== HTTP =="; curl -s -o /dev/null -w "ready: HTTP %{http_code}\\n" --max-time 10 http://localhost:3000/api/ready || true; echo "== Fehlerlog nach Start =="; tail -15 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null || echo "(leer)"; echo "== Ausgabelog =="; tail -8 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || echo "(leer)"'
               ;;
             health)
               $SSH_CMD 'echo "== PM2 =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready; echo "== Revenue-OS-Env in PM2? =="; pm2 env $(pm2 jlist | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{const j=JSON.parse(s);const p=j.find(x=>x.name.includes(\"cybersarah-control-center\"));console.log(p?p.pm_id:1)})") 2>/dev/null | grep -c "^REVENUE_OS_DATABASE_URL:" ; echo "== App-Log =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
