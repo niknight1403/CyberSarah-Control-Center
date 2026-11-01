@@ -116,9 +116,47 @@ export type AiInfluenzaOrderPayload={
   monthlyBudgetCents:number;
   paymentStatus:"not-started"|"pending"|"paid"|"past-due"|"cancelled"|"test-only";
   stripeSubscriptionId?:string|null;
+  lastPaidInvoiceId?:string|null;
   testOnly?:boolean;
   createdByOpenId:string;
 };
+
+/** Subscription-Status allein ist kein Zahlungsnachweis; aktiv/trialing bleiben pending. */
+export function aiInfluenzaPaymentStatusForSubscriptionStatus(status:string):AiInfluenzaOrderPayload["paymentStatus"]{
+  if(status==="past_due"||status==="unpaid")return "past-due";
+  if(status==="canceled"||status==="incomplete_expired")return "cancelled";
+  return "pending";
+}
+
+export function subscriptionHasVerifiedLatestPaidInvoice(args:{
+  subscriptionStatus:string;
+  latestInvoiceId:string|null;
+  lastPaidInvoiceId:string|null|undefined;
+}):boolean{
+  return args.subscriptionStatus==="active"&&Boolean(args.latestInvoiceId)&&args.latestInvoiceId===args.lastPaidInvoiceId;
+}
+
+export function applyAiInfluenzaVerifiedInvoicePayment(
+  order:AiInfluenzaOrderPayload,
+  invoice:{invoiceId:string;status:string|null;amountPaidCents:number;subscriptionId:string|null},
+){
+  if(order.testOnly||order.paymentStatus==="test-only")return {applied:false as const,order};
+  if(invoice.status!=="paid"||!Number.isFinite(invoice.amountPaidCents)||invoice.amountPaidCents<=0)return {applied:false as const,order};
+  const invoiceId=invoice.invoiceId.trim();
+  const subscriptionId=invoice.subscriptionId?.trim()??"";
+  if(!invoiceId||!subscriptionId)return {applied:false as const,order};
+  if(order.stripeSubscriptionId&&order.stripeSubscriptionId!==subscriptionId)return {applied:false as const,order};
+  return {
+    applied:true as const,
+    order:{
+      ...order,
+      step:order.step==="payment-pending"?"paid" as const:order.step,
+      paymentStatus:"paid" as const,
+      stripeSubscriptionId:subscriptionId,
+      lastPaidInvoiceId:invoiceId,
+    },
+  };
+}
 
 export function buildAiInfluenzaMonthlyPlan(packageId:AiInfluenzaPackageId){
   const pkg=AI_INFLUENZA_PACKAGES[packageId];

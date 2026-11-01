@@ -23,17 +23,10 @@ import {
 import { ENV } from "./_core/env";
 import { buildSessionOverview, sanitizeSessionId } from "../lib/chat-session-logic";
 import { resolvePgSslConfig, stripSslModeParam } from "../lib/db-ssl-logic";
-
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "niko.oeben@gmail.com")
-  .trim()
-  .toLowerCase();
+import { roleForUserUpsert, roleForPublicRegistration } from "../lib/account-role-logic";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
-}
-
-function isAdministratorEmail(email: string | null | undefined) {
-  return Boolean(email && normalizeEmail(email) === ADMIN_EMAIL);
 }
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -126,12 +119,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
-    if (isAdministratorEmail(user.email) || user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
-      updateSet.role = "admin";
-    } else if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
+    const resolvedRole = roleForUserUpsert({
+      openId: user.openId,
+      ownerOpenId: ENV.ownerOpenId,
+      requestedRole: user.role,
+    });
+    if (resolvedRole !== undefined) {
+      values.role = resolvedRole;
+      updateSet.role = resolvedRole;
     }
 
     if (!values.lastSignedIn) {
@@ -222,7 +217,7 @@ export async function createLocalUser(input: {
     name: input.name?.trim() || null,
     passwordHash: input.passwordHash,
     loginMethod: "password",
-    role: isAdministratorEmail(email) ? "admin" : "user",
+    role: roleForPublicRegistration(),
     lastSignedIn: new Date(),
   });
   const user = await getUserByOpenId(input.openId);
@@ -239,7 +234,6 @@ export async function touchUserSession(openId: string) {
     .update(users)
     .set({
       lastSignedIn: new Date(),
-      ...(isAdministratorEmail(user.email) ? { role: "admin" as const } : {}),
     })
     .where(eq(users.id, user.id));
 }
@@ -521,8 +515,6 @@ export async function listChatSessions(userOpenId: string, limit = 500) {
   const ascending = [...messages].reverse();
   return buildSessionOverview(ascending);
 }
-
-export { ADMIN_EMAIL, isAdministratorEmail };
 
 export async function getUserIdForStripeCustomerId(stripeCustomerId: string): Promise<number | null> {
   const db = await getDb();
