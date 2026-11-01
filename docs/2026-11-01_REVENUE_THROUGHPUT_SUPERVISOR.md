@@ -30,3 +30,7 @@ A projected MRR number is **not** emitted until historical MRR and churn/cohort 
 
 ## Autonomous boundaries
 Analysis, scoring, persona selection, content drafts, B2B prioritization, funnel diagnosis and experiment drafting may run autonomously. Unsolicited outreach, irreversible publishing, price changes and money movement remain behind existing approval/policy gates.
+
+
+## Verified readiness evidence
+The repository Revenue-OS readiness gate confirmed on 2026-11-01 that Stripe is reachable in LIVE restricted-key mode, the protected Revenue Bridge is reachable with authenticated reads, the Groq free LLM route is ready, Revenue DB access is available through the protected bridge, and commerce mode is LIVE. Direct database tunnel attempts remain unavailable and are therefore not treated as the production source of truth.
