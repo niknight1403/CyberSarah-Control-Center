@@ -5,7 +5,10 @@ import {nextWeeklyDraft, nextOutreachWindow, auditedRevenueKpis,
   summarizeMeterQueue, reconcileMeterEvents, nextHubSpotCursor,
   maySendOutreach, isSuppressed} from "./revenue-sprint-primitives";
 
+import {getRevenueMeterHealth} from "./revenue-meter-health";
+
 export const revenueIntegrationsRouter=router({
+  meterQueueHealth:adminProcedure.query(()=>getRevenueMeterHealth()),
   safetyStatus:adminProcedure.query(()=>({
     billingEnabled:false, outboundEnabled:false, weeklyPublishingEnabled:false,
     meteredLedgerRequiresMigration:true, liveKpisConnected:false,
