@@ -17,6 +17,7 @@ on:
           - diag
           - db-diag
           - db-fix
+          - migrate
           - db-probe
           - health
         default: deploy
@@ -85,6 +86,11 @@ jobs:
               # Holt die DATABASE_URL notfalls aus dem laufenden App-Prozess,
               # gleicht das Rollenpasswort an und prueft die Verbindung.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== .env-Dateien =="; ls -la .env* 2>/dev/null | head -6; PID=$(pgrep -f "node .*cybersarah-control-center" | head -1); echo "App-PID: ${PID:-keine}"; if [ -n "$PID" ]; then tr "\\000" "\\n" < /proc/$PID/environ | grep -m1 "^DATABASE_URL=" > /tmp/dburl.tmp; chmod 600 /tmp/dburl.tmp; echo "URL aus Prozess: $(wc -c < /tmp/dburl.tmp) Byte"; fi; echo "== DB-Fix =="; DATABASE_URL_FILE=/tmp/dburl.tmp node scripts/ops/db-fix.mjs; echo "exit=$?"; rm -f /tmp/dburl.tmp; echo "== App neu starten =="; pm2 restart cybersarah-control-center --update-env > /dev/null 2>&1; sleep 12; echo "== Readiness =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 700; echo; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
+              ;;
+            migrate)
+              # Spielt ausstehende Migrationen ein, prueft die Tabellen und
+              # gibt ungenutzten Docker-Platz frei (Images aelter als 7 Tage).
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== Platz vorher =="; df -h / | tail -1; echo "== Migration =="; ./node_modules/.bin/drizzle-kit migrate 2>&1 | tail -10; echo "== Datenbank danach =="; node scripts/ops/db-diag.mjs 2>&1 | head -10; echo "== Platz freigeben =="; docker container prune -f 2>&1 | tail -1; docker image prune -f --filter "until=168h" 2>&1 | tail -2; echo "== Platz nachher =="; df -h / | tail -1; echo "== Readiness =="; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
               ;;
             health)
               $SSH_CMD 'echo "== PM2 =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready; echo "== Revenue-OS-Env in PM2? =="; pm2 env $(pm2 jlist | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{const j=JSON.parse(s);const p=j.find(x=>x.name.includes(\"cybersarah-control-center\"));console.log(p?p.pm_id:1)})") 2>/dev/null | grep -c "^REVENUE_OS_DATABASE_URL:" ; echo "== App-Log =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
