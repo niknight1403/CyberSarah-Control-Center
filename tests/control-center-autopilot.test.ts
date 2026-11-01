@@ -32,7 +32,8 @@ describe("control center autopilot", () => {
     infrastructure:{databaseReady:true,providerCircuitsOpen:0,providerCircuitsTotal:3},
     generatedAt:"2026-11-01T00:00:00.000Z",evidence:{dailyRevenueRows:14,stripeCheckedAt:null,stripeStatus:"connected",mrrSource:"test",revenueVelocitySource:"test"},
   })) as never;
-  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput };
+  const incidentQueue = vi.fn(async () => ({queued:0,reused:0,ids:[]})) as never;
+  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput, incidentQueue };
 
   it("orchestriert echte Scans, Revenue und Drafts in einem Lauf", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
@@ -65,7 +66,7 @@ describe("control center autopilot", () => {
   it("meldet Growth-Ausfaelle als echte Blockade statt falschen Erfolg", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
     const growth = vi.fn(async () => { throw new Error("Growth DB offline"); }) as never;
-    const result = await runControlCenterAutopilot({ scan, revenue, drafts, learnInfluencers, b2bOverview, growth });
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts, learnInfluencers, b2bOverview, growth, throughput, incidentQueue });
     expect(result.ok).toBe(false);
     expect(result.growthPulse).toBeNull();
     expect(result.blocked.join(" ")).toContain("Growth DB offline");

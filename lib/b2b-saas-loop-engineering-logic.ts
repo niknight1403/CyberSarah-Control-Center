@@ -96,6 +96,14 @@ export function buildB2BExpansionQueue(priorities:B2BPriority[],assignments:B2BP
           :item.action==="QUALIFY"
             ?"Qualifizierungsfragen und Value-Proposition als Entwurf vorbereiten"
             :"Nurture-Entwurf mit relevantem, nicht aufdringlichem Nutzen vorbereiten",
+      recommendedChannel:item.action==="PARTNER"?"linkedin"
+        :item.action==="EXPAND"?"email"
+        :item.action==="QUALIFY"?(item.kind==="company"?"linkedin":"email")
+        :"content-nurture",
+      ctaMode:item.action==="PARTNER"?"pilot"
+        :item.action==="EXPAND"?"expansion-review"
+        :item.action==="QUALIFY"?"discovery"
+        :"value-content",
       externalActionRequiresApproval:true as const,
     }))
     .sort((a,b)=>b.priorityScore-a.priorityScore||a.nodeKey.localeCompare(b.nodeKey))

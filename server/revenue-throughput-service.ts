@@ -7,6 +7,7 @@ import {getDb} from "./db";
 import {collectRevenueAutopilotSnapshot} from "./revenue-autopilot";
 import {getAdministratorStripeHealth} from "./stripe-admin-health";
 import {getRevenueWebhookRuntimeStatus} from "./revenue-webhook-runtime";
+import {buildRevenueRepairPlan,classifyRevenueIncidents} from "../lib/revenue-incident-logic";
 
 export async function revenueThroughputOverview(){
   const [snapshot,stripeHealth]=await Promise.all([
@@ -37,9 +38,10 @@ export async function revenueThroughputOverview(){
   const circuits=providerCircuitSnapshot();
   const webhookRuntime=getRevenueWebhookRuntimeStatus();
 
-  return {
-    ...buildRevenueThroughputSnapshot({
+  const core=buildRevenueThroughputSnapshot({
       currentMrrEur:snapshot.mrrEur,
+      newMrr1dEur:snapshot.newMrr1dEur,
+      newMrr7dEur:snapshot.newMrr7dEur,
       activeSubscriptions:snapshot.activeSubscriptions,
       landingViews:snapshot.landingViews,
       signups:snapshot.signups,
@@ -51,6 +53,8 @@ export async function revenueThroughputOverview(){
       previous7RevenueCents:sum(previous,"revenueCents"),
       recent7Conversions:sum(recent,"conversions"),
       previous7Conversions:sum(previous,"conversions"),
+      crossSellRecommended:snapshot.crossSellRecommended,
+      crossSellConverted:snapshot.crossSellConverted,
       stripeConnected:stripeHealth.status==="connected",
       stripeWebhookConfigured:stripeHealth.webhookSecretConfigured,
       digistoreIpnConfigured:Boolean(resolveDigistore24IpnSecret()),
@@ -60,7 +64,12 @@ export async function revenueThroughputOverview(){
       providerCircuitsTotal:circuits.length,
       stripeWebhookConsecutiveFailures:webhookRuntime.stripe.consecutiveFailures,
       digistoreWebhookConsecutiveFailures:webhookRuntime.digistore24.consecutiveFailures,
-    }),
+    });
+  const incidents=classifyRevenueIncidents(core.blockers);
+  return {
+    ...core,
+    incidents,
+    repairPlan:buildRevenueRepairPlan(incidents),
     webhookRuntime,
     generatedAt:new Date().toISOString(),
     evidence:{

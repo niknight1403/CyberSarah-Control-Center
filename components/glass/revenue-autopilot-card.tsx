@@ -65,6 +65,8 @@ export function RevenueAutopilotCard() {
           <View style={styles.metrics}>
             <Metric label="MRR" value={data.snapshot.mrrEur === null ? "—" : `${data.snapshot.mrrEur.toLocaleString("de-DE", { maximumFractionDigits: 0 })} €`} />
             <Metric label="30d Revenue Run-Rate" value={throughput.data ? `${throughput.data.revenueVelocity.monthlyRunRateEur.toLocaleString("de-DE")} €` : "—"} />
+            <Metric label="Gross New MRR / 7d" value={throughput.data?.grossMrrAcquisition.newMrr7dEur === null || throughput.data?.grossMrrAcquisition.newMrr7dEur === undefined ? "—" : `${throughput.data.grossMrrAcquisition.newMrr7dEur.toLocaleString("de-DE")} €`} />
+            <Metric label="Hot B2B" value={b2b.data?.salesReadiness?.filter(item => item.tier === "hot").length ?? "—"} />
             <Metric label="Aktive Abos" value={data.snapshot.activeSubscriptions ?? "—"} />
             <Metric label="Prioritäten" value={data.opportunities.length} />
             <Metric label="B2B Health" value={b2b.data ? `${b2b.data.health.healthScore}/100` : "—"} />
@@ -95,9 +97,30 @@ export function RevenueAutopilotCard() {
                   {" · "}DB {throughput.data.infrastructure.databaseReady ? "✓" : "✕"}
                 </Text>
                 <Text style={styles.note}>
+                  Gross-MRR-Akquise: {throughput.data.grossMrrAcquisition.newMrr7dEur === null ? "—" : throughput.data.grossMrrAcquisition.newMrr7dEur.toLocaleString("de-DE") + " € / 7d"}
+                  {" · "}30d Gross-Run-Rate: {throughput.data.grossMrrAcquisition.gross30dAcquisitionRunRateEur === null ? "—" : throughput.data.grossMrrAcquisition.gross30dAcquisitionRunRateEur.toLocaleString("de-DE") + " €"}
+                </Text>
+                <Text style={styles.note}>
+                  Checkout: {throughput.data.checkoutFriction.status} · Friction {throughput.data.checkoutFriction.frictionPct === null ? "—" : throughput.data.checkoutFriction.frictionPct + "%"}
+                  {" · "}Cross-Sell: {throughput.data.crossSellEfficiency.conversionRatePct === null ? "—" : throughput.data.crossSellEfficiency.conversionRatePct + "%"} ({throughput.data.crossSellEfficiency.action})
+                </Text>
+                <Text style={styles.note}>
+                  Provider: {throughput.data.infrastructure.providerCapacity.status} · {throughput.data.infrastructure.providerCapacity.available}/{throughput.data.infrastructure.providerCapacity.total} verfügbar
+                </Text>
+                <Text style={styles.note}>
                   Webhook-Laufzeit: Stripe Fehlerfolge {throughput.data.payments.stripeWebhookConsecutiveFailures}
                   {" · "}Digistore24 Fehlerfolge {throughput.data.payments.digistoreWebhookConsecutiveFailures}
                 </Text>
+                {throughput.data.incidents.length ? (
+                  <Text style={styles.error}>
+                    Incidents: {throughput.data.incidents.slice(0, 2).map(item => `${item.severity} ${item.code}`).join(" · ")}
+                  </Text>
+                ) : null}
+                {throughput.data.repairPlan.length ? (
+                  <Text style={styles.note}>
+                    Safe Repair: {throughput.data.repairPlan.slice(0, 2).map(item => `${item.mode}: ${item.action}`).join(" · ")}
+                  </Text>
+                ) : null}
                 {throughput.data.bottleneck ? (
                   <Text style={styles.note}>
                     Funnel-Engpass: {throughput.data.bottleneck.key} · Conversion {throughput.data.bottleneck.ratePct ?? "—"}%
@@ -219,6 +242,16 @@ export function RevenueAutopilotCard() {
             </View>
           ) : null}
 
+          {b2b.data?.salesReadiness?.[0] ? (
+            <Text style={styles.note}>
+              B2B Sales Readiness: {b2b.data.salesReadiness[0].nodeKey} · {b2b.data.salesReadiness[0].tier} · Score {b2b.data.salesReadiness[0].score}/100 · {b2b.data.salesReadiness[0].nextInternalStep}
+            </Text>
+          ) : null}
+          {b2b.data?.expansionQueue?.[0] ? (
+            <Text style={styles.note}>
+              Next Best Action: {b2b.data.expansionQueue[0].recommendedChannel} · CTA {b2b.data.expansionQueue[0].ctaMode} · Persona {b2b.data.expansionQueue[0].persona}
+            </Text>
+          ) : null}
           {b2b.data?.health.nextActions?.[0] ? (
             <Text style={styles.note}>B2B nächster Schritt: {b2b.data.health.nextActions[0]}</Text>
           ) : null}

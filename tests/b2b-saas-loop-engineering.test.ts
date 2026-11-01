@@ -22,6 +22,8 @@ describe("B2B persona + SaaS loop engineering",()=>{
     const queue=buildB2BExpansionQueue(priorities,assignments,10);
     expect(queue[0]?.nodeKey).toBe("partner-a");
     expect(queue.every(item=>item.externalActionRequiresApproval)).toBe(true);
+    expect(queue.find(item=>item.nodeKey==="partner-a")?.recommendedChannel).toBe("linkedin");
+    expect(queue.find(item=>item.nodeKey==="customer-a")?.ctaMode).toBe("expansion-review");
     expect(queue.some(item=>item.nodeKey==="blocked")).toBe(false);
   });
 
