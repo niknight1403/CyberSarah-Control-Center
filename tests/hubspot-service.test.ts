@@ -8,6 +8,7 @@ import {
   SandboxHubspotService,
   assertValidToken,
   createHubspotModule,
+  HUBSPOT_API_HOSTS,
   classifyHubspotToken,
   describeHubspotEnv,
   resolveHubspotToken,
@@ -291,5 +292,39 @@ describe("HubSpot: Service Key (aktueller Weg seit 2026)", () => {
     expect(status.configured).toBe(false);
     expect(status.variable).toBe("HUBSPOT_SERVICE_KEY");
     expect(createHubspotModule({ HUBSPOT_SERVICE_KEY: fremd }).mode).toBe("sandbox");
+  });
+});
+describe("HubSpot: Rechenzentrum (NA und EU)", () => {
+  it("nutzt ohne Angabe den Standardhost", () => {
+    expect(describeHubspotEnv({ HUBSPOT_SERVICE_KEY: TOKEN }).baseUrl).toBe("https://api.hubapi.com");
+    expect(HUBSPOT_API_HOSTS.eu).toBe("https://api-eu1.hubapi.com");
+  });
+
+  it("akzeptiert den EU-Host und normalisiert einen Schraegstrich", () => {
+    const env = { HUBSPOT_SERVICE_KEY: TOKEN, HUBSPOT_API_BASE_URL: "https://api-eu1.hubapi.com/" };
+    expect(describeHubspotEnv(env).baseUrl).toBe("https://api-eu1.hubapi.com");
+  });
+
+  it("schickt Live-Aufrufe an den konfigurierten EU-Host", async () => {
+    const seen: string[] = [];
+    const impl = (async (input: any) => {
+      seen.push(String(input));
+      return new Response(JSON.stringify({ results: [] }), {
+        status: 200, headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+    const mod = createHubspotModule(
+      { HUBSPOT_SERVICE_KEY: TOKEN, HUBSPOT_API_BASE_URL: "https://api-eu1.hubapi.com" },
+      { fetchImpl: impl },
+    );
+    await mod.service.findContactByEmail("a@b.de");
+    expect(seen[0]?.startsWith("https://api-eu1.hubapi.com/crm/v3/objects/contacts/search")).toBe(true);
+  });
+
+  it("verwirft fremde Hosts statt still umzuleiten", () => {
+    const status = describeHubspotEnv({ HUBSPOT_SERVICE_KEY: TOKEN, HUBSPOT_API_BASE_URL: "https://evil.example.com" });
+    expect(status.configured).toBe(false);
+    expect(status.problem).toMatch(/bekannten HubSpot-Host/);
+    expect(createHubspotModule({ HUBSPOT_SERVICE_KEY: TOKEN, HUBSPOT_API_BASE_URL: "https://evil.example.com" }).mode).toBe("sandbox");
   });
 });

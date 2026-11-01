@@ -33,6 +33,33 @@ export function resolveHubspotToken(env: Record<string, string | undefined> = pr
 }
 
 /**
+ * HubSpot betreibt getrennte Rechenzentren. Ein Konto in der EU erreicht seine
+ * Daten nur ueber api-eu1.hubapi.com; der Standardhost liefert dort 401.
+ * Die Auswahl erfolgt ueber HUBSPOT_API_BASE_URL, begrenzt auf bekannte Hosts.
+ */
+export const HUBSPOT_API_HOSTS = {
+  na: "https://api.hubapi.com",
+  eu: "https://api-eu1.hubapi.com",
+} as const;
+
+export const DEFAULT_HUBSPOT_BASE_URL: string = HUBSPOT_API_HOSTS.na;
+
+export function resolveHubspotBaseUrl(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const raw = String(env.HUBSPOT_API_BASE_URL ?? "").trim();
+  if (!raw) return DEFAULT_HUBSPOT_BASE_URL;
+  const normalized = raw.replace(/\/+$/, "");
+  const allowed = Object.values(HUBSPOT_API_HOSTS) as readonly string[];
+  if (!allowed.includes(normalized)) {
+    throw new HubspotConfigError(
+      `HUBSPOT_API_BASE_URL muss einer der bekannten Hosts sein (${allowed.join(", ")}).`,
+    );
+  }
+  return normalized;
+}
+
+/**
  * Ordnet das Token formal ein. HubSpot akzeptiert fuer serverseitige Aufrufe
  * Service Keys und Private-App-Tokens (beide mit Praefix "pat-") sowie
  * OAuth-Tokens. Ein Legacy-API-Key (UUID-Form) wurde 2022 abgeschaltet.
@@ -52,6 +79,7 @@ export interface HubspotEnvStatus {
   validFormat: boolean;
   variable: string | null;
   kind: HubspotTokenKind;
+  baseUrl: string;
   problem: string | null;
 }
 
@@ -61,12 +89,26 @@ export function describeHubspotEnv(
 ): HubspotEnvStatus {
   const token = resolveHubspotToken(env);
   const variable = TOKEN_VARIABLES.find((name) => String(env[name] ?? "").trim()) ?? null;
+  let baseUrl = DEFAULT_HUBSPOT_BASE_URL;
+  try {
+    baseUrl = resolveHubspotBaseUrl(env);
+  } catch {
+    return {
+      configured: false,
+      validFormat: false,
+      variable,
+      kind: "unknown",
+      baseUrl: String(env.HUBSPOT_API_BASE_URL ?? ""),
+      problem: "HUBSPOT_API_BASE_URL zeigt nicht auf einen bekannten HubSpot-Host (api.hubapi.com oder api-eu1.hubapi.com).",
+    };
+  }
   if (!token) {
     return {
       configured: false,
       validFormat: false,
       variable: null,
       kind: "unknown",
+      baseUrl,
       problem: "Kein HubSpot-Schluessel gesetzt (erwartet HUBSPOT_SERVICE_KEY; aeltere Namen HUBSPOT_PRIVATE_APP_TOKEN, HUBSPOT_ACCESS_TOKEN, HUBSPOT_API_KEY werden weiter akzeptiert).",
     };
   }
@@ -77,16 +119,17 @@ export function describeHubspotEnv(
       validFormat: false,
       variable,
       kind,
+      baseUrl,
       problem:
         "Legacy-API-Key erkannt (UUID-Form). Diese Schluessel wurden 2022 abgeschaltet und liefern HTTP 401. Bitte eine Private App anlegen und deren pat-Token hinterlegen.",
     };
   }
   try {
     assertValidToken(token);
-    return { configured: true, validFormat: true, variable, kind, problem: null };
+    return { configured: true, validFormat: true, variable, kind, baseUrl, problem: null };
   } catch (error) {
     const message = error instanceof HubspotConfigError ? error.message : String(error);
-    return { configured: false, validFormat: false, variable, kind, problem: message };
+    return { configured: false, validFormat: false, variable, kind, baseUrl, problem: message };
   }
 }
 
@@ -112,6 +155,10 @@ export function createHubspotModule(
       reason: status.problem ?? "Kein HubSpot-Token konfiguriert.",
     };
   }
-  const client = new HubspotClient({ ...options, token: resolveHubspotToken(env) });
+  const client = new HubspotClient({
+    ...options,
+    baseUrl: options.baseUrl ?? resolveHubspotBaseUrl(env),
+    token: resolveHubspotToken(env),
+  });
   return { mode: "live", service: new HubspotService(client), reason: "Token vorhanden." };
 }
