@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - ports-lockdown
           - ports-audit
           - dns-verify
           - dns-prep
@@ -188,6 +189,19 @@ jobs:
               done
               echo "== 11. App direkt und ueber TLS =="
               curl -s -o /dev/null -w "  sslip HTTPS: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
+              ;;
+            ports-lockdown)
+              # Zeigt die Startkonfiguration der Container und entfernt die
+              # toten beziehungsweise unerwuenschten ufw-Regeln.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ports-lockdown.sh --inspect 2>&1 | tail -30; bash scripts/ops/ports-lockdown.sh --ufw 2>&1 | tail -30'
+              echo "== Erreichbarkeit nach der Aenderung =="
+              for port in 3000 3001 3389 8081 8888 12000; do
+                if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
+                  echo "  Port $port: OFFEN"
+                else
+                  echo "  Port $port: zu"
+                fi
+              done
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
