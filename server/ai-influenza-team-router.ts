@@ -52,7 +52,7 @@ export const aiInfluenzaTeamRouter=router({
         stripeCustomerId:ctx.user.stripeCustomerId,
         role:ctx.user.role,
       },input.packageId,order.payload.orderId);
-      return {orderId:order.payload.orderId,...checkout};
+      return checkout;
     }catch(error){
       throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Checkout konnte nicht vorbereitet werden."});
     }
