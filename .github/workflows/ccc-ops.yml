@@ -18,6 +18,7 @@ on:
           - db-diag
           - db-fix
           - migrate
+          - repair-schema
           - db-probe
           - health
         default: deploy
@@ -91,6 +92,10 @@ jobs:
               # Spielt ausstehende Migrationen ein, prueft die Tabellen und
               # gibt ungenutzten Docker-Platz frei (Images aelter als 7 Tage).
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== Platz vorher =="; df -h / | tail -1; echo "== Migration =="; ./node_modules/.bin/drizzle-kit migrate 2>&1 | tail -10; echo "== Datenbank danach =="; node scripts/ops/db-diag.mjs 2>&1 | head -10; echo "== Platz freigeben =="; docker container prune -f 2>&1 | tail -1; docker image prune -f --filter "until=168h" 2>&1 | tail -2; echo "== Platz nachher =="; df -h / | tail -1; echo "== Readiness =="; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
+              ;;
+            repair-schema)
+              # Spielt die fehlenden Revenue-Tabellen idempotent ein.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; set -a; . ./.env 2>/dev/null; set +a; echo "== DDL =="; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/repair-revenue-schema.sql 2>&1 | tail -8; echo "== Datenbank =="; node scripts/ops/db-diag.mjs 2>&1 | head -8; echo "== App neu starten =="; pm2 restart cybersarah-control-center --update-env > /dev/null 2>&1; sleep 12; echo "== Readiness =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 700; echo; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
               ;;
             health)
               $SSH_CMD 'echo "== PM2 =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready; echo "== Revenue-OS-Env in PM2? =="; pm2 env $(pm2 jlist | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{const j=JSON.parse(s);const p=j.find(x=>x.name.includes(\"cybersarah-control-center\"));console.log(p?p.pm_id:1)})") 2>/dev/null | grep -c "^REVENUE_OS_DATABASE_URL:" ; echo "== App-Log =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
