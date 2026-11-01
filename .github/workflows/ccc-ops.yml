@@ -17,6 +17,7 @@ on:
           - diag
           - db-diag
           - db-fix
+          - payment-status
           - migrate
           - repair-schema
           - db-probe
@@ -96,6 +97,11 @@ jobs:
             repair-schema)
               # Spielt die fehlenden Revenue-Tabellen idempotent ein.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; set -a; . ./.env 2>/dev/null; set +a; echo "== DDL =="; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/ops/repair-revenue-schema.sql 2>&1 | tail -8; echo "== Datenbank =="; node scripts/ops/db-diag.mjs 2>&1 | head -8; echo "== App neu starten =="; pm2 restart cybersarah-control-center --update-env > /dev/null 2>&1; sleep 12; echo "== Readiness =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 700; echo; curl -s -o /dev/null -w "HTTP %{http_code}\n" --max-time 10 http://localhost:3000/api/ready'
+              ;;
+            payment-status)
+              # Zeigt nur, ob Zahlungs-Variablen gesetzt sind (Namen und Laenge,
+              # niemals Werte) und was die App dazu meldet.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; echo "== Zahlungs-Variablen =="; for V in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_ID DIGISTORE24_API_KEY DIGISTORE24_IPN_TOKEN; do L=$(grep -m1 "^$V=" .env 2>/dev/null | wc -c); if [ "$L" -gt 0 ]; then echo "$V: gesetzt"; else echo "$V: fehlt"; fi; done; echo "== Billing-Status der App =="; curl -s --max-time 10 http://localhost:3000/api/billing/health 2>/dev/null | head -c 400; echo; echo "== Webhook-Routen erreichbar? =="; for U in /api/v1/webhooks/digistore24 /api/billing/webhook /api/stripe/webhook; do C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 6 -X POST -H "Content-Type: application/json" -d "{}" http://localhost:3000$U); echo "$U -> $C"; done'
               ;;
             health)
               $SSH_CMD 'echo "== PM2 =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready; echo "== Revenue-OS-Env in PM2? =="; pm2 env $(pm2 jlist | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{const j=JSON.parse(s);const p=j.find(x=>x.name.includes(\"cybersarah-control-center\"));console.log(p?p.pm_id:1)})") 2>/dev/null | grep -c "^REVENUE_OS_DATABASE_URL:" ; echo "== App-Log =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
