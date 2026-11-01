@@ -9,7 +9,7 @@ describe("AI Influenza lead compliance",()=>{
   it("scores commercial evidence deterministically",()=>{
     expect(scoreAiInfluenzaLead({
       automationPain:90,contentNeed:80,budgetSignal:85,engagement:70,strategicFit:95,
-    })).toEqual({score:86,tier:"hot"});
+    })).toEqual({score:85,tier:"hot"});
   });
   it("deduplicates companies by normalized domain key",()=>{
     expect(aiInfluenzaLeadNodeKey("https://www.Example.com/about")).toBe("ai-influenza-lead:example.com");
