@@ -25,6 +25,7 @@ describe("revenue throughput supervisor",()=>{
     expect(out.checkoutFriction.status).toBe("healthy");
     expect(out.crossSellEfficiency.conversionRatePct).toBe(10);
     expect(out.crossSellEfficiency.action).toBe("scale");
+    expect(out.infrastructure.providerCapacity.status).toBe("healthy");
     expect(out.checkoutFriction.source).toBe("stripe-checkout");
     expect(out.mrrVelocity.available).toBe(false);
     expect(out.mrrVelocity.projectedMrrEur).toBeNull();
@@ -55,6 +56,7 @@ describe("revenue throughput supervisor",()=>{
     expect(out.blockers.join(" ")).toContain("Stripe");
     expect(out.blockers.join(" ")).toContain("Digistore24");
     expect(out.blockers.join(" ")).toContain("LLM-Provider");
+    expect(out.infrastructure.providerCapacity.status).toBe("critical");
     expect(out.checkoutFriction.status).toBe("critical");
     expect(out.blockers.join(" ")).toContain("Invoice");
     expect(out.blockers.join(" ")).toContain("Cross-Sell");
