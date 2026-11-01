@@ -24,7 +24,7 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 | Sprint | Ziel | Status |
 |---:|---|---|
 | 21 | Stripe-Produkte über Produktstatus und Varianten zuverlässig abgleichen | OFFEN |
-| 22 | Stripe-Produktvarianten mit steuerlicher/zeitlicher Gültigkeit vergleichen | OFFEN |
+| 22 | Stripe-Produktvarianten mit steuerlicher/zeitlicher Gültigkeit vergleichen | CODE+CI — `lib/stripe-variant-validity-logic.ts` (Preiskollisionen je Waehrung/Intervall, ueberholte aktive Varianten, fehlende Erstellzeitpunkte, Steuer-Mix, Abweichung vom Standardpreis), in der Katalogprojektion aktiv, 9 Tests |
 | 23 | Doppelte Stripe-IDs und verwaiste lokale Offers sicher behandeln | OFFEN |
 | 24 | Checkout-Messung mit Stripe-Testmode-End-to-End abnehmen | OFFEN |
 | 25 | Webhook-Wiederholungen bei Bestellung/Refund idempotent verarbeiten | OFFEN |
