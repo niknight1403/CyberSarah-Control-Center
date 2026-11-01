@@ -7,6 +7,8 @@ on:
       - 'server/revenue-*.ts'
       - 'tests/revenue-*.test.ts'
       - '.github/workflows/revenue-branch-validation.yml'
+      - 'scripts/vercel-ignore-build.sh'
+      - 'vercel.json'
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,6 +37,16 @@ jobs:
           set -euo pipefail
           VERCEL_ENV=preview bash scripts/vercel-ignore-build.sh
           VERCEL_ENV=development bash scripts/vercel-ignore-build.sh
+          set +e
+          env -u VERCEL_ENV bash scripts/vercel-ignore-build.sh
+          unset_result=$?
+          VERCEL_ENV=unrecognized bash scripts/vercel-ignore-build.sh
+          unknown_result=$?
+          set -e
+          if [ "$unset_result" -ne 1 ] || [ "$unknown_result" -ne 1 ]; then
+            echo "Unknown/unset Vercel environment must never suppress production builds."
+            exit 1
+          fi
           set +e
           VERCEL_ENV=production bash scripts/vercel-ignore-build.sh
           result=$?
