@@ -75,3 +75,12 @@ SELECT * FROM (VALUES
    '["Individuelles Team","Vereinbarter Leistungsumfang","Wöchentliches Reporting"]'::jsonb, '[]'::jsonb, false)
 ) AS v(name, beschreibung, preis, waehrung, intervall, reihenfolge, aktiv, features, highlight_features, populaer)
 WHERE NOT EXISTS (SELECT 1 FROM subscription_plans sp WHERE sp.name = v.name);
+
+-- 5) DB-seitiges Freigabe-Gate: Versand nur mit dokumentierter Freigabe
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'angebote_versand_gate') THEN
+    ALTER TABLE angebote ADD CONSTRAINT angebote_versand_gate
+      CHECK (status <> 'versendet' OR (freigegeben_am IS NOT NULL AND freigegeben_von IS NOT NULL));
+  END IF;
+END $$;
