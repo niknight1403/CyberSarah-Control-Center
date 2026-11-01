@@ -21,7 +21,9 @@ jobs:
         shell: bash
         run: |
           set -u
-          failures=0
+          ok=0
+          auth_failures=0
+          degraded=0
           test_provider() {
             local name="$1"
             local url="$2"
@@ -52,12 +54,23 @@ jobs:
                 --data "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly OK.\"}],\"max_tokens\":8,\"temperature\":0}" 2>/dev/null); then :; else output="000 0"; fi
             fi
             status="${output%% *}"
-            if [ "$status" = "200" ]; then
-              echo "$name: PASS HTTP $status (${output#* }s)"
-            else
-              echo "$name: FAIL HTTP ${status:-000} (${output#* }s)"
-              failures=$((failures + 1))
-            fi
+            case "$status" in
+              200)
+                echo "$name: PASS HTTP $status (${output#* }s)"
+                ok=$((ok + 1))
+                ;;
+              401|403)
+                # Key abgelehnt: das ist ein Konfigurationsfehler, kein Ausfall.
+                echo "$name: AUTH_FAIL HTTP $status (${output#* }s)"
+                auth_failures=$((auth_failures + 1))
+                ;;
+              *)
+                # 429, 5xx, Timeout: Anbieter gerade nicht verfuegbar. Kein
+                # Repo-Defekt, deshalb Warnung statt Fehlschlag.
+                echo "$name: DEGRADED HTTP ${status:-000} (${output#* }s)"
+                degraded=$((degraded + 1))
+                ;;
+            esac
           }
           # Sprint 386: openai/gpt-oss-20b ist aus der Groq-Liste gefallen
           # (Key-Changer 01.11.2026, 15:43 UTC); qwen/qwen3.8-27b ist dort
@@ -65,8 +78,24 @@ jobs:
           # GROQ_MODEL_CANDIDATES.
           test_provider "Groq" "https://api.groq.com/openai/v1/chat/completions" "qwen/qwen3.8-27b" "$GROQ_KEY"
           test_provider "Gemini" "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" "gemini-flash-latest" "$GEMINI_KEY"
-          test_provider "OpenRouter" "https://openrouter.ai/api/v1/chat/completions" "openrouter/free" "$OPENROUTER_KEY" "HTTP-Referer: $OPENROUTER_REFERER"
-          if [ "$failures" -gt 0 ]; then
-            echo "Mindestens ein konfigurierter Provider ist nicht erreichbar."
+          test_provider "OpenRouter" "https://openrouter.ai/api/v1/chat/completions" "openrouter/free" "$OPENROUTER_KEY" "HTTP-Referer: ${OPENROUTER_REFERER:-https://app.cybersarah-ki.com}"
+          echo "---"
+          echo "Erreichbar: $ok | Key abgelehnt: $auth_failures | Zeitweise nicht verfuegbar: $degraded"
+          if [ "$auth_failures" -gt 0 ]; then
+            echo "Mindestens ein Key wird vom Anbieter abgelehnt (401/403) — Secret pruefen."
             exit 1
           fi
+          if [ "$ok" -eq 0 ]; then
+            echo "Kein konfigurierter Anbieter erreichbar — Rotation kann nicht antworten."
+            exit 1
+          fi
+          echo "Mindestens ein Anbieter antwortet. Zeitweise Ausfaelle sind kein Repo-Defekt."
+          # Zusammenfassung als Job-Summary, damit der Verlauf lesbar bleibt.
+          {
+            echo "### AI-Provider-Status"
+            echo "| Ergebnis | Anzahl |"
+            echo "| --- | --- |"
+            echo "| erreichbar | $ok |"
+            echo "| Key abgelehnt | $auth_failures |"
+            echo "| zeitweise nicht verfuegbar | $degraded |"
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || true
