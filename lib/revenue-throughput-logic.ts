@@ -13,6 +13,8 @@ export type RevenueThroughputInput={
   previous7RevenueCents:number;
   recent7Conversions:number;
   previous7Conversions:number;
+  crossSellRecommended:number|null;
+  crossSellConverted:number|null;
   stripeConnected:boolean;
   stripeWebhookConfigured:boolean;
   digistoreIpnConfigured:boolean;
@@ -67,6 +69,20 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
         nextAction:"Mehr echte Checkout-Ereignisse sammeln, bevor CRO-Änderungen priorisiert werden",
       };
 
+  const crossSellRate=input.crossSellRecommended!==null&&input.crossSellConverted!==null
+    ?pct(input.crossSellConverted,input.crossSellRecommended):null;
+  const crossSellEfficiency={
+    recommended:input.crossSellRecommended,
+    converted:input.crossSellConverted,
+    conversionRatePct:crossSellRate,
+    evidence:input.crossSellRecommended===null?"unavailable" as const:input.crossSellRecommended>=30?"high" as const:input.crossSellRecommended>=10?"medium" as const:"low" as const,
+    action:crossSellRate===null||input.crossSellRecommended===null||input.crossSellRecommended<10
+      ?"measure" as const
+      :crossSellRate<5
+        ?"optimize" as const
+        :"scale" as const,
+  };
+
   const blockers:string[]=[];
   if(!input.databaseReady)blockers.push("Revenue-Datenbank nicht verfügbar");
   if(!input.stripeConnected)blockers.push("Stripe-Katalog/API nicht verbunden");
@@ -77,6 +93,7 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
   if(input.digistoreWebhookConsecutiveFailures>=3)blockers.push(`Digistore24-IPN ${input.digistoreWebhookConsecutiveFailures} Fehler in Folge`);
   if(bottleneck&&bottleneck.dropOffPct!==null&&bottleneck.dropOffPct>=50)blockers.push(`Funnel-Engpass ${bottleneck.key}: ${bottleneck.dropOffPct}% Drop-off`);
   if(input.invoiceSuccessRate!==null&&input.invoiceSuccessRate<95)blockers.push(`Invoice-Erfolgsrate nur ${input.invoiceSuccessRate.toFixed(1)}%`);
+  if(crossSellEfficiency.action==="optimize")blockers.push(`Cross-Sell-Conversion nur ${crossSellRate?.toFixed(1)}% bei ${input.crossSellRecommended} Empfehlungen`);
 
   const priorities=[
     ...blockers.map((detail,index)=>({rank:index+1,kind:"repair" as const,detail})),
@@ -110,6 +127,7 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
     funnel,
     bottleneck,
     checkoutFriction,
+    crossSellEfficiency,
     payments:{
       stripeConnected:input.stripeConnected,
       stripeWebhookConfigured:input.stripeWebhookConfigured,
