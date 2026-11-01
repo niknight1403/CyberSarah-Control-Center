@@ -4,6 +4,7 @@ import {
   AI_INFLUENZA_PACKAGES,
   buildAiInfluenzaMonthlyPlan,
   canAdvanceAiInfluenzaStep,
+  maySetPaidWithoutStripe,
   nextAiInfluenzaStep,
   type AiInfluenzaMode,
   type AiInfluenzaOrderPayload,
@@ -161,7 +162,7 @@ export async function advanceAiInfluenzaOrder(input:{
     const order=parseOrderPayload(row.payload);
     const next=nextAiInfluenzaStep(order.step);
     if(!next)throw new Error("Auftrag befindet sich bereits im letzten Workflow-Schritt.");
-    if(next==="paid"&&!order.testOnly){
+    if(!maySetPaidWithoutStripe(Boolean(order.testOnly),next)){
       throw new Error("Der Status 'paid' darf für echte Aufträge nur aus einem verifizierten Stripe-Zahlungs-/Subscription-Event gesetzt werden.");
     }
     const decision=canAdvanceAiInfluenzaStep({
