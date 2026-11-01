@@ -16,6 +16,7 @@ import {
   createLiveBillingPortalSession,
 } from "./billing";
 import {adminProcedure,protectedProcedure,publicProcedure,router} from "./_core/trpc";
+import {aiInfluenzaLeadPipeline,prepareAiInfluenzaProposal,upsertAiInfluenzaLead} from "./ai-influenza-lead-service";
 
 const packageId=z.enum(AI_INFLUENZA_PACKAGE_IDS);
 
@@ -56,6 +57,25 @@ export const aiInfluenzaTeamRouter=router({
     try{return await createLiveBillingPortalSession({stripeCustomerId:ctx.user.stripeCustomerId});}
     catch(error){throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Kundenportal konnte nicht geöffnet werden."});}
   }),
+  leadPipeline:adminProcedure.query(()=>aiInfluenzaLeadPipeline()),
+  upsertLead:adminProcedure.input(z.object({
+    companyName:z.string().trim().min(2).max(220),
+    domain:z.string().trim().min(3).max(255),
+    publicSourceUrl:z.string().url().max(1000),
+    contactBasis:z.enum(["customer-requested","existing-customer","consent","legitimate-interest-review","unknown","opted-out"]),
+    signals:z.object({
+      automationPain:z.number().min(0).max(100),
+      contentNeed:z.number().min(0).max(100),
+      budgetSignal:z.number().min(0).max(100),
+      engagement:z.number().min(0).max(100),
+      strategicFit:z.number().min(0).max(100),
+    }),
+    estimatedValueCents:z.number().int().nonnegative().optional(),
+    optedOut:z.boolean().default(false),
+  })).mutation(({input})=>upsertAiInfluenzaLead(input)),
+  prepareProposal:adminProcedure.input(z.object({
+    nodeKey:z.string().trim().min(3).max(180),packageId,
+  })).mutation(({ctx,input})=>prepareAiInfluenzaProposal({...input,createdByOpenId:ctx.user.openId})),
   advanceOrder:adminProcedure.input(z.object({
     jobId:z.number().int().positive(),
     approved:z.boolean().default(false),
