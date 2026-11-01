@@ -83,10 +83,10 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     b2bNodes: b2b.counts.nodes,
     b2bQualified: b2b.counts.qualified,
     b2bPartners: b2b.counts.partners,
-    b2bPersonaAssignments: b2b.personaAssignments.length,
-    b2bExpansionQueue: b2b.expansionQueue.length,
-    saasLoopFocus: b2b.saasLoop.focus,
-    saasLoopOwnerPersona: b2b.saasLoop.ownerPersona,
+    b2bPersonaAssignments: b2b.personaAssignments?.length ?? 0,
+    b2bExpansionQueue: b2b.expansionQueue?.length ?? 0,
+    saasLoopFocus: b2b.saasLoop?.focus ?? "unavailable",
+    saasLoopOwnerPersona: b2b.saasLoop?.ownerPersona ?? "unassigned",
   };
 
   const realActions: string[] = [];
