@@ -7,7 +7,7 @@ import {getDb} from "./db";
 import {collectRevenueAutopilotSnapshot} from "./revenue-autopilot";
 import {getAdministratorStripeHealth} from "./stripe-admin-health";
 import {getRevenueWebhookRuntimeStatus} from "./revenue-webhook-runtime";
-import {classifyRevenueIncidents} from "../lib/revenue-incident-logic";
+import {buildRevenueRepairPlan,classifyRevenueIncidents} from "../lib/revenue-incident-logic";
 
 export async function revenueThroughputOverview(){
   const [snapshot,stripeHealth]=await Promise.all([
@@ -65,9 +65,11 @@ export async function revenueThroughputOverview(){
       stripeWebhookConsecutiveFailures:webhookRuntime.stripe.consecutiveFailures,
       digistoreWebhookConsecutiveFailures:webhookRuntime.digistore24.consecutiveFailures,
     });
+  const incidents=classifyRevenueIncidents(core.blockers);
   return {
     ...core,
-    incidents:classifyRevenueIncidents(core.blockers),
+    incidents,
+    repairPlan:buildRevenueRepairPlan(incidents),
     webhookRuntime,
     generatedAt:new Date().toISOString(),
     evidence:{
