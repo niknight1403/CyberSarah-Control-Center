@@ -66,3 +66,30 @@ ENV-Seite auf Render nicht mitgezogen wird.
 - Fix liegt auf dem Branch `fix/llm-rotation-integrity-20261101`.
 - Der Vorfall bleibt offen, bis mindestens ein zweiter Anbieter wieder
   zuverlaessig `VERFUEGBAR` meldet.
+
+## Nachtrag 01.11.2026, 18:30 — Live-Gegenprobe
+
+Nach dem Merge von PR #176 wurde `provider-smoke-test.yml` per
+`workflow_dispatch` auf `main` gestartet (Lauf `41331595127`, Commit `a4f5b52`):
+
+```
+Groq:        PASS HTTP 200 (0,17 s)   -> qwen/qwen3.8-27b, wie in PR #176 gesetzt
+Gemini:      FAIL HTTP 503 (18,64 s)  -> Dienst nicht verfuegbar, kein Key-Fehler
+OpenRouter:  FAIL HTTP 429 (0,63 s)   -> weiterhin im Rate-Limit
+```
+
+Damit ist die Korrektur am Modellnamen live bestaetigt: Groq antwortet mit dem
+eingetragenen Modell. Gleichzeitig zeigt sich, dass die Kette derzeit auf genau
+einen Anbieter gestuetzt ist. Gemini antwortet mit 503 (Ueberlastung), nicht mit
+401 — der Key ist also nicht das Problem, der Dienst ist es.
+
+**Folge fuer den Smoke-Test:** Ein harter Fehlschlag bei 429/5xx macht den Test
+chronisch rot, obwohl im Repo nichts kaputt ist. Genau dieses Rauschen hat in
+den letzten Wochen echte Befunde verdeckt. Die Auswertung unterscheidet jetzt:
+
+- `200` -> PASS, zaehlt als erreichbar
+- `401`/`403` -> AUTH_FAIL, harter Fehlschlag (Secret pruefen)
+- alles andere (429, 5xx, Timeout) -> DEGRADED, Warnung
+
+Der Job schlaegt nur noch fehl, wenn ein Key abgelehnt wird oder **kein**
+Anbieter antwortet. Die Zusammenfassung landet zusaetzlich in der Job-Summary.
