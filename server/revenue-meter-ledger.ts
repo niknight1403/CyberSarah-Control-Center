@@ -81,6 +81,19 @@ export async function markMeterFailure(db:SqlClient,event:ClaimedMeterEvent,erro
     WHERE event_id=$1 AND state='processing' AND attempts=$2`,
     [event.eventId,event.attempts,message.slice(0,300)]);
 }
+/**
+ * Recover exhausted leases after worker termination. Otherwise a fifth attempt
+ * can remain 'processing' forever because claimMeterEvent skips attempts >= 5.
+ * Safe to invoke repeatedly; only expired leases are changed.
+ */
+export async function quarantineExhaustedMeterLeases(db:SqlClient):Promise<number>{
+  const result=await db.query(`UPDATE revenue_meter_events
+    SET state='failed',locked_until=NULL,
+      last_error=COALESCE(last_error,'Worker lease expired after maximum attempts')
+    WHERE state='processing' AND attempts>=5 AND locked_until<now()
+    RETURNING event_id`);
+  return result.rows.length;
+}
 /** One dispatch iteration; intentionally not registered as a background job. */
 export async function dispatchOneMeterEvent(db:SqlClient, stripeKey:string,
     http:typeof fetch=fetch):Promise<"empty"|"sent"|"retry">{
