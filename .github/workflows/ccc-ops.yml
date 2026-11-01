@@ -11,6 +11,7 @@ on:
           - deploy
           - pm2-redeploy
           - revenue-os-db-url
+          - hubspot-env
           - health
         default: deploy
 
@@ -37,6 +38,7 @@ jobs:
       - name: Operation ausfuehren
         env:
           OP: ${{ github.event.inputs.operation }}
+          HS_KEY: ${{ secrets.HUBSPOT_SERVICE_KEY }}
           SSH_CMD: "ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new root@167.233.196.20"
         run: |
           echo "OP: $OP"
@@ -49,6 +51,12 @@ jobs:
               ;;
             revenue-os-db-url)
               $SSH_CMD 'SRC=/opt/cybersarah-revenue-os/.env; DST=/opt/cybersarah-control-center/.env; if [ ! -f "$SRC" ]; then echo "FEHLER: $SRC existiert nicht"; exit 1; fi; URL=$(grep -m1 "^DATABASE_URL=" "$SRC" | cut -d= -f2- | tr -d "\r"); if [ -z "$URL" ]; then echo "FEHLER: Keine DATABASE_URL in der Revenue-OS-.env"; exit 1; fi; if grep -q "^REVENUE_OS_DATABASE_URL=" "$DST" 2>/dev/null; then sed -i "s|^REVENUE_OS_DATABASE_URL=.*|REVENUE_OS_DATABASE_URL=$URL|" "$DST"; else printf "\nREVENUE_OS_DATABASE_URL=%s\n" "$URL" >> "$DST"; fi; chmod 600 "$DST"; echo "== .env: REVENUE_OS_DATABASE_URL gesetzt (Wert nie ausgeben) =="; echo "== Verbindungstest (psql, read-only SELECT 1) =="; if command -v psql >/dev/null; then PGPASSWORD=$(echo "$URL" | sed -E "s|.*:([^:@]+)@.*|\1|") psql "$(echo "$URL" | sed -E "s|^[a-z]+://||")" -c "SELECT 1" >/dev/null 2>&1 && echo "DB erreichbar: ja" || echo "DB erreichbar: pruefen (psql-Test nicht eindeutig)"; else echo "psql nicht verfuegbar — App-Test nach Sync"; fi; echo "== PM2-Env-Sync =="; cd /opt/cybersarah-control-center && node -e "const fs=require(\"fs\");const cp=require(\"child_process\");const lines=fs.readFileSync(\".env\",\"utf8\").split(/\r?\n/);const o={};for(const l of lines){const m=l.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);if(m)o[m[1]]=m[2];}cp.execSync(\"pm2 restart cybersarah-control-center --update-env\",{env:Object.assign({},process.env,o)});console.log(\"PM2 mit .env neu gestartet\");" && sleep 6; echo "== Health =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready'
+              ;;
+            hubspot-env)
+              # Schreibt den HubSpot-Service-Key aus dem GitHub-Secret in die
+              # Server-.env (600), startet PM2 mit den neuen Variablen und
+              # prueft danach die Rechte. Der Wert wird nie ausgegeben.
+              printf '%s' "$HS_KEY" | $SSH_CMD 'set -e; ENVF=/opt/cybersarah-control-center/.env; [ -f "$ENVF" ] || { echo "FEHLER: $ENVF fehlt"; exit 1; }; KEY=$(cat); case "$KEY" in pat-*) : ;; *) echo "FEHLER: Key hat kein pat-Praefix (Laenge ${#KEY})"; exit 1;; esac; if grep -q "^HUBSPOT_SERVICE_KEY=" "$ENVF" 2>/dev/null; then sed -i "s|^HUBSPOT_SERVICE_KEY=.*|HUBSPOT_SERVICE_KEY=$KEY|" "$ENVF"; else printf "\nHUBSPOT_SERVICE_KEY=%s\n" "$KEY" >> "$ENVF"; fi; if grep -q "^HUBSPOT_PORTAL_ID=" "$ENVF" 2>/dev/null; then sed -i "s|^HUBSPOT_PORTAL_ID=.*|HUBSPOT_PORTAL_ID=148844654|" "$ENVF"; else printf "HUBSPOT_PORTAL_ID=148844654\n" >> "$ENVF"; fi; chmod 600 "$ENVF"; echo "== .env aktualisiert: HUBSPOT_SERVICE_KEY (${#KEY} Zeichen), HUBSPOT_PORTAL_ID=148844654 =="; cd /opt/cybersarah-control-center; node -e "const fs=require(\"fs\");const cp=require(\"child_process\");const lines=fs.readFileSync(\".env\",\"utf8\").split(/\\r?\\n/);const o={};for(const l of lines){const m=l.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);if(m)o[m[1]]=m[2];}cp.execSync(\"pm2 restart cybersarah-control-center --update-env\",{env:Object.assign({},process.env,o)});console.log(\"PM2 mit .env neu gestartet\");"; sleep 6; curl -s -o /dev/null -w "localhost:3000/api/ready -> HTTP %{http_code}\\n" --max-time 8 http://localhost:3000/api/ready || true; echo "== HubSpot-Rechtepruefung auf dem Server =="; npx tsx scripts/hubspot-live-check.ts 2>&1 | tail -16 || echo "Pruefung nicht ausfuehrbar (tsx fehlt?)"'
               ;;
             health)
               $SSH_CMD 'echo "== PM2 =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready; echo "== Revenue-OS-Env in PM2? =="; pm2 env $(pm2 jlist | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{const j=JSON.parse(s);const p=j.find(x=>x.name.includes(\"cybersarah-control-center\"));console.log(p?p.pm_id:1)})") 2>/dev/null | grep -c "^REVENUE_OS_DATABASE_URL:" ; echo "== App-Log =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
