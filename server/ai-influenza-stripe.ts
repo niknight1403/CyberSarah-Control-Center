@@ -129,9 +129,11 @@ export async function erstelleCheckout(eingabe: {
 
 /** Verifizierter Webhook: Signatur, Modus, Idempotenz, dann Fachaktion. */
 export async function verarbeiteWebhook(payload: Buffer, signature: string | undefined) {
+  // Reihenfolge bewusst: Anfragen ohne Signatur sind immer ein Clientfehler (400),
+  // unabhaengig von unserer Konfiguration. Erst danach zaehlt ein Konfigurationsfehler (500).
+  if (!signature) throw new AiInfluenzaStripeError("Stripe-Signatur fehlt.", 400);
   const secret = process.env.AI_INFLUENZA_STRIPE_WEBHOOK_SECRET?.trim();
   if (!secret) throw new AiInfluenzaStripeError("AI_INFLUENZA_STRIPE_WEBHOOK_SECRET ist nicht konfiguriert.", 500);
-  if (!signature) throw new AiInfluenzaStripeError("Stripe-Signatur fehlt.", 400);
 
   const { stripe, modus } = holeStripe();
   let event: Stripe.Event;
