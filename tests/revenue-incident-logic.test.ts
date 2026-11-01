@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {classifyRevenueIncidents} from "../lib/revenue-incident-logic";
+import {buildRevenueRepairPlan,classifyRevenueIncidents} from "../lib/revenue-incident-logic";
 
 describe("revenue incident classifier",()=>{
   it("classifies payment, provider and funnel failures with safe repair actions",()=>{
@@ -13,5 +13,8 @@ describe("revenue incident classifier",()=>{
     expect(incidents.some(x=>x.code==="REV_PROVIDER_CAPACITY"&&x.autoRepairable)).toBe(true);
     expect(incidents.some(x=>x.code==="REV_FUNNEL_FRICTION"&&x.owner==="sales-conversion-unit")).toBe(true);
     expect(incidents.some(x=>x.code==="REV_CROSS_SELL"&&x.owner==="growth-swarm")).toBe(true);
+    const plan=buildRevenueRepairPlan(incidents);
+    expect(plan.some(x=>x.action==="defer-noncritical-llm"&&x.mode==="auto")).toBe(true);
+    expect(plan.some(x=>x.action==="generate-cro-draft"&&x.mode==="auto")).toBe(true);
   });
 });
