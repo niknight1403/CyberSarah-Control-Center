@@ -44,11 +44,23 @@ export const HUBSPOT_API_HOSTS = {
 
 export const DEFAULT_HUBSPOT_BASE_URL: string = HUBSPOT_API_HOSTS.na;
 
+/** Leitet das Rechenzentrum aus dem Praefix "pat-na1-" bzw. "pat-eu1-" ab. */
+export function regionFromToken(token: string): "na" | "eu" | null {
+  const value = String(token ?? "").trim().toLowerCase();
+  if (value.startsWith("pat-eu1-")) return "eu";
+  if (value.startsWith("pat-na1-")) return "na";
+  return null;
+}
+
 export function resolveHubspotBaseUrl(
   env: Record<string, string | undefined> = process.env,
+  token: string = "",
 ): string {
   const raw = String(env.HUBSPOT_API_BASE_URL ?? "").trim();
-  if (!raw) return DEFAULT_HUBSPOT_BASE_URL;
+  if (!raw) {
+    const derived = regionFromToken(token || resolveHubspotToken(env));
+    return derived ? HUBSPOT_API_HOSTS[derived] : DEFAULT_HUBSPOT_BASE_URL;
+  }
   const normalized = raw.replace(/\/+$/, "");
   const allowed = Object.values(HUBSPOT_API_HOSTS) as readonly string[];
   if (!allowed.includes(normalized)) {
@@ -91,7 +103,7 @@ export function describeHubspotEnv(
   const variable = TOKEN_VARIABLES.find((name) => String(env[name] ?? "").trim()) ?? null;
   let baseUrl = DEFAULT_HUBSPOT_BASE_URL;
   try {
-    baseUrl = resolveHubspotBaseUrl(env);
+    baseUrl = resolveHubspotBaseUrl(env, token);
   } catch {
     return {
       configured: false,
@@ -157,7 +169,7 @@ export function createHubspotModule(
   }
   const client = new HubspotClient({
     ...options,
-    baseUrl: options.baseUrl ?? resolveHubspotBaseUrl(env),
+    baseUrl: options.baseUrl ?? resolveHubspotBaseUrl(env, resolveHubspotToken(env)),
     token: resolveHubspotToken(env),
   });
   return { mode: "live", service: new HubspotService(client), reason: "Token vorhanden." };

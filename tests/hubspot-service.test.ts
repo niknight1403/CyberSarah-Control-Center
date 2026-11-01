@@ -9,6 +9,7 @@ import {
   assertValidToken,
   createHubspotModule,
   HUBSPOT_API_HOSTS,
+  regionFromToken,
   classifyHubspotToken,
   describeHubspotEnv,
   resolveHubspotToken,
@@ -326,5 +327,27 @@ describe("HubSpot: Rechenzentrum (NA und EU)", () => {
     expect(status.configured).toBe(false);
     expect(status.problem).toMatch(/bekannten HubSpot-Host/);
     expect(createHubspotModule({ HUBSPOT_SERVICE_KEY: TOKEN, HUBSPOT_API_BASE_URL: "https://evil.example.com" }).mode).toBe("sandbox");
+  });
+});
+describe("HubSpot: Rechenzentrum aus dem Schluessel ableiten", () => {
+  it("erkennt das Praefix", () => {
+    expect(regionFromToken("pat-eu1-" + "a".repeat(36))).toBe("eu");
+    expect(regionFromToken("pat-na1-" + "a".repeat(36))).toBe("na");
+    expect(regionFromToken("pa-eu1-" + "a".repeat(36))).toBeNull();
+    expect(regionFromToken("")).toBeNull();
+  });
+
+  it("waehlt ohne HUBSPOT_API_BASE_URL den Host des Schluessels", () => {
+    expect(describeHubspotEnv({ HUBSPOT_SERVICE_KEY: "pat-eu1-" + "b".repeat(36) }).baseUrl)
+      .toBe("https://api-eu1.hubapi.com");
+    expect(describeHubspotEnv({ HUBSPOT_SERVICE_KEY: "pat-na1-" + "b".repeat(36) }).baseUrl)
+      .toBe("https://api.hubapi.com");
+  });
+
+  it("laesst eine ausdrueckliche Angabe gewinnen", () => {
+    expect(describeHubspotEnv({
+      HUBSPOT_SERVICE_KEY: "pat-na1-" + "b".repeat(36),
+      HUBSPOT_API_BASE_URL: "https://api-eu1.hubapi.com",
+    }).baseUrl).toBe("https://api-eu1.hubapi.com");
   });
 });
