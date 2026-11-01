@@ -52,6 +52,8 @@ export async function collectRevenueAutopilotSnapshot(): Promise<RevenueAutopilo
     invoiceSuccessRate: saas?.subscriptions?.invoiceSuccessRate ?? null,
     invoiceAttempts: saas?.subscriptions?.invoiceAttempts ?? null,
     mrrEur: saas?.subscriptions?.mrrEur ?? null,
+    newMrr1dEur: saas?.subscriptions?.newMrr1dEur ?? null,
+    newMrr7dEur: saas?.subscriptions?.newMrr7dEur ?? null,
     activeSubscriptions: saas?.subscriptions?.active ?? null,
     affiliateClicks: affiliateOk?.affiliateClicks ?? null,
     affiliateConversions: affiliateOk?.affiliateConversions ?? null,
