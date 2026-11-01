@@ -53,6 +53,8 @@ export async function revenueThroughputOverview(){
       previous7RevenueCents:sum(previous,"revenueCents"),
       recent7Conversions:sum(recent,"conversions"),
       previous7Conversions:sum(previous,"conversions"),
+      crossSellRecommended:snapshot.crossSellRecommended,
+      crossSellConverted:snapshot.crossSellConverted,
       stripeConnected:stripeHealth.status==="connected",
       stripeWebhookConfigured:stripeHealth.webhookSecretConfigured,
       digistoreIpnConfigured:Boolean(resolveDigistore24IpnSecret()),
