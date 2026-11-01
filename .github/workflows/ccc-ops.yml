@@ -11,6 +11,7 @@ on:
           - deploy
           - deploy-cc
           - prepare-host
+          - dns-fix
           - net-fix
           - ram-boost
           - space-audit
@@ -107,6 +108,21 @@ jobs:
               done
               echo "== Host-Filter =="
               $SSH_CMD 'ufw status 2>/dev/null | head -12; echo "--- iptables INPUT ---"; iptables -L INPUT -n 2>/dev/null | head -12; echo "--- Listener 80/443/3000 ---"; ss -tlnp | grep -E ":80 |:443 |:3000 " || echo keine'
+              ;;
+            dns-fix)
+              # Setzt einen kostenlosen, sofort aufloesbaren Hostnamen auf
+              # Caddy auf und prueft HTTPS von aussen.
+              HOSTNAME_FREE="167.233.196.20.sslip.io"
+              $SSH_CMD "cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/caddy-site.sh $HOSTNAME_FREE" 2>&1 | tail -30
+              echo "== DNS-Aufloesung des freien Namens =="
+              getent hosts "$HOSTNAME_FREE" || echo "keine Aufloesung"
+              echo "== HTTPS von aussen (Zertifikat kann 30s brauchen) =="
+              for i in 1 2 3 4 5 6; do
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 "https://$HOSTNAME_FREE/api/ready" || echo 000)
+                echo "Versuch $i: $code"
+                [ "$code" = "200" ] && break
+                sleep 10
+              done
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
