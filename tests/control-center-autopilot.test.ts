@@ -22,7 +22,17 @@ describe("control center autopilot", () => {
     plan: { focus: "REACH" }, externalActionsExecuted: 0,
     executedAt: "2026-10-30T00:00:00.000Z",
   })) as never;
-  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse };
+  const throughput = vi.fn(async () => ({
+    status:"scale" as const,blockers:[],priorities:[],
+    currentMrrEur:1200,activeSubscriptions:20,
+    mrrVelocity:{available:false as const,projectedMrrEur:null,reason:"history missing"},
+    revenueVelocity:{recent7RevenueEur:700,previous7RevenueEur:600,changePct:16.67,monthlyRunRateEur:3000,recent7Conversions:7,previous7Conversions:6,conversionChangePct:16.67},
+    funnel:[],bottleneck:null,
+    payments:{stripeConnected:true,stripeWebhookConfigured:true,digistoreIpnConfigured:true,digistoreApiConfigured:true,stripeCheckoutSuccessRate:80,invoiceSuccessRate:99},
+    infrastructure:{databaseReady:true,providerCircuitsOpen:0,providerCircuitsTotal:3},
+    generatedAt:"2026-11-01T00:00:00.000Z",evidence:{dailyRevenueRows:14,stripeCheckedAt:null,stripeStatus:"connected",mrrSource:"test",revenueVelocitySource:"test"},
+  })) as never;
+  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput };
 
   it("orchestriert echte Scans, Revenue und Drafts in einem Lauf", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
