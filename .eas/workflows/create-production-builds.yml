@@ -1,0 +1,14 @@
+name: Create production builds
+
+# Deliberately no automatic trigger; run only through an explicit EAS workflow invocation.
+jobs:
+  build_android:
+    type: build
+    params:
+      platform: android
+      profile: production
+  build_ios:
+    type: build
+    params:
+      platform: ios
+      profile: production
