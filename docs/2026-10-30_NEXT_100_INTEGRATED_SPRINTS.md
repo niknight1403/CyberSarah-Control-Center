@@ -56,7 +56,7 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 | 41 | Platform-Connector-Permissions vor jedem Publish testen | OFFEN |
 | 42 | Publikations-Zeitplan robust gegen Zeitzonen und DST absichern | OFFEN |
 | 43 | Duplikate und Replays in Crossposting-Jobs verhindern | OFFEN |
-| 44 | Publikationsfehler nach Ursachen/Provider getrennt anzeigen | OFFEN |
+| 44 | Publikationsfehler nach Ursachen/Provider getrennt anzeigen | CODE+CI — `lib/publishing-failure-reasons-logic.ts` (Ursachen-Heuristik, Provider-Gruppierung, Retry vs. manuelle Pruefung, maskierte Fehlertexte, ehrliche Zaehlung ohne Fehlertext), in `publishing.opsOverview` aktiv, 7 Tests |
 | 45 | Upload-Quota und Rate-Limits mit angemessenem Backoff behandeln | OFFEN |
 | 46 | Organische Reichweiten-Kohorten pro Kanal getrennt messen | OFFEN |
 | 47 | Social-Engagement-Signale ohne private Daten-Dubletten erfassen | OFFEN |

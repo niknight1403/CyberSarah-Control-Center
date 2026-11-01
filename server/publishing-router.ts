@@ -5,7 +5,10 @@
 import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "./db";
+import { publishingJobs } from "../drizzle/schema";
+import { groupPublishingFailures } from "../lib/publishing-failure-reasons-logic";
 import {publishingOpsOverviewDb} from "./publishing-ops";
 import {getPublishingModeOverview} from "./publishing-service";
 import {isAutopilotEnabled} from "../lib/publishing-queue-logic";
@@ -25,10 +28,22 @@ export const publishingRouter = router({
     const db=await getDb();
     if(!db) throw new TRPCError({code:"SERVICE_UNAVAILABLE",message:"Datenbank nicht verfügbar."});
     const counts=await publishingOpsOverviewDb(db,ctx.user.openId);
+    // Sprint 44 — Fehlergruende je Provider und Ursache, ausschliesslich aus
+    // gespeicherten Fehlertexten des eigenen Kontos (max. 200 aktuelle Jobs).
+    const recentFailed = await db.select({
+      platform: publishingJobs.platform,
+      status: publishingJobs.status,
+      attempts: publishingJobs.attempts,
+      lastError: publishingJobs.lastError,
+    }).from(publishingJobs).where(and(
+      eq(publishingJobs.userOpenId, ctx.user.openId),
+      inArray(publishingJobs.status, ["fehlgeschlagen", "versand_ungeklaert"]),
+    )).orderBy(desc(publishingJobs.updatedAt)).limit(200);
     return {
       ...counts,
       autopilotConfigured:isAutopilotEnabled(process.env.PUBLISHING_AUTOPILOT),
       modes:getPublishingModeOverview(),
+      failureReasons: groupPublishingFailures(recentFailed),
     };
   }),
 
