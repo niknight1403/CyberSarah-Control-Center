@@ -8,7 +8,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { hashPassword, normalizeAccountEmail, validateAccountPassword, verifyPassword } from "./local-auth";
 import { DESIGN_THEMES } from "../lib/design-theme-logic";
 import { isGoogleLoginConfigured, verifyGoogleIdTokenClaims, type GoogleIdTokenClaims } from "../lib/google-login-logic";
-import { isAdministratorEmail } from "./db";
+import { roleForPublicRegistration } from "../lib/account-role-logic";
 
 const registerSchema = z.object({
   email: z.string().trim().email().max(320),
@@ -99,9 +99,9 @@ export const accountRouter = router({
    * Sprint 374 — Anmeldung mit Google-ID-Token.
    * Verifikation ueber den Google-tokeninfo-Endpunkt (Google prueft die
    * Signatur, wir pruefen aud/iss/exp/email_verified deterministisch).
-   * Existierende Konten werden per E-Mail verknuepft (z. B. Admin-Konto),
-   * neue Konten werden angelegt — die Admin-E-Mail erhaelt automatisch die
-   * Admin-Rolle (ADMIN_EMAIL-Bindung bleibt damit auch bei Google-Login wirksam).
+   * Existierende Konten werden per E-Mail verknuepft; neue öffentliche
+   * Registrierungen erhalten immer die Nutzerrolle. Admins werden ausschließlich
+   * über den serverseitigen Bootstrap bzw. eine konfigurierte Owner-ID vergeben.
    */
   loginWithGoogle: publicProcedure.input(googleLoginSchema).mutation(async ({ ctx, input }) => {
     const expectedAudience = process.env.GOOGLE_WEB_CLIENT_ID?.trim() ?? "";
@@ -134,7 +134,7 @@ export const accountRouter = router({
         email,
         name: verified.name,
         loginMethod: "google",
-        role: isAdministratorEmail(email) ? "admin" : "user",
+        role: roleForPublicRegistration(),
         lastSignedIn: new Date(),
       });
       const created = await db.getUserByOpenId(`google_${verified.sub}`);
