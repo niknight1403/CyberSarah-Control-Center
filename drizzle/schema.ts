@@ -487,3 +487,44 @@ export const aiAufgabenEreignisse = pgTable("aiAufgabenEreignisse", {
 export type AiAgentRow = typeof aiAgenten.$inferSelect;
 export type AiAufgabeRow = typeof aiAufgaben.$inferSelect;
 export type AiAufgabeEreignisRow = typeof aiAufgabenEreignisse.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Sprint 4 (AI Influenza) — Stripe-Zahlungsspur (siehe drizzle/0017_ai_influenza_stripe.sql)
+// ---------------------------------------------------------------------------
+export const aiStripeEreignisse = pgTable("aiStripeEreignisse", {
+  id: serial("id").primaryKey(),
+  stripeEventId: varchar("stripe_event_id", { length: 255 }).notNull().unique(),
+  eventTyp: varchar("event_typ", { length: 96 }).notNull(),
+  modus: varchar("modus", { length: 8 }).notNull(),
+  aktion: varchar("aktion", { length: 48 }).notNull(),
+  verarbeitet: boolean("verarbeitet").notNull().default(false),
+  fehler: text("fehler"),
+  empfangenAm: timestamp("empfangen_am", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const aiKundenAuftraege = pgTable("aiKundenAuftraege", {
+  id: serial("id").primaryKey(),
+  kundeId: integer("kunde_id").notNull(),
+  angebotId: integer("angebot_id").notNull(),
+  paket: varchar("paket", { length: 32 }).notNull(),
+  status: varchar("status", { length: 32 }).notNull().default("onboarding"),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }).unique(),
+  modus: varchar("modus", { length: 8 }).notNull(),
+  aboStatus: varchar("abo_status", { length: 24 }).notNull().default("aktiv"),
+  kostenCent: integer("kosten_cent").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const aiZahlungen = pgTable("aiZahlungen", {
+  id: serial("id").primaryKey(),
+  auftragId: integer("auftrag_id"),
+  stripeRechnungId: varchar("stripe_rechnung_id", { length: 255 }).unique(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  betragCent: integer("betrag_cent").notNull(),
+  waehrung: varchar("waehrung", { length: 3 }).notNull().default("EUR"),
+  status: varchar("status", { length: 16 }).notNull().default("bezahlt"),
+  modus: varchar("modus", { length: 8 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -16,6 +16,21 @@ import {
   legeAufgabeAn,
   listeAufgabeTypen,
 } from "./ai-influenza-engine";
+import {
+  AiInfluenzaStripeError,
+  erstelleCheckout,
+  richteStripeObjekteEin,
+  stripeStatus,
+  umsatzUebersicht,
+} from "./ai-influenza-stripe";
+import { revenueRows } from "./revenue-command-service";
+
+function alsTrpcFehler(err: unknown): never {
+  if (err instanceof AiInfluenzaStripeError) {
+    throw new TRPCError({ code: err.status === 403 ? "FORBIDDEN" : err.status === 500 ? "INTERNAL_SERVER_ERROR" : "BAD_REQUEST", message: err.message });
+  }
+  throw err;
+}
 
 const aufgabeTypSchema = z.string().min(2).max(64);
 
@@ -65,6 +80,51 @@ export const aiInfluenzaRouter = router({
         fehler: result.grund ?? null,
       };
     }),
+
+  /** Status der Stripe-Anbindung (Modus, Freigabe), ohne Netzwerkaufruf und ohne Secrets. */
+  stripeStatus: adminProcedure.query(() => stripeStatus()),
+
+  /**
+   * Stripe-Produkte/Preise einrichten. Standard ist ein Trockenlauf; echtes Anlegen
+   * erfordert trocken=false, und im Live-Modus zusaetzlich AI_INFLUENZA_STRIPE_LIVE=true.
+   */
+  stripeEinrichten: adminProcedure
+    .input(z.object({ trocken: z.boolean().default(true) }).optional())
+    .mutation(async ({ input }) => {
+      try {
+        return await richteStripeObjekteEin({ trocken: input?.trocken ?? true });
+      } catch (err) {
+        return alsTrpcFehler(err);
+      }
+    }),
+
+  /** Checkout-Link zu einem freigegebenen Angebot. Angebot/Kunde werden serverseitig geprueft. */
+  checkoutErstellen: adminProcedure
+    .input(z.object({ angebotId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const rows = await revenueRows<{ id: number; paket: string; status: string; kunde_id: number | null; email: string | null }>(
+        `SELECT a.id, a.paket, a.status, a.kunde_id, k.email FROM angebote a LEFT JOIN kunden k ON k.id = a.kunde_id WHERE a.id = ${Number(input.angebotId)} LIMIT 1`,
+      );
+      const angebot = rows[0];
+      if (!angebot) throw new TRPCError({ code: "NOT_FOUND", message: "Angebot nicht gefunden." });
+      if (!angebot.kunde_id || !angebot.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Dem Angebot ist kein Kunde mit E-Mail zugeordnet." });
+      }
+      try {
+        return await erstelleCheckout({
+          paketId: angebot.paket,
+          kundeId: angebot.kunde_id,
+          angebotId: angebot.id,
+          kundeEmail: angebot.email,
+          angebotStatus: angebot.status,
+        });
+      } catch (err) {
+        return alsTrpcFehler(err);
+      }
+    }),
+
+  /** Umsatz (nur bestaetigte Zahlungen) und Kosten, getrennt erfasst. */
+  umsatz: adminProcedure.query(() => umsatzUebersicht()),
 
   queueAbarbeiten: adminProcedure
     .input(z.object({ limit: z.number().int().min(1).max(10).optional() }).optional())

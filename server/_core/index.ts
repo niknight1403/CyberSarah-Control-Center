@@ -79,6 +79,28 @@ async function startServer() {
   app.use(requestMetricsMiddleware);
 
   app.post(
+    "/api/ai-influenza/stripe/webhook",
+    express.raw({ type: "application/json" }),
+    async (req, res) => {
+      try {
+        const { verarbeiteWebhook, AiInfluenzaStripeError } = await import("../ai-influenza-stripe");
+        try {
+          res.status(200).json(await verarbeiteWebhook(req.body as Buffer, req.header("stripe-signature")));
+        } catch (error) {
+          if (error instanceof AiInfluenzaStripeError) {
+            res.status(error.status === 403 ? 400 : error.status).json({ error: error.message });
+          } else {
+            throw error;
+          }
+        }
+      } catch {
+        console.error("[AI-Influenza] Webhook-Verarbeitung fehlgeschlagen.");
+        res.status(500).json({ error: "Webhook-Verarbeitung fehlgeschlagen." });
+      }
+    },
+  );
+
+  app.post(
     "/api/billing/stripe/webhook",
     express.raw({ type: "application/json" }),
     async (req, res) => {
