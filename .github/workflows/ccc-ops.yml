@@ -207,7 +207,7 @@ jobs:
             ports-rebind)
               # Bindet die Container-Ports an localhost und prueft danach
               # die Erreichbarkeit von aussen.
-              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ports-rebind.sh 2>&1 | tail -45'
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ports-rebind.sh 2>&1 | tail -50'
               echo "== Erreichbarkeit von aussen nach dem Umbau =="
               for port in 3000 3001 3002 12000; do
                 if timeout 5 bash -c "cat < /dev/null > /dev/tcp/167.233.196.20/$port" 2>/dev/null; then
