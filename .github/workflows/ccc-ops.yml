@@ -180,6 +180,14 @@ jobs:
                   echo "  Port $port: zu"
                 fi
               done
+              echo "== 10. Was antwortet auf 3000/3001/12000? =="
+              for p in 3000 3001 12000; do
+                code=$(curl -s -o /tmp/body.txt -w "%{http_code}" --max-time 8 "http://167.233.196.20:$p/" || echo 000)
+                echo "  Port $p -> HTTP $code"
+                head -c 120 /tmp/body.txt 2>/dev/null | tr -d '\n'; echo
+              done
+              echo "== 11. App direkt und ueber TLS =="
+              curl -s -o /dev/null -w "  sslip HTTPS: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
