@@ -1,5 +1,7 @@
 export type RevenueThroughputInput={
   currentMrrEur:number|null;
+  newMrr1dEur:number|null;
+  newMrr7dEur:number|null;
   activeSubscriptions:number|null;
   landingViews:number|null;
   signups:number|null;
@@ -62,6 +64,13 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
   return {
     currentMrrEur:input.currentMrrEur,
     activeSubscriptions:input.activeSubscriptions,
+    grossMrrAcquisition:{
+      newMrr1dEur:input.newMrr1dEur,
+      newMrr7dEur:input.newMrr7dEur,
+      avgDailyNewMrr7dEur:input.newMrr7dEur===null?null:Number((input.newMrr7dEur/7).toFixed(2)),
+      gross30dAcquisitionRunRateEur:input.newMrr7dEur===null?null:Number((input.newMrr7dEur/7*30).toFixed(2)),
+      caveat:"Gross acquisition only; cancellations/churn are not subtracted.",
+    },
     mrrVelocity:{
       available:false as const,
       projectedMrrEur:null,
