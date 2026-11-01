@@ -1,5 +1,6 @@
 import {z} from "zod";
 import {adminProcedure,router} from "./_core/trpc";
+import { createHubspotModule, describeHubspotEnv } from "./integrations/hubspot";
 import {hubspotContacts,hubspotDeals,firecrawlPreview,draftWeeklyMarketing,revenueKpis} from "./revenue-connectors";
 import {
   CONNECTOR_CATALOG, buildHubspotSyncPlan, buildLeadScrapePlan, buildMeteredUsageEvent,
@@ -96,4 +97,47 @@ export const revenueIntegrationsRouter=router({
     return draft?{ok:true as const,draft}:{ok:false as const,reason:"freigabe-ungueltig"};
   }),
   contentSchedule:adminProcedure.query(()=>({nextContentRun:nextWeeklyRun().toISOString()})),
+  /* --- HubSpot-Modul (Contacts, Companies, Deals, Search) --------------- */
+  hubspotModuleStatus:adminProcedure.query(()=>({
+    ...describeHubspotEnv(),
+    mode:createHubspotModule().mode,
+    endpoints:["/crm/v3/objects/contacts","/crm/v3/objects/companies","/crm/v3/objects/deals","/crm/v3/objects/{type}/search"],
+  })),
+  hubspotCreateContact:adminProcedure.input(z.object({
+    email:z.string().email().max(320),firstname:z.string().max(120).optional(),
+    lastname:z.string().max(120).optional(),phone:z.string().max(60).optional(),
+    lifecyclestage:z.string().max(60).optional(),
+  })).mutation(async({input})=>{
+    const {service,mode}=createHubspotModule();
+    return {mode,contact:await service.createContact(input)};
+  }),
+  hubspotUpsertCompany:adminProcedure.input(z.object({
+    name:z.string().min(1).max(200),domain:z.string().max(200).optional(),
+    industry:z.string().max(120).optional(),city:z.string().max(120).optional(),
+  })).mutation(async({input})=>{
+    const {service,mode}=createHubspotModule();
+    const result=await service.upsertCompany(input);
+    return {mode,...result};
+  }),
+  hubspotCreateDeal:adminProcedure.input(z.object({
+    dealname:z.string().min(1).max(200),dealstage:z.string().min(1).max(80),
+    amount:z.number().nonnegative().optional(),pipeline:z.string().max(80).optional(),
+    closedate:z.string().max(40).optional(),contactId:z.string().max(80).optional(),
+  })).mutation(async({input})=>{
+    const {service,mode}=createHubspotModule();
+    return {mode,deal:await service.createDeal(input)};
+  }),
+  hubspotSearch:adminProcedure.input(z.object({
+    objectType:z.enum(["contacts","companies","deals"]),
+    filters:z.array(z.object({
+      propertyName:z.string().min(1).max(120),
+      operator:z.enum(["EQ","NEQ","CONTAINS_TOKEN","GT","GTE","LT","LTE","HAS_PROPERTY"]),
+      value:z.string().max(320).optional(),
+    })).max(8),
+    properties:z.array(z.string().max(120)).max(20).optional(),
+    limit:z.number().int().min(1).max(100).optional(),
+  })).query(async({input})=>{
+    const {service,mode}=createHubspotModule();
+    return {mode,...await service.search(input)};
+  }),
 });
