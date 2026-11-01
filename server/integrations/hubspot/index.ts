@@ -17,6 +17,7 @@ export type { HubspotServiceLike } from "./service";
 export { SandboxHubspotService } from "./sandbox";
 
 const TOKEN_VARIABLES = [
+  "HUBSPOT_SERVICE_KEY",
   "HUBSPOT_PRIVATE_APP_TOKEN",
   "HUBSPOT_ACCESS_TOKEN",
   "HUBSPOT_API_KEY",
@@ -32,9 +33,9 @@ export function resolveHubspotToken(env: Record<string, string | undefined> = pr
 }
 
 /**
- * Ordnet das Token formal ein. HubSpot akzeptiert heute ausschliesslich
- * Private-App-Tokens (Praefix "pat-") oder OAuth-Tokens. Ein Legacy-API-Key
- * (UUID-Form) wurde 2022 abgeschaltet und liefert nur noch HTTP 401.
+ * Ordnet das Token formal ein. HubSpot akzeptiert fuer serverseitige Aufrufe
+ * Service Keys und Private-App-Tokens (beide mit Praefix "pat-") sowie
+ * OAuth-Tokens. Ein Legacy-API-Key (UUID-Form) wurde 2022 abgeschaltet.
  */
 export type HubspotTokenKind = "private_app" | "legacy_api_key" | "unknown";
 
@@ -66,7 +67,7 @@ export function describeHubspotEnv(
       validFormat: false,
       variable: null,
       kind: "unknown",
-      problem: "Kein HubSpot-Token gesetzt (erwartet HUBSPOT_PRIVATE_APP_TOKEN, HUBSPOT_ACCESS_TOKEN oder HUBSPOT_API_KEY).",
+      problem: "Kein HubSpot-Schluessel gesetzt (erwartet HUBSPOT_SERVICE_KEY; aeltere Namen HUBSPOT_PRIVATE_APP_TOKEN, HUBSPOT_ACCESS_TOKEN, HUBSPOT_API_KEY werden weiter akzeptiert).",
     };
   }
   const kind = classifyHubspotToken(token);

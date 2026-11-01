@@ -61,7 +61,7 @@ describe("HubSpot: Umgebungsprüfung", () => {
   it("meldet fehlende Konfiguration ohne Token", () => {
     const status = describeHubspotEnv({});
     expect(status.configured).toBe(false);
-    expect(status.problem).toMatch(/Kein HubSpot-Token gesetzt/);
+    expect(status.problem).toMatch(/Kein HubSpot-Schluessel gesetzt/);
   });
 
   it("akzeptiert den Namen HUBSPOT_ACCESS_TOKEN", () => {
@@ -270,5 +270,26 @@ describe("HubSpot: dritter Variablenname und Token-Form", () => {
     expect(status.kind).toBe("legacy_api_key");
     expect(status.problem).toMatch(/abgeschaltet/);
     expect(createHubspotModule({ HUBSPOT_API_KEY: "123e4567-e89b-12d3-a456-426614174000" }).mode).toBe("sandbox");
+  });
+});
+describe("HubSpot: Service Key (aktueller Weg seit 2026)", () => {
+  it("hat Vorrang vor den aelteren Variablennamen", () => {
+    const env = { HUBSPOT_SERVICE_KEY: TOKEN, HUBSPOT_API_KEY: "pat-alt-" + "c".repeat(24) };
+    expect(resolveHubspotToken(env)).toBe(TOKEN);
+    expect(describeHubspotEnv(env).variable).toBe("HUBSPOT_SERVICE_KEY");
+  });
+
+  it("akzeptiert ein Service Key im pat-na1-Format als live-faehig", () => {
+    const serviceKey = "pat-na1-" + "12345678-1234-1234-1234-123456789012";
+    expect(describeHubspotEnv({ HUBSPOT_SERVICE_KEY: serviceKey }).configured).toBe(true);
+    expect(createHubspotModule({ HUBSPOT_SERVICE_KEY: serviceKey }, { fetchImpl: makeFetch([{}]).impl }).mode).toBe("live");
+  });
+
+  it("verwirft einen Wert ohne pat-Praefix auch unter dem Service-Key-Namen", () => {
+    const fremd = "C" + "x".repeat(106);
+    const status = describeHubspotEnv({ HUBSPOT_SERVICE_KEY: fremd });
+    expect(status.configured).toBe(false);
+    expect(status.variable).toBe("HUBSPOT_SERVICE_KEY");
+    expect(createHubspotModule({ HUBSPOT_SERVICE_KEY: fremd }).mode).toBe("sandbox");
   });
 });
