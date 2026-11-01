@@ -11,6 +11,7 @@ on:
           - deploy
           - deploy-cc
           - prepare-host
+          - ram-boost
           - space-audit
           - add-memory
           - pm2-redeploy
@@ -86,6 +87,10 @@ jobs:
             space-audit)
               # Zeigt Platzverbrauch und raeumt Caches sowie rotierte Logs weg.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/space-audit.sh 2>&1 | tail -50'
+              ;;
+            ram-boost)
+              # Gibt RAM aus ephemere Sandbox-Containern frei und erweitert Swap.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ram-boost.sh 2>&1 | tail -45'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
