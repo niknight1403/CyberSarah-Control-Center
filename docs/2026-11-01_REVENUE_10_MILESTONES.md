@@ -41,3 +41,13 @@ outbound requests, charge no customers and send no messages. The returned
 policy decision is **not** authorization for sending until durable consent,
 suppression and approved records are checked server-side. Do not advertise
 preview metrics as measured MRR.
+
+## Additional API-level regression coverage
+`tests/revenue-integrations-api.test.ts` exercises the actual admin tRPC
+caller and checks forbidden access for unauthenticated/non-admin users,
+explicitly disabled live functionality, draft-only planning, no-send outreach
+previews, supplied-data provenance and invalid KPI rejection. The test stubs
+the request context and does not contact external providers.
+
+This is a **test implementation**, not a claim of successful CI or real
+provider E2E. Build status must be taken from the corresponding PR head SHA.
