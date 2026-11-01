@@ -13,7 +13,7 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { resolveBuildVersion } from "../lib/release-version-logic.ts";
+import { isVersionReleased, resolveBuildVersion } from "../lib/release-version-logic.ts";
 
 function ghReleaseTags() {
   try {
@@ -37,6 +37,12 @@ const tags = ghReleaseTags();
 // Wunschversionen (auch ein alter Pin in .github/release-requests/version.txt)
 // sind Mindeststand und duerfen kein bestehendes Release ueberschreiben.
 const candidate = resolveBuildVersion(tags, process.argv[2], "2.7.0");
+// Fail-closed-Guard: eine bereits veroeffentlichte Version darf nie erneut
+// gebaut werden — sonst ueberschreibt --clobber ein bestehendes Release.
+if (isVersionReleased(tags, candidate)) {
+  console.error(`Fehler: Version ${candidate} ist bereits als Release veroeffentlicht.`);
+  process.exit(1);
+}
 const [major, minor, patch] = candidate.split(".").map(Number);
 const belowMinimum = major < 2 || (major === 2 && minor < 7);
 const version = belowMinimum ? "2.7.0" : `${major}.${minor}.${patch}`;

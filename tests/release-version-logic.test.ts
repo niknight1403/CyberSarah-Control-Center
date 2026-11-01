@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compareVersions,
+  isVersionReleased,
   nextReleaseVersion,
   parseReleaseTag,
   resolveBuildVersion,
@@ -81,5 +82,28 @@ describe("resolveBuildVersion — kein Ueberschreiben bestehender Releases", () 
   it("ignoriert ungueltige Wuensche und bleibt monoton", () => {
     expect(resolveBuildVersion(["v2.8.0-apk"], "v2.9.9", "2.7.0")).toBe("2.8.1");
     expect(resolveBuildVersion(["v2.8.0-apk"], "abc", "2.7.0")).toBe("2.8.1");
+  });
+});
+
+describe("isVersionReleased — Fail-closed-Guard im Build", () => {
+  it("erkennt eine bereits veroeffentlichte Version", () => {
+    expect(isVersionReleased(["v2.8.0-apk", "v2.7.7-apk"], "2.8.0")).toBe(true);
+  });
+
+  it("meldet eine noch freie Version als nicht veroeffentlicht", () => {
+    expect(isVersionReleased(["v2.8.0-apk"], "2.8.1")).toBe(false);
+  });
+
+  it("ignoriert fremde Releases und Tags ohne APK-Suffix", () => {
+    expect(isVersionReleased(["v4.2.1", "release-kandidat"], "2.8.0")).toBe(false);
+  });
+
+  it("behandelt eine leere Tag-Liste als frei", () => {
+    expect(isVersionReleased([], "2.8.0")).toBe(false);
+  });
+
+  it("weist ungueltige Versionsangaben zurueck", () => {
+    expect(isVersionReleased(["v2.8.0-apk"], "2.8")).toBe(false);
+    expect(isVersionReleased(["v2.8.0-apk"], "" )).toBe(false);
   });
 });
