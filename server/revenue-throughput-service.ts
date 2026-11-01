@@ -6,6 +6,7 @@ import {buildRevenueThroughputSnapshot} from "../lib/revenue-throughput-logic";
 import {getDb} from "./db";
 import {collectRevenueAutopilotSnapshot} from "./revenue-autopilot";
 import {getAdministratorStripeHealth} from "./stripe-admin-health";
+import {getRevenueWebhookRuntimeStatus} from "./revenue-webhook-runtime";
 
 export async function revenueThroughputOverview(){
   const [snapshot,stripeHealth]=await Promise.all([
@@ -34,6 +35,7 @@ export async function revenueThroughputOverview(){
   const previous=ordered.slice(7,14);
   const sum=(items:typeof rows,key:"revenueCents"|"conversions")=>items.reduce((total,row)=>total+Math.max(0,Number(row[key])||0),0);
   const circuits=providerCircuitSnapshot();
+  const webhookRuntime=getRevenueWebhookRuntimeStatus();
 
   return {
     ...buildRevenueThroughputSnapshot({
@@ -56,7 +58,10 @@ export async function revenueThroughputOverview(){
       databaseReady,
       providerCircuitsOpen:circuits.filter(item=>item.state==="OPEN").length,
       providerCircuitsTotal:circuits.length,
+      stripeWebhookConsecutiveFailures:webhookRuntime.stripe.consecutiveFailures,
+      digistoreWebhookConsecutiveFailures:webhookRuntime.digistore24.consecutiveFailures,
     }),
+    webhookRuntime,
     generatedAt:new Date().toISOString(),
     evidence:{
       dailyRevenueRows:rows.length,
