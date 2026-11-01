@@ -11,6 +11,7 @@ on:
           - deploy
           - deploy-cc
           - prepare-host
+          - dns-hetzner
           - dns-fix
           - net-fix
           - ram-boost
@@ -58,6 +59,7 @@ jobs:
           OP: ${{ github.event.inputs.operation }}
           HS_KEY: ${{ secrets.HUBSPOT_SERVICE_KEY }}
           HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_DNS_API_TOKEN: ${{ secrets.HETZNER_DNS_API_TOKEN }}
           SSH_CMD: "ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new root@167.233.196.20"
         run: |
           echo "OP: $OP"
@@ -122,6 +124,20 @@ jobs:
                 echo "Versuch $i: $code"
                 [ "$code" = "200" ] && break
                 sleep 10
+              done
+              ;;
+            dns-hetzner)
+              # Zieht die A-Records der Zone auf den CCC-Server um.
+              node scripts/ops/hetzner-dns.mjs "$@"
+              echo "== Aufloesung nach Umstellung =="
+              sleep 5
+              getent hosts cybersarah-ki.com || echo "noch keine Aufloesung"
+              echo "== HTTPS-Test =="
+              for i in 1 2 3 4 5; do
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 "https://cybersarah-ki.com/api/ready" || echo 000)
+                echo "Versuch $i: $code"
+                [ "$code" = "200" ] && break
+                sleep 12
               done
               ;;
             git-status)
