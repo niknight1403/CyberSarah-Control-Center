@@ -4,6 +4,7 @@ import {
   compareVersions,
   nextReleaseVersion,
   parseReleaseTag,
+  resolveBuildVersion,
 } from "@/lib/release-version-logic";
 
 describe("parseReleaseTag", () => {
@@ -52,5 +53,33 @@ describe("nextReleaseVersion", () => {
   it("ohne gueltige Tags gibt es den Fallback", () => {
     expect(nextReleaseVersion([], undefined)).toBe("2.0.0");
     expect(nextReleaseVersion(["andere-tags", "v2.1.7"], undefined)).toBe("2.0.0");
+  });
+});
+
+describe("resolveBuildVersion — kein Ueberschreiben bestehender Releases", () => {
+  it("erhoeht eine bereits veroeffentlichte Wunschversion (der 2.8.0-Fall)", () => {
+    expect(resolveBuildVersion(["v2.8.0-apk", "v2.7.7-apk"], "2.8.0", "2.7.0")).toBe("2.8.1");
+  });
+
+  it("vergibt eine freie Wunschversion unveraendert", () => {
+    expect(resolveBuildVersion(["v2.8.0-apk"], "2.9.0", "2.7.0")).toBe("2.9.0");
+  });
+
+  it("verhindert Downgrades unter das hoechste Release", () => {
+    expect(resolveBuildVersion(["v2.8.0-apk", "v2.7.7-apk"], "2.7.1", "2.7.0")).toBe("2.8.1");
+  });
+
+  it("ueberspringt mehrere belegte Patch-Versionen", () => {
+    expect(resolveBuildVersion(["v2.8.0-apk", "v2.8.1-apk", "v2.8.2-apk"], "2.8.0", "2.7.0")).toBe("2.8.3");
+  });
+
+  it("arbeitet ohne Wunsch wie die Auto-Ableitung", () => {
+    expect(resolveBuildVersion(["v2.8.0-apk"], undefined, "2.7.0")).toBe("2.8.1");
+    expect(resolveBuildVersion([], undefined, "2.7.0")).toBe("2.7.0");
+  });
+
+  it("ignoriert ungueltige Wuensche und bleibt monoton", () => {
+    expect(resolveBuildVersion(["v2.8.0-apk"], "v2.9.9", "2.7.0")).toBe("2.8.1");
+    expect(resolveBuildVersion(["v2.8.0-apk"], "abc", "2.7.0")).toBe("2.8.1");
   });
 });
