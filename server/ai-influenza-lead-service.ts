@@ -28,7 +28,7 @@ export async function upsertAiInfluenzaLead(input:{
     nodeKey:key,kind:"company",name:input.companyName.trim(),domain:input.domain.trim().toLowerCase(),
     fit:input.signals.strategicFit,intent:Math.round((input.signals.automationPain+input.signals.contentNeed+input.signals.engagement)/3),
     trust:policy.mayPrepare?50:20,relationshipStrength:input.signals.engagement,
-    estimatedValueCents:input.estimatedValueCents??null,optedOut:Boolean(input.optedOut),
+    estimatedValueCents:input.estimatedValueCents,optedOut:Boolean(input.optedOut),
     metadata:{
       businessUnit:"ai-influenza-team",leadScore:scoring.score,leadTier:scoring.tier,
       publicSourceUrl:input.publicSourceUrl,contactBasis:input.contactBasis,
