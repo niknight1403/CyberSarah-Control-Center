@@ -18,6 +18,7 @@ import {
 import {adminProcedure,protectedProcedure,publicProcedure,router} from "./_core/trpc";
 import {aiInfluenzaLeadPipeline,prepareAiInfluenzaProposal,upsertAiInfluenzaLead} from "./ai-influenza-lead-service";
 import {aiInfluenzaDeliveryPlan,aiInfluenzaDeliveryStatus,generateAiInfluenzaTaskDraft} from "./ai-influenza-delivery-service";
+import {aiInfluenzaCustomerReport,aiInfluenzaProfitOverview,recordAiInfluenzaCost} from "./ai-influenza-profit-service";
 
 const packageId=z.enum(AI_INFLUENZA_PACKAGE_IDS);
 
@@ -58,6 +59,14 @@ export const aiInfluenzaTeamRouter=router({
     try{return await createLiveBillingPortalSession({stripeCustomerId:ctx.user.stripeCustomerId});}
     catch(error){throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Kundenportal konnte nicht geöffnet werden."});}
   }),
+  profit:adminProcedure.input(z.object({windowDays:z.number().int().min(1).max(365).default(30)}).optional()).query(({input})=>aiInfluenzaProfitOverview(input?.windowDays??30)),
+  customerReport:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaCustomerReport(input.orderId)),
+  recordCost:adminProcedure.input(z.object({
+    orderId:z.string().trim().min(4).max(120),
+    category:z.enum(["llm","media","delivery","tooling","refund","other"]),
+    amountCents:z.number().int().nonnegative(),
+    note:z.string().trim().max(300).optional(),
+  })).mutation(({ctx,input})=>recordAiInfluenzaCost({...input,actorOpenId:ctx.user.openId})),
   deliveryPlan:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaDeliveryPlan(input.orderId)),
   deliveryStatus:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaDeliveryStatus(input.orderId)),
   generateTaskDraft:adminProcedure.input(z.object({taskJobId:z.number().int().positive()})).mutation(({input})=>generateAiInfluenzaTaskDraft(input.taskJobId)),
