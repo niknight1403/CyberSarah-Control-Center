@@ -2,11 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe,expect,it } from "vitest";
 
 describe("Render app deployment migration gate",()=>{
-  it("always migrates the production database before deploying the app",()=>{
+  it("keeps manual production migration gates while Render owns automatic main deploys",()=>{
     const workflow=readFileSync(".github/workflows/render-deploy.yml","utf8");
     expect(workflow).toContain("node scripts/production-schema-preflight.mjs");
     expect(workflow).toContain("node scripts/render-deploy.mjs --migrate");
-    expect(workflow).toContain("- 'drizzle/**'");
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).not.toContain("  push:\n");
   });
 
   it("ships an idempotent repair migration for production growth relations",()=>{
