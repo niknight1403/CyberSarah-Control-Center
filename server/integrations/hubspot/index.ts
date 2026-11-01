@@ -11,7 +11,9 @@ import { HubspotService, type HubspotServiceLike } from "./service";
 import { HubspotConfigError } from "./types";
 
 export * from "./types";
-export { HubspotClient, assertValidToken } from "./client";
+export { HubspotClient, assertValidToken, requiredScopeHint } from "./client";
+export { probeHubspotCapabilities, summarizeCapabilities } from "./diagnostics";
+export type { CapabilityCheck } from "./diagnostics";
 export { HubspotService } from "./service";
 export type { HubspotServiceLike } from "./service";
 export { SandboxHubspotService } from "./sandbox";
@@ -155,6 +157,20 @@ export interface HubspotModule {
  * Baut den Service. Ohne gueltiges Token wird bewusst die Sandbox geliefert,
  * damit weder Tests noch lokale Laeufe an fehlenden Zugangsdaten scheitern.
  */
+/** Baut nur den Client, etwa fuer Diagnosen; null ohne gueltige Konfiguration. */
+export function createHubspotClient(
+  env: Record<string, string | undefined> = process.env,
+  options: Partial<Omit<HubspotClientOptions, "token">> = {},
+): HubspotClient | null {
+  const status = describeHubspotEnv(env);
+  if (!status.configured) return null;
+  return new HubspotClient({
+    ...options,
+    baseUrl: options.baseUrl ?? resolveHubspotBaseUrl(env, resolveHubspotToken(env)),
+    token: resolveHubspotToken(env),
+  });
+}
+
 export function createHubspotModule(
   env: Record<string, string | undefined> = process.env,
   options: Partial<Omit<HubspotClientOptions, "token">> = {},

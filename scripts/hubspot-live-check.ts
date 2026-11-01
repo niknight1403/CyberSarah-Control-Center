@@ -6,9 +6,12 @@
  * Aufruf: npm run hubspot:check
  */
 import {
+  createHubspotClient,
   createHubspotModule,
   describeHubspotEnv,
+  probeHubspotCapabilities,
   resolveHubspotToken,
+  summarizeCapabilities,
 } from "../server/integrations/hubspot/index";
 
 const TOKEN_VARIABLES = [
@@ -61,6 +64,15 @@ async function main(): Promise<void> {
   if (portal && /^\d+$/.test(portal) && account?.portalId && String(account.portalId) !== portal) {
     console.error(`Portal passt nicht: Schluessel gehoert zu ${account.portalId}, erwartet ${portal}.`);
     process.exit(1);
+  }
+
+  const client = createHubspotClient(process.env);
+  if (client) {
+    const checks = await probeHubspotCapabilities(client);
+    const summary = summarizeCapabilities(checks);
+    console.log("Rechte:");
+    for (const check of checks) console.log(`  ${check.ok ? "ok  " : "FEHLT"}  ${check.name} (${check.detail})`);
+    console.log("Schreibzugriff insgesamt:", summary.writable ? "vorhanden" : "NICHT vorhanden");
   }
 
   const res = await hub.service.search({

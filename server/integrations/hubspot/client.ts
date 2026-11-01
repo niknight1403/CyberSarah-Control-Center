@@ -10,6 +10,26 @@
  */
 import { HubspotApiError, HubspotConfigError } from "./types";
 
+/**
+ * Leitet aus Methode und Pfad den wahrscheinlich fehlenden Scope ab, damit ein
+ * 403 nicht als rohe API-Antwort beim Aufrufer landet.
+ */
+export function requiredScopeHint(method: string, path: string): string | null {
+  const objectMatch = /\/crm\/v3\/objects\/([a-z_]+)/.exec(path);
+  if (objectMatch) {
+    const object = objectMatch[1];
+    const writes = method === "POST" || method === "PATCH" || method === "PUT" || method === "DELETE";
+    // POST auf /search ist eine Leseoperation trotz POST.
+    const isSearch = objectMatch[0].endsWith("/search") || path.includes("/search");
+    return `crm.objects.${object}.${writes && !isSearch ? "write" : "read"}`;
+  }
+  if (path.includes("/crm/v3/owners")) return "crm.objects.owners.read";
+  if (path.includes("/settings/users")) return "settings.users.read";
+  if (path.includes("/crm/v3/pipelines")) return "crm.schemas.deals.read";
+  if (path.includes("/account-info")) return "account-info.read";
+  return null;
+}
+
 export interface HubspotAccountDetails {
   portalId?: number;
   timeZone?: string;
@@ -140,8 +160,12 @@ export class HubspotClient {
         return (text ? JSON.parse(text) : {}) as T;
       }
 
+      const hint = response.status === 403 ? requiredScopeHint(method, path) : null;
       const apiError = new HubspotApiError(
-        `HubSpot antwortete mit ${response.status} auf ${method} ${path}.`,
+        `HubSpot antwortete mit ${response.status} auf ${method} ${path}.` +
+          (hint
+            ? ` Fehlender Scope vermutlich: ${hint}. Im Service Key unter Development > Keys > Service keys ergaenzen.`
+            : ""),
         response.status,
         text.slice(0, 500),
         parseRetryAfter(response.headers.get("retry-after")),
