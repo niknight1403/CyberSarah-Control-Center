@@ -603,6 +603,29 @@ export const influencerLearningStates = pgTable("influencer_learning_states", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("influencer_learning_score_idx").on(table.score, table.updatedAt)]);
 
+/**
+ * Sprint 30 — Append-only Freigabe-Ereignisse des Admin-Produktkatalogs.
+ * Nur serverseitige Admin-Prozeduren schreiben; keine Stripe-Schreibzugriffe.
+ */
+export const productReleaseEvents = pgTable("product_release_events", {
+  id: serial("id").primaryKey(),
+  productId: text("product_id").notNull(),
+  productName: text("product_name").notNull(),
+  mode: text("mode").notNull(),
+  action: text("action").notNull(),
+  verdict: text("verdict").notNull(),
+  actorOpenId: text("actor_open_id").notNull(),
+  issuesSnapshot: jsonb("issues_snapshot").$type<string[]>().default([]).notNull(),
+  note: text("note"),
+  catalogComplete: boolean("catalog_complete").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("product_release_events_product_idx").on(table.productId, table.createdAt),
+  index("product_release_events_actor_idx").on(table.actorOpenId, table.createdAt),
+]);
+
+export type ProductReleaseEventRow = typeof productReleaseEvents.$inferSelect;
+
 export type B2BNetworkNodeRow = typeof b2bNetworkNodes.$inferSelect;
 export type B2BNetworkEdgeRow = typeof b2bNetworkEdges.$inferSelect;
 export type InfluencerLearningStateRow = typeof influencerLearningStates.$inferSelect;

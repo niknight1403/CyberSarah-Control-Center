@@ -20,6 +20,11 @@ Stand: 31.10.2026
 - Admin-Uebersicht `publishing.opsOverview` liefert `failureReasons` konto-gescoped (max. 200 aktuelle Jobs).
 - Nachweis: 7 neue Vitest-Faelle; Gesamtsuite 2995 gruen, TypeScript sauber, ESLint 0 Fehler.
 
+## Nachtrag Sprint 30 (02.11.2026)
+- Mobiler Admin-Katalog: Suche (umlautunabhaengig), Filter nach aktiv/inaktiv, Befunden, Verdikt, Waehrung und Hoechstpreis, Facetten und nach Schwere sortierte Zeilen; blockierende Befunde und Warnungen getrennt ausgewiesen.
+- Manuelle Freigabe serverseitig geprueft: auf Teilkatalog, inaktive Produkte oder Standardpreisprobleme ist keine Freigabe moeglich; Ereignisse werden append-only in `product_release_events` (Migration 0023) mit Befund-Snapshot und Akteur gespeichert, Ruecknahme als eigenes Ereignis.
+- Nachweis: 10 neue Vitest-Faelle; Suite 3005 gruen, TypeScript, ESLint und Build sauber. Stripe bleibt read-only.
+
 ## Neue, auf main übernommene Code-Verbesserungen
 | Bereich/Sprint | Nachweis | Status |
 |---|---|---|

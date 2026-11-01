@@ -18,6 +18,11 @@ import { getToolProxyQueueMetrics } from "./_core/tool-proxy-queue";
 import { getRouteRotationStatus } from "./route-rotation-agent";
 import { getAdministratorStripeHealth } from "./stripe-admin-health";
 import { readStripeAdminCatalog } from "./stripe-catalog-readonly";
+import { getDb } from "./db";
+import { desc, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { productReleaseEvents } from "../drizzle/schema";
+import { filterCatalogProducts, reviewCatalogProduct } from "../lib/admin-catalog-mobile-logic";
 import { queueStripeProductCampaign } from "./stripe-product-content-bridge";
 
 /**
@@ -74,6 +79,132 @@ export const appStatusRouter = router({
       throw new Error("Stripe-Produktkatalog derzeit nicht lesbar. Admin-Konfiguration und Rechte pruefen.");
     }
   }),
+  /**
+   * Sprint 30 — Mobile Katalogansicht: gefilterte, geprueften Zeilen mit
+   * Facetten. Read-only; die Freigabe selbst laeuft ueber stripeProductRelease.
+   */
+  stripeCatalogView: adminProcedure.input(z.object({
+    search: z.string().trim().max(80).optional(),
+    activeOnly: z.boolean().optional(),
+    onlyWithIssues: z.boolean().optional(),
+    verdict: z.enum(["freigabefaehig", "pruefen", "blockiert"]).optional(),
+    currency: z.string().trim().length(3).optional(),
+    maxPriceMinor: z.number().int().min(0).max(100_000_000).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  }).optional()).query(async ({ input }) => {
+    const catalog = await readStripeAdminCatalog();
+    const prices = catalog.prices.map(price => ({
+      id: price.id,
+      currency: price.currency,
+      amountMinor: price.amountMinor,
+      billing: price.billing,
+      interval: price.interval,
+      intervalCount: price.intervalCount,
+      taxBehavior: price.taxBehavior,
+      active: price.active,
+      createdAtMs: price.createdAt === null ? null : Date.parse(price.createdAt),
+      isDefault: catalog.products.some(product => product.defaultPriceId === price.id),
+    }));
+    const view = filterCatalogProducts(
+      catalog.products.map(product => ({
+        id: product.id,
+        name: product.name,
+        active: product.active,
+        defaultPriceId: product.defaultPriceId,
+        priceCount: product.priceCount,
+        issues: product.issues,
+      })),
+      prices,
+      input ?? {},
+      { catalogComplete: catalog.complete },
+    );
+    return { ...view, mode: catalog.mode, providerSync: catalog.providerSync };
+  }),
+
+  /** Sprint 30 — letzte manuelle Freigaben/Empfehlungen dieses Admins. */
+  stripeProductReleases: adminProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return { available: false as const, events: [] };
+    const events = await db.select({
+      productId: productReleaseEvents.productId,
+      productName: productReleaseEvents.productName,
+      action: productReleaseEvents.action,
+      verdict: productReleaseEvents.verdict,
+      note: productReleaseEvents.note,
+      createdAt: productReleaseEvents.createdAt,
+    }).from(productReleaseEvents)
+      .where(eq(productReleaseEvents.actorOpenId, ctx.user.openId))
+      .orderBy(desc(productReleaseEvents.createdAt)).limit(100);
+    return { available: true as const, events };
+  }),
+
+  /**
+   * Sprint 30 — manuelle Freigabe. Die Pruefung erfolgt serverseitig gegen den
+   * aktuellen Katalog; ein blockierter Befund verhindert die Freigabe.
+   */
+  stripeProductRelease: adminProcedure.input(z.object({
+    productId: z.string().regex(/^prod_[A-Za-z0-9]+$/).max(90),
+    action: z.enum(["approved", "withdrawn"]),
+    note: z.string().trim().max(300).optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const catalog = await readStripeAdminCatalog();
+    const product = catalog.products.find(entry => entry.id === input.productId);
+    if (!product) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Produkt ist im aktuellen Katalog nicht enthalten." });
+    }
+    const review = reviewCatalogProduct(
+      {
+        id: product.id,
+        name: product.name,
+        active: product.active,
+        defaultPriceId: product.defaultPriceId,
+        priceCount: product.priceCount,
+        issues: product.issues,
+      },
+      catalog.prices.map(price => ({
+        id: price.id,
+        currency: price.currency,
+        amountMinor: price.amountMinor,
+        billing: price.billing,
+        interval: price.interval,
+        intervalCount: price.intervalCount,
+        taxBehavior: price.taxBehavior,
+        active: price.active,
+        createdAtMs: price.createdAt === null ? null : Date.parse(price.createdAt),
+        isDefault: price.id === product.defaultPriceId,
+      })),
+      { catalogComplete: catalog.complete },
+    );
+    if (input.action === "approved" && !review.eligible) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `Freigabe blockiert: ${review.blockers.join(" | ")}`,
+      });
+    }
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Datenbank nicht verfügbar." });
+    await db.insert(productReleaseEvents).values({
+      productId: product.id,
+      productName: product.name,
+      mode: catalog.mode,
+      action: input.action,
+      verdict: review.verdict,
+      actorOpenId: ctx.user.openId,
+      issuesSnapshot: product.issues.slice(0, 40),
+      note: input.note ?? null,
+      catalogComplete: catalog.complete,
+    });
+    return {
+      ok: true as const,
+      action: input.action,
+      verdict: review.verdict,
+      blockers: review.blockers,
+      warnings: review.warnings,
+      evidenceNote:
+        "Freigabe ist eine menschliche Entscheidung; Stripe bleibt read-only und Medien-/Affiliate-Rechte gelten als unverifiziert.",
+    };
+  }),
+
   /**
    * Sprint 196 — Aggregierter Integrations-Status fuer die Admin-UI:
    * LLM-Routen (Health/Reihenfolge), Telegram-Bruecke (maskiert) und

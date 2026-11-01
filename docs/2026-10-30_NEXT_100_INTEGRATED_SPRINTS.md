@@ -32,7 +32,7 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 | 27 | Produktrechte und Affiliate-Kennzeichnung als prüfbare Freigaben speichern | OFFEN |
 | 28 | Produkt-Matching über Herkunftsquellen ohne stillen Importkollisionsverlust | OFFEN |
 | 29 | Produkt-Sync-Fehler pro Provider mit Recovery-Status dokumentieren | CODE+CI — `lib/provider-sync-recovery-logic.ts` (Klassifikation, Backoff, Blockade bei Auth/Konfiguration, Maskierung), 8 Tests, im Katalog-Abruf aktiv (`providerSync` + Provider-Name im Admin-Fehler) |
-| 30 | Admin-Produktkatalog mobil filtern, prüfen und manuell freigeben | OFFEN |
+| 30 | Admin-Produktkatalog mobil filtern, prüfen und manuell freigeben | CODE+CI — `lib/admin-catalog-mobile-logic.ts` (Suche ohne Umlautabhaengigkeit, Filter aktiv/Befunde/Verdikt/Waehrung/Hoechstpreis, Facetten, Verdict-Logik mit blockierenden Befunden), tRPC `stripeCatalogView` + `stripeProductRelease` (append-only `product_release_events`, Migration 0023), mobile Ansicht im Account-Tab, 10 Tests |
 
 ## 3. Content Production
 
