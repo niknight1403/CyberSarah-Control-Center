@@ -4,7 +4,7 @@
  * deterministisch und ohne ENV-Zugriff testbar.
  *
  * Sprint 108 — Zero-Cost-Routing: Groq- und OpenRouter-Endpoints bekommen
- * eigene Gratis-Defaults (openai/gpt-oss-20b / Free-Instruct-Modell),
+ * eigene Gratis-Defaults (Groq-Modell aus GROQ_MODEL_CANDIDATES / Free-Instruct-Modell),
  * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
  * KOSTENFREIES Modell pro Source waehlt.
  */

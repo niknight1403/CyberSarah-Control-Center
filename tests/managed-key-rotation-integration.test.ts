@@ -166,7 +166,7 @@ describe(
     // Kette: Groq (429) -> OpenRouter (Erfolg). Kein kostenpflichtiger Endpoint.
     expect(calls.length).toBe(2);
     expect(calls[0].url).toContain("api.groq.com");
-    expect(calls[0].body.model).toBe("openai/gpt-oss-20b");
+    expect(calls[0].body.model).toBe("qwen/qwen3.8-27b");
     expect(calls[1].url).toContain("openrouter.ai");
     expect(calls[1].body.model).toBe("openrouter/free"); // dynamischer Free-Router waehlt ein aktuell verfuegbares kompatibles Modell
     expect(calls.every((call) => !call.url.includes("api.openai.com"))).toBe(true);

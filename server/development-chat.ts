@@ -13,6 +13,7 @@ import { measureRetrievalOnUserMessage, recordLearningInjection } from "./retrie
 import { formatBestPracticesForContext } from "../lib/vector-memory-logic";
 import { persistLearningVector, queryUserBestPractices } from "./vector-memory-store";
 import { sanitizeSessionId } from "../lib/chat-session-logic";
+import { GROQ_MODEL_CANDIDATES } from "../lib/managed-model-logic";
 import {
   DEFAULT_DAILY_CHAT_LIMIT,
   countMessagesToday,
@@ -170,7 +171,7 @@ function getProviderConfig(provider: Exclude<ProviderId, "managed" | "anthropic"
     groq: {
       endpoint: getEnv("AI_GROQ_BASE_URL") ?? "https://api.groq.com/openai/v1/chat/completions",
       apiKey: getEnv("AI_GROQ_API_KEY") ?? getEnv("GROQ_API_KEY"),
-      defaultModel: getEnv("AI_GROQ_MODEL") ?? "openai/gpt-oss-20b",
+      defaultModel: getEnv("AI_GROQ_MODEL") ?? GROQ_MODEL_CANDIDATES[0],
     },
     together: {
       endpoint: getEnv("AI_TOGETHER_BASE_URL") ?? "https://api.together.xyz/v1/chat/completions",
