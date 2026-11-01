@@ -9,6 +9,12 @@ import { revenueOffers } from "../drizzle/schema";
 import { reconcileStripeOfferRefs } from "../lib/stripe-offer-reconciliation";
 import { stripeAdminSettings } from "../lib/stripe-admin-status-logic";
 import { projectStripeCatalog } from "../lib/stripe-catalog-projection";
+import {
+  applySyncAttempt,
+  classifySyncError,
+  providerSyncReport,
+  type ProviderSyncState,
+} from "../lib/provider-sync-recovery-logic";
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
@@ -18,8 +24,43 @@ type CatalogResult = ReturnType<typeof projectStripeCatalog> & {
   readOnly: true;
   localOfferReconciliation: ReturnType<typeof reconcileStripeOfferRefs> | null;
   localOfferStatus: "checked" | "unavailable";
+  providerSync: ReturnType<typeof providerSyncReport>;
 };
-let cache: { key: string; expiresAt: number; data: CatalogResult } | null = null;
+let cache: { key: string; expiresAt: number; data: Omit<CatalogResult, "providerSync"> } | null = null;
+
+/**
+ * Sprint 29 - Sync-Zustand je Stripe-Provider (produkte/preise). Entsteht nur
+ * aus echten Versuchen dieser Instanz; nie aus Annahmen.
+ */
+const providerSyncStates = new Map<string, ProviderSyncState>();
+
+export function readStripeProviderSyncReport(now = Date.now()) {
+  return providerSyncReport([...providerSyncStates.values()], now);
+}
+
+async function trackProvider<T>(provider: string, run: () => Promise<T>): Promise<T> {
+  const at = Date.now();
+  try {
+    const result = await run();
+    providerSyncStates.set(provider, applySyncAttempt(providerSyncStates.get(provider), { provider, at, ok: true }));
+    return result;
+  } catch (error) {
+    const { errorClass, message } = classifySyncError(error);
+    const state = applySyncAttempt(providerSyncStates.get(provider), {
+      provider,
+      at,
+      ok: false,
+      errorClass,
+      errorMessage: message,
+    });
+    providerSyncStates.set(provider, state);
+    const enriched = new Error(`${provider}: ${state.lastErrorMessage ?? message}`) as Error & {
+      providerSync?: ProviderSyncState;
+    };
+    enriched.providerSync = state;
+    throw enriched;
+  }
+}
 
 export async function collectPages<T extends { id: string }>(
   list: (args: { limit: number; starting_after?: string }) => Promise<{ data: T[]; has_more: boolean }>,
@@ -60,13 +101,15 @@ export async function readStripeAdminCatalog(): Promise<CatalogResult> {
     throw new Error("Stripe ist nicht korrekt serverseitig konfiguriert.");
   }
   const key = process.env.STRIPE_SECRET_KEY!.trim();
-  if (cache && cache.key === key && cache.expiresAt > Date.now()) return cache.data;
+  if (cache && cache.key === key && cache.expiresAt > Date.now()) {
+    return { ...cache.data, providerSync: readStripeProviderSyncReport() };
+  }
   const client = new Stripe(key, { timeout: 10_000, maxNetworkRetries: 1 });
   // Explicitly read inactive products/prices too. Do not silently omit
   // variants that are retired and might still be referenced in billing.
   const [products, prices] = await Promise.all([
-    collectPages(args => client.products.list(args)),
-    collectPages(args => client.prices.list(args)),
+    trackProvider("stripe.products", () => collectPages(args => client.products.list(args))),
+    trackProvider("stripe.prices", () => collectPages(args => client.prices.list(args))),
   ]);
   const projected = projectStripeCatalog(products.rows, prices.rows, products.complete, prices.complete);
   let localOfferReconciliation: ReturnType<typeof reconcileStripeOfferRefs> | null = null;
@@ -88,8 +131,10 @@ export async function readStripeAdminCatalog(): Promise<CatalogResult> {
     ...projected, mode: settings.mode, readOnly: true,
     localOfferStatus: localOfferReconciliation ? "checked" : "unavailable",
     localOfferReconciliation,
+    providerSync: readStripeProviderSyncReport(),
     fetchedAt: new Date().toISOString(),
   };
-  cache = { key, expiresAt: Date.now() + 2 * 60_000, data };
+  const { providerSync: _liveSync, ...cacheable } = data;
+  cache = { key, expiresAt: Date.now() + 2 * 60_000, data: cacheable };
   return data;
 }

@@ -54,7 +54,25 @@ export const appStatusRouter = router({
   })).mutation(({input}) => queueStripeProductCampaign(input)),
   stripeCatalog: adminProcedure.query(async () => {
     try { return await readStripeAdminCatalog(); }
-    catch { throw new Error("Stripe-Produktkatalog derzeit nicht lesbar. Admin-Konfiguration und Rechte pruefen."); }
+    catch (error) {
+      // Sprint 29 - Provider und Recovery-Status sichtbar machen statt pauschal zu verallgemeinern.
+      const state = (error as { providerSync?: {
+        provider: string; lastErrorClass: string | null; consecutiveFailures: number;
+        nextRetryAt: number | null; requiresManualAction: boolean; lastErrorMessage: string | null;
+      } }).providerSync;
+      if (state) {
+        const retry = state.requiresManualAction
+          ? "manuelle Pruefung erforderlich"
+          : state.nextRetryAt
+            ? `naechster Versuch ab ${new Date(state.nextRetryAt).toISOString()}`
+            : "kein automatischer Wiederholungsversuch";
+        throw new Error(
+          `Stripe-Produktkatalog nicht lesbar (${state.provider}: ${state.lastErrorClass ?? "unbekannt"}, ` +
+          `Fehlerserie ${state.consecutiveFailures}, ${retry}). Admin-Konfiguration und Rechte pruefen.`,
+        );
+      }
+      throw new Error("Stripe-Produktkatalog derzeit nicht lesbar. Admin-Konfiguration und Rechte pruefen.");
+    }
   }),
   /**
    * Sprint 196 — Aggregierter Integrations-Status fuer die Admin-UI:
