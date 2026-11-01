@@ -7,6 +7,10 @@ Stand: 31.10.2026
 - **TEILWEISE**: Nachweisbare Teilfunktionen vorhanden; das im ursprünglichen Plan definierte gesamte Nutzerziel ist nicht vollständig abgenommen.
 - **OFFEN**: Keine abschließende belegbare Umsetzung.
 
+## Nachtrag Sprint 29 (01.11.2026)
+- Produkt-Sync-Zustand je Provider (Stripe Products/Prices) mit Fehlerklasse, Fehlerserie, Backoff, Blockade bei Auth-/Konfigurationsfehlern und maskierten Meldungen; Admin-Fehler nennt jetzt Provider und Retry-Zeitpunkt statt Pauschalmeldung. Nachweis: 8 neue Vitest-Faelle, Gesamtsuite 2979 gruen.
+- Ehrlichkeitsgrenze unveraendert: Der Zustand entsteht nur aus echten Versuchen dieser Instanz; ein Provider gilt nie als gesund ohne belegten Erfolg. Externe Stripe-E2E-Abnahme bleibt offen.
+
 ## Neue, auf main übernommene Code-Verbesserungen
 | Bereich/Sprint | Nachweis | Status |
 |---|---|---|
