@@ -16,6 +16,7 @@ on:
           - app-boot
           - diag
           - db-diag
+          - db-fix
           - health
         default: deploy
 
@@ -78,6 +79,11 @@ jobs:
             db-diag)
               # Zieht den Code nach (ohne Build) und startet die read-only Diagnose.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== /api/ready =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 1500; echo; echo "== Datenbank =="; node scripts/ops/db-diag.mjs 2>&1 | head -20; echo "== App-Fehlerlog =="; tail -20 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null || echo "(leer)"; echo "== Docker-Platz =="; docker system df 2>/dev/null | head -6'
+              ;;
+            db-fix)
+              # Bringt das Postgres-Passwort auf den Stand der App-.env und prueft
+              # danach die Verbindung. Der Wert wird nie ausgegeben.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== Passwort-Sync =="; bash scripts/ops/db-password-sync.sh 2>&1 | tail -6; echo "== Datenbank nach Sync =="; node scripts/ops/db-diag.mjs 2>&1 | head -12; echo "== App neu starten =="; pm2 restart cybersarah-control-center --update-env 2>&1 | tail -2; sleep 12; echo "== Readiness =="; curl -s --max-time 10 http://localhost:3000/api/ready | head -c 800; echo; echo "== HTTP-Code =="; curl -s -o /dev/null -w "%{http_code}\\n" --max-time 10 http://localhost:3000/api/ready'
               ;;
             health)
               $SSH_CMD 'echo "== PM2 =="; pm2 list; echo "== HTTP =="; curl -s -o /dev/null -w "localhost:3000/api/ready → HTTP %{http_code}\n" --max-time 8 http://localhost:3000/api/ready; echo "== Revenue-OS-Env in PM2? =="; pm2 env $(pm2 jlist | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d);process.stdin.on(\"end\",()=>{const j=JSON.parse(s);const p=j.find(x=>x.name.includes(\"cybersarah-control-center\"));console.log(p?p.pm_id:1)})") 2>/dev/null | grep -c "^REVENUE_OS_DATABASE_URL:" ; echo "== App-Log =="; tail -6 ~/.pm2/logs/cybersarah-control-center-out.log 2>/dev/null || tail -6 /opt/cybersarah-control-center/logs/pm2-out.log 2>/dev/null || true'
