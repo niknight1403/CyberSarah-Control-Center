@@ -1,4 +1,5 @@
 import { z } from "zod";
+import {revenueThroughputOverview} from "./revenue-throughput-service";
 import { adminProcedure, router } from "./_core/trpc";
 import {
   commercialEvaluation, createContentFactory, createOneClickBusiness, createRevenueExperiment, evaluateRevenueExperiment,
@@ -9,6 +10,7 @@ const personaId=z.enum(["nova","mira","juno","lina","kaya","zara"]);
 const attributionPersonaId=z.union([personaId,z.literal("automationsklar-editorial")]);
 export const revenueOsV2Router=router({
   overview: adminProcedure.query(revenueOsV2Overview),
+  throughput: adminProcedure.query(revenueThroughputOverview),
   command: adminProcedure.input(z.object({command:z.string().trim().min(4).max(600),dedupeKey:z.string().trim().min(4).max(180).optional()})).mutation(({input})=>runRevenueMission(input)),
   contentFactory: adminProcedure.input(z.object({personaId,topic:z.string().trim().min(3).max(500),maxAssets:z.number().int().min(1).max(30).default(30)})).mutation(({input})=>createContentFactory(input)),
   oneClickBusiness: adminProcedure.input(z.object({idea:z.string().trim().min(5).max(800),audience:z.string().trim().max(500).optional(),goal:z.string().trim().max(500).optional()})).mutation(({input})=>createOneClickBusiness(input)),
