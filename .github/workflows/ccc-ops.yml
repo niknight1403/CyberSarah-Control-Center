@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - migrate-diag
           - ports-deny
           - ports-verify
           - ports-rebind
@@ -239,6 +240,10 @@ jobs:
                 fi
               done
               curl -s -o /dev/null -w "  oeffentlich via TLS: %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
+              ;;
+            migrate-diag)
+              # Zeigt App-Zustand und den vollstaendigen Migrationsfehler.
+              $SSH_CMD 'echo "== PM2 =="; pm2 list | tail -5; echo "== Health =="; curl -s -o /dev/null -w "localhost:3000/api/ready: %{http_code}\n" --max-time 10 http://localhost:3000/api/ready; echo "== Migrationslog (letzte 40 Zeilen) =="; tail -40 /tmp/ccc-migrate.log 2>/dev/null || echo "kein Log"; echo "== Git-Stand =="; cd /opt/cybersarah-control-center && git log --oneline -2; echo "== Drizzle-Journal =="; psql "$DATABASE_URL" -tAc "select count(*) from drizzle.__drizzle_migrations" 2>/dev/null || echo "Journal nicht lesbar (DATABASE_URL nicht in dieser Shell)"; echo "== Fehlerlog der App =="; tail -8 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null | tail -8'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
