@@ -3,7 +3,7 @@ import {buildRevenueThroughputSnapshot} from "../lib/revenue-throughput-logic";
 
 const base={
   currentMrrEur:1200,activeSubscriptions:20,
-  landingViews:1000,signups:200,checkoutStarts:80,upgrades:40,
+  landingViews:100,signups:80,checkoutStarts:70,upgrades:60,
   stripeCheckoutSuccessRate:80,invoiceSuccessRate:99,
   recent7RevenueCents:70000,previous7RevenueCents:56000,
   recent7Conversions:14,previous7Conversions:10,
