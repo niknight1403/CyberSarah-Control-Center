@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - agentforge-init
           - agentforge-check
           - deploy-fix
           - migrate-diag
@@ -258,6 +259,10 @@ jobs:
             agentforge-check)
               # Prueft PM2, die Agentforge-Tabellen und die Token-Lage.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/agentforge-check.sh 2>&1 | tail -25'
+              ;;
+            agentforge-init)
+              # Legt die Agentforge-Tabellen an und setzt den Service-Token.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/agentforge-init.sh 2>&1 | tail -25'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
