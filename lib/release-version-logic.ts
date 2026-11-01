@@ -108,3 +108,17 @@ export function resolveBuildVersion(
   while (released.has(`${major}.${minor}.${nextPatch}`)) nextPatch += 1;
   return `${major}.${minor}.${nextPatch}`;
 }
+
+/**
+ * Prueft, ob eine Version bereits als v<version>-apk-Release existiert.
+ * Wird als Fail-closed-Guard im Build genutzt: eine bereits veroeffentlichte
+ * Version darf niemals erneut gebaut und mit --clobber ueberschrieben werden.
+ */
+export function isVersionReleased(tags: readonly string[], version: string): boolean {
+  const target = version.trim();
+  if (!/^\d+\.\d+\.\d+$/.test(target)) return false;
+  return tags.some((tag) => {
+    const parsed = parseReleaseTag(tag);
+    return parsed !== null && `${parsed.major}.${parsed.minor}.${parsed.patch}` === target;
+  });
+}
