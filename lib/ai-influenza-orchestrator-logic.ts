@@ -152,3 +152,41 @@ export function baueIdempotenzKey(aufgabeTyp: string, eingabe: Record<string, un
 export function istFreigabeGueltig(status: AufgabeStatus, freigeber: string | null | undefined): boolean {
   return status === "freigabe_offen" && Boolean(freigeber && freigeber.trim().length > 0);
 }
+
+// ---------------------------------------------------------------------------
+// Ollama-First-Routing (Standing Instruction): lokale Knoten zuerst, Cloud nur
+// als Fallback. Reine Logik, damit Reihenfolge und Modellwahl testbar sind.
+// ---------------------------------------------------------------------------
+
+export type LlmQuelle = "ollama" | "cloud";
+
+export interface LlmVersuchPlan {
+  quelle: LlmQuelle;
+  baseUrl?: string;
+  modell?: string;
+}
+
+/** Normalisiert eine Ollama-Basis-URL auf den OpenAI-kompatiblen /v1-Pfad. */
+export function normalisiereOllamaBasis(raw: string | undefined | null): string | null {
+  const t = (raw ?? "").trim().replace(/\/+$/, "");
+  if (!t) return null;
+  return t.endsWith("/v1") ? t : `${t}/v1`;
+}
+
+/**
+ * Reihenfolge der Versuche: Ollama (falls konfiguriert), danach Cloud.
+ * Mit nurLokal=true gibt es keinen Cloud-Fallback (Budget/Datenschutz).
+ */
+export function planeLlmVersuche(env: {
+  ollamaBaseUrl?: string | null;
+  ollamaModell?: string | null;
+  nurLokal?: boolean;
+}): LlmVersuchPlan[] {
+  const plan: LlmVersuchPlan[] = [];
+  const basis = normalisiereOllamaBasis(env.ollamaBaseUrl);
+  if (basis) {
+    plan.push({ quelle: "ollama", baseUrl: basis, modell: (env.ollamaModell ?? "").trim() || "qwen2.5-coder:7b" });
+  }
+  if (!env.nurLokal) plan.push({ quelle: "cloud" });
+  return plan;
+}

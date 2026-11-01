@@ -39,10 +39,74 @@ import {
   baueIdempotenzKey,
   darfAufgabeWechseln,
   findAufgabeTyp,
+  planeLlmVersuche,
   statusNachAusfuehrung,
   waehleNaechsteAufgabe,
   type AufgabeStatus,
 } from "../lib/ai-influenza-orchestrator-logic";
+
+type LlmAntwort = { text: string; quelle: "ollama" | "cloud"; modell: string };
+
+/** Ruft einen lokalen Ollama-Knoten OpenAI-kompatibel auf (0 Cent). */
+async function rufeOllama(baseUrl: string, modell: string, system: string, user: string): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180_000);
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OLLAMA_API_KEY?.trim() || "ollama"}`,
+      },
+      body: JSON.stringify({
+        model: modell,
+        stream: false,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Ollama ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = json.choices?.[0]?.message?.content?.trim();
+    if (!text) throw new Error("Ollama lieferte eine leere Antwort");
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Ollama zuerst, Cloud-Kette nur als Fallback (Standing Instruction Ollama-First). */
+async function erzeugeText(system: string, user: string): Promise<LlmAntwort> {
+  const plan = planeLlmVersuche({
+    ollamaBaseUrl: process.env.AI_OLLAMA_BASE_URL ?? process.env.OLLAMA_BASE_URL,
+    ollamaModell: process.env.OLLAMA_MODEL,
+    nurLokal: process.env.AI_INFLUENZA_NUR_LOKAL === "true",
+  });
+  const fehler: string[] = [];
+  for (const schritt of plan) {
+    try {
+      if (schritt.quelle === "ollama") {
+        const text = await rufeOllama(schritt.baseUrl!, schritt.modell!, system, user);
+        return { text, quelle: "ollama", modell: schritt.modell! };
+      }
+      const llm = await invokeLLM({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      });
+      const text = extrahiereText(llm).trim();
+      if (!text) throw new Error("Cloud-LLM lieferte eine leere Antwort");
+      return { text, quelle: "cloud", modell: "managed-kette" };
+    } catch (err) {
+      fehler.push(`${schritt.quelle}: ${err instanceof Error ? err.message.slice(0, 160) : "Fehler"}`);
+    }
+  }
+  throw new Error(`Alle LLM-Quellen fehlgeschlagen (${fehler.join(" | ")})`);
+}
 
 /** Prompt-Rahmen je Aufgabentyp (deutsch, geschäftsorientiert, ohne Floskeln). */
 const PROMPT_RAHMEN: Record<string, string> = {
@@ -172,18 +236,14 @@ export async function fuehreAufgabeAus(aufgabeId: number): Promise<{
   let status: AufgabeStatus;
   let ergebnis: string | null = null;
   let fehler: string | null = null;
+  let llmQuelle = "unbekannt";
   try {
-    const llm = await invokeLLM({
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `${rahmen}\n\nAufgabe: ${aufgabe.titel}\nEingabe (JSON):\n${nutzEingabe}`,
-        },
-      ],
-    });
-    ergebnis = extrahiereText(llm).trim();
-    if (!ergebnis) throw new Error("LLM lieferte eine leere Antwort");
+    const antwort = await erzeugeText(
+      SYSTEM_PROMPT,
+      `${rahmen}\n\nAufgabe: ${aufgabe.titel}\nEingabe (JSON):\n${nutzEingabe}`,
+    );
+    ergebnis = antwort.text;
+    llmQuelle = `${antwort.quelle}:${antwort.modell}`;
     status = statusNachAusfuehrung(aufgabe.aufgabeTyp);
   } catch (err) {
     fehler = err instanceof Error ? err.message.slice(0, 800) : "Unbekannter Fehler";
@@ -207,7 +267,7 @@ export async function fuehreAufgabeAus(aufgabeId: number): Promise<{
     vonStatus: "running",
     zuStatus: status,
     agentTyp: aufgabe.agentTyp,
-    nachricht: fehler ? `Fehlgeschlagen: ${fehler}` : `Ausgeführt (${Date.now() - gestartet} ms)`,
+    nachricht: fehler ? `Fehlgeschlagen: ${fehler}` : `Ausgeführt via ${llmQuelle} (${Date.now() - gestartet} ms)`,
   });
 
   await db

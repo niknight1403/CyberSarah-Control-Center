@@ -145,3 +145,34 @@ describe("Idempotenz und Freigabe", () => {
     expect(istFreigabeGueltig("freigabe_offen", null)).toBe(false);
   });
 });
+
+import { normalisiereOllamaBasis, planeLlmVersuche } from "../../lib/ai-influenza-orchestrator-logic";
+
+describe("Ollama-First-Routing", () => {
+  it("normalisiert die Basis-URL auf /v1", () => {
+    expect(normalisiereOllamaBasis("http://127.0.0.1:11434")).toBe("http://127.0.0.1:11434/v1");
+    expect(normalisiereOllamaBasis("http://127.0.0.1:11434/")).toBe("http://127.0.0.1:11434/v1");
+    expect(normalisiereOllamaBasis("http://x:11434/v1")).toBe("http://x:11434/v1");
+    expect(normalisiereOllamaBasis("  ")).toBeNull();
+    expect(normalisiereOllamaBasis(undefined)).toBeNull();
+  });
+
+  it("setzt Ollama vor die Cloud", () => {
+    const plan = planeLlmVersuche({ ollamaBaseUrl: "http://127.0.0.1:11434", ollamaModell: "qwen2.5-coder:7b" });
+    expect(plan.map((p) => p.quelle)).toEqual(["ollama", "cloud"]);
+    expect(plan[0].baseUrl).toBe("http://127.0.0.1:11434/v1");
+  });
+
+  it("nutzt ohne Ollama-Konfiguration nur die Cloud", () => {
+    expect(planeLlmVersuche({}).map((p) => p.quelle)).toEqual(["cloud"]);
+  });
+
+  it("kennt keinen Cloud-Fallback im Nur-Lokal-Modus", () => {
+    const plan = planeLlmVersuche({ ollamaBaseUrl: "http://h:11434", nurLokal: true });
+    expect(plan.map((p) => p.quelle)).toEqual(["ollama"]);
+  });
+
+  it("fällt auf ein Standardmodell zurück", () => {
+    expect(planeLlmVersuche({ ollamaBaseUrl: "http://h:11434" })[0].modell).toBe("qwen2.5-coder:7b");
+  });
+});
