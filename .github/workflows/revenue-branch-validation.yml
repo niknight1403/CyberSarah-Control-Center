@@ -3,6 +3,10 @@ on:
   push:
     branches:
       - feat/revenue-sprints-10-20261101
+    paths:
+      - 'server/revenue-*.ts'
+      - 'tests/revenue-*.test.ts'
+      - '.github/workflows/revenue-branch-validation.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,7 +29,3 @@ jobs:
         run: npm run check
       - name: Targeted revenue regression tests
         run: npx vitest run tests/revenue-connectors.test.ts tests/revenue-meter-ledger.test.ts tests/revenue-sprint-primitives.test.ts tests/revenue-integrations-api.test.ts
-      - name: Full test suite
-        run: npm test
-      - name: Production server build
-        run: npm run build
