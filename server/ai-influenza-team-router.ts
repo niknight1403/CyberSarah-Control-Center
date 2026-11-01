@@ -17,6 +17,7 @@ import {
 } from "./billing";
 import {adminProcedure,protectedProcedure,publicProcedure,router} from "./_core/trpc";
 import {aiInfluenzaLeadPipeline,prepareAiInfluenzaProposal,upsertAiInfluenzaLead} from "./ai-influenza-lead-service";
+import {aiInfluenzaDeliveryPlan,aiInfluenzaDeliveryStatus,generateAiInfluenzaTaskDraft} from "./ai-influenza-delivery-service";
 
 const packageId=z.enum(AI_INFLUENZA_PACKAGE_IDS);
 
@@ -57,6 +58,9 @@ export const aiInfluenzaTeamRouter=router({
     try{return await createLiveBillingPortalSession({stripeCustomerId:ctx.user.stripeCustomerId});}
     catch(error){throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Kundenportal konnte nicht geöffnet werden."});}
   }),
+  deliveryPlan:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaDeliveryPlan(input.orderId)),
+  deliveryStatus:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaDeliveryStatus(input.orderId)),
+  generateTaskDraft:adminProcedure.input(z.object({taskJobId:z.number().int().positive()})).mutation(({input})=>generateAiInfluenzaTaskDraft(input.taskJobId)),
   leadPipeline:adminProcedure.query(()=>aiInfluenzaLeadPipeline()),
   upsertLead:adminProcedure.input(z.object({
     companyName:z.string().trim().min(2).max(220),
