@@ -32,6 +32,7 @@ import { externalActionsRouter } from "./external-actions-router";
 import { influencerRouter } from "./influencer-router";
 import { publishingRouter } from "./publishing-router";
 import { agentsRouter } from "./agents-router";
+import { aiInfluenzaRouter } from "./ai-influenza-router";
 import { revenueRouter } from "./revenue-router";
 import { draftEngineRouter } from "./draft-engine-router";
 import { campaignBridgeRouter } from "./campaign-bridge-router";
@@ -46,6 +47,7 @@ export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   agents: agentsRouter,
+  aiInfluenza: aiInfluenzaRouter,
   revenue: revenueRouter,
   integrations: integrationsRouter,
   imageGeneration: imageGenerationRouter,

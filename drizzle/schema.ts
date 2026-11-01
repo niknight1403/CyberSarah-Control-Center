@@ -426,3 +426,64 @@ export const revenueDailyStats = pgTable("revenue_daily_stats", {
   revenueCents: integer("revenueCents").default(0).notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ---------------------------------------------------------------------------
+// Sprint 3 (AI Influenza) — Agenten-Registry, Aufgaben-Queue, Ereignis-Log.
+// Operativer Zustand in der App-DB (cybersarah); Geschaeftsobjekte
+// (kunden/angebote/auftraege) liegen weiterhin in revenue_os.
+// ---------------------------------------------------------------------------
+export const aiAgenten = pgTable("aiAgenten", {
+  id: serial("id").primaryKey(),
+  typ: varchar("typ", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  rolle: text("rolle").notNull(),
+  modus: varchar("modus", { length: 32 }).notNull().default("assisted"),
+  aktiv: boolean("aktiv").notNull().default(true),
+  ausgefuehrtAufgaben: integer("ausgefuehrt_aufgaben").notNull().default(0),
+  fehlerAnzahl: integer("fehler_anzahl").notNull().default(0),
+  letzteAktivitaet: timestamp("letzte_aktivitaet", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const aiAufgaben = pgTable("aiAufgaben", {
+  id: serial("id").primaryKey(),
+  agentTyp: varchar("agent_typ", { length: 64 }).notNull(),
+  aufgabeTyp: varchar("aufgabe_typ", { length: 64 }).notNull(),
+  titel: varchar("titel", { length: 255 }).notNull(),
+  eingabe: jsonb("eingabe").notNull().default({}),
+  status: varchar("status", { length: 32 }).notNull().default("queued"),
+  prioritaet: integer("prioritaet").notNull().default(50),
+  versuche: integer("versuche").notNull().default(0),
+  maxVersuche: integer("max_versuche").notNull().default(3),
+  ergebnis: text("ergebnis"),
+  fehler: text("fehler"),
+  idempotenzKey: varchar("idempotenz_key", { length: 160 }).notNull().unique(),
+  erfordertFreigabe: boolean("erfordert_freigabe").notNull().default(false),
+  freigegebenVon: varchar("freigegeben_von", { length: 255 }),
+  freigegebenAm: timestamp("freigegeben_am", { withTimezone: true }),
+  gestartetAm: timestamp("gestartet_am", { withTimezone: true }),
+  beendetAm: timestamp("beendet_am", { withTimezone: true }),
+  dauerMs: integer("dauer_ms"),
+  kostenCent: integer("kosten_cent").notNull().default(0),
+  erstelltVon: varchar("erstellt_von", { length: 64 }).notNull().default("admin"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (table) => [
+  index("aiAufgaben_status_idx").on(table.status),
+  index("aiAufgaben_agent_idx").on(table.agentTyp),
+]);
+
+export const aiAufgabenEreignisse = pgTable("aiAufgabenEreignisse", {
+  id: serial("id").primaryKey(),
+  aufgabeId: integer("aufgabe_id").notNull().references(() => aiAufgaben.id, { onDelete: "cascade" }),
+  vonStatus: varchar("von_status", { length: 32 }),
+  zuStatus: varchar("zu_status", { length: 32 }).notNull(),
+  agentTyp: varchar("agent_typ", { length: 64 }),
+  nachricht: text("nachricht"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type AiAgentRow = typeof aiAgenten.$inferSelect;
+export type AiAufgabeRow = typeof aiAufgaben.$inferSelect;
+export type AiAufgabeEreignisRow = typeof aiAufgabenEreignisse.$inferSelect;
