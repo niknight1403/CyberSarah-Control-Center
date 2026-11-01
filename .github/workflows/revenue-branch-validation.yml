@@ -1,0 +1,31 @@
+name: Revenue Branch Validation
+on:
+  push:
+    branches:
+      - feat/revenue-sprints-10-20261101
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: revenue-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  revenue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify types
+        run: npm run check
+      - name: Targeted revenue regression tests
+        run: npx vitest run tests/revenue-connectors.test.ts tests/revenue-meter-ledger.test.ts tests/revenue-sprint-primitives.test.ts tests/revenue-integrations-api.test.ts
+      - name: Full test suite
+        run: npm test
+      - name: Production server build
+        run: npm run build
