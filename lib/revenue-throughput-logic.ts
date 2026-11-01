@@ -83,6 +83,19 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
         :"scale" as const,
   };
 
+  const providerOpenRatio=input.providerCircuitsTotal>0?input.providerCircuitsOpen/input.providerCircuitsTotal:0;
+  const providerCapacity={
+    status:(input.providerCircuitsTotal===0?"unknown":providerOpenRatio>=1?"critical":providerOpenRatio>=0.5?"degraded":"healthy") as "unknown"|"critical"|"degraded"|"healthy",
+    open:input.providerCircuitsOpen,
+    total:input.providerCircuitsTotal,
+    available:Math.max(0,input.providerCircuitsTotal-input.providerCircuitsOpen),
+    recommendation:providerOpenRatio>=1
+      ?"Revenue-kritische LLM-Aufgaben verschieben; lokale/fallback Route prüfen"
+      :providerOpenRatio>=0.5
+        ?"Nur Revenue-kritische Generierung priorisieren und nicht-kritische Drafts drosseln"
+        :"Normale autonome Revenue-Generierung möglich",
+  };
+
   const blockers:string[]=[];
   if(!input.databaseReady)blockers.push("Revenue-Datenbank nicht verfügbar");
   if(!input.stripeConnected)blockers.push("Stripe-Katalog/API nicht verbunden");
@@ -142,6 +155,7 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
       databaseReady:input.databaseReady,
       providerCircuitsOpen:input.providerCircuitsOpen,
       providerCircuitsTotal:input.providerCircuitsTotal,
+      providerCapacity,
     },
     blockers,
     priorities,
