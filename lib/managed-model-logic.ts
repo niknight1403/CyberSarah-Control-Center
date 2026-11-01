@@ -4,7 +4,7 @@
  * deterministisch und ohne ENV-Zugriff testbar.
  *
  * Sprint 108 — Zero-Cost-Routing: Groq- und OpenRouter-Endpoints bekommen
- * eigene Gratis-Defaults (openai/gpt-oss-20b / Free-Instruct-Modell),
+ * eigene Gratis-Defaults (Groq-Modell aus GROQ_MODEL_CANDIDATES / Free-Instruct-Modell),
  * damit der Managed-Aufruf ohne manuelle Konfiguration ein funktionsfaehiges
  * KOSTENFREIES Modell pro Source waehlt.
  */
@@ -37,6 +37,12 @@ export type ManagedModelSource =
  *
  * Beide Listen am 30.09.2026 gegen die Live-Modelllisten verifiziert
  * (tools/free-llm-changer/changer-status.json).
+ *
+ * Sprint 386 (01.11.2026): Groq-Liste neu geordnet. Der Key-Changer hat
+ * qwen/qwen3.8-27b am 01.11.2026 um 15:43 UTC live mit HTTP 200 bestaetigt,
+ * waehrend die gpt-oss-Modelle aus der Liste gefallen sind. Das live
+ * bestaetigte Modell fuehrt jetzt, die gpt-oss-Eintraege bleiben als
+ * Fallback fuer den Fall, dass Groq sie wieder ausrollt.
  */
 export const OPENROUTER_FREE_MODEL_CANDIDATES = [
   "openrouter/free",
@@ -47,9 +53,9 @@ export const OPENROUTER_FREE_MODEL_CANDIDATES = [
 ] as const;
 
 export const GROQ_MODEL_CANDIDATES = [
-  "openai/gpt-oss-20b",
-  "openai/gpt-oss-120b",
   "qwen/qwen3.8-27b",
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
 ] as const;
 
 /**
@@ -120,7 +126,9 @@ export function resolveManagedModel(
   }
 
   if (source === "groq") {
-    return env.AI_GROQ_MODEL?.trim() || "openai/gpt-oss-20b";
+    // Sprint 386: Default kommt aus der Kandidatenliste, damit Code und
+    // Liste nicht auseinanderlaufen (vorher doppelt gepflegtes Literal).
+    return env.AI_GROQ_MODEL?.trim() || GROQ_MODEL_CANDIDATES[0];
   }
 
   if (source === "local-ollama") {

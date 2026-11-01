@@ -59,7 +59,11 @@ jobs:
               failures=$((failures + 1))
             fi
           }
-          test_provider "Groq" "https://api.groq.com/openai/v1/chat/completions" "openai/gpt-oss-20b" "$GROQ_KEY"
+          # Sprint 386: openai/gpt-oss-20b ist aus der Groq-Liste gefallen
+          # (Key-Changer 01.11.2026, 15:43 UTC); qwen/qwen3.8-27b ist dort
+          # live mit HTTP 200 bestaetigt und fuehrt auch in
+          # GROQ_MODEL_CANDIDATES.
+          test_provider "Groq" "https://api.groq.com/openai/v1/chat/completions" "qwen/qwen3.8-27b" "$GROQ_KEY"
           test_provider "Gemini" "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" "gemini-flash-latest" "$GEMINI_KEY"
           test_provider "OpenRouter" "https://openrouter.ai/api/v1/chat/completions" "openrouter/free" "$OPENROUTER_KEY" "HTTP-Referer: $OPENROUTER_REFERER"
           if [ "$failures" -gt 0 ]; then

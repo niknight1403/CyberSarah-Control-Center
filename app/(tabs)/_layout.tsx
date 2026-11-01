@@ -1,5 +1,5 @@
 import { router, Tabs } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOnboarding } from "@/hooks/use-onboarding";
@@ -48,7 +48,11 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const wide = Platform.OS === "web" && isWideViewport(width);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const toolsProgress = useRef(new Animated.Value(0)).current;
+  // Sprint 386: Animated-Wert ueber useState statt useRef.current halten.
+  // React 19 / react-hooks verbietet das Lesen von refs im Render-Body
+  // ("Cannot access refs during render"); die Lazy-Initialisierung liefert
+  // weiterhin genau eine Animated.Value-Instanz pro Mount.
+  const [toolsProgress] = useState(() => new Animated.Value(0));
   const hiddenRoutes = [
     { route: "business", label: "Business", icon: "▥" },
     { route: "ai-influenza-team", label: "AI Influenza Team", icon: "✦" },

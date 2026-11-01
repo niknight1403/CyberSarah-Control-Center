@@ -37,7 +37,7 @@ describe("resolveManagedModel (Sprint 85)", () => {
   });
 
   it("Sprint 108: nutzt fuer Groq-Endpoints das aktive Default-Modell (kein Enterprise-Gate)", () => {
-    expect(resolveManagedModel(undefined, "groq", {})).toBe("openai/gpt-oss-20b");
+    expect(resolveManagedModel(undefined, "groq", {})).toBe("qwen/qwen3.8-27b");
     expect(resolveManagedModel(undefined, "groq", { AI_GROQ_MODEL: "openai/gpt-oss-120b" })).toBe("openai/gpt-oss-120b");
   });
 
