@@ -22,6 +22,10 @@ export type ControlCenterAutopilotResult = {
     b2bNodes: number;
     b2bQualified: number;
     b2bPartners: number;
+    b2bPersonaAssignments: number;
+    b2bExpansionQueue: number;
+    saasLoopFocus: string;
+    saasLoopOwnerPersona: string;
   };
   growthPulse: Awaited<ReturnType<typeof runGrowthPulse>> | null;
   realActions: string[];
@@ -79,6 +83,10 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     b2bNodes: b2b.counts.nodes,
     b2bQualified: b2b.counts.qualified,
     b2bPartners: b2b.counts.partners,
+    b2bPersonaAssignments: b2b.personaAssignments.length,
+    b2bExpansionQueue: b2b.expansionQueue.length,
+    saasLoopFocus: b2b.saasLoop.focus,
+    saasLoopOwnerPersona: b2b.saasLoop.ownerPersona,
   };
 
   const realActions: string[] = [];
@@ -97,6 +105,9 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (growth.influencerPersonasLearned > 0) realActions.push(`${growth.influencerPersonasLearned} Influencer-Personas aus Live-Signalen weiterentwickelt`);
   if (growth.influencerExperimentsQueued > 0) realActions.push(`${growth.influencerExperimentsQueued} Influencer-Lernexperimente priorisiert`);
   if (growth.b2bQualified > 0) realActions.push(`${growth.b2bQualified} qualifizierte B2B-Beziehungen im Netzwerk bewertet`);
+  if (growth.b2bPersonaAssignments > 0) realActions.push(`${growth.b2bPersonaAssignments} B2B-Beziehungen autonom passenden KI-Personas zugeordnet`);
+  if (growth.b2bExpansionQueue > 0) realActions.push(`${growth.b2bExpansionQueue} B2B-Expansion-/Nurture-Aktionen priorisiert`);
+  realActions.push(`SaaS Loop Engineering: Fokus ${growth.saasLoopFocus}, Owner-Persona ${growth.saasLoopOwnerPersona}`);
   if (growthPulse?.generated) realActions.push(`${growthPulse.generated} datenbasierte Reichweiten-/Funnel-Entwuerfe erzeugt`);
   if (growthError) blocked.push(`Growth Pulse: ${growthError}`);
   for (const item of drafts.skipped) {
