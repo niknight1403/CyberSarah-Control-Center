@@ -2,7 +2,7 @@ name: CyberSarah Control Center CI
 
 on:
   push:
-    branches: [main, next-development]
+    branches: [main, next-development, feat/revenue-sprints-10-20261101]
   pull_request:
     branches: [main, next-development]
   workflow_dispatch:
