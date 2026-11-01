@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - deploy-fix
           - migrate-diag
           - ports-deny
           - ports-verify
@@ -244,6 +245,14 @@ jobs:
             migrate-diag)
               # Zeigt App-Zustand und den vollstaendigen Migrationsfehler.
               $SSH_CMD 'echo "== PM2 =="; pm2 list | tail -5; echo "== Health =="; curl -s -o /dev/null -w "localhost:3000/api/ready: %{http_code}\n" --max-time 10 http://localhost:3000/api/ready; echo "== Migrationslog (letzte 40 Zeilen) =="; tail -40 /tmp/ccc-migrate.log 2>/dev/null || echo "kein Log"; echo "== Git-Stand =="; cd /opt/cybersarah-control-center && git log --oneline -2; echo "== Drizzle-Journal =="; psql "$DATABASE_URL" -tAc "select count(*) from drizzle.__drizzle_migrations" 2>/dev/null || echo "Journal nicht lesbar (DATABASE_URL nicht in dieser Shell)"; echo "== Fehlerlog der App =="; tail -8 ~/.pm2/logs/cybersarah-control-center-error.log 2>/dev/null | tail -8'
+              ;;
+            deploy-fix)
+              # Stempelt die Migrationen (Schema existiert, Journal leer),
+              # deployt anschliessend und prueft die Agentforge-Endpunkte.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== Journal stempeln =="; set -a; . ./.env 2>/dev/null; set +a; node scripts/ops/stamp-migrations.mjs --apply 2>&1 | tail -12; echo "== Migrationslauf =="; npx drizzle-kit migrate 2>&1 | tail -5'
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; bash scripts/ops/deploy-cc.sh --apply 2>&1 | tail -22'
+              echo "== PM2 und Endpunkte =="
+              $SSH_CMD 'pm2 list | tail -6; echo "--- Health ---"; curl -s -o /dev/null -w "ready: %{http_code}\n" --max-time 10 http://localhost:3000/api/ready; echo "--- Agentforge ---"; for ep in "POST /api/agentforge/events" "POST /api/agentforge/checkpoints" "GET /api/agentforge/stream"; do m=${ep%% *}; u=${ep#* }; code=$(curl -s -o /dev/null -w "%{http_code}" -X $m --max-time 8 -H "Content-Type: application/json" -d "{}" "http://localhost:3000$u"); echo "  $m $u -> $code"; done; echo "--- Git ---"; git log --oneline -1'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
