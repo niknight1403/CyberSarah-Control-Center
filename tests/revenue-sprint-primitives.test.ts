@@ -23,6 +23,7 @@ describe("ten revenue safety milestones",()=>{
  it("5 CRM checkpoint only advances for validated batches",()=>{
   expect(advanceCrmCheckpoint("old","new",5)).toEqual({cursor:"new",processed:5,complete:false});
   expect(()=>advanceCrmCheckpoint(null,"next",-1)).toThrow();
+  expect(advanceCrmCheckpoint("page-2",null,0)).toEqual({cursor:null,processed:0,complete:true});
  });
  it("6 outreach requires consent approval and verified domain",()=>{
   expect(maySendOutreach({approved:true,consentRecorded:true,unsubscribed:false,domainVerified:true})).toBe(true);
