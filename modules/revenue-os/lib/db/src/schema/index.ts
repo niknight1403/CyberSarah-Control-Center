@@ -29,3 +29,5 @@ export * from "./subscriptions";
 export * from "./crossSell";
 export * from "./abTesting";
 export * from "./tenants";
+
+export * from "./aiInfluenza";
