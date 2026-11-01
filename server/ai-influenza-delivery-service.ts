@@ -1,7 +1,7 @@
 import {eq} from "drizzle-orm";
 import {b2bNetworkNodes,revenueJobs} from "../drizzle/schema";
 import {aiInfluenzaCreativePrompt,buildAiInfluenzaDeliveryBriefs} from "../lib/ai-influenza-delivery-logic";
-import {packageForStripeMetadata,type AiInfluenzaOrderPayload,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
+import {packageForStripeMetadata,type AiInfluenzaOrderPayload} from "../lib/ai-influenza-team-logic";
 import {getDb} from "./db";
 import {insertPendingDraft} from "./draft-engine";
 import {invokeLLM} from "./_core/llm";
