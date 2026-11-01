@@ -7,6 +7,7 @@ import {getDb} from "./db";
 import {collectRevenueAutopilotSnapshot} from "./revenue-autopilot";
 import {getAdministratorStripeHealth} from "./stripe-admin-health";
 import {getRevenueWebhookRuntimeStatus} from "./revenue-webhook-runtime";
+import {classifyRevenueIncidents} from "../lib/revenue-incident-logic";
 
 export async function revenueThroughputOverview(){
   const [snapshot,stripeHealth]=await Promise.all([
@@ -37,8 +38,7 @@ export async function revenueThroughputOverview(){
   const circuits=providerCircuitSnapshot();
   const webhookRuntime=getRevenueWebhookRuntimeStatus();
 
-  return {
-    ...buildRevenueThroughputSnapshot({
+  const core=buildRevenueThroughputSnapshot({
       currentMrrEur:snapshot.mrrEur,
       newMrr1dEur:snapshot.newMrr1dEur,
       newMrr7dEur:snapshot.newMrr7dEur,
@@ -64,7 +64,10 @@ export async function revenueThroughputOverview(){
       providerCircuitsTotal:circuits.length,
       stripeWebhookConsecutiveFailures:webhookRuntime.stripe.consecutiveFailures,
       digistoreWebhookConsecutiveFailures:webhookRuntime.digistore24.consecutiveFailures,
-    }),
+    });
+  return {
+    ...core,
+    incidents:classifyRevenueIncidents(core.blockers),
     webhookRuntime,
     generatedAt:new Date().toISOString(),
     evidence:{
