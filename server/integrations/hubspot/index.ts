@@ -16,7 +16,11 @@ export { HubspotService } from "./service";
 export type { HubspotServiceLike } from "./service";
 export { SandboxHubspotService } from "./sandbox";
 
-const TOKEN_VARIABLES = ["HUBSPOT_PRIVATE_APP_TOKEN", "HUBSPOT_ACCESS_TOKEN"] as const;
+const TOKEN_VARIABLES = [
+  "HUBSPOT_PRIVATE_APP_TOKEN",
+  "HUBSPOT_ACCESS_TOKEN",
+  "HUBSPOT_API_KEY",
+] as const;
 
 /** Loest das Token aus der Umgebung auf; beide historischen Namen werden akzeptiert. */
 export function resolveHubspotToken(env: Record<string, string | undefined> = process.env): string {
@@ -27,10 +31,26 @@ export function resolveHubspotToken(env: Record<string, string | undefined> = pr
   return "";
 }
 
+/**
+ * Ordnet das Token formal ein. HubSpot akzeptiert heute ausschliesslich
+ * Private-App-Tokens (Praefix "pat-") oder OAuth-Tokens. Ein Legacy-API-Key
+ * (UUID-Form) wurde 2022 abgeschaltet und liefert nur noch HTTP 401.
+ */
+export type HubspotTokenKind = "private_app" | "legacy_api_key" | "unknown";
+
+export function classifyHubspotToken(token: string): HubspotTokenKind {
+  const value = String(token ?? "").trim();
+  if (!value) return "unknown";
+  if (value.startsWith("pat-")) return "private_app";
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return "legacy_api_key";
+  return "unknown";
+}
+
 export interface HubspotEnvStatus {
   configured: boolean;
   validFormat: boolean;
   variable: string | null;
+  kind: HubspotTokenKind;
   problem: string | null;
 }
 
@@ -45,15 +65,27 @@ export function describeHubspotEnv(
       configured: false,
       validFormat: false,
       variable: null,
-      problem: "HUBSPOT_ACCESS_TOKEN ist nicht gesetzt.",
+      kind: "unknown",
+      problem: "Kein HubSpot-Token gesetzt (erwartet HUBSPOT_PRIVATE_APP_TOKEN, HUBSPOT_ACCESS_TOKEN oder HUBSPOT_API_KEY).",
+    };
+  }
+  const kind = classifyHubspotToken(token);
+  if (kind === "legacy_api_key") {
+    return {
+      configured: false,
+      validFormat: false,
+      variable,
+      kind,
+      problem:
+        "Legacy-API-Key erkannt (UUID-Form). Diese Schluessel wurden 2022 abgeschaltet und liefern HTTP 401. Bitte eine Private App anlegen und deren pat-Token hinterlegen.",
     };
   }
   try {
     assertValidToken(token);
-    return { configured: true, validFormat: true, variable, problem: null };
+    return { configured: true, validFormat: true, variable, kind, problem: null };
   } catch (error) {
     const message = error instanceof HubspotConfigError ? error.message : String(error);
-    return { configured: false, validFormat: false, variable, problem: message };
+    return { configured: false, validFormat: false, variable, kind, problem: message };
   }
 }
 

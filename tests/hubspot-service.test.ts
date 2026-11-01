@@ -8,6 +8,7 @@ import {
   SandboxHubspotService,
   assertValidToken,
   createHubspotModule,
+  classifyHubspotToken,
   describeHubspotEnv,
   resolveHubspotToken,
 } from "@/server/integrations/hubspot";
@@ -60,7 +61,7 @@ describe("HubSpot: Umgebungsprüfung", () => {
   it("meldet fehlende Konfiguration ohne Token", () => {
     const status = describeHubspotEnv({});
     expect(status.configured).toBe(false);
-    expect(status.problem).toMatch(/nicht gesetzt/);
+    expect(status.problem).toMatch(/Kein HubSpot-Token gesetzt/);
   });
 
   it("akzeptiert den Namen HUBSPOT_ACCESS_TOKEN", () => {
@@ -248,5 +249,26 @@ describe("HubSpot: Sandbox-Fallback", () => {
   it("liefert einen klaren Fehler für unbekannte Firmen", async () => {
     const sandbox = new SandboxHubspotService();
     await expect(sandbox.getObject("companies", "fehlt")).rejects.toThrow(/existiert in der Sandbox/);
+  });
+});
+describe("HubSpot: dritter Variablenname und Token-Form", () => {
+  it("erkennt HUBSPOT_API_KEY als gespeichertes Geheimnis", () => {
+    expect(resolveHubspotToken({ HUBSPOT_API_KEY: TOKEN })).toBe(TOKEN);
+    expect(describeHubspotEnv({ HUBSPOT_API_KEY: TOKEN }).variable).toBe("HUBSPOT_API_KEY");
+  });
+
+  it("ordnet Token-Formen korrekt ein", () => {
+    expect(classifyHubspotToken(TOKEN)).toBe("private_app");
+    expect(classifyHubspotToken("123e4567-e89b-12d3-a456-426614174000")).toBe("legacy_api_key");
+    expect(classifyHubspotToken("irgendwas")).toBe("unknown");
+    expect(classifyHubspotToken("")).toBe("unknown");
+  });
+
+  it("weist einen abgeschalteten Legacy-Key mit klarer Begründung ab", () => {
+    const status = describeHubspotEnv({ HUBSPOT_API_KEY: "123e4567-e89b-12d3-a456-426614174000" });
+    expect(status.configured).toBe(false);
+    expect(status.kind).toBe("legacy_api_key");
+    expect(status.problem).toMatch(/abgeschaltet/);
+    expect(createHubspotModule({ HUBSPOT_API_KEY: "123e4567-e89b-12d3-a456-426614174000" }).mode).toBe("sandbox");
   });
 });

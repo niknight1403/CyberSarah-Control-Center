@@ -75,7 +75,7 @@ export type ConnectorReadiness = {
  * Token gesetzt ist.
  */
 const ENV_ALIASES: Record<string, readonly string[]> = {
-  HUBSPOT_PRIVATE_APP_TOKEN: ["HUBSPOT_ACCESS_TOKEN"],
+  HUBSPOT_PRIVATE_APP_TOKEN: ["HUBSPOT_ACCESS_TOKEN", "HUBSPOT_API_KEY"],
 };
 
 export function resolveEnvValue(
