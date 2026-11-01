@@ -7,18 +7,7 @@ name: Render Deploy
 # Ausloesen: GitHub UI → Actions → "Render Deploy" → Run workflow.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'server/**'
-      - 'app/**'
-      - 'components/**'
-      - 'lib/**'
-      - 'drizzle/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/render-deploy.yml'
+  # Render Git integration auto-deploys main; manual workflow prevents duplicate builds.
   workflow_dispatch:
     inputs:
       target:
