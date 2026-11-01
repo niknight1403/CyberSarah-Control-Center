@@ -27,3 +27,19 @@ Fehlende Secrets einfach ergaenzen — der Changer erkennt sie automatisch
 - Laeuft KEIN Anbieter mehr: Discord-Alarm (DISCORD_WEBHOOK_URL) + rot.
 - Committet wird NUR `changer-status.json` (anonym, ohne Keys).
   `aktive-anbindung.env` enthaelt den aktiven Key und ist gitignored.
+
+## Felder in `changer-status.json` (Sprint 386)
+
+| Feld | Bedeutung |
+|---|---|
+| `stand` | Zeitpunkt des Laufs (Serverzeit des Runners) |
+| `aktiv`, `aktiv_name`, `endpunkt`, `modell` | Der Gewinner des Laufs, `null` wenn keiner verfuegbar war |
+| `anbieter[].status` | Klartext-Zustand: `VERFUEGBAR`, `LIMIT ERREICHT`, `KEY UNGUELTIG`, `NICHT KONFIGURIERT/ERREICHBAR` |
+| `anbieter[].http_status` | HTTP-Code des Chat-Probes (`429`, `500` …), `null` wenn kein Code vorliegt |
+| `anbieter[].modell` | Nur der Modellname. Vorher landete hier das ganze Detail (`500 gemma-4-31b-it`) |
+| `anbieter[].detail` | Rohdetail des Probes (`500 gemma-4-31b-it`, `FEHLT`, `429 <modell>`) |
+| `anbieter[].hinweis` | Naechster Schritt, z. B. `Changer rotiert weiter`, `Secret erneuern` |
+
+Der Bericht ist ein reiner Statusreport. Er steuert die Laufzeit nicht: der
+Server liest seine Provider aus ENV (`server/_core/llm.ts`), die Modell-Defaults
+stehen in `lib/managed-model-logic.ts`.

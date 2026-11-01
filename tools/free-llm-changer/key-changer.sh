@@ -24,10 +24,19 @@ probe_chat() { # $1=base_url $2=key $3=prefs -> "OK <modell>" | "<status> <model
   local base="$1" key="$2" prefs="$3"
   local models_json status chosen mstatus
   models_json=$(curl -sS -m 15 "${base%/}/models" -H "Authorization: Bearer ${key}" 2>/dev/null || true)
-  mstatus=$(printf '%s' "$models_json" | head -c 200 | grep -q '"error"' && echo "err" || echo "ok")
+  # Sprint 386: Fehlererkennung ohne Pipe. Vorher lief die Rohantwort durch
+  # "head -c 200" bzw. "grep -q"; bei grossen Modelllisten (OpenRouter ~750 KB)
+  # brach printf daraufhin mit "write error: Broken pipe" ab, was unter
+  # set -o pipefail eine latente Abbruchstelle ist. Reine Bash-Pruefung, kein
+  # Subprozess, kein SIGPIPE.
+  local sample="${models_json:0:200}" lower="${models_json,,}"
+  mstatus="ok"
+  if [[ "$sample" == *'"error"'* ]]; then
+    mstatus="err"
+  fi
   if [[ "$mstatus" == "err" ]]; then
     # Anbieter meldet Fehler auf /models: haeufig 401/403 (Key ungueltig) oder leer.
-    if printf '%s' "$models_json" | grep -qi 'invalid\|unauthorized\|api key'; then
+    if [[ "$lower" == *invalid* || "$lower" == *unauthorized* || "$lower" == *"api key"* ]]; then
       echo "KEYUNGUELTIG -"
     else
       echo "404 -"
@@ -80,19 +89,23 @@ while IFS=$'\t' read -r id name base_url env_key first_model prefs; do
   verdict_model="${verdict#* }"
   provider_model=""
   if [[ "$verdict_model" != "-" ]]; then provider_model="$verdict_model"; fi
+  # Sprint 386: Status, Detail und Hinweis getrennt halten. Vorher landete das
+  # Detail ("500 gemma-4-31b-it") als Ganzes im Modellfeld des Statusberichts.
+  v_status=""; v_detail="$verdict"; v_note=""
   case "$verdict" in
-    OK*) verdict="VERFUEGBAR ($verdict_model)"
+    OK*) v_status="VERFUEGBAR"; v_detail="$verdict_model"
          if [[ -z "$winner_id" ]]; then
            winner_id="$id"; winner_name="$name"; winner_base="$base_url"
            winner_model="$verdict_model"; winner_key="$key"
          fi ;;
-    429*|402*) verdict="LIMIT ERREICHT ($verdict) — Changer rotiert weiter" ;;
-    KEYUNGUELTIG*) verdict="KEY UNGUELTIG ($verdict) — Secret erneuern" ;;
-    401*|403*) verdict="KEY UNGUELTIG ($verdict)" ;;
-    *) verdict="NICHT KONFIGURIERT/ERREICHBAR ($verdict)" ;;
+    429*|402*) v_status="LIMIT ERREICHT"; v_note="Changer rotiert weiter" ;;
+    KEYUNGUELTIG*) v_status="KEY UNGUELTIG"; v_note="Secret erneuern" ;;
+    401*|403*) v_status="KEY UNGUELTIG" ;;
+    *) v_status="NICHT KONFIGURIERT/ERREICHBAR" ;;
   esac
-  printf '  [%-13s] %-38s -> %s\n' "$id" "$name" "$verdict"
-  results+=("$id|$verdict")
+  printf '  [%-13s] %-38s -> %s (%s)%s\n' "$id" "$name" "$v_status" "$v_detail" \
+    "${v_note:+ — $v_note}"
+  results+=("$id|$v_status|$v_detail|$v_note")
 done < <(python3 -c "
 import json
 for a in json.load(open('$REGISTRY'))['anbieter']:
@@ -108,15 +121,37 @@ if [[ -z "$winner_id" ]] && [[ "$(probe_ollama http://127.0.0.1:11434/v1)" == "O
 fi
 
 python3 - "$STATUS_FILE" "$winner_id" "$winner_name" "$winner_base" "$winner_model" "${results[@]}" <<'PY'
-import datetime, json, sys
+import datetime, json, re, sys
 path, winner_id, wname, wbase, wmodel, *res = sys.argv[1:]
+HTTP_CODE = re.compile(r"^(\d{3})\s*(.*)$")
 anbieter = []
 for r in res:
-    rid, rstatus = r.split("|", 1)
-    status, _, rmodel = rstatus.partition(" (")
-    rmodel = rmodel.rstrip(")") if rmodel else None
-    anbieter.append({"id": rid, "status": status or rstatus,
-                     "modell": rmodel or None})
+    # Format: id|status|detail|hinweis  (Sprint 386)
+    fields = (r.split("|") + ["", "", ""])[:4]
+    rid, rstatus, rdetail, rnote = (f.strip() for f in fields)
+    detail = rdetail or None
+    http_status = None
+    model = None
+    if detail and detail not in {"-", "FEHLT", "lokal"}:
+        match = HTTP_CODE.match(detail)
+        if match:
+            # "000" ist curl-Platzhalter fuer "keine Verbindung", kein HTTP-Code.
+            code = int(match.group(1))
+            http_status = code if code > 0 else None
+            rest = match.group(2).strip()
+            model = rest or None
+        else:
+            # Reines Modell ohne HTTP-Code (z. B. "qwen/qwen3.8-27b",
+            # "KEYUNGUELTIG", "FEHLT") oder eine Fehlermeldung.
+            model = detail
+    anbieter.append({
+        "id": rid,
+        "status": rstatus or None,
+        "http_status": http_status,
+        "modell": model,
+        "detail": detail,
+        "hinweis": rnote or None,
+    })
 json.dump({"stand": datetime.datetime.now().isoformat(timespec="seconds"),
            "aktiv": winner_id or None, "aktiv_name": wname or None,
            "endpunkt": wbase or None, "modell": wmodel or None,
