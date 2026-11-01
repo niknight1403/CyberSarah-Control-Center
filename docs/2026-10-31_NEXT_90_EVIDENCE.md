@@ -15,6 +15,11 @@ Stand: 31.10.2026
 - Variantenvergleich je Produkt: Preiskollisionen pro Waehrung/Abrechnungsintervall, ueberholte aber weiterhin aktive Preise, fehlende Erstellzeitpunkte (ehrlich als nicht belegbar), uneinheitliche Steuerbehandlung und Abweichungen vom Standardpreis. `created` wird jetzt als `createdAt` in die Projektion uebernommen.
 - Nachweis: 9 neue Vitest-Faelle; Gesamtsuite 2988 gruen, TypeScript und ESLint sauber. Stripe-Testmode-E2E bleibt offen.
 
+## Nachtrag Sprint 44 (01.11.2026)
+- Publikationsfehler werden je Provider und Ursache gruppiert (Auth, Rate-Limit, Kontingent, Medium, Richtlinie, Netz, Versand unklar), inklusive Retry-Empfehlung und Hinweis; maskierte Fehlertexte; Jobs ohne Fehlertext werden als unbekannt gezaehlt statt stillschweigend verworfen.
+- Admin-Uebersicht `publishing.opsOverview` liefert `failureReasons` konto-gescoped (max. 200 aktuelle Jobs).
+- Nachweis: 7 neue Vitest-Faelle; Gesamtsuite 2995 gruen, TypeScript sauber, ESLint 0 Fehler.
+
 ## Neue, auf main übernommene Code-Verbesserungen
 | Bereich/Sprint | Nachweis | Status |
 |---|---|---|
