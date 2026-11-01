@@ -30,7 +30,8 @@
     "smoke": "node scripts/smoke-live.mjs",
     "audit:growth": "node scripts/growth-release-audit.mjs",
     "hubspot:check": "tsx scripts/hubspot-live-check.ts",
-    "hubspot:write-check": "tsx scripts/hubspot-write-roundtrip.ts"
+    "hubspot:write-check": "tsx scripts/hubspot-write-roundtrip.ts",
+    "hubspot:mrr-check": "tsx scripts/hubspot-mrr-check.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

@@ -87,7 +87,35 @@ Alle vier sind aktiv, geprüft am 1. November 2026 um 02:45 Uhr.
 | Tests | 2886 grün, `tsc` ohne Fehler, Build erfolgreich |
 | Abnahme | erfüllt: `hubspot:check` meldet "Schreibzugriff insgesamt: vorhanden", `hubspot:write-check` läuft durch |
 
+## MRR-Dashboard
+
+Das Admin-UI zeigt unter „UMSATZ" die Karte „Umsatz aus HubSpot". Sie liest den
+admin-geschützten Endpunkt `revenueIntegrations.hubspotMrr` und rechnet selbst
+nichts.
+
+| Kennzahl | Herkunft |
+| --- | --- |
+| MRR | Summe der Beträge aller Deals in einer gewonnenen Stage, auf Monat normalisiert |
+| Neuer MRR im Fenster | gewonnene Deals der letzten 30 Tage |
+| Offene Pipeline | Beträge der Deals in offenen Stages |
+| Gewichtete Pipeline | offene Beträge mal Stage-Wahrscheinlichkeit |
+| MRR nach Owner | Gruppierung über `hubspot_owner_id` |
+| Verlauf | gewonnener Umsatz je Monat, sechs Monate standardmäßig |
+| Abdeckung | gelesene Deals, Deals ohne Betrag, ohne Owner, ohne Stage |
+
+Abrechnungsintervall: Trägt ein Deal `billing_frequency`, wird er entsprechend
+normalisiert (jährlich durch zwölf, quartalsweise durch drei). Fehlt das Feld,
+gilt der Betrag als monatlich; das steht als Annahme in der Karte.
+
+Deals werden über den Listen-Endpunkt gelesen, nicht über die Suche: der
+Suchindex hinkt nach dem Anlegen einige Sekunden hinterher.
+
+Geprüft mit `npm run hubspot:mrr-check`: baut drei Testdeals (zwei gewonnen,
+einer offen), erwartet MRR plus 2.000 und offene Pipeline plus 4.000, prüft
+Owner-Zuordnung und Verlauf und löscht alles wieder. Ergebnis vom 1. November
+2026: alle vier Prüfungen ok, Portal danach wieder bei 0 Deals.
+
 ## Nächster Schritt
 
-Die Anbindung ist abgenommen. Offen ist nur noch die Verdrahtung des
-MRR-Dashboards im Admin-UI gegen die echten Deals und Owner.
+Die Anbindung ist abgenommen und das Dashboard verdrahtet. Offen ist nur noch
+das Ausrollen auf den Server, sofern dort `HUBSPOT_SERVICE_KEY` gesetzt ist.

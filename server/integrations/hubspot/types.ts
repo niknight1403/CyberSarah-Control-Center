@@ -30,6 +30,8 @@ export interface DealInput {
   dealstage: string;
   pipeline?: string;
   closedate?: string;
+  /** Owner-Zuordnung; ohne sie landet der Deal im MRR unter "Nicht zugewiesen". */
+  hubspotOwnerId?: string;
   /** Verknuepfter Kontakt (optional, wird als Assoziation angelegt). */
   contactId?: string;
 }

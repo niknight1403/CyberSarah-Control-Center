@@ -2,6 +2,7 @@ import {z} from "zod";
 import {adminProcedure,router} from "./_core/trpc";
 import { createHubspotModule, describeHubspotEnv } from "./integrations/hubspot";
 import {hubspotContacts,hubspotDeals,firecrawlPreview,draftWeeklyMarketing,revenueKpis} from "./revenue-connectors";
+import {loadHubspotMrrSnapshot} from "./hubspot-mrr";
 import {
   CONNECTOR_CATALOG, buildHubspotSyncPlan, buildLeadScrapePlan, buildMeteredUsageEvent,
   buildOutreachDispatchPlan, evaluateConnectorReadiness, summarizeConnectorReadiness,
@@ -35,6 +36,19 @@ export const revenueIntegrationsRouter=router({
     leads:z.number().int().nonnegative(),conversions:z.number().int().nonnegative(),
     apiCalls:z.number().int().nonnegative(),
   })).query(({input})=>({...revenueKpis(input),source:"supplied_preview_only" as const})),
+
+  /* ---- Umsatz: MRR aus echten HubSpot-Deals und Ownern ---- */
+  hubspotMrr:adminProcedure.input(z.object({
+    months:z.number().int().min(1).max(24).default(6),
+    windowDays:z.number().int().min(1).max(365).default(30),
+  }).optional()).query(async({input})=>{
+    const result=await loadHubspotMrrSnapshot(process.env,{
+      months:input?.months??6,windowDays:input?.windowDays??30,
+    });
+    return result.ok
+      ? {ok:true as const,snapshot:result.snapshot,warnings:result.warnings}
+      : {ok:false as const,reason:result.reason,code:result.code};
+  }),
 
   /* ---- Konto-Agent: Konten anlegen und einstellen (Metadaten, keine Fremd-Registrierung) ---- */
   accountProviders:adminProcedure.query(()=>({

@@ -144,6 +144,7 @@ export class HubspotService implements HubspotServiceLike {
       amount: input.amount === undefined ? undefined : String(input.amount),
       pipeline: input.pipeline,
       closedate: input.closedate,
+      hubspot_owner_id: input.hubspotOwnerId,
     });
     const associations = input.contactId
       ? [
@@ -173,6 +174,7 @@ export class HubspotService implements HubspotServiceLike {
     if (!String(input.dealstage ?? "").trim()) throw new Error("dealstage ist erforderlich.");
     const properties = cleanProperties({
       dealstage: input.dealstage,
+      hubspot_owner_id: input.hubspotOwnerId,
       amount: input.amount === undefined ? undefined : String(input.amount),
       closedate: input.closedate,
     });

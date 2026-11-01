@@ -18,6 +18,7 @@ import { ProviderAdminCard } from "@/components/studio/provider-admin-card";
 import { PublishingReviewAdminCard } from "@/components/studio/publishing-review-admin-card";
 import { PublishingOpsAdminCard } from "@/components/studio/publishing-ops-admin-card";
 import { IntegrationStatusCard } from "@/components/studio/integration-status-card";
+import { HubspotMrrCard } from "@/components/studio/hubspot-mrr-card";
 import { WixCard } from "@/components/studio/wix-card";
 import { AutonomousDevCard } from "@/components/studio/autonomous-dev-card";
 import { trpc } from "@/lib/trpc";
@@ -122,6 +123,10 @@ export default function AdminDashboardScreen() {
         <Text style={styles.sectionTitle}>Integrations-Status (Sprint 196)</Text>
         <IntegrationStatusCard isAdmin={isAdmin} />
         <WixCard isAdmin={isAdmin} />
+
+        <Text style={styles.sectionLabel}>UMSATZ</Text>
+        <Text style={styles.sectionTitle}>MRR aus HubSpot-Deals</Text>
+        <HubspotMrrCard isAdmin={isAdmin} />
 
         <Text style={styles.sectionLabel}>ENTWICKLUNG</Text>
         <Text style={styles.sectionTitle}>Autonome Entwicklung (0 EUR)</Text>
