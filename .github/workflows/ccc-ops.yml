@@ -10,6 +10,7 @@ on:
         options:
           - deploy
           - deploy-cc
+          - prepare-host
           - pm2-redeploy
           - revenue-os-db-url
           - hubspot-env
@@ -71,6 +72,10 @@ jobs:
             deploy-cc)
               # Fuehrt den sicheren Bootstrapper auf dem Server aus.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/deploy-cc.sh --apply 2>&1 | tail -40'
+              ;;
+            prepare-host)
+              # Zustand pruefen, Swap aktivieren, ungenutzte Images freigeben.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/prepare-host.sh 2>&1 | tail -40'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
