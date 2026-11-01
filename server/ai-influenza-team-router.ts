@@ -4,6 +4,7 @@ import {
   AI_INFLUENZA_AGENTS,
   AI_INFLUENZA_PACKAGE_IDS,
   AI_INFLUENZA_PACKAGES,
+  simulateAiInfluenzaTestJourney,
 } from "../lib/ai-influenza-team-logic";
 import {
   createAiInfluenzaInboundOrder,
@@ -30,6 +31,7 @@ export const aiInfluenzaTeamRouter=router({
   })),
   agents:adminProcedure.query(()=>AI_INFLUENZA_AGENTS),
   overview:adminProcedure.query(()=>aiInfluenzaTeamOverview()),
+  testJourney:adminProcedure.input(z.object({packageId})).query(({input})=>simulateAiInfluenzaTestJourney(input.packageId)),
   checkout:protectedProcedure.input(z.object({packageId})).mutation(async({ctx,input})=>{
     try{
       const customer=await ensureAiInfluenzaCustomerNode({
