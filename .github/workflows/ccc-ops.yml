@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - agentforge-check
           - deploy-fix
           - migrate-diag
           - ports-deny
@@ -252,7 +253,11 @@ jobs:
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; echo "== Journal stempeln =="; set -a; . ./.env 2>/dev/null; set +a; node scripts/ops/stamp-migrations.mjs --apply 2>&1 | tail -12; echo "== Migrationslauf =="; npx drizzle-kit migrate 2>&1 | tail -5'
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; bash scripts/ops/deploy-cc.sh --apply 2>&1 | tail -22'
               echo "== PM2 und Endpunkte =="
-              $SSH_CMD 'pm2 list | tail -6; echo "--- Health ---"; curl -s -o /dev/null -w "ready: %{http_code}\n" --max-time 10 http://localhost:3000/api/ready; echo "--- Agentforge ---"; for ep in "POST /api/agentforge/events" "POST /api/agentforge/checkpoints" "GET /api/agentforge/stream"; do m=${ep%% *}; u=${ep#* }; code=$(curl -s -o /dev/null -w "%{http_code}" -X $m --max-time 8 -H "Content-Type: application/json" -d "{}" "http://localhost:3000$u"); echo "  $m $u -> $code"; done; echo "--- Git ---"; git log --oneline -1'
+              $SSH_CMD 'pm2 list | tail -6; echo "--- Health ---"; curl -s -o /dev/null -w "ready: %{http_code}\n" --max-time 10 http://localhost:3000/api/ready; echo "--- Agentforge ---"; for ep in "POST /api/agentforge/events" "POST /api/agentforge/checkpoints" "GET /api/agentforge/stream"; do m=${ep%% *}; u=${ep#* }; code=$(curl -s -o /dev/null -w "%{http_code}" -X $m --max-time 8 -H "Content-Type: application/json" -d "{}" "http://localhost:3000$u"); echo "  $m $u -> $code"; done; echo "--- Git ---"; cd /opt/cybersarah-control-center && git log --oneline -1'
+              ;;
+            agentforge-check)
+              # Prueft PM2, die Agentforge-Tabellen und die Token-Lage.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -1; bash scripts/ops/agentforge-check.sh 2>&1 | tail -25'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
