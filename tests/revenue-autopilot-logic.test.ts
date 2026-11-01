@@ -17,6 +17,8 @@ const base: RevenueAutopilotSnapshot = {
   invoiceSuccessRate: null,
   invoiceAttempts: null,
   mrrEur: null,
+  newMrr1dEur: null,
+  newMrr7dEur: null,
   activeSubscriptions: null,
   affiliateClicks: null,
   affiliateConversions: null,
