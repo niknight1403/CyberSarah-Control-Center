@@ -17,11 +17,6 @@ try {
   process.exit(1);
 }
 
-const keys = raw
-  .split(/\r?\n/)
-  .map((line) => line.match(/^([A-Za-z_][A-Za-z0-9_]*)="/) ?? line.match(/^([A-Za-z_][A-Za-z0-9_]*)=") )
-  .filter(Boolean);
-
 const line = raw.split(/\r?\n/).find((entry) => entry.startsWith("DATABASE_URL"));
 if (!line) {
   console.log("FEHLER: keine DATABASE_URL-Zeile gefunden.");
