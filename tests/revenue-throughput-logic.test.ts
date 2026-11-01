@@ -7,6 +7,7 @@ const base={
   stripeCheckoutSuccessRate:80,invoiceSuccessRate:99,
   recent7RevenueCents:70000,previous7RevenueCents:56000,
   recent7Conversions:14,previous7Conversions:10,
+  crossSellRecommended:40,crossSellConverted:4,
   stripeConnected:true,stripeWebhookConfigured:true,
   digistoreIpnConfigured:true,digistoreApiConfigured:true,
   databaseReady:true,providerCircuitsOpen:0,providerCircuitsTotal:3,
@@ -22,6 +23,8 @@ describe("revenue throughput supervisor",()=>{
     expect(out.grossMrrAcquisition.avgDailyNewMrr7dEur).toBe(30);
     expect(out.grossMrrAcquisition.gross30dAcquisitionRunRateEur).toBe(900);
     expect(out.checkoutFriction.status).toBe("healthy");
+    expect(out.crossSellEfficiency.conversionRatePct).toBe(10);
+    expect(out.crossSellEfficiency.action).toBe("scale");
     expect(out.checkoutFriction.source).toBe("stripe-checkout");
     expect(out.mrrVelocity.available).toBe(false);
     expect(out.mrrVelocity.projectedMrrEur).toBeNull();
@@ -42,6 +45,8 @@ describe("revenue throughput supervisor",()=>{
       upgrades:5,
       invoiceSuccessRate:80,
       stripeCheckoutSuccessRate:35,
+      crossSellRecommended:40,
+      crossSellConverted:1,
       stripeWebhookConsecutiveFailures:4,
       digistoreWebhookConsecutiveFailures:3,
     });
@@ -52,6 +57,7 @@ describe("revenue throughput supervisor",()=>{
     expect(out.blockers.join(" ")).toContain("LLM-Provider");
     expect(out.checkoutFriction.status).toBe("critical");
     expect(out.blockers.join(" ")).toContain("Invoice");
+    expect(out.blockers.join(" ")).toContain("Cross-Sell");
     expect(out.blockers.join(" ")).toContain("Stripe-Webhook");
     expect(out.blockers.join(" ")).toContain("Digistore24-IPN");
     expect(out.priorities.every((item)=>item.kind==="repair")).toBe(true);
