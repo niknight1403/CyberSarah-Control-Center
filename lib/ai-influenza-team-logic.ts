@@ -147,3 +147,32 @@ export function calculateAiInfluenzaUnitEconomics(args:{
 export function packageForStripeMetadata(value:unknown):AiInfluenzaPackageId|null{
   return typeof value==="string"&&(AI_INFLUENZA_PACKAGE_IDS as readonly string[]).includes(value)?value as AiInfluenzaPackageId:null;
 }
+
+
+export const AI_INFLUENZA_PRICE_ENV:Record<AiInfluenzaPackageId,string>={
+  starter:"STRIPE_AI_INFLUENZA_PRICE_ID_STARTER",
+  growth:"STRIPE_AI_INFLUENZA_PRICE_ID_GROWTH",
+  business:"STRIPE_AI_INFLUENZA_PRICE_ID_BUSINESS",
+};
+
+export function buildAiInfluenzaStripeLineItem(packageId:AiInfluenzaPackageId,env:Record<string,string|undefined>){
+  const pkg=AI_INFLUENZA_PACKAGES[packageId];
+  const configured=env[AI_INFLUENZA_PRICE_ENV[packageId]]?.trim();
+  if(configured){
+    if(!configured.startsWith("price_"))throw new Error(`${AI_INFLUENZA_PRICE_ENV[packageId]} muss eine Stripe-Preis-ID sein.`);
+    return {price:configured,quantity:1} as const;
+  }
+  return {
+    price_data:{
+      currency:pkg.currency,
+      unit_amount:pkg.monthlyPriceCents,
+      recurring:{interval:"month" as const},
+      product_data:{
+        name:`AI Influenza Team · ${pkg.name}`,
+        description:pkg.deliverables.join(" · ").slice(0,500),
+        metadata:{businessUnit:"ai-influenza-team",packageId:pkg.id},
+      },
+    },
+    quantity:1,
+  } as const;
+}
