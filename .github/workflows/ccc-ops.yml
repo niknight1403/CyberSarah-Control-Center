@@ -12,6 +12,7 @@ on:
           - deploy-cc
           - prepare-host
           - dns-hetzner
+          - dns-verify
           - dns-prep
           - dns-fix
           - net-fix
@@ -151,6 +152,20 @@ jobs:
               curl -s -o /dev/null -w "http://cybersarah-ki.com -> %{http_code}\n" --max-time 12 http://cybersarah-ki.com || echo "http nicht erreichbar"
               echo "== Bestehender HTTPS-Zugang =="
               curl -s -o /dev/null -w "https://167.233.196.20.sslip.io/api/ready -> %{http_code}\n" --max-time 12 https://167.233.196.20.sslip.io/api/ready
+              ;;
+            dns-verify)
+              # Prueft nach dem DNS-Umzug Aufloesung, Zertifikat und Health
+              # fuer beide Domains und den freien Ausweichnamen.
+              echo "== Aufloesung =="
+              for host in cybersarah-control-center.de cybersarah-ki.com www.cybersarah-ki.com 167.233.196.20.sslip.io; do
+                ip=$(getent hosts "$host" | awk '{print $1}' | head -1)
+                echo "  $host -> ${ip:-keine Aufloesung}"
+              done
+              echo "== HTTPS und Health =="
+              for host in cybersarah-control-center.de cybersarah-ki.com 167.233.196.20.sslip.io; do
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 "https://$host/api/ready" || echo 000)
+                echo "  https://$host/api/ready -> $code"
+              done
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
