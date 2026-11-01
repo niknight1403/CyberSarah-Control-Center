@@ -1,6 +1,6 @@
 import {describe,it,expect,vi} from "vitest";
 import {enqueueMeterEvent,claimMeterEvent,markMeterSent,markMeterFailure,
-  dispatchOneMeterEvent,quarantineExhaustedMeterLeases,METER_LEDGER_SCHEMA,type SqlClient} from "../server/revenue-meter-ledger";
+  dispatchOneMeterEvent,quarantineExhaustedMeterLeases,readMeterQueueHealth,METER_LEDGER_SCHEMA,type SqlClient} from "../server/revenue-meter-ledger";
 const event={eventId:"event_000000001",customerId:"cus_123456",meterEventName:"ai_tokens",
   units:80,occurredAt:Math.floor(Date.now()/1000)};
 const db=(...responses:Record<string,unknown>[][]):SqlClient=>{
@@ -30,6 +30,14 @@ describe("durable revenue metering",()=>{
    expect(await markMeterSent(db([]),claimed!)).toBe(false);
    const failure=db([]);
    await markMeterFailure(failure,claimed!,new Error("Provider 429"));
+ });
+ it("reads real queue state from SQL and rejects corrupt counts",async()=>{
+  const current=await readMeterQueueHealth(db([{state:"pending",count:3,retried:1,
+    oldest_created_at:"2026-11-01T00:00:00.000Z"},{state:"sent",count:2,retried:0,
+    oldest_created_at:"2026-11-01T01:00:00.000Z"}]));
+  expect(current).toMatchObject({source:"postgres_revenue_meter_events",
+    totals:{pending:3,sent:2,retried:1},oldestCreatedAt:"2026-11-01T00:00:00.000Z"});
+  await expect(readMeterQueueHealth(db([{state:"pending",count:-1,retried:0}]))).rejects.toThrow();
  });
  it("quarantines exhausted worker leases and supports repeated cleanup",async()=>{
   expect(await quarantineExhaustedMeterLeases(db([{event_id:"expired-a"},{event_id:"expired-b"}]))).toBe(2);
