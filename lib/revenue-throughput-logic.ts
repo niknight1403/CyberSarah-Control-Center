@@ -44,6 +44,28 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
   const monthlyRunRateEur=Number((recentDaily*30/100).toFixed(2));
   const revenueVelocityPct=change(input.recent7RevenueCents,input.previous7RevenueCents);
   const conversionVelocityPct=change(input.recent7Conversions,input.previous7Conversions);
+  const internalUpgradeRate=input.checkoutStarts!==null&&input.upgrades!==null?pct(input.upgrades,input.checkoutStarts):null;
+  const checkoutObserved=(input.checkoutStarts??0)>=5||(input.stripeCheckoutSuccessRate!==null);
+  const checkoutRate=input.stripeCheckoutSuccessRate??internalUpgradeRate;
+  const checkoutFriction=checkoutObserved&&checkoutRate!==null
+    ? {
+        status:(checkoutRate<40?"critical":checkoutRate<70?"watch":"healthy") as "critical"|"watch"|"healthy",
+        completionRatePct:Number(checkoutRate.toFixed(2)),
+        frictionPct:Number((100-checkoutRate).toFixed(2)),
+        source:input.stripeCheckoutSuccessRate!==null?"stripe-checkout" as const:"internal-funnel" as const,
+        nextAction:checkoutRate<40
+          ?"Checkout-Abbruchpfad, Zahlungsfehler und Angebotsklarheit zuerst reparieren"
+          :checkoutRate<70
+            ?"Checkout-Varianten und Zahlungsoptionen kontrolliert testen"
+            :"Checkout stabil; Fokus auf mehr qualifizierte Checkout-Starts",
+      }
+    : {
+        status:"insufficient-data" as const,
+        completionRatePct:null,
+        frictionPct:null,
+        source:null,
+        nextAction:"Mehr echte Checkout-Ereignisse sammeln, bevor CRO-Änderungen priorisiert werden",
+      };
 
   const blockers:string[]=[];
   if(!input.databaseReady)blockers.push("Revenue-Datenbank nicht verfügbar");
@@ -87,6 +109,7 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
     },
     funnel,
     bottleneck,
+    checkoutFriction,
     payments:{
       stripeConnected:input.stripeConnected,
       stripeWebhookConfigured:input.stripeWebhookConfigured,
