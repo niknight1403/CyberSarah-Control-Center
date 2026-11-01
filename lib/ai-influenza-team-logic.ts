@@ -176,3 +176,38 @@ export function buildAiInfluenzaStripeLineItem(packageId:AiInfluenzaPackageId,en
     quantity:1,
   } as const;
 }
+
+
+export function maySetPaidWithoutStripe(testOnly:boolean,nextStep:AiInfluenzaWorkflowStep){
+  return nextStep!=="paid"||testOnly;
+}
+
+export function simulateAiInfluenzaTestJourney(packageId:AiInfluenzaPackageId){
+  let current:AiInfluenzaWorkflowStep="market-analysis";
+  const visited:AiInfluenzaWorkflowStep[]=[current];
+  let guard=0;
+  while(guard++<AI_INFLUENZA_WORKFLOW_STEPS.length+2){
+    const next=nextAiInfluenzaStep(current);
+    if(!next)break;
+    const sensitive=EXTERNAL_OR_SENSITIVE_STEPS.has(next);
+    const approved=sensitive||next==="paid";
+    const decision=canAdvanceAiInfluenzaStep({
+      mode:"assisted",from:current,to:next,approved,
+      budgetCents:AI_INFLUENZA_PACKAGES[packageId].monthlyPriceCents,
+      estimatedCostCents:0,
+    });
+    if(!decision.allowed)throw new Error(`Test-Journey blockiert bei ${current} -> ${next}: ${decision.reason}`);
+    if(!maySetPaidWithoutStripe(true,next))throw new Error("Test-only Payment-Gate unerwartet blockiert.");
+    current=next;visited.push(current);
+  }
+  return {
+    testOnly:true as const,
+    packageId,
+    paymentStatus:"test-only" as const,
+    externalActionsExecuted:0,
+    visited,
+    completed:current==="renewal",
+    deliveryPlan:buildAiInfluenzaMonthlyPlan(packageId),
+    truthNote:"Keine Live-Zahlung, kein Vertrag und kein externer Versand wurde ausgeführt.",
+  };
+}
