@@ -87,16 +87,40 @@ else
 fi
 
 info "3/5 Abhaengigkeiten und Build"
+
+# Startet die App wieder, egal auf welchem Weg wir hier herausgehen.
+start_app() {
+  pm2 start "$APP_NAME" --update-env > /dev/null 2>&1 || pm2 restart "$APP_NAME" --update-env > /dev/null 2>&1 || true
+}
+
 if [ "$MODE" = "apply" ]; then
+  # Auf diesem Server hat npm ci schon mehrfach den OOM-Killer getroffen.
+  AVAIL_MB=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
+  info "Verfuegbarer RAM: ${AVAIL_MB} MB"
+  if [ ! -f /swapfile ]; then
+    if fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096 status=none 2>/dev/null; then
+      chmod 600 /swapfile && mkswap /swapfile > /dev/null 2>&1 && swapon /swapfile 2>/dev/null && ok "4 GB Swap angelegt und aktiv"
+    else
+      warn "Swap konnte nicht angelegt werden"
+    fi
+  else
+    swapon /swapfile 2>/dev/null && ok "Swap aktiv ($(awk '/SwapTotal/{print int($2/1024)}' /proc/meminfo) MB)" || warn "Swap vorhanden, aber nicht aktiv"
+  fi
+
+  info "App fuer die Installation anhalten (kurze Downtime)"
+  pm2 stop "$APP_NAME" > /dev/null 2>&1 && ok "App angehalten" || warn "App war nicht gestoppt"
+
   if npm ci --include=dev --no-audit --no-fund > /tmp/ccc-npm.log 2>&1; then
     ok "Abhaengigkeiten installiert"
   else
-    fail "npm ci fehlgeschlagen, siehe /tmp/ccc-npm.log"; tail -5 /tmp/ccc-npm.log; exit 1
+    fail "npm ci fehlgeschlagen, siehe /tmp/ccc-npm.log"; tail -5 /tmp/ccc-npm.log
+    start_app; fail "App wieder gestartet, Deploy abgebrochen"; exit 1
   fi
   if npm run build > /tmp/ccc-build.log 2>&1; then
     ok "Build erfolgreich"
   else
-    fail "Build fehlgeschlagen, siehe /tmp/ccc-build.log"; tail -15 /tmp/ccc-build.log; exit 1
+    fail "Build fehlgeschlagen, siehe /tmp/ccc-build.log"; tail -15 /tmp/ccc-build.log
+    start_app; fail "App wieder gestartet, Deploy abgebrochen"; exit 1
   fi
 else
   info "uebersprungen (nur mit --apply)"
@@ -107,9 +131,12 @@ if [ "$MODE" = "apply" ]; then
   if ./node_modules/.bin/drizzle-kit migrate > /tmp/ccc-migrate.log 2>&1; then
     ok "Migrationen eingespielt"
   else
-    fail "Migration fehlgeschlagen, siehe /tmp/ccc-migrate.log"; tail -10 /tmp/ccc-migrate.log; exit 1
+    fail "Migration fehlgeschlagen, siehe /tmp/ccc-migrate.log"; tail -10 /tmp/ccc-migrate.log
+    start_app; exit 1
   fi
   node scripts/ops/db-diag.mjs 2>&1 | head -4
+  info "App starten"
+  start_app && ok "App gestartet"
 else
   info "uebersprungen (nur mit --apply)"
 fi
@@ -132,7 +159,7 @@ if [ "$MODE" != "apply" ]; then
 fi
 
 info "Self-Healing: App neu starten"
-pm2 restart "$APP_NAME" --update-env > /dev/null 2>&1 && ok "PM2-Neustart ausgeloest" || fail "PM2-Neustart fehlgeschlagen"
+start_app && ok "PM2-Neustart ausgeloest" || fail "PM2-Neustart fehlgeschlagen"
 
 for i in $(seq 1 "$RETRIES"); do
   sleep "$DELAY"
