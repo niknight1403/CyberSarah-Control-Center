@@ -29,7 +29,9 @@ describe("durable revenue metering",()=>{
    expect(await markMeterSent(db([{event_id:event.eventId}]),claimed!)).toBe(true);
    expect(await markMeterSent(db([]),claimed!)).toBe(false);
    const failure=db([]);
-   await markMeterFailure(failure,claimed!,new Error("Provider 429"));
+   await markMeterFailure(failure,claimed!,new Error("Provider 429 sk_test_private_key"));
+   expect(vi.mocked(failure.query).mock.calls[0][1]).toEqual([event.eventId,1,"Error"]);
+   expect(JSON.stringify(vi.mocked(failure.query).mock.calls)).not.toContain("sk_test_private_key");
  });
  it("reads real queue state from SQL and rejects corrupt counts",async()=>{
   const current=await readMeterQueueHealth(db([{state:"pending",count:3,retried:1,
