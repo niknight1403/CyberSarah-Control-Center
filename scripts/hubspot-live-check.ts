@@ -1,4 +1,4 @@
-import { describeHubspotEnv, createHubspotModule } from "./server/integrations/hubspot/index";
+import { describeHubspotEnv, createHubspotModule } from "../server/integrations/hubspot/index";
 
 async function main() {
   const status = describeHubspotEnv(process.env);
