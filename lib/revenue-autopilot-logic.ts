@@ -18,6 +18,8 @@ export type RevenueAutopilotSnapshot = {
   invoiceSuccessRate: number | null;
   invoiceAttempts: number | null;
   mrrEur: number | null;
+  newMrr1dEur: number | null;
+  newMrr7dEur: number | null;
   activeSubscriptions: number | null;
   affiliateClicks: number | null;
   affiliateConversions: number | null;
