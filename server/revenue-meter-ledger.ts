@@ -109,3 +109,29 @@ export async function dispatchOneMeterEvent(db:SqlClient, stripeKey:string,
     return "retry";
   }
 }
+
+/** Read-only operational status from PostgreSQL, not user-supplied preview figures. */
+export async function readMeterQueueHealth(db:SqlClient){
+  const result=await db.query(`SELECT state, COUNT(*)::int AS count,
+    COUNT(*) FILTER (WHERE attempts>1)::int AS retried,
+    MIN(created_at) AS oldest_created_at
+    FROM revenue_meter_events GROUP BY state`);
+  const totals={pending:0,processing:0,sent:0,failed:0,retried:0};
+  let oldestCreatedAt:string|null=null;
+  for(const row of result.rows){
+    const state=String(row.state);
+    if(!(state in totals) || state==="retried")throw new Error("Unknown metering state");
+    const count=Number(row.count), retried=Number(row.retried);
+    if(!Number.isSafeInteger(count)||count<0||!Number.isSafeInteger(retried)||retried<0||retried>count)
+      throw new Error("Invalid queue counts");
+    totals[state as "pending"|"processing"|"sent"|"failed"]+=count;
+    totals.retried+=retried;
+    if(row.oldest_created_at){
+      const date=new Date(String(row.oldest_created_at));
+      if(!Number.isFinite(date.getTime()))throw new Error("Invalid queue timestamp");
+      const stamp=date.toISOString();
+      if(!oldestCreatedAt || stamp<oldestCreatedAt)oldestCreatedAt=stamp;
+    }
+  }
+  return {totals,oldestCreatedAt,source:"postgres_revenue_meter_events" as const};
+}
