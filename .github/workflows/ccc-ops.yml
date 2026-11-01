@@ -11,6 +11,7 @@ on:
           - deploy
           - deploy-cc
           - prepare-host
+          - space-audit
           - add-memory
           - pm2-redeploy
           - revenue-os-db-url
@@ -81,7 +82,10 @@ jobs:
             add-memory)
               # Schafft Disk- und Swapspeicher und installiert danach neu.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/add-memory.sh 2>&1 | tail -55'
-              timeout-minutes: 20
+              ;;
+            space-audit)
+              # Zeigt Platzverbrauch und raeumt Caches sowie rotierte Logs weg.
+              $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/space-audit.sh 2>&1 | tail -50'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
