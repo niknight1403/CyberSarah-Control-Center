@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# Vercel ignored-build step: 0 skips, 1 builds.
-# This avoids preview compilations. Production builds remain enabled.
-# NOTE: skipped deployments can still count toward Vercel deployment quotas.
-if [ "${VERCEL_ENV:-}" != "production" ]; then
-  echo "Skipping nonproduction Vercel build; CI handles feature branches."
-  exit 0
-fi
-echo "Production Vercel build permitted."
-exit 1
+# Vercel ignored-build step: exit 0 SKIPS, exit 1 BUILDS.
+# Fail open on missing/unknown environment: never accidentally block production.
+case "${VERCEL_ENV:-}" in
+  preview|development)
+    echo "Skipping Vercel nonproduction build; GitHub CI validates changes."
+    exit 0
+    ;;
+  production)
+    echo "Production Vercel build permitted."
+    exit 1
+    ;;
+  *)
+    echo "Vercel environment unset or unrecognized; allowing build for safety."
+    exit 1
+    ;;
+esac
