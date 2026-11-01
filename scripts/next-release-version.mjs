@@ -13,7 +13,7 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { nextReleaseVersion } from "../lib/release-version-logic.ts";
+import { resolveBuildVersion } from "../lib/release-version-logic.ts";
 
 function ghReleaseTags() {
   try {
@@ -34,7 +34,9 @@ function ghReleaseTags() {
 }
 
 const tags = ghReleaseTags();
-const candidate = nextReleaseVersion(tags, process.argv[2], "2.7.0");
+// Wunschversionen (auch ein alter Pin in .github/release-requests/version.txt)
+// sind Mindeststand und duerfen kein bestehendes Release ueberschreiben.
+const candidate = resolveBuildVersion(tags, process.argv[2], "2.7.0");
 const [major, minor, patch] = candidate.split(".").map(Number);
 const belowMinimum = major < 2 || (major === 2 && minor < 7);
 const version = belowMinimum ? "2.7.0" : `${major}.${minor}.${patch}`;

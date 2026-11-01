@@ -64,3 +64,47 @@ export function nextReleaseVersion(
 
   return `${newest.major}.${newest.minor}.${newest.patch + 1}`;
 }
+
+/**
+ * Loest die endgueltige Build-Version auf und verhindert das Ueberschreiben
+ * eines bereits veroeffentlichten Releases.
+ *
+ * Anlass (02.11.2026): `.github/release-requests/version.txt` pinnte 2.8.0.
+ * Der Workflow uebergab den Pin als Wunschversion, `nextReleaseVersion` gab
+ * ihn unveraendert zurueck und der Build lud die neuen APKs per `--clobber`
+ * erneut in `v2.8.0-apk`. Neue Staende waren damit an der Versionsnummer
+ * nicht erkennbar.
+ *
+ * Regeln:
+ * - Ein Wunsch ist ein Mindeststand, kein Ueberschreibrecht.
+ * - Ist die gewuenschte Version bereits als Release-Tag vorhanden, wird auf
+ *   die naechste freie Patch-Version erhoeht.
+ * - Liegt ein gueltiger Wunsch unter der hoechsten vorhandenen Version, gilt
+ *   ebenfalls die naechste freie Version (kein Downgrade).
+ */
+export function resolveBuildVersion(
+  existingTags: string[],
+  requested?: string,
+  fallback = "2.0.0",
+): string {
+  const parsed = existingTags
+    .map(parseReleaseTag)
+    .filter((v): v is ParsedVersion => v != null);
+
+  const released = new Set(parsed.map((v) => `${v.major}.${v.minor}.${v.patch}`));
+  const highest = parsed.length
+    ? parsed.reduce((a, b) => (compareVersions(b, a) > 0 ? b : a))
+    : null;
+
+  const candidate = nextReleaseVersion(existingTags, requested, fallback);
+  const [major, minor, patch] = candidate.split(".").map(Number);
+
+  // Ein gueltiger Wunsch unterhalb des hoechsten Releases darf nicht zurueckfallen.
+  if (highest && compareVersions({ major, minor, patch }, highest) <= 0) {
+    return `${highest.major}.${highest.minor}.${highest.patch + 1}`;
+  }
+
+  let nextPatch = patch;
+  while (released.has(`${major}.${minor}.${nextPatch}`)) nextPatch += 1;
+  return `${major}.${minor}.${nextPatch}`;
+}
