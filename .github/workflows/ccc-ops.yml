@@ -11,6 +11,7 @@ on:
           - deploy
           - deploy-cc
           - prepare-host
+          - net-fix
           - ram-boost
           - space-audit
           - add-memory
@@ -91,6 +92,21 @@ jobs:
             ram-boost)
               # Gibt RAM aus ephemere Sandbox-Containern frei und erweitert Swap.
               $SSH_CMD 'cd /opt/cybersarah-control-center || exit 1; git fetch -q origin main; git pull --ff-only -q origin main 2>&1 | tail -2; bash scripts/ops/ram-boost.sh 2>&1 | tail -45'
+              ;;
+            net-fix)
+              # Oeffnet 80/443 in der Hetzner-Firewall (falls noetig) und prueft
+              # danach die Erreichbarkeit von aussen und den Host-Filter.
+              env:
+                HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+              run: |
+                node scripts/ops/hetzner-fw.mjs --apply
+                echo "== Erreichbarkeit von aussen (Runner) =="
+                for target in http://167.233.196.20 https://167.233.196.20 http://167.233.196.20/api/health; do
+                  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$target" || echo 000)
+                  echo "$target -> $code"
+                done
+                echo "== Host-Filter =="
+                $SSH_CMD 'ufw status 2>/dev/null | head -12; echo "--- iptables INPUT ---"; iptables -L INPUT -n 2>/dev/null | head -12; echo "--- Listener 80/443/3000 ---"; ss -tlnp | grep -E ":80 |:443 |:3000 " || echo keine'
               ;;
             git-status)
               # Read-only Diagnose: Abweichungen der Server-Arbeitskopie.
