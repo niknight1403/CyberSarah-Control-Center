@@ -21,6 +21,7 @@ import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { affiliateProducts, conversionEvents } from "../drizzle/schema";
 import { resolveDigistore24IpnSecret } from "../lib/digistore24-ipn-config";
+import {markRevenueWebhookFailure,markRevenueWebhookSuccess} from "./revenue-webhook-runtime";
 import {
   commissionCents, hashedBuyerEmail, ledgerOrderKey,
   minimalIpnPayload, validSha512Hex,
@@ -41,6 +42,7 @@ export function buildIpnSignature(fields: Record<string, string>, passphrase: st
 export async function handleDigistore24Ipn(req: Request, res: Response): Promise<void> {
   const passphrase = resolveDigistore24IpnSecret();
   if (!passphrase) {
+    markRevenueWebhookFailure("digistore24","configuration");
     res.status(503).json({ ok: false, detail: "IPN-Secret nicht konfiguriert (DIGISTORE24_IPN_SECRET / DIGISTORE24_IPN_PASSPHRASE)." });
     return;
   }
@@ -54,12 +56,13 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
   const valid = validSha512Hex(received) &&
     crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received, "hex"));
   if (!valid) {
+    markRevenueWebhookFailure("digistore24","signature_invalid");
     res.status(401).json({ ok: false, detail: "Ungültige Signatur." });
     return;
   }
   const orderId = String(fields.order_id ?? fields.order ?? "").trim();
   const eventType = String(fields.event ?? fields.status ?? fields.sale_status ?? "sale").slice(0,64);
-  if (!orderId) {res.status(400).json({ok:false,detail:"order_id fehlt."});return;}
+  if (!orderId) {markRevenueWebhookFailure("digistore24","invalid_payload");res.status(400).json({ok:false,detail:"order_id fehlt."});return;}
   const eventLower = eventType.toLowerCase();
   const kind: D24EventKind = eventLower.includes("chargeback") ? "chargeback" :
     eventLower.includes("refund") || eventLower.includes("return") ? "refund" : "sale";
@@ -72,7 +75,7 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
   try {
     amountCents = commissionCents(fields.amount ?? fields.gross_amount ?? "0",kind);
     commissionAmount = commissionCents(fields.commission ?? fields.net_amount ?? fields.amount ?? "0",kind);
-  } catch {res.status(400).json({ok:false,detail:"Ungültiger Betrag."});return;}
+  } catch {markRevenueWebhookFailure("digistore24","invalid_amount",eventType);res.status(400).json({ok:false,detail:"Ungültiger Betrag."});return;}
   const currency = /^[A-Z]{3}$/.test(fields.currency ?? "EUR") ? (fields.currency ?? "EUR") : "EUR";
   const buyerEmailHash = hashedBuyerEmail(fields.buyer_email, process.env.D24_CUSTOMER_HASH_SECRET || process.env.JWT_SECRET);
   const occurredAt = new Date();
@@ -81,10 +84,12 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
   try {
     db = await getDb();
   } catch {
+    markRevenueWebhookFailure("digistore24","database",eventType);
     res.status(503).json({ ok: false, detail: "Datenbank nicht verfügbar." });
     return;
   }
   if (!db) {
+    markRevenueWebhookFailure("digistore24","database",eventType);
     res.status(503).json({ ok: false, detail: "Datenbank nicht verfügbar." });
     return;
   }
@@ -110,8 +115,10 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
         "revenueCents"=revenue_daily_stats."revenueCents"+${commissionAmount},"updatedAt"=now()`);
       return "recorded" as const;
     });
+    markRevenueWebhookSuccess("digistore24",eventType);
     res.status(200).type("text/plain").send(status === "duplicate" ? "OK duplicate" : "OK recorded");
   } catch {
+    markRevenueWebhookFailure("digistore24","database",eventType);
     // Never expose SQL, credentials or provider payloads to public callers.
     res.status(503).json({ok:false,detail:"Conversion vorübergehend nicht speicherbar."});
   }
