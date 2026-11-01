@@ -7,18 +7,9 @@ name: Render Deploy
 # Ausloesen: GitHub UI → Actions → "Render Deploy" → Run workflow.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'server/**'
-      - 'app/**'
-      - 'components/**'
-      - 'lib/**'
-      - 'drizzle/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/render-deploy.yml'
+  # Render services already auto-deploy from main. Avoid a second API-triggered
+  # deployment for every commit; this workflow remains manual for recovery,
+  # domain setup and deliberate workspace releases.
   workflow_dispatch:
     inputs:
       target:
