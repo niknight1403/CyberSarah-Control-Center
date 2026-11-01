@@ -10,6 +10,7 @@ const base={
   stripeConnected:true,stripeWebhookConfigured:true,
   digistoreIpnConfigured:true,digistoreApiConfigured:true,
   databaseReady:true,providerCircuitsOpen:0,providerCircuitsTotal:3,
+  stripeWebhookConsecutiveFailures:0,digistoreWebhookConsecutiveFailures:0,
 };
 
 describe("revenue throughput supervisor",()=>{
@@ -36,6 +37,8 @@ describe("revenue throughput supervisor",()=>{
       checkoutStarts:20,
       upgrades:5,
       invoiceSuccessRate:80,
+      stripeWebhookConsecutiveFailures:4,
+      digistoreWebhookConsecutiveFailures:3,
     });
     expect(out.status).toBe("repair");
     expect(out.blockers.join(" ")).toContain("Revenue-Datenbank");
@@ -43,6 +46,8 @@ describe("revenue throughput supervisor",()=>{
     expect(out.blockers.join(" ")).toContain("Digistore24");
     expect(out.blockers.join(" ")).toContain("LLM-Provider");
     expect(out.blockers.join(" ")).toContain("Invoice");
+    expect(out.blockers.join(" ")).toContain("Stripe-Webhook");
+    expect(out.blockers.join(" ")).toContain("Digistore24-IPN");
     expect(out.priorities.every((item)=>item.kind==="repair")).toBe(true);
   });
 });
