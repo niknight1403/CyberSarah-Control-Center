@@ -30,6 +30,7 @@ import {
   resolveVoiceTarget,
   type VoiceTarget,
 } from "../lib/ai-influenza-voice-logic";
+import { buildMotifPpm, paletteFor } from "../lib/ai-influenza-motif-logic";
 import { buildConcatFfmpegArgs, buildSceneFfmpegArgs } from "../lib/video-assembly-logic";
 
 const SCRIPTS: Record<string, string> = {
@@ -122,7 +123,7 @@ async function buildSceneMotif(
   prompt: string,
   workDir: string,
   index: number,
-  palette: string[],
+  packageId: string,
 ): Promise<{ file: string; source: string }> {
   const output = path.join(workDir, `scene-${index + 1}.png`);
   if (apiKey?.trim()) {
@@ -142,9 +143,11 @@ async function buildSceneMotif(
       console.log(`  Szene ${index + 1}: Motiv fehlgeschlagen (${(error as Error).message}) — Farbflaeche.`);
     }
   }
-  execFileSync("ffmpeg", ["-y", "-f", "lavfi", "-i", `color=c=${palette[index % palette.length]}:s=1080x1920`,
-    "-frames:v", "1", output], { stdio: "ignore" });
-  return { file: output, source: "color-fallback" };
+  // Kein Bilddienst: Markenmotiv aus reiner Rechnung, kein leeres Farbfeld.
+  const ppmPath = path.join(workDir, `scene-${index + 1}.ppm`);
+  writeFileSync(ppmPath, buildMotifPpm({ width: 1080, height: 1920, palette: paletteFor(packageId), sceneIndex: index }));
+  execFileSync("ffmpeg", ["-y", "-i", ppmPath, "-frames:v", "1", output], { stdio: "ignore" });
+  return { file: output, source: "brand-gradient" };
 }
 
 async function main(): Promise<void> {
@@ -172,11 +175,10 @@ async function main(): Promise<void> {
   const voiceTarget = resolveVoiceTarget(process.env);
   const imageKey = process.env.GEMINI_API_KEY;
   console.log(`Paket ${packageId}: ${approved.scenes.length} Szenen`);
-  console.log(`Vertonung: ${voiceTarget ? voiceTarget.provider : "keine"} · Motive: ${imageKey ? "gemini" : "Farbflaeche"}`);
+  console.log(`Vertonung: ${voiceTarget ? voiceTarget.provider : "keine"} · Motive: ${imageKey ? "gemini, sonst Markenmotiv" : "Markenmotiv"}`);
   if (!voiceTarget) console.log(`Hinweis: ${explainMissingVoice(process.env)}`);
 
   const workDir = mkdtempSync(path.join(tmpdir(), `content-${packageId}-`));
-  const palette = ["0x101a2e", "0x1d1233", "0x0d2430", "0x241226"];
   const manifestScenes: {
     index: number;
     voiceover: string;
@@ -210,7 +212,7 @@ async function main(): Promise<void> {
       buildMotifPrompt({ visual: scene.visual, sceneIndex: index, packageName: packageId }),
       workDir,
       index,
-      palette,
+      packageId,
     );
 
     prepared.push({
@@ -299,7 +301,12 @@ async function main(): Promise<void> {
         publishingTriggered: approved.publishingTriggered,
         durationSeconds: Number(seconds.toFixed(2)),
         voiceProvider: voiceTarget?.provider ?? null,
-        motifProvider: imageKey ? "gemini-image" : null,
+        // Was wirklich im Paket steckt, nicht was geplant war.
+        voiceScenes: manifestScenes.filter((scene) => scene.voiceSource !== "silence").length,
+        motifScenes: manifestScenes.filter((scene) => scene.motifSource === "gemini-image").length,
+        motifProvider: manifestScenes.some((scene) => scene.motifSource === "gemini-image")
+          ? "gemini-image"
+          : "brand-gradient",
         scenes: manifestScenes,
         notes: approved.notes,
       },
