@@ -366,6 +366,27 @@ jobs:
                   | jq -r '"#\(.id) \(.name) | \(.status) | tasks: \(.tasks // [] | group_by(.status) | map("\(.[0].status)=\(length)") | join(", "))"'
               done
               ;;
+            villa-progress)
+              # Read-only: echter Fortschritt einer Villa (Aufgaben, Belege, Spuren).
+              VID="${VILLA_ID:-34}"
+              TOK=$(curl -s -m 25 -X POST -H "Content-Type: application/json" \
+                -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+                https://hub.cybersarah-ki.com/api/auth/login | python3 -c "import json,sys; print(json.load(sys.stdin).get('token',''))")
+              [ -n "$TOK" ] || { echo "FEHLER: Login"; exit 1; }
+              curl -s -m 30 -H "Authorization: Bearer $TOK" "https://hub.cybersarah-ki.com/api/villas/$VID" -o /tmp/v.json
+              echo "== Kopf =="
+              jq -r '"Villa #\(.id): \(.name)\nStatus: \(.status)  Autonomie: \(.autonomy)"' /tmp/v.json
+              echo "== Aufgaben je Status =="
+              jq -r '(.tasks // []) | group_by(.status) | map("\(.[0].status)=\(length)") | join("  ")' /tmp/v.json
+              echo "== zuletzt erledigte Aufgaben =="
+              jq -r '[(.tasks // [])[] | select(.status=="DONE")] | sort_by(.updated_at) | reverse | .[0:8][] | "  +\(.title)"' /tmp/v.json
+              echo "== offene Aufgaben (Auswahl) =="
+              jq -r '[(.tasks // [])[] | select(.status=="PENDING" or .status=="READY" or .status=="RUNNING")] | .[0:6][] | "  ~\(.status): \(.title)"' /tmp/v.json
+              echo "== letzte Spuren aus der Villa =="
+              jq -r '[(.messages // [])[]] | .[-6:][] | "  \(.role): \(.content | gsub("\n";" ") | .[0:150])"' /tmp/v.json
+              echo "== Belege/Reports =="
+              curl -s -m 30 -H "Authorization: Bearer $TOK" "https://hub.cybersarah-ki.com/api/villas/$VID/reports" | jq -r 'if type=="array" then "Anzahl Reports: \(length)" else "keine Reports" end'
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
