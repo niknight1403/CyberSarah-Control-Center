@@ -138,6 +138,25 @@ jobs:
                 du -sh /root/.ollama /var/lib/containerd /var/lib/docker /var/log /root/hub.db 2>/dev/null
               '
               ;;
+            disk-clean)
+              # Gezieltes Aufraeumen belegter Reste. Loescht nur Caches,
+              # Installer-Archive und rotierte Logs - keine Datenbanken,
+              # keine Backups, keine Modelle.
+              $SSH_CMD '
+                echo "== vorher =="; df -h / | tail -1
+                echo "== swap =="; swapon --show 2>/dev/null; free -m | head -3
+                echo "== Caches leeren =="
+                sudo -n rm -rf /root/.npm/_cacache /home/*/.npm/_cacache /root/.gradle/caches /home/*/.gradle/caches 2>/dev/null
+                sudo -n rm -rf /root/.cache/pip /home/*/.cache/pip /root/.cache/typescript /home/*/.cache/typescript 2>/dev/null
+                sudo -n apt-get clean 2>/dev/null || true
+                sudo -n journalctl --vacuum-size=200M 2>/dev/null | tail -1 || true
+                echo "== Installer-Archiv entfernen =="
+                ls -lh /usr/local/lib/hermes-agent.tgz 2>/dev/null && sudo -n rm -f /usr/local/lib/hermes-agent.tgz && echo "hermes-agent.tgz entfernt"
+                echo "== nachher =="; df -h / | tail -1
+                echo "== Rest-Kandidaten =="
+                sudo -n du -xh --max-depth=1 /opt /var/lib 2>/dev/null | sort -rh | head -6
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
