@@ -396,6 +396,9 @@ jobs:
               echo "RAW: REPORTS $(jq -c 'if type=="array" then length else . end' /tmp/r.json)"
               ;;
             hub-upgrade)
+              # HINWEIS: zielt auf diese VM (CyberSarah-pro, Parallelbetrieb).
+              # Der oeffentliche Hub laeuft auf der Oracle-VM "ollama-free-a1"
+              # (92.5.177.159) und wird ueber Pushes nach Agentforge2 versorgt.
               # Rollt Agentforge2 main auf die VM aus: Sicherung, Einspielen,
               # Neustart, Health-Pruefung, bei Fehlschlag automatischer Rueckweg.
               $SSH_CMD 'bash -s' < .github/scripts/hub-upgrade.sh

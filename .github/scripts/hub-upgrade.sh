@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# ACHTUNG (02.11.2026): Dieses Skript rollt auf der VM CyberSarah-pro aus.
+# Der OEFFENTLICHE Hub (hub.cybersarah-ki.com -> 92.5.177.159) laeuft aber auf
+# der Oracle-VM "ollama-free-a1". Dort liegen auch die echten Daten (db.main
+# ~286 MB, 16 Villen). Der Dienst hier ist eine parallele, veraltete Instanz
+# (db.main 729 KB, 1 Testvilla). Live-Aenderungen kommen ueber den Push nach
+# Agentforge2 main zustande; dieses Skript ist nur fuer den Parallelbetrieb.
 # VillaForge-Hub auf den Stand von Agentforge2 main bringen - mit Sicherung und Rueckweg.
 # Laeuft auf der VM: ssh ... 'bash -s' < .github/scripts/hub-upgrade.sh
 set -uo pipefail
