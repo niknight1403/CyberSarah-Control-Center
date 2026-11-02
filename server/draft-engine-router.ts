@@ -8,6 +8,7 @@ import { z } from "zod";
 import { decideDraft, listDraftQueue, runDraftEngine } from "./draft-engine";
 import { buildDraftQueueView, type DraftRow } from "../lib/draft-engine-logic";
 import { adminProcedure, router } from "./_core/trpc";
+import { enqueueApprovedContentDraft } from "./publishing-service";
 
 function serializeRow(row: Awaited<ReturnType<typeof listDraftQueue>>[number]): DraftRow {
   return {
@@ -38,7 +39,17 @@ export const draftEngineRouter = router({
       const decidedBy = ctx.user?.openId ?? ctx.user?.email ?? "unbekannt";
       const row = await decideDraft(input.id, input.action, String(decidedBy));
       if (!row) return { ok: false as const, reason: "Entwurf nicht (mehr) offen — vielleicht schon entschieden." };
-      return { ok: true as const, row: serializeRow(row) };
+      let processing: { inserted: boolean; jobId: number | null } | null = null;
+      if (input.action === "approve" && row.kind === "content") {
+        const payload = row.payload as { personaId?: unknown; platform?: unknown; topic?: unknown; content?: unknown };
+        if ([payload.personaId,payload.platform,payload.topic,payload.content].every(value => typeof value === "string")) {
+          processing = await enqueueApprovedContentDraft(String(decidedBy), {
+            id: row.id, personaId: String(payload.personaId), platform: String(payload.platform),
+            topic: String(payload.topic), content: String(payload.content),
+          });
+        }
+      }
+      return { ok: true as const, row: serializeRow(row), processing };
     }),
 
   /** Admin-Trigger: Engine sofort ausfuehren (sonst taeglicher Cron). */
