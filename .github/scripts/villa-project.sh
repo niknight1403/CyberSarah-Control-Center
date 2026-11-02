@@ -1,36 +1,34 @@
 #!/usr/bin/env bash
-# Read-only: Quelle (source_path) der Villen und Testaufbau im Projektordner.
+# Read-only: Welche Datenbank nutzt der laufende Hub wirklich?
 set -uo pipefail
 
-DB=/opt/villaforge/data/hub.db
+PID=$(pgrep -f "server/server[.]mjs" | head -1)
+echo "Hub-PID: ${PID:-keine}"
+if [ -n "${PID:-}" ]; then
+  echo "== geoeffnete Dateien (.db) =="
+  sudo -n ls -l /proc/$PID/fd 2>/dev/null | grep -i "\.db" | head -10
+  echo "== Umgebung des Prozesses =="
+  sudo -n tr '\0' '\n' < /proc/$PID/environ 2>/dev/null | grep -iE "VF_|DB|WORKSPACE" | grep -vi token | head -10
+  echo "== Arbeitsverzeichnis =="
+  sudo -n readlink /proc/$PID/cwd
+fi
 
-echo "== Hub-Umgebung (nur VF_/WORKSPACE) =="
-sudo -n grep -iE "VF_|WORKSPACE|NODE_ENV" /opt/villaforge/hub.env 2>/dev/null | sed 's/=.*TOKEN.*/=<verdeckt>/' | head -10
-
-echo "== Villen in der DB =="
-sudo -n node --experimental-sqlite -e '
-const { DatabaseSync } = require("node:sqlite");
-const db = new DatabaseSync("/opt/villaforge/data/hub.db");
-for (const v of db.prepare("SELECT id, name, status, source_path FROM villas ORDER BY id").all()) {
-  console.log(`${v.id}\t${v.status}\t${v.source_path || "-"}\t${String(v.name).slice(0,40)}`);
-}
-' 2>/dev/null
-
-echo "== Projektordner der Fokusvillen =="
-for VID in 34 3; do
-  SRC=$(sudo -n node --experimental-sqlite -e "
+echo "== alle SQLite-Dateien unter /opt =="
+sudo -n find /opt -maxdepth 4 -name "*.db" -o -maxdepth 4 -name "*.sqlite*" 2>/dev/null | head -20 | while read -r f; do
+  N=$(sudo -n node --experimental-sqlite -e "
     const { DatabaseSync } = require('node:sqlite');
-    const db = new DatabaseSync('/opt/villaforge/data/hub.db');
-    const r = db.prepare('SELECT source_path FROM villas WHERE id=?').get($VID);
-    process.stdout.write(r?.source_path || '');
+    try { const db = new DatabaseSync('$f', { readOnly: true });
+      const c = db.prepare(\"SELECT COUNT(*) c FROM sqlite_master WHERE name='villas'\").get();
+      if (!c || !c.c) { process.stdout.write('keine villas-Tabelle'); }
+      else { const n = db.prepare('SELECT COUNT(*) c FROM villas').get();
+             const maxId = db.prepare('SELECT MAX(id) m FROM villas').get();
+             process.stdout.write(n.c + ' Villen, max id ' + (maxId.m||0)); }
+    } catch (e) { process.stdout.write('nicht lesbar: ' + String(e.message).split('\n')[0]); }
   " 2>/dev/null)
-  DIR="${SRC:-/opt/villaforge/workspace/villa-$VID/project}"
-  echo "--- Villa $VID: $DIR ---"
-  [ -d "$DIR" ] || { echo "  (fehlt)"; continue; }
-  sudo -n ls -la "$DIR" | head -8
-  echo "  Dateien:"; sudo -n find "$DIR" -maxdepth 2 -not -path "*/node_modules*" -type f 2>/dev/null | head -12
-  echo "  package.json:"; sudo -n head -25 "$DIR/package.json" 2>/dev/null
-  echo "  node_modules: $(sudo -n test -d "$DIR/node_modules" && echo ja || echo nein)"
-  echo "  jest binär: $(sudo -n test -x "$DIR/node_modules/.bin/jest" && echo ja || echo nein)"
-  echo "  Python: $(sudo -n find "$DIR" -name '*.py' -not -path '*/node_modules*' 2>/dev/null | wc -l) Dateien"
+  echo "  $(sudo -n ls -lh "$f" | awk '{print $5, $6, $7, $8}')  $f  -> $N"
 done
+
+echo "== Workspace-Inhalt =="
+sudo -n ls -la /opt/villaforge/workspace | head -20
+echo "== weitere Workspace-Kandidaten =="
+sudo -n find /opt /root /home -maxdepth 4 -type d -name "villa-34*" 2>/dev/null | head -5
