@@ -18,7 +18,7 @@ import {
 } from "./billing";
 import {adminProcedure,protectedProcedure,publicProcedure,router} from "./_core/trpc";
 import {aiInfluenzaLeadPipeline,prepareAiInfluenzaProposal,upsertAiInfluenzaLead} from "./ai-influenza-lead-service";
-import {aiInfluenzaDeliveryPlan,aiInfluenzaDeliveryStatus,generateAiInfluenzaTaskDraft} from "./ai-influenza-delivery-service";
+import {aiInfluenzaDeliveryPlan,aiInfluenzaDeliveryStatus,aiInfluenzaOrderLaunchReadiness,generateAiInfluenzaTaskDraft} from "./ai-influenza-delivery-service";
 import {aiInfluenzaCustomerReport,aiInfluenzaProfitOverview,recordAiInfluenzaCost} from "./ai-influenza-profit-service";
 
 const packageId=z.enum(AI_INFLUENZA_PACKAGE_IDS);
@@ -71,6 +71,7 @@ export const aiInfluenzaTeamRouter=router({
   })).mutation(({ctx,input})=>recordAiInfluenzaCost({...input,actorOpenId:ctx.user.openId})),
   deliveryPlan:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaDeliveryPlan(input.orderId)),
   deliveryStatus:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaDeliveryStatus(input.orderId)),
+  launchReadiness:adminProcedure.input(z.object({orderId:z.string().trim().min(4).max(120)})).query(({input})=>aiInfluenzaOrderLaunchReadiness(input.orderId)),
   generateTaskDraft:adminProcedure.input(z.object({taskJobId:z.number().int().positive()})).mutation(({input})=>generateAiInfluenzaTaskDraft(input.taskJobId)),
   leadPipeline:adminProcedure.query(()=>aiInfluenzaLeadPipeline()),
   upsertLead:adminProcedure.input(z.object({

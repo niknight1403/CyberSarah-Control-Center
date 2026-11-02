@@ -7,6 +7,8 @@ import {insertPendingDraft} from "./draft-engine";
 import {invokeLLM} from "./_core/llm";
 import {aiInfluenzaTaskCostEventKey,estimateAiInfluenzaUsageCost} from "../lib/ai-influenza-cost-logic";
 import {recordAiInfluenzaCost} from "./ai-influenza-profit-service";
+import {assessAiInfluenzaLaunchReadiness} from "../lib/ai-influenza-launch-readiness-logic";
+import {verifiedAiInfluenzaDeliveryCount} from "../lib/ai-influenza-delivery-evidence-logic";
 
 type TaskPayload={
   businessUnit:string;orderId:string;packageId:string;customerNodeKey:string;
@@ -105,5 +107,29 @@ export async function aiInfluenzaDeliveryStatus(orderId:string){
     completed:own.filter(x=>x.status==="completed").length,
     blocked:own.filter(x=>x.status==="blocked").length,
     tasks:own,
+  };
+}
+
+/**
+ * Read-only operational launch gate. The existing draft task result is NOT
+ * customer delivery evidence. Only explicitly persisted, verified evidence
+ * with customer approval may clear the package gate.
+ */
+export async function aiInfluenzaOrderLaunchReadiness(orderId:string){
+  const {order}=await aiInfluenzaDeliveryPlan(orderId);
+  const status=await aiInfluenzaDeliveryStatus(orderId);
+  const evidence=status.tasks.flatMap((task)=>{
+    const payload=task.payload as TaskPayload;
+    const result=task.result as Record<string,unknown>|null;
+    if(task.status!=="completed" || payload.orderId!==orderId) return [];
+    const count=verifiedAiInfluenzaDeliveryCount(result,orderId,payload.taskKind);
+    if(count===0) return [];
+    return [{taskKind:payload.taskKind,deliveredQuantity:count,verified:true,customerApproved:true}];
+  });
+  return {
+    orderId,
+    ...assessAiInfluenzaLaunchReadiness(order.packageId,evidence),
+    source:"persisted-task-results",
+    note:"Generated drafts alone never count as delivered customer-approved assets.",
   };
 }
