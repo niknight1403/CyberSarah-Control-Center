@@ -1,0 +1,34 @@
+name: Repair npm lockfile (temporary)
+on:
+  push:
+    branches:
+      - test/revenue-package-login-roundtrip-20261102
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regenerate lockfile with npm
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify reproducible clean install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Commit lockfile to repair branch only
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "No lockfile changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "fix(ci): synchronize Redis dependencies in npm lockfile"
+          git push origin HEAD:test/revenue-package-login-roundtrip-20261102
