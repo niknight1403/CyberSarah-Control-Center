@@ -33,7 +33,9 @@ export default function AiInfluenzaTeamScreen(){
   const checkout=trpc.aiInfluenzaTeam.checkout.useMutation({
     onSuccess:result=>{void Linking.openURL(result.url);},
   });
-  const sandbox=trpc.aiInfluenzaTeam.adminSandboxOrder.useMutation();
+  const sandbox=trpc.aiInfluenzaTeam.adminSandboxOrder.useMutation({
+    onSuccess:()=>{void overview.refetch();},
+  });
   const portal=trpc.aiInfluenzaTeam.portal.useMutation({
     onSuccess:result=>{void Linking.openURL(result.url);},
   });
