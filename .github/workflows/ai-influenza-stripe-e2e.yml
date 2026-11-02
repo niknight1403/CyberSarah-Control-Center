@@ -4,6 +4,11 @@ name: AI Influenza Stripe Test-Modus E2E
 on:
   workflow_dispatch:
 
+# Teilt sich das LLM-/API-Kontingent mit dem Content-Paket-Lauf.
+concurrency:
+  group: ai-influenza-llm-kontingent
+  cancel-in-progress: false
+
 jobs:
   stripe-test-e2e:
     runs-on: ubuntu-latest

@@ -9,6 +9,12 @@ on:
         required: false
         default: "growth"
 
+# Gemeinsame Gruppe mit dem Stripe-E2E: beide Laeufe teilen sich ein
+# LLM-Kontingent. Parallel gestartet ziehen sie sich gegenseitig 429 zu.
+concurrency:
+  group: ai-influenza-llm-kontingent
+  cancel-in-progress: false
+
 jobs:
   content-package:
     runs-on: ubuntu-latest
@@ -26,7 +32,10 @@ jobs:
       - name: Paket bauen
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_BACKUP_KEY: ${{ secrets.GEMINI_BACKUP_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_BACKUP_KEY }}
+          # Ein halb vertontes Paket ist kein Erfolg: dann soll der Job rot werden.
+          REQUIRE_COMPLETE_PACKAGE: "1"
         run: npx tsx scripts/build-ai-influenza-content-package.ts "${{ inputs.paket }}" artifacts/content-package
       - name: Nachweis zusammenfassen
         if: always()
@@ -40,7 +49,7 @@ jobs:
               for(const s of m.scenes) console.log(`  Szene ${s.index}: ${s.seconds}s · ${s.voiceSource} · ${s.motifSource}`);
               const v=m.scenes.filter(s=>s.voiceSource!=="silence").length;
               console.log("Vertonte Szenen:", v+"/"+m.scenes.length);
-              if(v===0){ console.log("HINWEIS: keine echte Vertonung — Schluessel pruefen."); process.exitCode=1; }
+              if(v<m.scenes.length){ console.log("HINWEIS: nur "+v+"/"+m.scenes.length+" Szenen vertont."); process.exitCode=1; }
             '
           else
             echo "Kein Manifest gefunden."; exit 1

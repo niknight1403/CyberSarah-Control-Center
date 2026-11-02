@@ -7,7 +7,11 @@ import {
   parseMotifImage,
   parseTtsAudio,
   pcm16ToWav,
+  resolveImageKeys,
   resolveVoiceTarget,
+  resolveVoiceTargets,
+  retryDelayMs,
+  shouldRetryStatus,
 } from "../lib/ai-influenza-voice-logic";
 
 const GEMINI_TARGET = { provider: "gemini" as const, apiKey: "g-key", voice: "Kore", model: "gemini-2.5-flash-preview-tts" };
@@ -146,5 +150,52 @@ describe("explainMissingVoice", () => {
   it("nennt den fehlenden Schluessel beim Namen", () => {
     expect(explainMissingVoice({})).toContain("GEMINI_API_KEY");
     expect(explainMissingVoice({ GEMINI_API_KEY: "g" })).toContain("keine Audiodaten");
+  });
+});
+
+describe("resolveVoiceTargets", () => {
+  it("bildet die ganze Kette: Gemini, Reserve, OpenAI", () => {
+    const targets = resolveVoiceTargets({
+      GEMINI_API_KEY: "g1",
+      GEMINI_BACKUP_KEY: "g2",
+      OPENAI_BACKUP_KEY: "o1",
+    });
+    expect(targets.map((t) => `${t.provider}:${t.apiKey}`)).toEqual(["gemini:g1", "gemini:g2", "openai:o1"]);
+  });
+
+  it("nimmt keinen Schluessel doppelt", () => {
+    const targets = resolveVoiceTargets({ GEMINI_API_KEY: "gleich", GEMINI_BACKUP_KEY: "gleich" });
+    expect(targets).toHaveLength(1);
+  });
+
+  it("liefert eine leere Kette ohne Schluessel", () => {
+    expect(resolveVoiceTargets({})).toEqual([]);
+  });
+});
+
+describe("resolveImageKeys", () => {
+  it("nutzt Haupt- und Reserveschluessel, ohne Doppelte", () => {
+    expect(resolveImageKeys({ GEMINI_API_KEY: "a", GEMINI_BACKUP_KEY: "b" })).toEqual(["a", "b"]);
+    expect(resolveImageKeys({ GEMINI_API_KEY: "a", GEMINI_BACKUP_KEY: "a" })).toEqual(["a"]);
+    expect(resolveImageKeys({ OPENAI_API_KEY: "o" })).toEqual([]);
+  });
+});
+
+describe("shouldRetryStatus", () => {
+  it("wiederholt Kontingent und Serverfehler, aber nicht Fehlbedienung", () => {
+    expect(shouldRetryStatus(429)).toBe(true);
+    expect(shouldRetryStatus(503)).toBe(true);
+    expect(shouldRetryStatus(400)).toBe(false);
+    expect(shouldRetryStatus(401)).toBe(false);
+  });
+});
+
+describe("retryDelayMs", () => {
+  it("wartet wachsend und respektiert Retry-After", () => {
+    expect(retryDelayMs(0)).toBe(2000);
+    expect(retryDelayMs(1)).toBe(6000);
+    expect(retryDelayMs(5)).toBe(14000);
+    expect(retryDelayMs(0, 3)).toBe(3000);
+    expect(retryDelayMs(0, 600)).toBe(30000);
   });
 });
