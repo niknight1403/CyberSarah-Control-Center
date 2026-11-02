@@ -44,7 +44,7 @@ jobs:
         env:
           # Bei schedule-Laeufen sind inputs leer -> status als Standard.
           MODE: ${{ inputs.mode || 'status' }}
-          STATUS_B64: 'ZWNobyAiaG9zdDogJChob3N0bmFtZSkiCmVjaG8gInVwdGltZTogJCh1cHRpbWUgLXAgMj4vZGV2L251bGwgfHwgdXB0aW1lKSIKZWNobyAibG9hZDogJChjdXQgLWQnICcgLWYxLTMgL3Byb2MvbG9hZGF2ZykiCmVjaG8gImRpc2tfcGN0OiAkKGRmIC1QIC8gfCBhd2sgJ05SPT0ye2dzdWIoIiUiLCIiLCQ1KTsgcHJpbnQgJDV9JykiCmVjaG8gImRpc2tfZnJlZTogJChkZiAtaCAvIHwgYXdrICdOUj09MntwcmludCAkNH0nKSIKZWNobyAibWVtOiAkKGZyZWUgLW0gfCBhd2sgJy9NZW06L3twcmludCAidXNlZD0iJDMiTUIgYXZhaWw9IiQ3Ik1CIn0nKSIKcG0yIGxpc3QgMj4vZGV2L251bGwgfCBzZWQgLW4gJzMsMTBwJyB8IHNlZCAncy9eL3BtMjogLycKZWNobyAiaHViX3Byb2M6ICQocGdyZXAgLWZjICd2aWxsYWZvcmdlfGFnZW50Zm9yZ2UnIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiCmVjaG8gInBvcnQ0NDM6ICQoc3MgLWxudCAyPi9kZXYvbnVsbCB8IGdyZXAgLWMgJzo0NDMgJyB8fCBlY2hvIDApIgplY2hvICJkYl9zaXplOiAkKGR1IC1oIC9vcHQvdmlsbGFmb3JnZS9kYXRhL2h1Yi5kYiAyPi9kZXYvbnVsbCB8IGN1dCAtZjEgfHwgZWNobyB1bmJla2FubnQpIgplY2hvICJodHRwOiAkKGN1cmwgLXNrIC0tcmVzb2x2ZSBodWIuY3liZXJzYXJhaC1raS5jb206NDQzOjEyNy4wLjAuMSAtbyAvZGV2L251bGwgLXcgJyV7aHR0cF9jb2RlfScgLS1tYXgtdGltZSA4IGh0dHBzOi8vaHViLmN5YmVyc2FyYWgta2kuY29tLyAyPi9kZXYvbnVsbCB8fCBlY2hvIDAwMCkiCg==' 
+          STATUS_B64: 'ZWNobyAiaG9zdDogJChob3N0bmFtZSkiCmVjaG8gInVwdGltZTogJCh1cHRpbWUgLXAgMj4vZGV2L251bGwgfHwgdXB0aW1lKSIKZWNobyAibG9hZDogJChjdXQgLWQnICcgLWYxLTMgL3Byb2MvbG9hZGF2ZykiCmVjaG8gImRpc2tfcGN0OiAkKGRmIC1QIC8gfCBhd2sgJ05SPT0ye2dzdWIoIiUiLCIiLCQ1KTsgcHJpbnQgJDV9JykiCmVjaG8gImRpc2tfZnJlZTogJChkZiAtaCAvIHwgYXdrICdOUj09MntwcmludCAkNH0nKSIKZWNobyAibWVtOiAkKGZyZWUgLW0gfCBhd2sgJy9NZW06L3twcmludCAidXNlZD0iJDMiTUIgYXZhaWw9IiQ3Ik1CIn0nKSIKZWNobyAiaHViX3Byb2M6ICQocGdyZXAgLWZjICdzZXJ2ZXIvc2VydmVyWy5dbWpzfHZpbGxhZm9yZ2UnIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiCmVjaG8gIm5vZGVfcG9ydHM6ICQoc3MgLWxudHAgMj4vZGV2L251bGwgfCBncmVwIC1vICc6WzAtOV0qICcgfCBzb3J0IC11IHwgdHIgLWQgJyA6JyB8IHRyICdcbicgJyAnKSIKZWNobyAiZGJfc2l6ZTogJChkdSAtaCAvb3B0L3ZpbGxhZm9yZ2UvZGF0YS9odWIuZGIgMj4vZGV2L251bGwgfCBjdXQgLWYxIHx8IGVjaG8gdW5iZWthbm50KSIK' 
           VILLA_ID: ${{ inputs.villa_id }}
           CONFIRM_NAME: ${{ inputs.confirm_name }}
           SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
@@ -75,16 +75,49 @@ jobs:
               } >> "$GITHUB_STEP_SUMMARY"
               DISK=$(printf '%s\n' "$OUT" | awk -F': ' '/^disk_pct:/{print $2}')
               HUB=$(printf '%s\n' "$OUT" | awk -F': ' '/^hub_proc:/{print $2}')
-              HTTP=$(printf '%s\n' "$OUT" | awk -F': ' '/^http:/{print $2}')
               FAIL=0
               if [ -n "$DISK" ] && [ "$DISK" -ge 90 ]; then echo "::error::Platte zu voll: ${DISK}% belegt"; FAIL=1; fi
               if [ -n "$HUB" ] && [ "$HUB" -lt 1 ]; then echo "::error::Kein VillaForge-Prozess gefunden"; FAIL=1; fi
-              case "$HTTP" in
-                200|301|302|401|403) : ;;
-                *) echo "::error::Hub antwortet nicht (HTTP ${HTTP:-000})"; FAIL=1 ;;
-              esac
-              echo "disk=${DISK}% hub_proc=$HUB http=$HTTP"
+              # HTTP-Pruefung passiert von aussen im naechsten Schritt
+              # (die VM selbst sieht ihren vhost nicht zuverlaessig).
+              echo "disk=${DISK}% hub_proc=$HUB"
               exit $FAIL
+              ;;
+            hub-diag)
+              # Warum liefert die Hub-UI 502, waehrend /api/health antwortet?
+              # Nur Struktur und Logzeilen, keine Secret-Werte.
+              $SSH_CMD '
+                echo "== nginx-vhosts mit hub =="
+                grep -rn "hub.cybersarah-ki.com" /etc/nginx/ 2>/dev/null | head -10
+                echo "== proxy_pass-Ziele =="
+                grep -rn "proxy_pass" /etc/nginx/sites-enabled/ 2>/dev/null | head -20
+                echo "== lauschende Ports =="
+                ss -lntp 2>/dev/null | grep -E "LISTEN" | head -20
+                echo "== Hub-Dateien =="
+                ls -la /opt/villaforge | head -20
+                echo "== Hub-Logs (letzte 15 Zeilen) =="
+                for f in /opt/villaforge/*.log /root/.pm2/logs/*.log; do
+                  [ -f "$f" ] && { echo "--- $f"; tail -15 "$f"; }
+                done
+              '
               ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
+      - name: Hub von aussen pruefen
+        if: always()
+        run: |
+          # Die VM sieht ihren eigenen vhost nicht zuverlaessig; geprueft wird
+          # der oeffentliche Weg, den auch Nutzer gehen.
+          set +e
+          API=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 15 https://hub.cybersarah-ki.com/api/health)
+          UI=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://hub.cybersarah-ki.com/)
+          echo "api_health=$API ui=$UI"
+          {
+            echo "## Hub (oeffentlich)"
+            echo "- /api/health: $API"
+            echo "- /: $UI"
+          } >> "$GITHUB_STEP_SUMMARY"
+          FAIL=0
+          if [ "$API" != "200" ]; then echo "::error::Hub-API antwortet mit $API"; FAIL=1; fi
+          if [ "$UI" != "200" ]; then echo "::error::Hub-Oberflaeche antwortet mit $UI"; FAIL=1; fi
+          exit $FAIL
