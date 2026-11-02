@@ -85,20 +85,20 @@ jobs:
               ;;
             hub-diag)
               # Warum liefert die Hub-UI 502, waehrend /api/health antwortet?
-              # Nur Struktur und Logzeilen, keine Secret-Werte.
+              # Fokus: Reverse-Proxy (Caddy/nginx), Ports, Hub-Log. Keine Secrets.
               $SSH_CMD '
-                echo "== nginx-vhosts mit hub =="
-                grep -rn "hub.cybersarah-ki.com" /etc/nginx/ 2>/dev/null | head -10
-                echo "== proxy_pass-Ziele =="
-                grep -rn "proxy_pass" /etc/nginx/sites-enabled/ 2>/dev/null | head -20
-                echo "== lauschende Ports =="
-                ss -lntp 2>/dev/null | grep -E "LISTEN" | head -20
-                echo "== Hub-Dateien =="
-                ls -la /opt/villaforge | head -20
-                echo "== Hub-Logs (letzte 15 Zeilen) =="
-                for f in /opt/villaforge/*.log /root/.pm2/logs/*.log; do
-                  [ -f "$f" ] && { echo "--- $f"; tail -15 "$f"; }
-                done
+                echo "== Ports 80/443/3000 =="
+                ss -lntp 2>/dev/null | grep -E ":(80|443|3000|4000|8080) " | head -10
+                echo "== Caddy-Konfiguration =="
+                ls /etc/caddy 2>/dev/null
+                grep -rn "hub.cybersarah-ki\|reverse_proxy\|handle" /etc/caddy/Caddyfile 2>/dev/null | head -25
+                echo "== Caddy-Fehler (letzte 12) =="
+                journalctl -u caddy -n 12 --no-pager 2>/dev/null | tail -12
+                echo "== nginx hub-vhost =="
+                grep -rln "hub" /etc/nginx/sites-enabled/ 2>/dev/null
+                echo "== Hub-Startzeile / Log =="
+                ls -la /opt/villaforge/*.log 2>/dev/null
+                tail -12 /opt/villaforge/*.log 2>/dev/null
               '
               ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
