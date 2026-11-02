@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS "revenue_jobs" (
   "payload" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "result" jsonb,
   "attempts" integer NOT NULL DEFAULT 0,
+  "last_error" text,
+  "deferred_until" timestamptz,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now()
 );

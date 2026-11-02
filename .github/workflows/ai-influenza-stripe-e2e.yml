@@ -32,6 +32,6 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Assert Stripe test-mode customer journey
         env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
           AI_INFLUENZA_INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/influenza_stripe_ci
         run: npx tsx scripts/test-ai-influenza-stripe-test-mode-e2e.ts
