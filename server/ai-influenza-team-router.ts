@@ -8,6 +8,7 @@ import {
 } from "../lib/ai-influenza-team-logic";
 import {
   createAiInfluenzaInboundOrder,
+  createAiInfluenzaOrder,
   ensureAiInfluenzaCustomerNode,
   aiInfluenzaTeamOverview,
   advanceAiInfluenzaOrder,
@@ -56,6 +57,25 @@ export const aiInfluenzaTeamRouter=router({
     }catch(error){
       throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Checkout konnte nicht vorbereitet werden."});
     }
+  }),
+  adminSandboxOrder:adminProcedure.input(z.object({packageId})).mutation(async({ctx,input})=>{
+    // Admin-only internal test order. No Stripe session, subscription or paid status.
+    // This endpoint deliberately does not enqueue external delivery or publishing.
+    const customer=await ensureAiInfluenzaCustomerNode({
+      openId:ctx.user.openId,name:ctx.user.name,email:ctx.user.email,
+      packageId:input.packageId,
+    });
+    const order=await createAiInfluenzaOrder({
+      customerNodeKey:customer.nodeKey,
+      packageId:input.packageId,
+      createdByOpenId:ctx.user.openId,
+      mode:"assisted",
+      testOnly:true,
+      monthlyBudgetCents:0,
+    });
+    return {orderId:order.payload.orderId,packageId:input.packageId,
+      paymentStatus:"test-only" as const,realRevenueCents:0,
+      note:"Interner Admin-Testauftrag ohne Stripe-Zahlung und ohne reale Umsatzbuchung."};
   }),
   portal:protectedProcedure.mutation(async({ctx})=>{
     try{return await createLiveBillingPortalSession({stripeCustomerId:ctx.user.stripeCustomerId});}
