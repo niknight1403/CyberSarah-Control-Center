@@ -11,6 +11,7 @@ export function estimateMaximumPaidCost(
 ): number | null {
   const inputTokens = Math.ceil((task.prompt.length + (task.systemPrompt?.length ?? 0)) / 4);
   const outputTokens = task.maxTokens ?? 1024;
+  if (!Number.isSafeInteger(inputTokens) || inputTokens < 1) return null;
   if (!Number.isFinite(pricing.inputUsdPerMillion) ||
       !Number.isFinite(pricing.outputUsdPerMillion) ||
       pricing.inputUsdPerMillion < 0 ||
