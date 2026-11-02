@@ -367,30 +367,28 @@ jobs:
               done
               ;;
             villa-progress)
-              # Read-only: echter Fortschritt einer Villa. Der Hub liefert die
-              # Villa verschachtelt (villa + tasks), daher beide Formen abfangen.
+              # Read-only: echter Fortschritt einer Villa. Jede Zeile beginnt mit
+              # RAW:, damit die Auswertung nichts wegfiltert.
               VID="${VILLA_ID:-34}"
               TOK=$(curl -s -m 25 -X POST -H "Content-Type: application/json" \
                 -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
                 https://hub.cybersarah-ki.com/api/auth/login | python3 -c "import json,sys; print(json.load(sys.stdin).get('token',''))")
-              [ -n "$TOK" ] || { echo "FEHLER: Login"; exit 1; }
+              [ -n "$TOK" ] || { echo "RAW: FEHLER Login"; exit 1; }
               curl -s -m 30 -H "Authorization: Bearer $TOK" "https://hub.cybersarah-ki.com/api/villas/$VID" -o /tmp/v.json
               curl -s -m 30 -H "Authorization: Bearer $TOK" "https://hub.cybersarah-ki.com/api/villas/$VID/messages" -o /tmp/m.json
-              echo "== Felder =="
-              jq -r 'keys | join(", ")' /tmp/v.json
-              echo "== Villa =="
-              jq -r '(.villa // .) | "#\(.id) \(.name) | Status: \(.status) | Autonomie: \(.autonomy)"' /tmp/v.json
-              echo "== Aufgaben je Status =="
-              jq -r '(.tasks // []) | sort_by(.status) | group_by(.status) | map("\(.[0].status)=\(length)") | join("  ")' /tmp/v.json
-              echo "== Beispiel einer erledigten Aufgabe (Felder) =="
-              jq -r '[(.tasks // [])[] | select(.status=="DONE")][0] | keys | join(", ")' /tmp/v.json
-              jq -r '[(.tasks // [])[] | select(.status=="DONE")][-6:][] | "  + \(.title // .name // "?")"' /tmp/v.json
-              echo "== offene Aufgaben =="
-              jq -r '[(.tasks // [])[] | select(.status != "DONE" and .status != "FAILED")][] | "  ~ \(.status): \(.title // .name // "?")"' /tmp/v.json
-              echo "== letzte Meldungen =="
-              jq -r 'if type=="array" then .[-6:][] | "  \(.role): \(.content // "" | gsub("\n";" ") | .[0:140])" else "(Form: \(keys|join(",")))" end' /tmp/m.json
-              echo "== Reports =="
-              curl -s -m 30 -H "Authorization: Bearer $TOK" "https://hub.cybersarah-ki.com/api/villas/$VID/reports" | jq -r 'if type=="array" then "Anzahl: \(length)" else "keine" end'
+              curl -s -m 30 -H "Authorization: Bearer $TOK" "https://hub.cybersarah-ki.com/api/villas/$VID/reports" -o /tmp/r.json
+              echo "RAW: KEYS $(jq -c 'if type=="object" then keys else [type] end' /tmp/v.json)"
+              echo "RAW: VILLA $(jq -c '(.villa // .) | {id, name, status, autonomy, updated_at}' /tmp/v.json)"
+              echo "RAW: TASKS_ART $(jq -c '.tasks | type' /tmp/v.json)"
+              echo "RAW: TASKS_N $(jq -c '(.tasks // []) | if type=="array" then length else -1 end' /tmp/v.json)"
+              echo "RAW: TASK_COUNTS $(jq -c '[(.tasks // [])[]] | group_by(.status) | map({(.[0].status): length}) | add' /tmp/v.json)"
+              echo "RAW: TASK_FELDER $(jq -c '[(.tasks // [])[]][0] | if . == null then null else (keys) end' /tmp/v.json)"
+              echo "RAW: DONE_TAIL $(jq -c '[(.tasks // [])[] | select(.status=="DONE")] | .[-8:] | map(.title // .name // "?")' /tmp/v.json)"
+              echo "RAW: OFFEN $(jq -c '[(.tasks // [])[] | select(.status != "DONE")] | map({s: .status, t: (.title // .name // "?")}) | .[0:8]' /tmp/v.json)"
+              echo "RAW: MSG_ART $(jq -c 'type' /tmp/m.json)"
+              echo "RAW: MSG_N $(jq -c 'if type=="array" then length else -1 end' /tmp/m.json)"
+              echo "RAW: MSG_TAIL $(jq -c 'if type=="array" then .[-4:] | map({role, created_at, c: ((.content // "") | .[0:120])}) else . end' /tmp/m.json)"
+              echo "RAW: REPORTS $(jq -c 'if type=="array" then length else . end' /tmp/r.json)"
               ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
