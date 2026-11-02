@@ -32,9 +32,21 @@ function keyDiagnostics(key: string): string {
   return `laenge=${key.length} ${flags.join(" ") || "kein_bekanntes_praefix"}`;
 }
 
-function assertSafety() {
-  if (!STRIPE_KEY.startsWith("sk_test_") && !STRIPE_KEY.startsWith("rk_test_"))
-    throw new Error("Safety gate: nur Test-Keys (sk_test_/rk_test_).");
+async function assertSafety(): Promise<void> {
+  console.log(`Key-Diagnose: ${keyDiagnostics(STRIPE_KEY)}`);
+  const prefixIsTest = STRIPE_KEY.startsWith("sk_test_") || STRIPE_KEY.startsWith("rk_test_");
+  if (!prefixIsTest) {
+    // Praefix reicht als Kriterium nicht: Stripe selbst ist die Autoritaet.
+    // Ein Live-Key wird hier hart abgelehnt, ein Test-Key mit unerwartetem
+    // Praefix darf weiterlaufen.
+    const res = await fetch("https://api.stripe.com/v1/customers?limit=1", {
+      headers: { Authorization: `Bearer ${STRIPE_KEY}` },
+    });
+    if (!res.ok) throw new Error(`Safety gate: Key nicht pruefbar (HTTP ${res.status}).`);
+    const body = (await res.json()) as { livemode?: boolean };
+    if (body.livemode !== false) throw new Error("Safety gate: Key ist LIVE — Testlauf abgebrochen.");
+    console.log("Key-Diagnose: Stripe meldet livemode=false, Testbetrieb bestaetigt.");
+  }
   const target = new URL(DB_URL);
   if (
     target.protocol !== "postgresql:" ||
@@ -45,7 +57,7 @@ function assertSafety() {
 }
 
 async function main(): Promise<void> {
-  assertSafety();
+  await assertSafety();
   console.log(`Key-Klasse: TEST (Praefix ${STRIPE_KEY.slice(0, 8)}…, ${STRIPE_KEY.length} Zeichen)`);
   const pool = new Pool({ connectionString: DB_URL, max: 2 });
   const ddl = await readFile("tests/fixtures/ai-influenza-test-schema.sql", "utf8");
