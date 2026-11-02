@@ -9,10 +9,16 @@ export async function recordAiInfluenzaCost(input:{
   amountCents:number;
   note?:string;
   actorOpenId:string;
+  /**
+   * Sprint 2: optionaler, deterministischer Event-Key. Damit ist die
+   * automatische Token-Kostenbuchung idempotent — ein Wiederholungslauf
+   * erzeugt keine zweite Kostenzeile.
+   */
+  eventKey?:string;
 }){
   if(!Number.isInteger(input.amountCents)||input.amountCents<0)throw new Error("Kostenbetrag muss in nichtnegativen Cent angegeben werden.");
   const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
-  const eventKey=`ai-influenza-cost:${input.orderId}:${crypto.randomUUID()}`;
+  const eventKey=input.eventKey?.trim()||`ai-influenza-cost:${input.orderId}:${crypto.randomUUID()}`;
   const [row]=await db.insert(revenueCostEvents).values({
     eventKey,
     category:input.category,
@@ -23,8 +29,8 @@ export async function recordAiInfluenzaCost(input:{
       note:input.note?.trim().slice(0,300)??null,
       actorOpenId:input.actorOpenId,
     },
-  }).returning();
-  return row;
+  }).onConflictDoNothing().returning();
+  return row ?? null;
 }
 
 export async function aiInfluenzaProfitOverview(windowDays=30){
