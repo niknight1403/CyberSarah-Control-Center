@@ -35,6 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Repo auschecken
+        uses: actions/checkout@v4
       - name: SSH-Zugang einrichten
         run: |
           mkdir -p ~/.ssh
@@ -392,6 +394,24 @@ jobs:
               echo "RAW: MSG_N $(jq -c 'if type=="array" then length else -1 end' /tmp/m.json)"
               echo "RAW: MSG_TAIL $(jq -c 'if type=="array" then .[-4:] | map({role, created_at, c: ((.content // "") | .[0:120])}) else . end' /tmp/m.json)"
               echo "RAW: REPORTS $(jq -c 'if type=="array" then length else . end' /tmp/r.json)"
+              ;;
+            hub-upgrade)
+              # Rollt Agentforge2 main auf die VM aus: Sicherung, Einspielen,
+              # Neustart, Health-Pruefung, bei Fehlschlag automatischer Rueckweg.
+              $SSH_CMD 'bash -s' < .github/scripts/hub-upgrade.sh
+              ;;
+            focus-set)
+              # Setzt den Projekt-Fokus ueber die Hub-API (nach dem Ausrollen).
+              TOK=$(curl -s -m 25 -X POST -H 'Content-Type: application/json' \
+                -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+                https://hub.cybersarah-ki.com/api/auth/login | python3 -c "import json,sys; print(json.load(sys.stdin).get('token',''))")
+              [ -n "$TOK" ] || { echo 'FEHLER: Login fehlgeschlagen'; exit 1; }
+              echo '== Fokus setzen =='
+              curl -s -m 25 -X POST -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+                -d '{"villaIds":[34,3],"reason":"Nikos Auftrag: erst mybabes.ai (#34) und Autonomous Revenue Engine (#3) fertigstellen"}' \
+                https://hub.cybersarah-ki.com/api/focus | jq -c '{active, villaIds, open, ready_to_release, villas: [.villas[]? | {id, status, open, done}]}'
+              echo '== Stand =='
+              curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/focus | jq -c '{active, reason, history: [.history[]? | {action, reason}] }'
               ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
