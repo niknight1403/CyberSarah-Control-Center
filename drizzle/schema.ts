@@ -307,6 +307,9 @@ export const publishingJobs = pgTable(
     userOpenId: text("user_open_id").notNull(),
     product: text("product").notNull(),
     goal: text("goal").notNull(),
+    /** Freigegebener Draft-Text: wird unverändert statt erneuter LLM-Generierung verarbeitet. */
+    contentOverride: text("content_override"),
+    sourceDraftId: integer("source_draft_id"),
     persona: text("persona").notNull(),
     platform: text("platform").notNull(),
     campaignDay: integer("campaign_day").notNull(),
