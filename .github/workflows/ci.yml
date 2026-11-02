@@ -176,6 +176,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+      - name: AI-Influenza-Video-Paket zu MP4 rendern (ffmpeg)
+        run: npx tsx scripts/test-ai-influenza-video-render.ts
       - name: Assert live CAS and quarantine transitions with 24 concurrent claims
         run: npx tsx scripts/test-publishing-claim-postgres.ts
       - name: Create influenza_ci database (idempotent)

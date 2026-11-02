@@ -94,7 +94,10 @@ export function buildConcatFfmpegArgs(input: {
   const { sceneVideoPaths, srtPath, outputPath } = input;
   if (sceneVideoPaths.length === 0) return null;
   const filterParts = sceneVideoPaths.map((_, index) => `[${index}:v]scale=${VIDEO_LIMITS.width}:${VIDEO_LIMITS.height}[v${index}]`).join(";");
-  const joinParts = sceneVideoPaths.map((_, index) => `[v${index}][${index}:a]`).join("");
+  // Der Concat muss die aresample-Ausgaenge [a0..aN] verbrauchen. Mit [0:a]
+  // blieb jeder aresample-Filter ohne Verbraucher: ffmpeg bricht mit
+  // "Filter aresample:default has an unconnected output" ab.
+  const joinParts = sceneVideoPaths.map((_, index) => `[v${index}][a${index}]`).join("");
   const concatIn = sceneVideoPaths.map((_, index) => `[${index}:a]aresample=48000[a${index}]`).join(";");
   const filterComplex = [
     filterParts,

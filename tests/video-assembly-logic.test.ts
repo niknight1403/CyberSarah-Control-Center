@@ -41,6 +41,9 @@ describe("ffmpeg-Verkettung (Sprint 274)", () => {
     expect(flat).toContain("concat=n=2:v=1:a=1");
     expect(flat).toContain("subtitles=/tmp/sub.srt");
     expect(flat).toContain("-movflags +faststart");
+    // Regression: aresample-Ausgaenge muessen im concat landen, nicht die Rohspuren.
+    expect(flat).toContain("[v0][a0][v1][a1]concat=n=2:v=1:a=1");
+    expect(flat).not.toContain("[0:a][v1]");
   });
 
   it("lehnt leere Szenenlisten ab", () => {
