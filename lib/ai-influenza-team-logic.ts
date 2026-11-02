@@ -1,4 +1,4 @@
-export const AI_INFLUENZA_PACKAGE_IDS=["starter","growth","business"] as const;
+export const AI_INFLUENZA_PACKAGE_IDS=["starter","growth","business","elite"] as const;
 export type AiInfluenzaPackageId=(typeof AI_INFLUENZA_PACKAGE_IDS)[number];
 
 export type AiInfluenzaPackage={
@@ -41,6 +41,17 @@ export const AI_INFLUENZA_PACKAGES:Record<AiInfluenzaPackageId,AiInfluenzaPackag
       {kind:"performance-report",quantity:1,ownerAgent:"revenue-profit-optimizer"},
     ],
     hypothesisNotice:"Startpreis-Hypothese; Leistungsumfang, Kosten und Kundenfeedback müssen vor Skalierung validiert werden.",
+  },
+  elite:{
+    id:"elite",name:"Elite",monthlyPriceCents:499900,currency:"eur",
+    deliverables:["Vollständiges KI-Agenturteam","Content-, Video- und Kampagnenplanung","Priorisierte Strategie und Reporting"],
+    defaultMonthlyTaskBatches:[
+      {kind:"custom-strategy",quantity:1,ownerAgent:"ceo-orchestrator"},
+      {kind:"short-video",quantity:12,ownerAgent:"video-creative-studio"},
+      {kind:"content-post",quantity:20,ownerAgent:"content-production"},
+      {kind:"performance-report",quantity:1,ownerAgent:"revenue-profit-optimizer"},
+    ],
+    hypothesisNotice:"Elite-Preis ist eine Hypothese. Admin-Zugriff ist kostenlos; externe Aktionen bleiben freigabepflichtig.",
   },
 };
 
