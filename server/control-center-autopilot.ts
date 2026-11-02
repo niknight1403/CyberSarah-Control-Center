@@ -7,6 +7,7 @@ import { runGrowthPulse } from "./always-on-growth";
 import { assertControlCenterAutopilotEnabled } from "../lib/control-center-operator-policy";
 import { revenueThroughputOverview } from "./revenue-throughput-service";
 import { runAiInfluenzaAutopilotStep, type AiInfluenzaAutopilotResult } from "./ai-influenza-autopilot";
+import { runSalesCatalogStep, type SalesCatalogRunResult } from "./ai-influenza-sales-catalog";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -33,6 +34,8 @@ export type ControlCenterAutopilotResult = {
   throughput: Awaited<ReturnType<typeof revenueThroughputOverview>> | null;
   /** AI Influenza Team: autonom weitergeschaltete Auftragsschritte des Tageslaufs. */
   aiInfluenza: AiInfluenzaAutopilotResult | null;
+  /** AI Influenza Team: Kataloglage auf Stripe und Digistore24. */
+  salesCatalog: SalesCatalogRunResult | null;
   realActions: string[];
   deferred: string[];
   blocked: string[];
@@ -49,6 +52,7 @@ export type ControlCenterAutopilotDeps = {
   growth?: typeof runGrowthPulse;
   throughput?: typeof revenueThroughputOverview;
   aiInfluenza?: typeof runAiInfluenzaAutopilotStep;
+  salesCatalog?: typeof runSalesCatalogStep;
 };
 
 async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
@@ -81,6 +85,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   const growthRunner = deps.growth ?? runGrowthPulse;
   const throughputRunner = deps.throughput ?? revenueThroughputOverview;
   const influenzaRunner = deps.aiInfluenza ?? runAiInfluenzaAutopilotStep;
+  const catalogRunner = deps.salesCatalog ?? runSalesCatalogStep;
 
   const [hara, expansion] = await Promise.all([scan("hara/scan", trigger), scan("expansion/scan", trigger)]);
   const revenue = await runRevenue(5);
@@ -105,12 +110,16 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   let throughputError: string | null = null;
   let aiInfluenza: AiInfluenzaAutopilotResult | null = null;
   let aiInfluenzaError: string | null = null;
+  let salesCatalog: SalesCatalogRunResult | null = null;
+  let salesCatalogError: string | null = null;
   try { growthPulse = await growthRunner(); }
   catch (error) { growthError = error instanceof Error ? error.message : "Growth Pulse fehlgeschlagen"; }
   try { throughput = await throughputRunner(); }
   catch (error) { throughputError = error instanceof Error ? error.message : "Revenue Throughput Supervisor fehlgeschlagen"; }
   try { aiInfluenza = await influenzaRunner(); }
   catch (error) { aiInfluenzaError = error instanceof Error ? error.message : "AI-Influenza-Autopilot fehlgeschlagen"; }
+  try { salesCatalog = await catalogRunner(); }
+  catch (error) { salesCatalogError = error instanceof Error ? error.message : "Katalog-Schritt fehlgeschlagen"; }
   const deferred: string[] = [];
   const blocked: string[] = [];
   if (hara.ok) realActions.push("HARA-Live-Scan gestartet"); else blocked.push(`HARA: ${hara.detail}`);
@@ -134,6 +143,24 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     if (aiInfluenza.waiting > 0) deferred.push(`AI Influenza: ${aiInfluenza.waiting} Schritt(e) warten auf Freigabe`);
     if (aiInfluenza.failed > 0) blocked.push(`AI Influenza: ${aiInfluenza.failed} Schritt(e) fehlgeschlagen${aiInfluenza.error ? ` (${aiInfluenza.error})` : ""}`);
   }
+  if (salesCatalogError) blocked.push(`AI Influenza Katalog: ${salesCatalogError}`);
+  if (salesCatalog) {
+    if (salesCatalog.executed > 0) realActions.push(`${salesCatalog.executed} Stripe-Katalogpreis(e) autonom angelegt`);
+    if (salesCatalog.dryRun && salesCatalog.plans > 0) deferred.push(`AI Influenza Katalog: Trockenlauf über ${salesCatalog.plans} Pläne`);
+    if (salesCatalog.needsReview > 0)
+      deferred.push(
+        `AI Influenza Katalog: ${salesCatalog.needsReview} ${salesCatalog.needsReview === 1 ? "Zahlungsplan-Entwurf wartet" : "Zahlungsplan-Entwürfe warten"} auf Freigabe`,
+      );
+    if (salesCatalog.error) {
+      blocked.push(`AI Influenza Katalog: ${salesCatalog.error}`);
+    } else if (salesCatalog.blocked.length > 0) {
+      // Fehlende Schluessel oder Seiten sind Konfiguration, kein Defekt: sie
+      // warten, statt den ganzen Tageslauf rot zu faerben.
+      const preview = salesCatalog.blocked.slice(0, 2).join(" · ");
+      const count = salesCatalog.blocked.length;
+      deferred.push(`AI Influenza Katalog: ${count} ${count === 1 ? "offener Punkt" : "offene Punkte"} (${preview})`);
+    }
+  }
   if (throughput) {
     if (throughput.status === "repair") blocked.push(...throughput.blockers.map(item => `Revenue: ${item}`));
     else realActions.push(`Revenue Throughput stabil · 30d Run-Rate ${throughput.revenueVelocity.monthlyRunRateEur.toLocaleString("de-DE")} EUR`);
@@ -155,6 +182,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     growthPulse,
     throughput,
     aiInfluenza,
+    salesCatalog,
     realActions,
     deferred,
     blocked,

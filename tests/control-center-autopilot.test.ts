@@ -35,7 +35,10 @@ describe("control center autopilot", () => {
   // Sprint 3: der AI-Influenza-Schritt ist eine eigene Abhaengigkeit. Ohne diesen
   // Fake wuerde der Test gegen eine echte Datenbank laufen.
   const aiInfluenza = async () => ({ considered: 0, advanced: 0, waiting: 0, failed: 0, details: [], error: null });
-  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput, aiInfluenza };
+  // Katalog-Schritt ebenfalls als Fake: er wuerde sonst Plaene aus der
+  // Umgebung bauen und den Test von Secrets abhaengig machen.
+  const salesCatalog = async () => ({ dryRun: true, plans: 0, executed: 0, skipped: 0, needsReview: 0, created: [], blocked: [], error: null });
+  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput, aiInfluenza, salesCatalog };
 
   it("orchestriert echte Scans, Revenue und Drafts in einem Lauf", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
@@ -53,6 +56,22 @@ describe("control center autopilot", () => {
     expect(result.realActions.join(" ")).toContain("Reichweiten");
     expect(result.realActions.join(" ")).toContain("Influencer-Personas");
     expect(result.decision.action).toBe("VERIFY");
+  });
+
+  it("meldet angelegte Katalogpreise als echte Aktion und Trockenlauf als Wartestand", async () => {
+    const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
+    const executed = async () => ({
+      dryRun: false, plans: 6, executed: 2, skipped: 1, needsReview: 3,
+      created: [], blocked: ["digistore24/starter: DIGISTORE24_API_KEY fehlt."], error: null,
+    });
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts, ...growthDeps, salesCatalog: executed });
+    // ok bleibt false, solange etwas wartet: der Katalog ist noch nicht fertig.
+    expect(result.ok).toBe(false);
+    expect(result.blocked).toEqual([]);
+    expect(result.realActions.join(" ")).toContain("2 Stripe-Katalogpreis(e) autonom angelegt");
+    expect(result.deferred.join(" ")).toContain("1 offener Punkt");
+    expect(result.deferred.join(" ")).toContain("3 Zahlungsplan-Entwürfe warten");
+    expect(result.blocked).toEqual([]);
   });
 
   it("behandelt Provider-Quota ehrlich als verschobene Arbeit", async () => {
