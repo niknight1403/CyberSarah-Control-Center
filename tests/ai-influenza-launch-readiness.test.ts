@@ -19,4 +19,29 @@ describe("AI Influenza revenue launch gate", () => {
     expect(result.readyForUnattendedFulfilment).toBe(false);
     expect(result.gaps.length).toBeGreaterThan(0);
   });
+  it("requires verified customer-approved evidence for every contracted deliverable", () => {
+    const partial = assessAiInfluenzaLaunchReadiness("starter", [
+      { taskKind: "content-post", deliveredQuantity: 12, verified: true, customerApproved: true },
+      { taskKind: "ai-image", deliveredQuantity: 4, verified: false, customerApproved: true },
+      { taskKind: "content-plan", deliveredQuantity: 1, verified: true, customerApproved: true },
+    ]);
+    expect(partial.readyForUnattendedFulfilment).toBe(false);
+    expect(partial.gaps.map((gap) => gap.taskKind)).toContain("ai-image");
+
+    const complete = assessAiInfluenzaLaunchReadiness("starter", [
+      { taskKind: "content-post", deliveredQuantity: 12, verified: true, customerApproved: true },
+      { taskKind: "ai-image", deliveredQuantity: 4, verified: true, customerApproved: true },
+      { taskKind: "content-plan", deliveredQuantity: 1, verified: true, customerApproved: true },
+    ]);
+    expect(complete.readyForUnattendedFulfilment).toBe(true);
+  });
+
+  it("rejects unapproved or insufficient delivery evidence", () => {
+    const result = assessAiInfluenzaLaunchReadiness("growth", [
+      { taskKind: "short-video", deliveredQuantity: 11, verified: true, customerApproved: true },
+      { taskKind: "content-post", deliveredQuantity: 20, verified: true, customerApproved: false },
+      { taskKind: "monthly-report", deliveredQuantity: 1, verified: true, customerApproved: true },
+    ]);
+    expect(result.gaps.map((gap) => gap.taskKind)).toEqual(["short-video", "content-post"]);
+  });
 });
