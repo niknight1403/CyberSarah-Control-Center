@@ -1,34 +1,49 @@
 #!/usr/bin/env bash
-# Read-only: Welche Datenbank nutzt der laufende Hub wirklich?
+# Read-only: Datenbank inklusive WAL kopieren und daraus lesen.
 set -uo pipefail
 
-PID=$(pgrep -f "server/server[.]mjs" | head -1)
-echo "Hub-PID: ${PID:-keine}"
-if [ -n "${PID:-}" ]; then
-  echo "== geoeffnete Dateien (.db) =="
-  sudo -n ls -l /proc/$PID/fd 2>/dev/null | grep -i "\.db" | head -10
-  echo "== Umgebung des Prozesses =="
-  sudo -n tr '\0' '\n' < /proc/$PID/environ 2>/dev/null | grep -iE "VF_|DB|WORKSPACE" | grep -vi token | head -10
-  echo "== Arbeitsverzeichnis =="
-  sudo -n readlink /proc/$PID/cwd
-fi
+TMP=/tmp/dbcheck-$$
+mkdir -p "$TMP"
+sudo -n cp /opt/villaforge/data/hub.db "$TMP/hub.db" 2>/dev/null || { echo "DB nicht kopierbar"; exit 1; }
+sudo -n cp /opt/villaforge/data/hub.db-wal "$TMP/hub.db-wal" 2>/dev/null || true
+sudo -n cp /opt/villaforge/data/hub.db-shm "$TMP/hub.db-shm" 2>/dev/null || true
+sudo -n chown -R "$(id -u):$(id -g)" "$TMP" 2>/dev/null || true
+echo "Kopie: $(du -sh "$TMP" | cut -f1)"
 
-echo "== alle SQLite-Dateien unter /opt =="
-sudo -n find /opt -maxdepth 4 -name "*.db" -o -maxdepth 4 -name "*.sqlite*" 2>/dev/null | head -20 | while read -r f; do
-  N=$(sudo -n node --experimental-sqlite -e "
-    const { DatabaseSync } = require('node:sqlite');
-    try { const db = new DatabaseSync('$f', { readOnly: true });
-      const c = db.prepare(\"SELECT COUNT(*) c FROM sqlite_master WHERE name='villas'\").get();
-      if (!c || !c.c) { process.stdout.write('keine villas-Tabelle'); }
-      else { const n = db.prepare('SELECT COUNT(*) c FROM villas').get();
-             const maxId = db.prepare('SELECT MAX(id) m FROM villas').get();
-             process.stdout.write(n.c + ' Villen, max id ' + (maxId.m||0)); }
-    } catch (e) { process.stdout.write('nicht lesbar: ' + String(e.message).split('\n')[0]); }
-  " 2>/dev/null)
-  echo "  $(sudo -n ls -lh "$f" | awk '{print $5, $6, $7, $8}')  $f  -> $N"
+TMP="$TMP" node --experimental-sqlite -e '
+const { DatabaseSync } = require("node:sqlite");
+const path = process.env.TMP + "/hub.db";
+const db = new DatabaseSync(path);
+console.log("== Villen ==");
+for (const v of db.prepare("SELECT id, status, source_path, name FROM villas ORDER BY id").all()) {
+  console.log(`${v.id}\t${v.status}\t${v.source_path || "-"}\t${String(v.name).slice(0,45)}`);
+}
+console.log("== Aufgaben der Fokusvillen ==");
+for (const id of [34, 3]) {
+  const rows = db.prepare("SELECT status, COUNT(*) c FROM tasks WHERE villa_id=? GROUP BY status").all(id);
+  console.log(`Villa ${id}: ` + rows.map(r => r.status + "=" + r.c).join("  "));
+}
+' 2>&1 | head -40
+
+echo "== Projektordner pruefen =="
+for VID in 34 3; do
+  SRC=$(TMP="$TMP" VID="$VID" node --experimental-sqlite -e '
+    const { DatabaseSync } = require("node:sqlite");
+    const db = new DatabaseSync(process.env.TMP + "/hub.db");
+    const r = db.prepare("SELECT source_path FROM villas WHERE id=?").get(Number(process.env.VID));
+    process.stdout.write(r?.source_path || "");
+  ' 2>/dev/null)
+  echo "--- Villa $VID source_path: ${SRC:-(leer)} ---"
+  for DIR in "$SRC" "/opt/villaforge/workspace/villa-$VID/project" "/opt/villaforge/workspace/villa-$VID"; do
+    [ -n "$DIR" ] && [ -d "$DIR" ] || continue
+    echo "  Ordner: $DIR"
+    sudo -n find "$DIR" -maxdepth 1 -not -path "*/node_modules*" 2>/dev/null | head -8
+    if sudo -n test -f "$DIR/package.json"; then
+      echo "  package.json:"; sudo -n head -20 "$DIR/package.json"
+      echo "  node_modules: $(sudo -n test -d "$DIR/node_modules" && echo ja || echo nein)"
+      echo "  jest: $(sudo -n test -x "$DIR/node_modules/.bin/jest" && echo vorhanden || echo fehlt)"
+    fi
+    break
+  done
 done
-
-echo "== Workspace-Inhalt =="
-sudo -n ls -la /opt/villaforge/workspace | head -20
-echo "== weitere Workspace-Kandidaten =="
-sudo -n find /opt /root /home -maxdepth 4 -type d -name "villa-34*" 2>/dev/null | head -5
+sudo -n rm -rf "$TMP"
