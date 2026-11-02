@@ -15,6 +15,7 @@
  */
 
 import * as db from "./db";
+import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
 import {
   checkQuota,
   consumeQuota,
@@ -73,7 +74,18 @@ async function saveMonetizationAccount(openId: string, state: MonetizationAccoun
 export async function resolvePlanForUser(userId: number): Promise<"free" | "lite" | "pro" | "expert"> {
   try {
     const subscription = await db.getBillingSubscriptionForUser(userId);
-    if (subscription && subscription.status === "active" && subscription.stripePriceId) {
+    // Sprint 26: Zugriff entscheidet die Lebenszyklus-Lesart, nicht nur
+    // "status === active". Ein zum Periodenende gekuendigtes Abo behaelt
+    // seinen Zugriff bis zum Ende; past_due erhaelt eine Kulanzfrist.
+    const lifecycle = subscription
+      ? readSubscriptionLifecycle({
+          status: subscription.status,
+          cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          pausedBehavior: (subscription as { pausedBehavior?: string | null }).pausedBehavior ?? null,
+        })
+      : null;
+    if (subscription && lifecycle?.entitled && subscription.stripePriceId) {
       // Tier aus dem konfigurierten Preis-Env loesen (kanal-agnostisch:
       // Stripe-Checkout und Google-Play-Billing schreiben beide nur die
       // stripePriceId des gebuchten Preises).

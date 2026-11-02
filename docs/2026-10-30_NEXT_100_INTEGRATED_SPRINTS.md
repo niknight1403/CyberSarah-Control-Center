@@ -28,7 +28,7 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 | 23 | Doppelte Stripe-IDs und verwaiste lokale Offers sicher behandeln | OFFEN |
 | 24 | Checkout-Messung mit Stripe-Testmode-End-to-End abnehmen | OFFEN |
 | 25 | Webhook-Wiederholungen bei Bestellung/Refund idempotent verarbeiten | CODE+CI — `lib/stripe-event-idempotency-logic.ts` (Zustellentscheidung, Out-of-order-Schutz je Aggregat, kumulativer Refund-Deckel), dauerhafte Belege in `stripe_webhook_events` (Migration 0024) via `server/stripe-webhook-ledger.ts`, Handler nutzt Ledger mit Speicher-Fallback, 11 Tests |
-| 26 | Abonnements mit Kündigung, Retention und Wiederaufnahme konsistent lesen | OFFEN |
+| 26 | Abonnements mit Kündigung, Retention und Wiederaufnahme konsistent lesen | CODE+CI — `lib/subscription-lifecycle-logic.ts` (eine Lesart fuer aktiv/probe/kuendigt_zum_periodenende/pausiert/zahlung_offen/abgelaufen/unvollstaendig, Zugriff bis Periodenende, 3 Tage Kulanz bei past_due, Retention-Fenster 14 Tage), im Plan-Gating und in der Abrechnungsuebersicht aktiv (`tierActive`, `lifecycle`), `pausedBehavior` persistiert (Migration 0025), 14 Tests |
 | 27 | Produktrechte und Affiliate-Kennzeichnung als prüfbare Freigaben speichern | OFFEN |
 | 28 | Produkt-Matching über Herkunftsquellen ohne stillen Importkollisionsverlust | OFFEN |
 | 29 | Produkt-Sync-Fehler pro Provider mit Recovery-Status dokumentieren | CODE+CI — `lib/provider-sync-recovery-logic.ts` (Klassifikation, Backoff, Blockade bei Auth/Konfiguration, Maskierung), 8 Tests, im Katalog-Abruf aktiv (`providerSync` + Provider-Name im Admin-Fehler) |

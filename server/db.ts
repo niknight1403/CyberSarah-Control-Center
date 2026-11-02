@@ -271,6 +271,7 @@ export async function upsertBillingSubscription(input: {
   stripePriceId?: string | null;
   status: string;
   cancelAtPeriodEnd: boolean;
+  pausedBehavior?: string | null;
   currentPeriodEnd?: Date | null;
 }) {
   const db = await getDb();
@@ -285,6 +286,7 @@ export async function upsertBillingSubscription(input: {
         stripePriceId: input.stripePriceId ?? null,
         status: input.status,
         cancelAtPeriodEnd: input.cancelAtPeriodEnd,
+        pausedBehavior: input.pausedBehavior ?? null,
         currentPeriodEnd: input.currentPeriodEnd ?? null,
       },
     });

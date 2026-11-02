@@ -25,6 +25,11 @@ Stand: 31.10.2026
 - Manuelle Freigabe serverseitig geprueft: auf Teilkatalog, inaktive Produkte oder Standardpreisprobleme ist keine Freigabe moeglich; Ereignisse werden append-only in `product_release_events` (Migration 0023) mit Befund-Snapshot und Akteur gespeichert, Ruecknahme als eigenes Ereignis.
 - Nachweis: 10 neue Vitest-Faelle; Suite 3005 gruen, TypeScript, ESLint und Build sauber. Stripe bleibt read-only.
 
+## Sprint 26 — Abo-Lesart konsistent (02.11.2026)
+- Vorher: Gating verlangte hart `status === active`, die Abrechnungsuebersicht leitete den Tarif allein aus der Preis-ID ab — ein kuendigendes Abo verlor Zugriff oder zeigte gleichzeitig einen Tarif, der nicht nutzbar war.
+- Jetzt: `readSubscriptionLifecycle` ist die einzige Lesart; Gating und Uebersicht nutzen sie, `pausedBehavior` wird persistiert.
+- Nachweis: 14 neue Vitest-Faelle, Suite 3041 gruen, TypeScript/ESLint/Build sauber; Stripe-Testmode-E2E bleibt offen.
+
 ## Hotfix 02.11.2026 — APK-Versionen eindeutig
 - Ursache: `.github/release-requests/version.txt` pinnte 2.8.0; der Workflow uebergab das als Wunschversion und lud neue APKs mit `--clobber` erneut in `v2.8.0-apk`. Neue Staende waren an der Nummer nicht erkennbar.
 - Fix: `resolveBuildVersion` behandelt Wuensche als Mindeststand, erhoeht belegte Versionen auf die naechste freie Patch-Version und verhindert Downgrades; Skript und Workflow nutzen die Funktion. 6 zusaetzliche Tests (Suite 3011 gruen), TypeScript/ESLint/Build sauber.
