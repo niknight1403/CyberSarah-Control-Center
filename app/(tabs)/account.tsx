@@ -332,7 +332,14 @@ export default function AccountScreen() {
               ) : (
                 <GlassCard accent="green" style={styles.billingCard}>
                   <Text style={styles.billingTitle}>LIVE-ABRECHNUNG</Text>
-                  <Text style={styles.billingCopy}>{billingQuery.data?.subscription ? `Stufe: ${billingQuery.data?.tierLabel ?? "Lite"} · Status: ${billingQuery.data.subscription.status}${billingQuery.data.subscription.cancelAtPeriodEnd ? " · Kündigung vorgemerkt" : ""}` : "Noch kein aktives Abonnement — Stufe wählen:"}</Text>
+                  <Text style={styles.billingCopy}>{billingQuery.data?.subscription ? `Stufe: ${billingQuery.data?.tierLabel ?? "Lite"}${billingQuery.data?.tierActive ? "" : " (ruht)"} · Status: ${billingQuery.data.subscription.status}${billingQuery.data.subscription.cancelAtPeriodEnd ? " · Kündigung vorgemerkt" : ""}` : "Noch kein aktives Abonnement — Stufe wählen:"}</Text>
+                  {billingQuery.data?.lifecycle ? (
+                    <Text style={styles.billingCopy}>
+                      {billingQuery.data.lifecycle.reason}
+                      {billingQuery.data.lifecycle.accessUntil ? ` · Zugriff bis ${new Date(billingQuery.data.lifecycle.accessUntil).toLocaleDateString("de-DE")}` : ""}
+                      {billingQuery.data.lifecycle.retentionEligible ? " · Rückgewinnung möglich" : ""}
+                    </Text>
+                  ) : null}
                   <View style={styles.tierRow}>
                     {(["lite", "pro", "expert"] as const).map((tier) => (
                       <GlowButton

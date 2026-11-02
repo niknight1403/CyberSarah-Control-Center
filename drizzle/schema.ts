@@ -65,6 +65,8 @@ export const billingSubscriptions = pgTable("billingSubscriptions", {
   stripePriceId: varchar("stripePriceId", { length: 255 }),
   status: varchar("status", { length: 64 }).notNull(),
   cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false).notNull(),
+  /** Sprint 26 — Stripe pause_collection.behaviour. */
+  pausedBehavior: text("pausedBehavior"),
   currentPeriodEnd: timestamp("currentPeriodEnd"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")

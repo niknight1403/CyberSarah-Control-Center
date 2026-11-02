@@ -17,6 +17,7 @@ import {
   type SubscriptionTier,
 } from "../lib/subscription-tiers-logic";
 import { normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-webhook-logic";
+import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
 import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
 import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
 import {buildAiInfluenzaStripeLineItem,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
@@ -322,6 +323,7 @@ export async function syncStripeSubscription(
     stripePriceId: priceId,
     status: normalizeSubscriptionStatus(subscription.status),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    pausedBehavior: subscription.pause_collection?.behavior ?? null,
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
   });
   await syncAiInfluenzaSubscription(subscription);
@@ -658,13 +660,25 @@ export async function getBillingOverview(user: BillingUser) {
       ? tierFromPriceId(subscription.stripePriceId, env)
       : "lite";
 
+  // Sprint 26: Tarif und Zugriff duerfen sich nicht widersprechen.
+  const lifecycle = subscription
+    ? readSubscriptionLifecycle({
+        status: subscription.status,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        pausedBehavior: (subscription as { pausedBehavior?: string | null }).pausedBehavior ?? null,
+      })
+    : null;
   return {
     subscription: subscription ?? null,
     customerConfigured: Boolean(user.stripeCustomerId),
     adminGranted,
     tier,
     tierLabel: tier === "expert" ? "Expert" : tier === "pro" ? "Pro" : "Lite",
-    entitlements: entitlementsForRole(user.role, tier),
+    /** Tarif ist gebucht, aber der Zugriff kann ruhen (kuendigt/pausiert/offen). */
+    tierActive: adminGranted || Boolean(lifecycle?.entitled),
+    lifecycle,
+    entitlements: adminGranted || lifecycle?.entitled ? entitlementsForRole(user.role, tier) : entitlementsForRole(user.role, "lite"),
     tierEntitlements: entitlementsForTier(tier),
   };
 }
