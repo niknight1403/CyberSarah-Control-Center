@@ -110,21 +110,26 @@ async function main(): Promise<void> {
     recurring: { interval: "month" },
     product_data: { name: "AI Influenza Growth (Test)" },
   });
+  // Zahlungsmittel direkt am Abo hinterlegen: Stripe zieht die erste Rechnung
+  // im Testmodus sofort ein. Neue API-Versionen liefern kein payment_intent
+  // mehr auf der Invoice, deshalb dieser Weg statt PaymentIntent-Confirm.
+  const paymentMethod = await stripe.paymentMethods.create({ type: "card", card: { token: "tok_visa" } });
+  await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
   const subscription = await stripe.subscriptions.create({
     customer: customer.id,
     items: [{ price: price.id }],
-    payment_behavior: "default_incomplete",
-    expand: ["latest_invoice.payment_intent"],
+    default_payment_method: paymentMethod.id,
+    payment_behavior: "allow_incomplete",
+    expand: ["latest_invoice"],
     metadata: { businessUnit: "ai-influenza-team", packageId: "growth", orderId },
   });
   const latest = subscription.latest_invoice;
   const invoiceId = typeof latest === "string" ? latest : latest?.id;
   assert.ok(invoiceId, "Subscription braucht eine Invoice");
-  const intent = typeof latest === "object" && latest ? (latest as { payment_intent?: { id?: string } | string | null }).payment_intent : null;
-  const intentId = typeof intent === "string" ? intent : intent?.id;
-  assert.ok(intentId, "Subscription braucht ein PaymentIntent im Testmodus");
-  await stripe.paymentIntents.confirm(intentId as string, { payment_method: "pm_card_visa" });
-
+  const invoiceStatus = typeof latest === "object" && latest ? (latest as { status?: string }).status : undefined;
+  if (invoiceStatus !== "paid") {
+    await stripe.invoices.pay(invoiceId as string);
+  }
   const paidInvoice = await stripe.invoices.retrieve(invoiceId as string, { expand: ["parent.subscription_details"] });
   const activeSub = await stripe.subscriptions.retrieve(subscription.id, { expand: ["latest_invoice.parent.subscription_details"] });
   assert.equal(paidInvoice.status, "paid", "Test-Invoice muss bezahlt sein");
@@ -148,8 +153,20 @@ async function main(): Promise<void> {
   const payload = row.payload as { step?: string; paymentStatus?: string };
   assert.equal(payload.step, "paid", "Auftrag muss nach verifiziertem Stripe-Event auf paid stehen");
   assert.equal(payload.paymentStatus, "paid");
-  const tasks = await conn.select().from(schema.revenueJobs).where(eq(schema.revenueJobs.kind, "ai-influenza-task"));
-  assert.ok(tasks.length >= 33, `Growth braucht mindestens 33 Delivery-Tasks, gefunden: ${tasks.length}`);
+  // Der Monatsplan nennt Task-Arten und Stueckzahlen; beides wird geprueft,
+  // damit "3 Zeilen" nicht mit "33 Einheiten" verwechselt wird.
+  const { buildAiInfluenzaMonthlyPlan } = await import("../lib/ai-influenza-team-logic");
+  const plan = buildAiInfluenzaMonthlyPlan("growth");
+  const taskRows = await conn.select().from(schema.revenueJobs).where(eq(schema.revenueJobs.kind, "ai-influenza-task"));
+  const mine = taskRows.filter(
+    (row) => (row.payload as { orderId?: string }).orderId === orderId,
+  ) as { payload: { taskKind?: string; quantity?: number } }[];
+  assert.equal(mine.length, plan.length, `Growth braucht ${plan.length} Task-Zeilen, gefunden: ${mine.length}`);
+  const units = mine.reduce((sum, row) => sum + (row.payload.quantity ?? 0), 0);
+  const plannedUnits = plan.reduce((sum, item) => sum + item.quantity, 0);
+  assert.equal(units, plannedUnits, `Task-Einheiten muessen ${plannedUnits} sein, gefunden: ${units}`);
+  const kinds = mine.map((row) => row.payload.taskKind).sort();
+  assert.deepEqual(kinds, plan.map((item) => item.taskKind).sort(), "Task-Arten muessen dem Monatsplan entsprechen");
   const [attr] = await conn
     .select()
     .from(schema.revenueAttributionEvents)
@@ -157,7 +174,7 @@ async function main(): Promise<void> {
     .limit(1);
   assert.equal(attr.valueCents, 99900);
   assert.equal(attr.platform, "stripe");
-  console.log(`DB-Beleg: Auftrag paid, ${tasks.length} Delivery-Tasks, Attribution ${(attr.valueCents / 100).toFixed(2)} EUR`);
+  console.log(`DB-Beleg: Auftrag paid, ${mine.length} Task-Zeilen / ${units} Einheiten, Attribution ${(attr.valueCents / 100).toFixed(2)} EUR`);
 
   // 6) Aufraeumen (Testmodus)
   await stripe.subscriptions.cancel(subscription.id);
@@ -167,6 +184,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("FAIL:", error instanceof Error ? error.message : error);
+  const cause = (error as { cause?: { message?: string } })?.cause?.message;
+  console.error("FAIL:", error instanceof Error ? error.message : error, cause ? `| Ursache: ${cause}` : "");
   process.exit(1);
 });
