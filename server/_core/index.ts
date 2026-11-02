@@ -61,6 +61,7 @@ import {
 import { agenticLoopTelemetryBus } from "../agentic-loop-telemetry";
 import { isValidLoopSessionId } from "../../lib/agentic-loop-telemetry-logic";
 import { registerAgentforgeTelemetryRoutes } from "../agentforge-telemetry";
+import { revenueLoopHistory, runRevenueLoopIteration } from "../revenue-loop-orchestrator";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
   try {
@@ -394,6 +395,64 @@ async function startServer() {
 
   // Revenue-Autopilot: bewertet reale Funnel-/Stripe-/Affiliate-Signale
   // und legt nur deduplizierte, messbare Experimente als pending Drafts ab.
+  // Autonomer Revenue-Loop: ein Durchlauf (messen → priorisieren → handeln als
+  // Entwurf → bewerten → festhalten). Externe Ansprache wird nie ausgelöst.
+  app.post("/api/cron/revenue-loop", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runRevenueLoopIteration();
+      console.info("[Revenue-Loop] Lauf abgeschlossen:", JSON.stringify({
+        status: result.digest.status,
+        lever: result.digest.lever?.key ?? null,
+        actions: result.digest.actions.length,
+        verdict: result.outcome?.verdict ?? null,
+        persisted: result.persisted,
+      }));
+      res.status(result.persisted ? 200 : 207).json({
+        ok: result.ok,
+        persisted: result.persisted,
+        summary: result.summary,
+        lever: result.digest.lever,
+        revenue: result.digest.revenue,
+        reach: result.digest.reach,
+        network: {
+          total: result.digest.network.total,
+          byStage: result.digest.network.byStage,
+          staleCount: result.digest.network.staleCount,
+          note: result.digest.network.note,
+        },
+        actions: result.digest.actions,
+        directive: result.digest.directive,
+        blockers: result.digest.blockers,
+        verdict: result.outcome,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("[Revenue-Loop] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
+  // Umsatz-, Reichweiten- und Netzwerk-Update (nur lesend, ohne Aktionen).
+  app.get("/api/revenue-loop/status", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const digest = (await runRevenueLoopIteration({ persist: false })).digest;
+      const history = await revenueLoopHistory(10);
+      res.json({ ok: true, digest, history, timestamp: Date.now() });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
   app.post("/api/cron/revenue-autopilot", async (req, res) => {
     const configuredToken = process.env.METRICS_TOKEN?.trim();
     if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {

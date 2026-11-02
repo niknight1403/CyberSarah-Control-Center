@@ -1,0 +1,67 @@
+name: revenue-loop-autopilot
+
+# Autonomer Revenue-Loop: ein Durchlauf pro Tag (Umsatz, Reichweite, B2B-Netzwerk).
+# Der Lauf misst die verbundenen Quellen, priorisiert den größten Hebel, legt
+# Aktionen als Entwurf ab und hält Urteil + Direktive fest. Menschen werden
+# nicht angeschrieben; freigabepflichtige Aktionen erscheinen nur im Report.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Anlass (nur für das Log)"
+        default: "manuell"
+  schedule:
+    - cron: "40 5 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revenue-loop-autopilot
+  cancel-in-progress: false
+
+jobs:
+  loop:
+    name: Loop-Durchlauf
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Durchlauf auslösen und Ergebnis prüfen
+        env:
+          BASE_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          TOKEN: ${{ secrets.METRICS_TOKEN }}
+          REASON: ${{ inputs.reason || 'Zeitplan' }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_URL"
+          test -n "$TOKEN"
+          case "$BASE_URL" in https://*) ;; *) echo "::error::RENDER_PUBLIC_URL muss HTTPS sein"; exit 1;; esac
+          body_file="$(mktemp)"
+          summary_file="$(mktemp)"
+          trap 'rm -f "$body_file" "$summary_file"' EXIT
+          http_code="$(curl --silent --show-error --max-time 120 \
+            --output "$body_file" --write-out '%{http_code}' \
+            --request POST --header "Authorization: Bearer $TOKEN" \
+            "${BASE_URL%/}/api/cron/revenue-loop")"
+          echo "Anlass: $REASON | HTTP $http_code"
+          # Nur verdichtete Kennzahlen veröffentlichen, keine Rohdaten (Kundenbezug).
+          node -e '
+            const fs = require("fs");
+            const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const lines = [];
+            const push = (label, value) => lines.push(`- ${label}: ${value}`);
+            if (Array.isArray(body.summary)) for (const line of body.summary) lines.push(`- ${line}`);
+            if (body.lever) push("Hebel", `${body.lever.title} (${body.lever.key})`);
+            push("Aktionen", Array.isArray(body.actions) ? body.actions.length : 0);
+            push("Freigabepflichtig", Array.isArray(body.actions) ? body.actions.filter(a => a.requiresApproval).length : 0);
+            push("Gespeichert", body.persisted === true ? "ja" : "nein");
+            if (body.verdict) push("Urteil", `${body.verdict.verdict} (${body.verdict.deltaPct ?? "n/a"} %)`);
+            if (Array.isArray(body.blockers) && body.blockers.length) push("Blocker", body.blockers.join(" | "));
+            fs.writeFileSync(process.argv[2], lines.join("\n") + "\n");
+          ' "$body_file" "$summary_file"
+          cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+          cat "$summary_file"
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Revenue-Loop lieferte HTTP $http_code (207 = Lauf ohne Persistenz)."
+            exit 1
+          fi

@@ -3,6 +3,7 @@ import {
   index,
   jsonb,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   serial,
@@ -652,3 +653,27 @@ export type ProductReleaseEventRow = typeof productReleaseEvents.$inferSelect;
 export type B2BNetworkNodeRow = typeof b2bNetworkNodes.$inferSelect;
 export type B2BNetworkEdgeRow = typeof b2bNetworkEdges.$inferSelect;
 export type InfluencerLearningStateRow = typeof influencerLearningStates.$inferSelect;
+
+/**
+ * Revenue-Loop-Iterationen (append-only): je Lauf der Hebel, die Aktionen und
+ * das gemessene Urteil. Wird nie aktualisiert, damit die Lernhistorie
+ * nachvollziehbar bleibt.
+ */
+export const revenueLoopRuns = pgTable("revenue_loop_runs", {
+  id: serial("id").primaryKey(),
+  runKey: varchar("run_key", { length: 190 }).notNull().unique(),
+  leverKey: varchar("lever_key", { length: 120 }),
+  leverTitle: varchar("lever_title", { length: 200 }),
+  status: varchar("status", { length: 24 }).notNull().default("optimize"),
+  verdict: varchar("verdict", { length: 24 }),
+  mrrEurBefore: integer("mrr_eur_before"),
+  mrrEurAfter: integer("mrr_eur_after"),
+  deltaPct: numeric("delta_pct", { precision: 8, scale: 2 }),
+  reachSnapshot: jsonb("reach_snapshot").$type<Record<string, unknown>>().default({}).notNull(),
+  networkSnapshot: jsonb("network_snapshot").$type<Record<string, unknown>>().default({}).notNull(),
+  actions: jsonb("actions").$type<unknown[]>().default([]).notNull(),
+  directive: varchar("directive", { length: 32 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type RevenueLoopRunRow = typeof revenueLoopRuns.$inferSelect;
