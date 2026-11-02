@@ -40,10 +40,12 @@ export class AgentCheckpointEngine {
     return String(result);
   }
   async getLastCheckpoint(taskId: string): Promise<AgentStepState | null> {
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(taskId)) throw new Error("Invalid task id");
     const raw = await this.redis.get(this.stateKey(taskId));
     return raw ? JSON.parse(raw) as AgentStepState : null;
   }
   async monitorAndSelfHeal(taskId: string, maxStaleMs = 30000, resumeCallback: (state: AgentStepState) => Promise<void>): Promise<boolean> {
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(taskId) || !Number.isFinite(maxStaleMs) || maxStaleMs < 0) throw new Error("Invalid recovery request");
     const current = await this.getLastCheckpoint(taskId);
     if (!current || current.status !== "IN_PROGRESS" || Date.now() - current.timestamp <= maxStaleMs) return false;
     const token = randomUUID();
