@@ -4,11 +4,15 @@ name: VillaForge-Ops
 # SQLite-DB finden, Villen auflisten oder gezielt loeschen (mit Namens-Bestaetigung).
 #   mode=list                               -> Host-Erkennung + Villa-Inventar (read-only)
 #   mode=delete, villa_id, confirm_name     -> Villa samt Tasks/Agents/Chats loeschen
+#   mode=status                             -> VM-Gesundheit pruefen (rote Schwelle = Workflow rot)
+#
+# Laeuft zusaetzlich taeglich um 06:00 UTC als Statuswaechter; ein roter Lauf
+# ist das Alarmsignal (Platte >= 90 %, Hub-Prozess fehlt, Port 443 zu).
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "list | delete | disk-free"
+        description: "list | delete | disk-free | status"
         default: "list"
       villa_id:
         description: "Villa-ID (nur delete)"
@@ -16,6 +20,9 @@ on:
       confirm_name:
         description: "Exakter Villaname als Bestaetigung (nur delete)"
         default: ""
+  schedule:
+    # Taeglicher Statuswaechter (Wartung + Ueberwachung der Produktions-VM).
+    - cron: '0 6 * * *'
 
 permissions:
   contents: read
@@ -35,7 +42,9 @@ jobs:
           chmod 600 ~/.ssh/prod_key
       - name: VillaForge verwalten
         env:
-          MODE: ${{ inputs.mode }}
+          # Bei schedule-Laeufen sind inputs leer -> status als Standard.
+          MODE: ${{ inputs.mode || 'status' }}
+          STATUS_B64: 'ZWNobyAiaG9zdDogJChob3N0bmFtZSkiCmVjaG8gInVwdGltZTogJCh1cHRpbWUgLXAgMj4vZGV2L251bGwgfHwgdXB0aW1lKSIKZWNobyAibG9hZDogJChjdXQgLWQnICcgLWYxLTMgL3Byb2MvbG9hZGF2ZykiCmVjaG8gImRpc2tfcGN0OiAkKGRmIC1QIC8gfCBhd2sgJ05SPT0ye2dzdWIoIiUiLCIiLCQ1KTsgcHJpbnQgJDV9JykiCmVjaG8gImRpc2tfZnJlZTogJChkZiAtaCAvIHwgYXdrICdOUj09MntwcmludCAkNH0nKSIKZWNobyAibWVtOiAkKGZyZWUgLW0gfCBhd2sgJy9NZW06L3twcmludCAidXNlZD0iJDMiTUIgYXZhaWw9IiQ3Ik1CIn0nKSIKZWNobyAiaHViX3Byb2M6ICQocGdyZXAgLWZjICdzZXJ2ZXIvc2VydmVyWy5dbWpzfHZpbGxhZm9yZ2UnIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiCmVjaG8gIm5vZGVfcG9ydHM6ICQoc3MgLWxudHAgMj4vZGV2L251bGwgfCBncmVwIC1vICc6WzAtOV0qICcgfCBzb3J0IC11IHwgdHIgLWQgJyA6JyB8IHRyICdcbicgJyAnKSIKZWNobyAiZGJfc2l6ZTogJChkdSAtaCAvb3B0L3ZpbGxhZm9yZ2UvZGF0YS9odWIuZGIgMj4vZGV2L251bGwgfCBjdXQgLWYxIHx8IGVjaG8gdW5iZWthbm50KSIK' 
           VILLA_ID: ${{ inputs.villa_id }}
           CONFIRM_NAME: ${{ inputs.confirm_name }}
           SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
@@ -52,5 +61,141 @@ jobs:
             disk-free)
               $SSH_CMD 'echo "Y29uc3QgeyBleGVjU3luYyB9ID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCBydW4gPSAoYykgPT4geyB0cnkgeyByZXR1cm4gU3RyaW5nKGV4ZWNTeW5jKGMsIHsgc2hlbGw6ICcvYmluL2Jhc2gnIH0pKS50cmltKCk7IH0gY2F0Y2ggKGUpIHsgcmV0dXJuICdGRUhMRVI6ICcgKyBTdHJpbmcoZS5tZXNzYWdlKS5zcGxpdCgnXG4nKVswXTsgfSB9Owpjb25zb2xlLmxvZygnPT0gdm9yaGVyID09Jyk7IGNvbnNvbGUubG9nKHJ1bignZGYgLWggLyB8IHRhaWwgLTEnKSk7CmNvbnNvbGUubG9nKCc9PSAvdmFyL2xpYiBUb3AgPT0nKTsgY29uc29sZS5sb2cocnVuKCdkdSAteGggLS1tYXgtZGVwdGg9MSAvdmFyL2xpYiAyPi9kZXYvbnVsbCB8IHNvcnQgLXJoIHwgaGVhZCAtOCcpKTsKY29uc29sZS5sb2coJz09IC92YXIvbG9nIFRvcCA9PScpOyBjb25zb2xlLmxvZyhydW4oJ2R1IC14aCAtLW1heC1kZXB0aD0xIC92YXIvbG9nIDI+L2Rldi9udWxsIHwgc29ydCAtcmggfCBoZWFkIC02JykpOwpjb25zb2xlLmxvZygnPT0gL2hvbWUgVG9wID09Jyk7IGNvbnNvbGUubG9nKHJ1bignZHUgLXhoIC0tbWF4LWRlcHRoPTIgL2hvbWUgMj4vZGV2L251bGwgfCBzb3J0IC1yaCB8IGhlYWQgLTEwJykpOwpjb25zb2xlLmxvZygnPT0gbnBtLUNhY2hlcyBoYXJ0IGxvZXNjaGVuID09Jyk7CmNvbnNvbGUubG9nKHJ1bigncm0gLXJmIC9ob21lLyovLm5wbS9fY2FjYWNoZSAvcm9vdC8ubnBtL19jYWNhY2hlIC9ob21lLyovLmNhY2hlL3BpcCAvcm9vdC8uY2FjaGUvcGlwIC9ob21lLyovLmdyYWRsZS9jYWNoZXMgL3Jvb3QvLmdyYWRsZS9jYWNoZXMgL2hvbWUvKi8uY2FjaGUvdHlwZXNjcmlwdCAvcm9vdC8uY2FjaGUvdHlwZXNjcmlwdCAmJiBlY2hvIE9LJykpOwpjb25zb2xlLmxvZygnPT0gcG5wbSBzdG9yZSBwcnVuZSA9PScpOyBjb25zb2xlLmxvZyhydW4oJ3BucG0gc3RvcmUgcHJ1bmUgMj4vZGV2L251bGwgfHwgZWNobyBwbnBtIG5pY2h0IGltIFBBVEgnKSk7CmNvbnNvbGUubG9nKCc9PSBhcHQgY2xlYW4gPT0nKTsgY29uc29sZS5sb2cocnVuKCdzdWRvIC1uIGFwdC1nZXQgY2xlYW4gMj4vZGV2L251bGwgfHwgYXB0LWdldCBjbGVhbiAyPi9kZXYvbnVsbCB8fCBlY2hvIGFwdC1jbGVhbiBuaWNodCBtb2VnbGljaCcpKTsKY29uc29sZS5sb2coJz09IGpvdXJuYWwgYXVmIDEwME0gPT0nKTsgY29uc29sZS5sb2cocnVuKCdzdWRvIC1uIGpvdXJuYWxjdGwgLS12YWN1dW0tc2l6ZT0xMDBNIDI+L2Rldi9udWxsIHx8IGpvdXJuYWxjdGwgLS12YWN1dW0tc2l6ZT0xMDBNIDI+L2Rldi9udWxsIHx8IGVjaG8gbmljaHQgdmFjdXVtYmFyJykpOwpjb25zb2xlLmxvZygnPT0gbmFjaGhlciA9PScpOyBjb25zb2xlLmxvZyhydW4oJ2RmIC1oIC8gfCB0YWlsIC0xJykpOwo=" | base64 -d | node -'
               ;;
+            status)
+              # VM-Gesundheit messen. Roter Lauf = Handlungsbedarf
+              # (Platte >= 90 % oder kein VillaForge-Prozess).
+              set +e
+              OUT=$($SSH_CMD "echo '$STATUS_B64' | base64 -d | bash")
+              echo "$OUT"
+              {
+                echo "## VillaForge-VM Status"
+                echo '```'
+                echo "$OUT"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              DISK=$(printf '%s\n' "$OUT" | awk -F': ' '/^disk_pct:/{print $2}')
+              HUB=$(printf '%s\n' "$OUT" | awk -F': ' '/^hub_proc:/{print $2}')
+              FAIL=0
+              if [ -n "$DISK" ] && [ "$DISK" -ge 90 ]; then echo "::error::Platte zu voll: ${DISK}% belegt"; FAIL=1; fi
+              if [ -n "$HUB" ] && [ "$HUB" -lt 1 ]; then echo "::error::Kein VillaForge-Prozess gefunden"; FAIL=1; fi
+              # HTTP-Pruefung passiert von aussen im naechsten Schritt
+              # (die VM selbst sieht ihren vhost nicht zuverlaessig).
+              echo "disk=${DISK}% hub_proc=$HUB"
+              exit $FAIL
+              ;;
+            hub-diag)
+              # Fokus: welcher Port gehoert zum Hub-Prozess und wie routet Caddy.
+              # Caddyfile ist klein und enthaelt keine Secrets.
+              $SSH_CMD '
+                echo "== Caddyfile =="
+                cat /etc/caddy/Caddyfile 2>/dev/null | head -60
+                echo "== Hub-Prozess =="
+                for p in $(pgrep -f "server/server[.]mjs"); do
+                  echo "pid=$p cwd=$(readlink /proc/$p/cwd 2>/dev/null)"
+                  echo "  cmd=$(tr "\0" " " < /proc/$p/cmdline 2>/dev/null | cut -c1-120)"
+                done
+                echo "== Ports aller node-Prozesse =="
+                ss -lntp 2>/dev/null | grep node | head -10
+              '
+              ;;
+            hub-route)
+              # Repariert die fehlende Route fuer hub.cybersarah-ki.com.
+              # Abgesichert: Backup, caddy validate, Reload nur bei gueltiger
+              # Konfiguration, sonst Rollback. Bestehende Route bleibt unangetastet.
+              $SSH_CMD '
+                set -e
+                if grep -q "hub.cybersarah-ki.com" /etc/caddy/Caddyfile; then
+                  echo "Route existiert bereits:"; grep -n -A3 "hub.cybersarah-ki.com" /etc/caddy/Caddyfile
+                  exit 0
+                fi
+                BACKUP=/etc/caddy/Caddyfile.bak-hubroute-$(date +%Y%m%d%H%M%S)
+                sudo -n cp /etc/caddy/Caddyfile "$BACKUP" || cp /etc/caddy/Caddyfile "$BACKUP" || { echo "FEHLER: kein Backup moeglich"; exit 1; }
+                echo "Backup: $BACKUP"
+                printf "\n\nhub.cybersarah-ki.com {\n\tencode gzip\n\treverse_proxy 127.0.0.1:12000\n}\n" | sudo -n tee -a /etc/caddy/Caddyfile >/dev/null || { echo "FEHLER: kein Schreibrecht"; exit 1; }
+                if sudo -n caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -3; then
+                  sudo -n systemctl reload caddy
+                  echo "Caddy neu geladen"
+                else
+                  echo "FEHLER: Konfiguration ungueltig, Rollback"
+                  sudo -n cp "$BACKUP" /etc/caddy/Caddyfile
+                  exit 1
+                fi
+                echo "Hub lokal: $(curl -s -o /dev/null -w "%{http_code}" --max-time 8 http://127.0.0.1:12000/api/health || echo 000)"
+              '
+              ;;
+            disk-report)
+              # Read-only: wo liegt der Plattenplatz? Nur messen, nichts loeschen.
+              $SSH_CMD '
+                echo "== / Top 12 =="
+                sudo -n du -xh --max-depth=1 / 2>/dev/null | sort -rh | head -12 || du -xh --max-depth=1 / 2>/dev/null | sort -rh | head -12
+                echo "== /var Top 8 =="
+                sudo -n du -xh --max-depth=1 /var 2>/dev/null | sort -rh | head -8
+                echo "== /root /opt /home Top 8 =="
+                sudo -n du -xh --max-depth=1 /root /opt /home 2>/dev/null | sort -rh | head -10
+                echo "== grosse Dateien > 300M =="
+                sudo -n find / -xdev -type f -size +300M -printf "%s %p\n" 2>/dev/null | sort -rn | head -10 | awk "{printf \"%.1fG %s\n\", \$1/1073741824, \$2}"
+                echo "== Aufraeum-Kandidaten =="
+                du -sh /root/.ollama /var/lib/containerd /var/lib/docker /var/log /root/hub.db 2>/dev/null
+              '
+              ;;
+            disk-clean)
+              # Gezieltes Aufraeumen belegter Reste. Loescht nur Caches,
+              # Installer-Archive und rotierte Logs - keine Datenbanken,
+              # keine Backups, keine Modelle.
+              $SSH_CMD '
+                echo "== vorher =="; df -h / | tail -1
+                echo "== swap =="; swapon --show 2>/dev/null; free -m | head -3
+                echo "== Caches leeren =="
+                sudo -n rm -rf /root/.npm/_cacache /home/*/.npm/_cacache /root/.gradle/caches /home/*/.gradle/caches 2>/dev/null
+                sudo -n rm -rf /root/.cache/pip /home/*/.cache/pip /root/.cache/typescript /home/*/.cache/typescript 2>/dev/null
+                sudo -n apt-get clean 2>/dev/null || true
+                sudo -n journalctl --vacuum-size=200M 2>/dev/null | tail -1 || true
+                echo "== Installer-Archiv entfernen =="
+                ls -lh /usr/local/lib/hermes-agent.tgz 2>/dev/null && sudo -n rm -f /usr/local/lib/hermes-agent.tgz && echo "hermes-agent.tgz entfernt"
+                echo "== nachher =="; df -h / | tail -1
+                echo "== Rest-Kandidaten =="
+                sudo -n du -xh --max-depth=1 /opt /var/lib 2>/dev/null | sort -rh | head -6
+              '
+              ;;
+            swap-shrink)
+              # Das 6-GB-Swapfile ist zu 96 % ungenutzt und belegt die Platte.
+              # Ablauf mit Sicherheitspruefung: nur wenn genug RAM frei ist,
+              # wird /swapfile2 abgeschaltet, aus der fstab entfernt und geloescht.
+              $SSH_CMD '
+                set -e
+                echo "== vorher =="; df -h / | tail -1; swapon --show; free -m | head -3
+                USED=$(free -m | awk "/Swap:/{print \$3}")
+                AVAIL=$(free -m | awk "/Mem:/{print \$7}")
+                echo "swap_used=${USED}MB ram_available=${AVAIL}MB"
+                if [ "${AVAIL:-0}" -lt $(( ${USED:-0} * 2 )) ]; then
+                  echo "ABBRUCH: zu wenig freier RAM fuer swapoff (Regel: RAM frei >= 2x Swap belegt)"
+                  exit 1
+                fi
+                if [ ! -f /swapfile2 ]; then echo "kein /swapfile2 vorhanden - nichts zu tun"; exit 0; fi
+                sudo -n swapoff /swapfile2
+                sudo -n cp /etc/fstab /etc/fstab.bak-$(date +%Y%m%d%H%M%S)
+                sudo -n sed -i "\|/swapfile2|d" /etc/fstab
+                sudo -n rm -f /swapfile2
+                echo "== nachher =="; df -h / | tail -1; swapon --show; free -m | head -3
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
+      - name: Hub von aussen pruefen
+        if: always()
+        run: |
+          # Die VM sieht ihren eigenen vhost nicht zuverlaessig; geprueft wird
+          # der oeffentliche Weg, den auch Nutzer gehen.
+          set +e
+          API=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 15 https://hub.cybersarah-ki.com/api/health)
+          UI=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://hub.cybersarah-ki.com/)
+          echo "api_health=$API ui=$UI"
+          {
+            echo "## Hub (oeffentlich)"
+            echo "- /api/health: $API"
+            echo "- /: $UI"
+          } >> "$GITHUB_STEP_SUMMARY"
+          FAIL=0
+          if [ "$API" != "200" ]; then echo "::error::Hub-API antwortet mit $API"; FAIL=1; fi
+          if [ "$UI" != "200" ]; then echo "::error::Hub-Oberflaeche antwortet mit $UI"; FAIL=1; fi
+          exit $FAIL
