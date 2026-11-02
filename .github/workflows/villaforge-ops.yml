@@ -157,6 +157,28 @@ jobs:
                 sudo -n du -xh --max-depth=1 /opt /var/lib 2>/dev/null | sort -rh | head -6
               '
               ;;
+            swap-shrink)
+              # Das 6-GB-Swapfile ist zu 96 % ungenutzt und belegt die Platte.
+              # Ablauf mit Sicherheitspruefung: nur wenn genug RAM frei ist,
+              # wird /swapfile2 abgeschaltet, aus der fstab entfernt und geloescht.
+              $SSH_CMD '
+                set -e
+                echo "== vorher =="; df -h / | tail -1; swapon --show; free -m | head -3
+                USED=$(free -m | awk "/Swap:/{print \$3}")
+                AVAIL=$(free -m | awk "/Mem:/{print \$7}")
+                echo "swap_used=${USED}MB ram_available=${AVAIL}MB"
+                if [ "${AVAIL:-0}" -lt $(( ${USED:-0} * 2 )) ]; then
+                  echo "ABBRUCH: zu wenig freier RAM fuer swapoff (Regel: RAM frei >= 2x Swap belegt)"
+                  exit 1
+                fi
+                if [ ! -f /swapfile2 ]; then echo "kein /swapfile2 vorhanden - nichts zu tun"; exit 0; fi
+                sudo -n swapoff /swapfile2
+                sudo -n cp /etc/fstab /etc/fstab.bak-$(date +%Y%m%d%H%M%S)
+                sudo -n sed -i "\|/swapfile2|d" /etc/fstab
+                sudo -n rm -f /swapfile2
+                echo "== nachher =="; df -h / | tail -1; swapon --show; free -m | head -3
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
