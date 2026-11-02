@@ -340,6 +340,21 @@ jobs:
                 echo "Fokus-Endpunkt: $(curl -s -o /dev/null -w "%{http_code}" -m 10 http://127.0.0.1:12000/api/focus)"
               '
               ;;
+            hub-version)
+              # Vergleicht den Hub-Stand auf der VM mit dem Repo (Pruefsummen).
+              $SSH_CMD '
+                echo "== Unit =="
+                systemctl cat villaforge.service 2>/dev/null | grep -E "^(ExecStart|WorkingDirectory|User|Environment)=" | head -8
+                echo "== Dateien =="
+                for f in server/server.mjs server/scheduler.mjs server/master.mjs package.json; do
+                  printf "%s  %s\n" "$(sha256sum /opt/villaforge/$f 2>/dev/null | cut -c1-16)" "$f"
+                done
+                echo "== Verzeichnisliste server/ (Anzahl) =="
+                ls /opt/villaforge/server/*.mjs 2>/dev/null | wc -l
+                echo "== letzte Aenderung =="
+                stat -c "%y %n" /opt/villaforge/server/server.mjs 2>/dev/null
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
