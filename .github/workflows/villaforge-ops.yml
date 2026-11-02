@@ -387,6 +387,7 @@ jobs:
               echo "RAW: TASK_FELDER $(jq -c '[(.tasks // [])[]][0] | if . == null then null else (keys) end' /tmp/v.json)"
               echo "RAW: DONE_TAIL $(jq -c '[(.tasks // [])[] | select(.status=="DONE")] | .[-8:] | map(.title // .name // "?")' /tmp/v.json)"
               echo "RAW: OFFEN $(jq -c '[(.tasks // [])[] | select(.status != "DONE")] | map({s: .status, t: (.title // .name // "?")}) | .[0:8]' /tmp/v.json)"
+              echo "RAW: FEHLERGRUND $(jq -c '[(.tasks // [])[] | select(.status=="FAILED" or .status=="RUNNING")] | map({t: (.title // "?"), s: .status, r: ((.result // "") | tostring | .[0:700])}) | .[0:4]' /tmp/v.json)"
               echo "RAW: MSG_ART $(jq -c 'type' /tmp/m.json)"
               echo "RAW: MSG_N $(jq -c 'if type=="array" then length else -1 end' /tmp/m.json)"
               echo "RAW: MSG_TAIL $(jq -c 'if type=="array" then .[-4:] | map({role, created_at, c: ((.content // "") | .[0:120])}) else . end' /tmp/m.json)"
