@@ -133,6 +133,29 @@ export async function getPersonaPerformanceForUser(
   );
 }
 
+export async function enqueueApprovedContentDraft(
+  userOpenId: string,
+  draft: { id: number; personaId: string; platform: string; topic: string; content: string },
+): Promise<{ inserted: boolean; jobId: number | null }> {
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfuegbar — freigegebener Content nicht einreihbar.");
+  const content = draft.content.trim();
+  if (!userOpenId || !Number.isSafeInteger(draft.id) || draft.id < 1 || content.length < 10) throw new Error("Ungueltiger freigegebener Content-Draft.");
+  const platform = draft.platform.toLowerCase().replace("youtube/shorts", "tiktok");
+  const supported = new Set(["instagram","tiktok","linkedin","x","threads","bluesky"]);
+  if (!supported.has(platform)) throw new Error(`Plattform ${platform} wird von der Publishing-Pipeline nicht unterstuetzt.`);
+  const [created] = await db.insert(publishingJobs).values({
+    userOpenId, product: draft.topic.trim() || "Freigegebener Content", goal: "reach",
+    contentOverride: content, sourceDraftId: draft.id, persona: draft.personaId,
+    platform, campaignDay: 1, dedupeKey: `approved-draft:${draft.id}`,
+    scheduledFor: new Date(),
+  }).onConflictDoNothing().returning({ id: publishingJobs.id });
+  if (created) return { inserted: true, jobId: created.id };
+  const [existing] = await db.select({id:publishingJobs.id}).from(publishingJobs)
+    .where(and(eq(publishingJobs.userOpenId,userOpenId),eq(publishingJobs.sourceDraftId,draft.id))).limit(1);
+  return { inserted: false, jobId: existing?.id ?? null };
+}
+
 export async function enqueueCampaignForUser(
   userOpenId: string,
   input: { product: string; goal: InfluencerGoal; days?: number; assetUrl?: string | null; assetUrls?: string[] }
@@ -335,6 +358,8 @@ async function usersWithDueJobs(): Promise<string[]> {
 // ---------------------------------------------------------------------------
 
 async function generateJobContent(job: PublishingJobRow): Promise<string> {
+  const approved = job.contentOverride?.trim();
+  if (approved) return approved;
   const persona = getInfluencerPersona(job.persona as InfluencerPersonaId);
   if (!persona) throw new Error(`Unbekannte Persona "${job.persona}" — Job nicht veroeffentlichbar.`);
   const prompt = buildInfluencerPrompt(persona, job.product, job.platform as InfluencerPlatform);
