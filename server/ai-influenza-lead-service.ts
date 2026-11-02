@@ -40,7 +40,7 @@ export async function upsertAiInfluenzaLead(input:{
 
 export async function prepareAiInfluenzaProposal(input:{
   nodeKey:string;
-  packageId:"starter"|"growth"|"business";
+  packageId:"starter"|"growth"|"business"|"elite";
   createdByOpenId:string;
 }){
   const db=await getDb();if(!db)throw new Error("Datenbank nicht verfügbar.");
