@@ -164,6 +164,7 @@ export const AI_INFLUENZA_PRICE_ENV:Record<AiInfluenzaPackageId,string>={
   starter:"STRIPE_AI_INFLUENZA_PRICE_ID_STARTER",
   growth:"STRIPE_AI_INFLUENZA_PRICE_ID_GROWTH",
   business:"STRIPE_AI_INFLUENZA_PRICE_ID_BUSINESS",
+  elite:"STRIPE_AI_INFLUENZA_PRICE_ID_ELITE",
 };
 
 export function buildAiInfluenzaStripeLineItem(packageId:AiInfluenzaPackageId,env:Record<string,string|undefined>){
