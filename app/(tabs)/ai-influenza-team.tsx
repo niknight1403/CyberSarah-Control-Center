@@ -1,4 +1,4 @@
-import {useMemo} from "react";
+import {useMemo,useState} from "react";
 import {Linking,Pressable,ScrollView,StyleSheet,Text,View} from "react-native";
 import {ScreenContainer} from "@/components/screen-container";
 import {GlassBackdrop} from "@/components/glass/glass-backdrop";
@@ -6,6 +6,15 @@ import {GlassCard,GlowButton,StatusChip} from "@/components/glass/glass-primitiv
 import {NavDrawer,NavDrawerButton,useNavDrawer} from "@/components/responsive/nav-drawer";
 import {glassPalette,glassSurface} from "@/lib/design/future-glass";
 import {trpc} from "@/lib/trpc";
+import {
+  AI_INFLUENZA_DASHBOARD_VIEWS,
+  buildAiInfluenzaHealthVerdict,
+  formatEuroCents,
+  formatPercent,
+  readNumber,
+  resolveAiInfluenzaDashboardView,
+  type AiInfluenzaDashboardViewId,
+} from "@/lib/ai-influenza-dashboard-logic";
 
 function money(cents:number){return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(cents/100);}
 
@@ -26,6 +35,13 @@ export default function AiInfluenzaTeamScreen(){
     onSuccess:result=>{void Linking.openURL(result.url);},
   });
   const packages=useMemo(()=>catalog.data?.packages??[],[catalog.data]);
+  const [viewId,setViewId]=useState<AiInfluenzaDashboardViewId>("revenue");
+  const activeView=resolveAiInfluenzaDashboardView(viewId);
+  const health=buildAiInfluenzaHealthVerdict({
+    databaseAvailable:Boolean(overview.data)&&!overview.error,
+    openOrders:readNumber(overview.data?.counts,"orders"),
+    waitingApprovals:readNumber(overview.data?.counts?.steps,"approval"),
+  });
 
   return <GlassBackdrop accent="magenta">
     <ScreenContainer edges={["top","left","right"]} containerClassName="bg-transparent" safeAreaClassName="bg-transparent">
@@ -46,6 +62,23 @@ export default function AiInfluenzaTeamScreen(){
             <StatusChip label={media.data?.video.available?"Video bereit":"Video prüfen"} accent={media.data?.video.available?"green":"amber"}/>
             <StatusChip label={isAdmin?"Admin Control":"Customer View"} accent={isAdmin?"cyan":"blue"}/>
           </View>
+        </GlassCard>
+
+        <Text style={s.sectionTitle}>Ansichten</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.viewTabs}>
+          {AI_INFLUENZA_DASHBOARD_VIEWS.map(view=><Pressable
+            key={view.id}
+            accessibilityRole="tab"
+            accessibilityState={{selected:view.id===activeView.id}}
+            onPress={()=>setViewId(view.id)}
+            style={[s.viewTab,view.id===activeView.id&&s.viewTabActive]}>
+            <Text style={[s.viewTabText,view.id===activeView.id&&s.viewTabTextActive]}>{view.title}</Text>
+          </Pressable>)}
+        </ScrollView>
+        <GlassCard accent="cyan" style={s.card}>
+          <Text style={s.kicker}>{activeView.title.toUpperCase()}</Text>
+          <Text style={s.copy}>{activeView.purpose}</Text>
+          {activeView.requiresAdmin&&!isAdmin?<Text style={s.notice}>Diese Ansicht ist nur für Administratoren freigegeben.</Text>:null}
         </GlassCard>
 
         <Text style={s.sectionTitle}>Buchbare Pakete</Text>
@@ -69,43 +102,79 @@ export default function AiInfluenzaTeamScreen(){
           {portal.error?<Text style={s.error}>{portal.error.message}</Text>:null}
         </GlassCard>
 
-        {isAdmin?<>
-          <Text style={s.sectionTitle}>Revenue Dashboard</Text>
-          <View style={s.metrics}>
-            <Metric label="Aufträge" value={overview.data?.counts.orders??"—"}/>
-            <Metric label="Agent Tasks" value={overview.data?.counts.tasks??"—"}/>
-            <Metric label="Leads" value={leads.data?.counts.total??"—"}/>
-            <Metric label="Hot Leads" value={leads.data?.counts.hot??"—"}/>
-            <Metric label="Kunden" value={leads.data?.counts.customers??"—"}/>
-            <Metric label="Revenue 30d" value={profit.data?money(profit.data.recognizedRevenueCents):"—"}/>
-            <Metric label="Kosten 30d" value={profit.data?money(profit.data.totalCostCents):"—"}/>
-            <Metric label="Deckungsbeitrag" value={profit.data?money(profit.data.contributionCents):"—"}/>
-          </View>
+                {isAdmin?<>
+          {activeView.id==="revenue"?<>
+            <Text style={s.sectionTitle}>Revenue Dashboard</Text>
+            <View style={s.metrics}>
+              <Metric label="Aufträge" value={overview.data?.counts.orders??"—"}/>
+              <Metric label="Agent Tasks" value={overview.data?.counts.tasks??"—"}/>
+              <Metric label="Leads" value={leads.data?.counts.total??"—"}/>
+              <Metric label="Hot Leads" value={leads.data?.counts.hot??"—"}/>
+              <Metric label="Kunden" value={leads.data?.counts.customers??"—"}/>
+              <Metric label="Revenue 30d" value={formatEuroCents(profit.data?profit.data.recognizedRevenueCents:null)}/>
+              <Metric label="Kosten 30d" value={formatEuroCents(profit.data?profit.data.totalCostCents:null)}/>
+              <Metric label="Deckungsbeitrag" value={formatEuroCents(profit.data?profit.data.contributionCents:null)}/>
+            </View>
+          </>:null}
 
-          <GlassCard accent="purple" style={s.card}>
+          {activeView.id==="agents"?<GlassCard accent="purple" style={s.card}>
             <Text style={s.sectionTitle}>AI Agent Team</Text>
             {(agents.data??[]).map(agent=><View key={agent.id} style={s.agent}>
               <Text style={s.agentName}>{agent.name}</Text>
               <Text style={s.copy}>{agent.mission}</Text>
+              <Text style={s.notice}>Externe Aktionen: {agent.externalActionAllowed?"erlaubt":"nur mit Freigabe"}</Text>
             </View>)}
-          </GlassCard>
+          </GlassCard>:null}
 
-          <GlassCard accent="green" style={s.card}>
+          {activeView.id==="leads"?<GlassCard accent="green" style={s.card}>
             <Text style={s.sectionTitle}>Lead Pipeline</Text>
             <Text style={s.copy}>Hot {leads.data?.counts.hot??0} · Warm {leads.data?.counts.warm??0} · Opt-out {leads.data?.counts.optedOut??0}</Text>
             <Text style={s.notice}>Externe Kontaktaufnahme ist nicht automatisch freigegeben. Quellen, Rechtsgrundlage und Opt-outs bleiben Bestandteil jedes Lead-Datensatzes.</Text>
-          </GlassCard>
+          </GlassCard>:null}
 
-          <GlassCard accent="green" style={s.card}>
+          {activeView.id==="customers"?<GlassCard accent="cyan" style={s.card}>
+            <Text style={s.sectionTitle}>Customer Management</Text>
+            <Text style={s.copy}>Offene Aufträge: {overview.data?.counts.orders??"—"} · Agent Tasks: {overview.data?.counts.tasks??"—"} · Kunden im Netzwerk: {leads.data?.counts.customers??"—"}</Text>
+            <Text style={s.notice}>Auftragsdetails, Workflow-Schritt und Lieferplan je Kunde liegen in der Auftrags-Engine; der Kundenweg ist gegen PostgreSQL getestet.</Text>
+          </GlassCard>:null}
+
+          {activeView.id==="content"?<GlassCard accent="purple" style={s.card}>
+            <Text style={s.sectionTitle}>Content Factory</Text>
+            <Text style={s.copy}>Video-Pipeline: {media.data?.video.available?"verfügbar":"nicht verfügbar"} · Entwürfe werden erst nach Qualitätsprüfung veröffentlicht.</Text>
+            <Text style={s.notice}>Kein automatisches Publishing: Entwürfe laufen über die bestehenden Draft-/Freigabe-Gates.</Text>
+          </GlassCard>:null}
+
+          {activeView.id==="campaigns"?<GlassCard accent="amber" style={s.card}>
+            <Text style={s.sectionTitle}>Campaign Manager</Text>
+            <Text style={s.notice}>Noch keine Datenquelle für Kampagnen. Kanalplanung je Kunde folgt mit der Content-Pipeline (Sprint 6); hier wird keine Zahl angezeigt, solange sie nicht belegt ist.</Text>
+          </GlassCard>:null}
+
+          {activeView.id==="billing"?<GlassCard accent="cyan" style={s.card}>
+            <Text style={s.sectionTitle}>Stripe & Subscriptions</Text>
+            <Text style={s.copy}>Paketpreise: {packages.map(pkg=>`${pkg.name} ${formatEuroCents(pkg.monthlyPriceCents)}`).join(" · ")||"—"}</Text>
+            <Text style={s.notice}>Erkannter Umsatz stammt ausschließlich aus verifizierten Stripe-Events, nicht aus Paketpreisen.</Text>
+          </GlassCard>:null}
+
+          {activeView.id==="profit"?<GlassCard accent="green" style={s.card}>
             <Text style={s.sectionTitle}>Profit Analytics</Text>
-            <Text style={s.copy}>Erkannter Umsatz: {profit.data?money(profit.data.recognizedRevenueCents):"—"} · Kosten: {profit.data?money(profit.data.totalCostCents):"—"} · Marge: {profit.data?.marginPct===null||profit.data?.marginPct===undefined?"—":profit.data.marginPct+"%"}</Text>
+            <Text style={s.copy}>Erkannter Umsatz: {formatEuroCents(profit.data?profit.data.recognizedRevenueCents:null)} · Kosten: {formatEuroCents(profit.data?profit.data.totalCostCents:null)} · Marge: {formatPercent(profit.data?profit.data.marginPct:null)}</Text>
             <Text style={s.notice}>Quelle: verifizierte Stripe-Invoices minus separat erfasste Cost-Events. Paketpreise werden nicht als Umsatz angenommen.</Text>
-          </GlassCard>
+          </GlassCard>:null}
 
-          <GlassCard accent="amber" style={s.card}>
+          {activeView.id==="autopilot"?<GlassCard accent="amber" style={s.card}>
             <Text style={s.sectionTitle}>Autopilot Control Center</Text>
             <Text style={s.copy}>Standardmodus: Assisted. Interne Analyse, Planung und Drafts dürfen autonom laufen. Zahlungen, Verträge, externe Sends, Veröffentlichungen und sensible Kundenaktionen benötigen bestehende Freigabe-/Policy-Gates.</Text>
-          </GlassCard>
+            <Text style={s.notice}>Der Tages-Autopilot führt die Sparte mit aus und schaltet nur Guard-erlaubte Schritte weiter.</Text>
+          </GlassCard>:null}
+
+          {activeView.id==="health"?<GlassCard accent={health.level==="ok"?"green":health.level==="warn"?"amber":"magenta"} style={s.card}>
+            <Text style={s.sectionTitle}>System Health & QA</Text>
+            <View style={s.row}>
+              <StatusChip label={health.label} accent={health.level==="ok"?"green":health.level==="warn"?"amber":"magenta"}/>
+              <StatusChip label={media.data?.video.available?"Video bereit":"Video prüfen"} accent={media.data?.video.available?"green":"amber"}/>
+            </View>
+            {health.notes.map(note=><Text key={note} style={s.notice}>• {note}</Text>)}
+          </GlassCard>:null}
         </>:null}
       </ScrollView>
     </ScreenContainer>
@@ -140,4 +209,9 @@ const s=StyleSheet.create({
   metricLabel:{color:glassSurface.textMuted,fontSize:10,marginTop:3},
   agent:{borderTopColor:glassSurface.border,borderTopWidth:1,paddingTop:9,gap:4},
   agentName:{color:glassSurface.textPrimary,fontSize:13,fontWeight:"900"},
+  viewTabs:{flexDirection:"row",gap:8,paddingVertical:2},
+  viewTab:{borderColor:glassSurface.border,borderRadius:999,borderWidth:1,paddingHorizontal:12,paddingVertical:7},
+  viewTabActive:{backgroundColor:`${glassPalette.cyan}22`,borderColor:glassPalette.cyan},
+  viewTabText:{color:glassSurface.textMuted,fontSize:11,fontWeight:"800"},
+  viewTabTextActive:{color:glassPalette.cyan},
 });
