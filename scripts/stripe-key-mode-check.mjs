@@ -27,8 +27,12 @@ for (const name of names) {
       continue;
     }
     const body = await res.json();
-    const mode = body.livemode === true ? "LIVE" : "TEST";
-    console.log(`${name}: ${mode}`);
+    // Praefix ist eindeutiger als ein fehlendes livemode-Feld: restricted Keys
+    // liefern livemode nicht immer mit, dann sah die alte Fassung faelschlich TEST.
+    const prefix = ["sk_test_", "rk_test_", "sk_live_", "rk_live_"].find((p) => key.startsWith(p)) ?? "unbekannt";
+    const livemode = typeof body.livemode === "boolean" ? body.livemode : null;
+    const mode = livemode === null ? (prefix.endsWith("_live_") ? "LIVE" : prefix.endsWith("_test_") ? "TEST" : "UNBEKANNT") : livemode ? "LIVE" : "TEST";
+    console.log(`${name}: ${mode} (praefix=${prefix}, livemode=${String(livemode)})`);
   } catch (error) {
     console.log(`${name}: CONNECTION_ERROR (${error?.message ?? "unbekannt"})`);
     exitCode = 1;
