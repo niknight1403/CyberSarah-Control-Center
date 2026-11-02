@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import AsyncIterator
+
+from starlette.exceptions import StarletteDeprecationWarning
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"Using `httpx` with `starlette\.testclient` is deprecated.*",
+    category=StarletteDeprecationWarning,
+)
 
 import pytest
 from asgi_lifespan import LifespanManager
