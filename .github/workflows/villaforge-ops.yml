@@ -123,6 +123,21 @@ jobs:
                 echo "Hub lokal: $(curl -s -o /dev/null -w "%{http_code}" --max-time 8 http://127.0.0.1:12000/api/health || echo 000)"
               '
               ;;
+            disk-report)
+              # Read-only: wo liegt der Plattenplatz? Nur messen, nichts loeschen.
+              $SSH_CMD '
+                echo "== / Top 12 =="
+                sudo -n du -xh --max-depth=1 / 2>/dev/null | sort -rh | head -12 || du -xh --max-depth=1 / 2>/dev/null | sort -rh | head -12
+                echo "== /var Top 8 =="
+                sudo -n du -xh --max-depth=1 /var 2>/dev/null | sort -rh | head -8
+                echo "== /root /opt /home Top 8 =="
+                sudo -n du -xh --max-depth=1 /root /opt /home 2>/dev/null | sort -rh | head -10
+                echo "== grosse Dateien > 300M =="
+                sudo -n find / -xdev -type f -size +300M -printf "%s %p\n" 2>/dev/null | sort -rn | head -10 | awk "{printf \"%.1fG %s\n\", \$1/1073741824, \$2}"
+                echo "== Aufraeum-Kandidaten =="
+                du -sh /root/.ollama /var/lib/containerd /var/lib/docker /var/log /root/hub.db 2>/dev/null
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
