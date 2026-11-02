@@ -277,6 +277,20 @@ jobs:
                 rm -f /tmp/ccc.env
               '
               ;;
+            hub-api)
+              # Read-only: fragt den Hub ueber seine eigene API (Login ueber
+              # Repo-Secrets). Zeigt Villen, Flotte und Fokus aus Sicht des Hubs.
+              TOK=$(curl -s -m 25 -X POST -H "Content-Type: application/json" \
+                -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+                https://hub.cybersarah-ki.com/api/auth/login | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))')
+              [ -n "$TOK" ] || { echo "FEHLER: Hub-Login fehlgeschlagen"; exit 1; }
+              echo "Login ok"
+              echo "== Villen =="
+              curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/villas | python3 -c "import json,sys;d=json.load(sys.stdin);rows=d if isinstance(d,list) else (d.get('villas') or d.get('items') or []);[print(json.dumps({k:v.get(k) for k in ('id','name','status','autonomy') if k in v},ensure_ascii=False),'open=',v.get('open') or v.get('openTasks') or '') for v in rows[:40]];print('ANZAHL:',len(rows))"
+              echo "== Flotte =="
+              curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/public/fleet | head -c 1200
+              echo
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
