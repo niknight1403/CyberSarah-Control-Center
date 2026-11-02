@@ -49,8 +49,30 @@ Wichtig: PGlite verkraftet standardmaessig nur **eine** Verbindung, deshalb
 `maxConnections` setzen — sonst bricht die Verbindung mit
 "Connection terminated unexpectedly" ab.
 
-## Offener Punkt
+## CI-Beleg (Run 41382892904, gruen)
 
-Das Secret `STRIPE_TEST_SECRET_KEY` konnte ich nicht selbst anlegen (der
-GitHub-Token darf keine Secrets schreiben, die API antwortet mit HTTP 400).
-Bis das Secret existiert, laeuft der Nachweis lokal, nicht in der CI.
+Derselbe Nachweis laeuft jetzt auch in der CI gegen den Postgres-Service des
+Runners:
+
+| Schritt | Beleg aus dem CI-Log |
+| --- | --- |
+| Key-Klasse | `TEST (Praefix sk_test_…)` |
+| Auftrag | `ait-835c9e29-4667-4cf2-9181-5983a094529a` bis `payment-pending` |
+| Invoice | `in_1UXBrbAuUge07PL9nybKUTEC`, 999,00 EUR, bezahlt |
+| Datenbank | Auftrag `paid`, 3 Task-Zeilen / 33 Einheiten, Attribution 999,00 EUR |
+| Ergebnis | `PASS: Stripe-Testmodus-E2E` |
+
+## Warum das Secret zunaechst mit HTTP 400 scheiterte
+
+Das Repository steht bei **100 von 100 Repo-Secrets** — dem harten Limit von
+GitHub. Neue Repo-Secrets lehnt die API deshalb mit HTTP 400 ab, unabhaengig
+von Berechtigung und Verschluesselung; die offizielle `gh`-CLI scheitert
+identisch, ebenso ein zweiter Token mit `repo`-Scope. Lesen funktioniert
+weiter (200, `total_count: 100`).
+
+Loesung ohne Datenverlust: der Test-Key liegt als **Environment-Secret** im
+Environment `ci-stripe-e2e` (eigener Zaehler), der Job deklariert
+`environment: ci-stripe-e2e`. Kein bestehendes Repo-Secret wurde angefasst.
+
+Wer neuen Repo-Secrets anlegen will, muss zuerst aufraeumen. Kandidaten nennt
+`docs/2026-11-01_GITHUB_SECRETS_AUDIT.md`.
