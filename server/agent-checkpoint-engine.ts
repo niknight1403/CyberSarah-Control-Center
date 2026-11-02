@@ -19,7 +19,7 @@ export class AgentCheckpointEngine {
   private stateKey(id: string) { return `cybersarah:agent:state:${id}`; }
   private lockKey(id: string) { return `cybersarah:agent:recovery:${id}`; }
   async saveCheckpoint(state: AgentStepState): Promise<string> {
-    if (!state.taskId || !state.agentId || !Number.isSafeInteger(state.stepNumber) || state.stepNumber < 0 || !Number.isSafeInteger(state.timestamp) || state.timestamp <= 0) throw new Error("Invalid checkpoint");
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(state.taskId) || !/^[a-zA-Z0-9_-]{1,120}$/.test(state.agentId) || !Number.isSafeInteger(state.stepNumber) || state.stepNumber < 0 || !Number.isSafeInteger(state.timestamp) || state.timestamp <= 0) throw new Error("Invalid checkpoint");
     if (Buffer.byteLength(JSON.stringify(state)) > 65536) throw new Error("Checkpoint too large");
     const script = `
       local previous = redis.call("GET", KEYS[1])
