@@ -18,7 +18,18 @@ export type AiInfluenzaLaunchReadiness = {
   gaps: AiInfluenzaLaunchGap[];
 };
 
-export function assessAiInfluenzaLaunchReadiness(packageId: AiInfluenzaPackageId): AiInfluenzaLaunchReadiness {
+export type VerifiedDeliveryEvidence = {
+  taskKind: string;
+  deliveredQuantity: number;
+  customerApproved: boolean;
+  verified: boolean;
+};
+
+/** Evidence must originate from persisted, independently verified deliveries. */
+export function assessAiInfluenzaLaunchReadiness(
+  packageId: AiInfluenzaPackageId,
+  evidence: readonly VerifiedDeliveryEvidence[] = [],
+): AiInfluenzaLaunchReadiness {
   const contracted = AI_INFLUENZA_PACKAGES[packageId].defaultMonthlyTaskBatches;
   const briefs = buildAiInfluenzaDeliveryBriefs(packageId);
   const gaps: AiInfluenzaLaunchGap[] = [];
@@ -27,6 +38,11 @@ export function assessAiInfluenzaLaunchReadiness(packageId: AiInfluenzaPackageId
     const brief = briefs.find((entry) => entry.taskKind === task.kind);
     if (!brief || brief.quantity !== task.quantity) {
       gaps.push({ taskKind: task.kind, quantity: task.quantity, reason: "Contract and delivery plan differ." });
+      continue;
+    }
+    const proof = evidence.find((entry) => entry.taskKind === task.kind);
+    if (proof?.verified === true && proof.customerApproved === true &&
+        Number.isSafeInteger(proof.deliveredQuantity) && proof.deliveredQuantity >= task.quantity) {
       continue;
     }
     if (brief.renderPipeline === "draft-only") {
