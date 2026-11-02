@@ -24,6 +24,7 @@ export default function AiInfluenzaTeamScreen(){
   const nav=useNavDrawer();
   const me=trpc.account.me.useQuery(undefined,{retry:false});
   const isAdmin=me.data?.role==="admin";
+  const eliteAccess=trpc.aiInfluenzaTeam.adminEliteAccess.useQuery(undefined,{enabled:isAdmin,retry:false});
   const catalog=trpc.aiInfluenzaTeam.catalog.useQuery(undefined,{retry:false});
   const overview=trpc.aiInfluenzaTeam.overview.useQuery(undefined,{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const leads=trpc.aiInfluenzaTeam.leadPipeline.useQuery(undefined,{enabled:isAdmin,retry:false,refetchInterval:60_000});
@@ -74,6 +75,14 @@ export default function AiInfluenzaTeamScreen(){
             <StatusChip label={isAdmin?"Admin Control":"Customer View"} accent={isAdmin?"cyan":"blue"}/>
           </View>
         </GlassCard>
+
+        {isAdmin?<GlassCard accent="green" style={s.card}>
+          <Text style={s.sectionTitle}>Elite · Administrator</Text>
+          <Text style={s.copy}>{eliteAccess.data?.enabled?"Alle AI-Influenza-Adminfunktionen freigeschaltet – kostenlos, ohne Stripe und ohne Umsatzbuchung.":"Elite-Berechtigung wird geprüft …"}</Text>
+          <StatusChip label={eliteAccess.data?.enabled?"ELITE AKTIV":"PRÜFUNG"} accent={eliteAccess.data?.enabled?"green":"amber"}/>
+          {eliteAccess.error?<Text style={s.error}>{eliteAccess.error.message}</Text>:null}
+          <Text style={s.notice}>Externe Veröffentlichungen, Kundennachrichten und kostenpflichtige Aktionen benötigen weiterhin Freigaben.</Text>
+        </GlassCard>:null}
 
         <Text style={s.sectionTitle}>Ansichten</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.viewTabs}>
