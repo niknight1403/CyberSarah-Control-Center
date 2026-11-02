@@ -88,6 +88,10 @@ jobs:
       - name: Deterministic test suite mit Coverage
         run: npm run test:coverage
 
+      - name: ffmpeg bereitstellen (falls im Runner nicht vorhanden)
+        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - name: AI-Influenza-Video-Paket zu MP4 rendern (ffmpeg)
+        run: npx tsx scripts/test-ai-influenza-video-render.ts
       - name: Coverage-Bericht als Artifact hochladen
         if: always()
         uses: actions/upload-artifact@v7
@@ -176,8 +180,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      - name: AI-Influenza-Video-Paket zu MP4 rendern (ffmpeg)
-        run: npx tsx scripts/test-ai-influenza-video-render.ts
       - name: Assert live CAS and quarantine transitions with 24 concurrent claims
         run: npx tsx scripts/test-publishing-claim-postgres.ts
       - name: Create influenza_ci database (idempotent)
