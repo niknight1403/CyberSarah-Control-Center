@@ -1,0 +1,53 @@
+name: AI Influenza Content-Paket
+
+# Manuell: baut ein Content-Paket (Vertonung + Motive + MP4). Veroeffentlicht nie.
+on:
+  workflow_dispatch:
+    inputs:
+      paket:
+        description: "Paket (starter|growth)"
+        required: false
+        default: "growth"
+
+jobs:
+  content-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: ffmpeg bereitstellen
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Paket bauen
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_BACKUP_KEY }}
+        run: npx tsx scripts/build-ai-influenza-content-package.ts "${{ inputs.paket }}" artifacts/content-package
+      - name: Nachweis zusammenfassen
+        if: always()
+        run: |
+          if [ -f artifacts/content-package/content-package-*.json ]; then
+            node -e '
+              const fs=require("fs");
+              const f=fs.readdirSync("artifacts/content-package").find(n=>n.endsWith(".json"));
+              const m=JSON.parse(fs.readFileSync("artifacts/content-package/"+f,"utf8"));
+              console.log("Paket:", m.packageId, "| Dauer:", m.durationSeconds+"s", "| Stimme:", m.voiceProvider);
+              for(const s of m.scenes) console.log(`  Szene ${s.index}: ${s.seconds}s · ${s.voiceSource} · ${s.motifSource}`);
+              const v=m.scenes.filter(s=>s.voiceSource!=="silence").length;
+              console.log("Vertonte Szenen:", v+"/"+m.scenes.length);
+              if(v===0){ console.log("HINWEIS: keine echte Vertonung — Schluessel pruefen."); process.exitCode=1; }
+            '
+          else
+            echo "Kein Manifest gefunden."; exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: content-paket-${{ inputs.paket }}
+          path: artifacts/content-package/
+          if-no-files-found: warn
