@@ -1,0 +1,63 @@
+{
+  "hinweis": "BEISPIEL-Paket aus Fixture-Text zur Darstellung der Paketstruktur. Kein generierter Kundeninhalt, keine Veroeffentlichung.",
+  "paket": {
+    "orderId": "example-order-fixture",
+    "taskLabel": "Beispiel: Kurzvideo 1/12 (Starter-Paket)",
+    "scenes": [
+      {
+        "startSeconds": 0,
+        "endSeconds": 2,
+        "voiceover": "Wir bauen Content, der Kunden bringt.",
+        "subtitles": "Wir bauen Content, der Kunden bringt.",
+        "visual": "Nahaufnahme: Kalender mit geplanten Posts"
+      },
+      {
+        "startSeconds": 2,
+        "endSeconds": 5,
+        "voiceover": "Zwölf Kurzvideos pro Monat, ohne Agentur-Overhead.",
+        "subtitles": "Zwölf Kurzvideos pro Monat, ohne Agentur-Overhead.",
+        "visual": "Split-Screen: Agentur-Team vs. Solo-Creator"
+      },
+      {
+        "startSeconds": 5,
+        "endSeconds": 8,
+        "voiceover": "Jedes Video mit Skript, Untertiteln und Freigabe.",
+        "subtitles": "Jedes Video mit Skript, Untertiteln und Freigabe.",
+        "visual": "Bildschirm: Storyboard und SRT im Dashboard"
+      },
+      {
+        "startSeconds": 8,
+        "endSeconds": 11,
+        "voiceover": "Starter ab 299 Euro monatlich, jederzeit kündbar.",
+        "subtitles": "Starter ab 299 Euro monatlich, jederzeit kündbar.",
+        "visual": "Preiskarte mit Starter, Growth, Business"
+      }
+    ],
+    "variants": [
+      {
+        "platform": "reels",
+        "aspectRatio": "9:16",
+        "maxDurationSeconds": 30
+      },
+      {
+        "platform": "shorts",
+        "aspectRatio": "9:16",
+        "maxDurationSeconds": 30
+      },
+      {
+        "platform": "tiktok",
+        "aspectRatio": "9:16",
+        "maxDurationSeconds": 30
+      }
+    ],
+    "approval": {
+      "approvedBy": "beispiel-freigabe (Fixture, keine echte Person)",
+      "approvedAt": "2026-11-02T01:59:27.195Z"
+    },
+    "publishingTriggered": false,
+    "status": "ready-to-publish",
+    "durationSeconds": 11,
+    "subtitlesSrt": "1\n00:00:00,000 --> 00:00:02,000\nWir bauen Content, der Kunden bringt.\n\n2\n00:00:02,000 --> 00:00:05,000\nZwölf Kurzvideos pro Monat, ohne Agentur-Overhead.\n\n3\n00:00:05,000 --> 00:00:08,000\nJedes Video mit Skript, Untertiteln und Freigabe.\n\n4\n00:00:08,000 --> 00:00:11,000\nStarter ab 299 Euro monatlich, jederzeit kündbar.\n",
+    "notes": []
+  }
+}
