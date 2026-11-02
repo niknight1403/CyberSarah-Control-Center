@@ -293,6 +293,53 @@ jobs:
               curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/public/fleet | head -c 1200
               echo
               ;;
+            hub-deploy)
+              # Vorpruefung ohne Eingriff: Herkunft, Stand, Dienstart des Hubs.
+              $SSH_CMD '
+                cd /opt/villaforge || { echo "FEHLER: /opt/villaforge fehlt"; exit 1; }
+                echo "== Git =="
+                sudo -n git remote -v 2>/dev/null | head -2 || git remote -v | head -2
+                echo "branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+                echo "HEAD:   $(git rev-parse --short HEAD 2>/dev/null)"
+                echo "dirty:  $(git status --porcelain 2>/dev/null | wc -l) Dateien"
+                echo "== Dienst =="
+                (command -v pm2 >/dev/null && pm2 list 2>/dev/null | head -12) || echo "kein pm2"
+                systemctl list-units --type=service --state=running 2>/dev/null | grep -Ei "villa|hub" || echo "keine systemd-Unit passend"
+                echo "== Prozess =="
+                ps -o pid,etime,cmd -p $(pgrep -f "server/server[.]mjs" | head -1) 2>/dev/null || echo "kein Hub-Prozess"
+                echo "== Health =="
+                curl -s -o /dev/null -w "lokal 12000: %{http_code}\n" -m 10 http://127.0.0.1:12000/api/health
+                curl -s -m 10 http://127.0.0.1:12000/api/health | head -c 200; echo
+              '
+              ;;
+            hub-deploy-apply)
+              # Rollt main aus: harter Abgleich mit origin, Neustart, Health-Pruefung.
+              $SSH_CMD '
+                cd /opt/villaforge || { echo "FEHLER: /opt/villaforge fehlt"; exit 1; }
+                echo "vorher: $(git rev-parse --short HEAD)"
+                git fetch -q origin main || { echo "FEHLER: fetch"; exit 1; }
+                git reset -q --hard origin/main || { echo "FEHLER: reset"; exit 1; }
+                echo "nachher: $(git rev-parse --short HEAD)"
+                PID=$(pgrep -f "server/server[.]mjs" | head -1)
+                echo "alter PID: $PID"
+                if command -v pm2 >/dev/null && pm2 list 2>/dev/null | grep -qi "villaforge"; then
+                  pm2 restart villaforge --update-env >/dev/null 2>&1 && echo "pm2 restart ok"
+                else
+                  [ -n "$PID" ] && kill "$PID" && sleep 3
+                  cd /opt/villaforge && VF_DB=/opt/villaforge/data/hub.db PORT=12000 nohup node --experimental-sqlite server/server.mjs >> /var/log/villaforge/hub.log 2>&1 &
+                  sleep 6
+                fi
+                echo "neuer PID: $(pgrep -f "server/server[.]mjs" | head -1)"
+                for i in 1 2 3 4 5 6 7 8 9 10; do
+                  CODE=$(curl -s -o /tmp/health.json -w "%{http_code}" -m 10 http://127.0.0.1:12000/api/health)
+                  [ "$CODE" = "200" ] && break
+                  sleep 4
+                done
+                echo "Health: $CODE"
+                head -c 300 /tmp/health.json; echo
+                echo "Fokus-Endpunkt: $(curl -s -o /dev/null -w "%{http_code}" -m 10 http://127.0.0.1:12000/api/focus)"
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
