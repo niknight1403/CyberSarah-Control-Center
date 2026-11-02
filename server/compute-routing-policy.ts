@@ -1,4 +1,4 @@
-import { ComputeTier, type TaskRequest } from "./compute-cascading-router";
+import type { ComputeTier, TaskRequest } from "./compute-cascading-router";
 
 export interface PaidPricing {
   inputUsdPerMillion: number;
@@ -22,9 +22,9 @@ export function estimateMaximumPaidCost(
 
 export function canUseTier(task: TaskRequest, tier: ComputeTier, pricing?: PaidPricing): boolean {
   if (task.privacy === "air-gapped" || task.privacy === "internal") {
-    return tier === ComputeTier.TIER_1_LOCAL;
+    return tier === "TIER_1_LOCAL_OLLAMA";
   }
-  if (tier !== ComputeTier.TIER_3_PAID_API) return true;
+  if (tier !== "TIER_3_PAID_API") return true;
   if (task.allowPaid !== true || !Number.isFinite(task.maxCostUSD) ||
       (task.maxCostUSD ?? 0) <= 0 || !pricing) return false;
   const estimate = estimateMaximumPaidCost(task, pricing);
