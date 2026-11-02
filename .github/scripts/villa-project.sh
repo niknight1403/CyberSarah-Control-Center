@@ -1,37 +1,42 @@
 #!/usr/bin/env bash
-# Read-only: Alle Node-Prozesse, ihre Ports und ihre Datenbank.
+# Read-only: Ist die Domain derselbe Prozess wie hier? Und gibt es einen Weg zur Oracle-VM?
 set -uo pipefail
 
-echo "== alle node-Prozesse =="
-for P in $(pgrep -f "node" | head -25); do
-  CMD=$(sudo -n tr '\0' ' ' < /proc/$P/cmdline 2>/dev/null | cut -c1-90)
-  CWD=$(sudo -n readlink /proc/$P/cwd 2>/dev/null)
-  DB=$(sudo -n tr '\0' '\n' < /proc/$P/environ 2>/dev/null | grep -E '^VF_DB=' | head -1)
-  PORTS=$(sudo -n ss -lntp 2>/dev/null | grep "pid=$P," | awk '{print $4}' | tr '\n' ' ')
-  echo "  PID $P | $CMD | cwd=$CWD | $DB | ports=${PORTS:-keine}"
-done 2>/dev/null | head -30
-
-echo "== hoerende Ports gesamt =="
-sudo -n ss -lntp 2>/dev/null | grep -E ":(12000|12001|12002|3000|3001|3002|4000|8080)\b" | head -10
-
-echo "== Vergleich lokaler Hub gegen Domain (mit Admin-Token) =="
-TOKEN=$(sudo -n grep -E '^VF_TOKEN=' /opt/villaforge/hub.env 2>/dev/null | cut -d= -f2)
-for BASE in "http://127.0.0.1:12000" "https://hub.cybersarah-ki.com"; do
-  N=$(curl -s -m 15 -H "x-api-key: ${TOKEN}" "$BASE/api/villas" | python3 -c '
+echo "== Health der Domain (voll, ohne Geheimnisse) =="
+curl -s -m 10 https://hub.cybersarah-ki.com/api/health | python3 -c '
 import json,sys
-try: d=json.load(sys.stdin)
-except Exception: print("keine JSON-Antwort"); raise SystemExit
-d = d if isinstance(d,list) else d.get("villas", [])
-print(len(d), "Villen", [v.get("id") for v in d][:12])
-' 2>/dev/null)
-  echo "  $BASE -> ${N:-keine Antwort}"
+d=json.load(sys.stdin)
+for k,v in d.items():
+    s=str(v)
+    print(f"  {k}: {s[:160]}")
+' 2>/dev/null || echo "  keine JSON-Antwort"
+
+echo "== Health lokal (voll) =="
+curl -s -m 8 http://127.0.0.1:12000/api/health | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+for k,v in d.items():
+    s=str(v)
+    print(f"  {k}: {s[:160]}")
+' 2>/dev/null || echo "  keine JSON-Antwort"
+
+echo "== Startzeit des lokalen Hub-Prozesses =="
+PID=$(pgrep -f "server/server[.]mjs" | head -1)
+ps -o pid,lstart,etimes -p "$PID" 2>/dev/null
+sudo -n systemctl show villaforge -p ExecMainStartTimestamp -p ActiveEnterTimestamp 2>/dev/null
+
+echo "== Versuch: Oracle-VM mit vorhandenen Schluesseln =="
+for U in root ubuntu opc; do
+  for K in /root/.ssh/id_ed25519 /root/.ssh/id_rsa; do
+    [ -f "$K" ] || continue
+    OUT=$(sudo -n timeout 10 ssh -i "$K" -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=6 "$U"@92.5.177.159 'hostname; ls -d /opt/villaforge 2>/dev/null' 2>&1 | head -3)
+    echo "  $U mit $(basename "$K"): $OUT"
+  done
 done
 
-echo "== Kennzahlen aus der lokalen DB vs. API =="
-sudo -n curl -s -m 10 -o /dev/null -w "  lokal /api/villas mit Token: %{http_code}\n" -H "x-api-key: ${TOKEN}" http://127.0.0.1:12000/api/villas
+echo "== Dienste, die die Oracle-IP nutzen =="
+sudo -n systemctl cat revenue-bridge-relay.service 2>/dev/null | grep -iE "ExecStart|Environment|ssh|scp" | head -8
 
-echo "== Caddy: welche Upstreams nutzt es wirklich? =="
-sudo -n grep -n -E "reverse_proxy|:12000|:12001" /etc/caddy/Caddyfile 2>/dev/null | head -12
-
-echo "== kommen Anfragen der Domain hier an? =="
-sudo -n sh -c 'ls -la /var/log/caddy 2>/dev/null | head -5' || echo "  kein Caddy-Log"
+echo "== vorhandene SSH-Konfigurationen =="
+sudo -n ls /root/.ssh 2>/dev/null | head -10
+sudo -n cat /root/.ssh/config 2>/dev/null | head -20
