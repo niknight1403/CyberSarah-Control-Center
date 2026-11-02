@@ -10,6 +10,7 @@ import { useEffect, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -17,6 +18,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useColors } from "@/hooks/use-colors";
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 import {
   AVATAR_MOOD_ANIMATION,
   avatarSeedFromName,
@@ -40,6 +42,7 @@ export function AgentAvatar({
   label?: string;
 }) {
   const colors = useColors();
+  const allowMotion = decorativeMotionEnabled();
   const normalizedMood = normalizeAvatarMood(mood);
   const animation = AVATAR_MOOD_ANIMATION[normalizedMood];
   const geometry = useMemo(
@@ -59,6 +62,11 @@ export function AgentAvatar({
   const ringSpin = useSharedValue(0);
 
   useEffect(() => {
+    cancelAnimation(breath);
+    if (!allowMotion) {
+      breath.value = 1;
+      return () => cancelAnimation(breath);
+    }
     breath.value = withRepeat(
       withTiming(animation.breathAmplitude, {
         duration: animation.breathDurationMs / 2,
@@ -67,21 +75,28 @@ export function AgentAvatar({
       -1,
       true,
     );
-  }, [animation.breathAmplitude, animation.breathDurationMs, breath]);
+    return () => cancelAnimation(breath);
+  }, [allowMotion, animation.breathAmplitude, animation.breathDurationMs, breath]);
 
   useEffect(() => {
+    cancelAnimation(ringSpin);
+    if (!allowMotion) {
+      ringSpin.value = 0;
+      return () => cancelAnimation(ringSpin);
+    }
     // Volle Umdrehung linear, Richtung aus der Stimmung (negativ = rueckwaerts).
     const durationMs = animation.ringRotationDegPerSec === 0 ? 0 : Math.round(36000 / Math.abs(animation.ringRotationDegPerSec));
     if (durationMs === 0) {
       ringSpin.value = withTiming(0, { duration: 400 });
-      return;
+      return () => cancelAnimation(ringSpin);
     }
     ringSpin.value = withRepeat(
       withTiming(360 * Math.sign(animation.ringRotationDegPerSec), { duration: durationMs, easing: Easing.linear }),
       -1,
       false,
     );
-  }, [animation.ringRotationDegPerSec, ringSpin]);
+    return () => cancelAnimation(ringSpin);
+  }, [allowMotion, animation.ringRotationDegPerSec, ringSpin]);
 
   const coreStyle = useAnimatedStyle(() => ({ transform: [{ scale: breath.value }] }));
   const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${ringSpin.value}deg` }] }));
