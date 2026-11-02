@@ -1,6 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {
   AI_INFLUENZA_WORKFLOW_STEPS,
+  AI_INFLUENZA_PACKAGE_IDS,
   maySetPaidWithoutStripe,
   simulateAiInfluenzaTestJourney,
 } from "../lib/ai-influenza-team-logic";
@@ -15,6 +16,14 @@ describe("AI Influenza Team end-to-end safety",()=>{
     expect(result.completed).toBe(true);
     expect(result.deliveryPlan.find(x=>x.taskKind==="short-video")?.quantity).toBe(12);
     expect(result.truthNote).toContain("Keine Live-Zahlung");
+  });
+
+  it.each([...AI_INFLUENZA_PACKAGE_IDS])("keeps %s sandbox simulations unpaid and side-effect free",(packageId)=>{
+    const result=simulateAiInfluenzaTestJourney(packageId);
+    expect(result.testOnly).toBe(true);
+    expect(result.paymentStatus).toBe("test-only");
+    expect(result.externalActionsExecuted).toBe(0);
+    expect(result.completed).toBe(true);
   });
 
   it("forbids manual paid transitions for real orders",()=>{
