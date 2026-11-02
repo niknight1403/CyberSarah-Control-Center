@@ -19,8 +19,10 @@ export class AgentCheckpointEngine {
   private stateKey(id: string) { return `cybersarah:agent:state:${id}`; }
   private lockKey(id: string) { return `cybersarah:agent:recovery:${id}`; }
   async saveCheckpoint(state: AgentStepState): Promise<string> {
-    if (!state.taskId || !state.agentId || !Number.isSafeInteger(state.stepNumber) || state.stepNumber < 0) throw new Error("Invalid checkpoint");
+    if (!state.taskId || !state.agentId || !Number.isSafeInteger(state.stepNumber) || state.stepNumber < 0 || !Number.isSafeInteger(state.timestamp) || state.timestamp <= 0) throw new Error("Invalid checkpoint");
     if (Buffer.byteLength(JSON.stringify(state)) > 65536) throw new Error("Checkpoint too large");
+    const previous = await this.getLastCheckpoint(state.taskId);
+    if (previous && (state.stepNumber < previous.stepNumber || (state.stepNumber === previous.stepNumber && state.timestamp < previous.timestamp))) throw new Error("Stale checkpoint rejected");
     const result = await this.redis.multi()
       .xadd(this.streamKey, "*", "taskId", state.taskId, "agentId", state.agentId, "stepNumber", String(state.stepNumber), "status", state.status, "timestamp", String(state.timestamp), "payload", JSON.stringify(state))
       .set(this.stateKey(state.taskId), JSON.stringify(state))
