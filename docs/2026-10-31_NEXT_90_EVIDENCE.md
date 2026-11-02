@@ -25,6 +25,11 @@ Stand: 31.10.2026
 - Manuelle Freigabe serverseitig geprueft: auf Teilkatalog, inaktive Produkte oder Standardpreisprobleme ist keine Freigabe moeglich; Ereignisse werden append-only in `product_release_events` (Migration 0023) mit Befund-Snapshot und Akteur gespeichert, Ruecknahme als eigenes Ereignis.
 - Nachweis: 10 neue Vitest-Faelle; Suite 3005 gruen, TypeScript, ESLint und Build sauber. Stripe bleibt read-only.
 
+## Hotfix 02.11.2026 — Webhook-Dedupe war nicht race-sicher
+- Befund: `claimStripeWebhookEvent` las den Beleg und schrieb ihn danach. Zwei parallele Zustellungen konnten beide `process` beschliessen und beide Seiteneffekte ausfuehren; `onConflictDoNothing` verhinderte nur den zweiten Datensatz, nicht die zweite Verarbeitung. Zusaetzlich wuchs `stripe_webhook_events` unbegrenzt.
+- Fix: atomarer Claim per `insert ... on conflict do nothing returning`; nur der Gewinner verarbeitet, ein verlorener Claim wird neu gelesen und ueber `resolveClaimAttempt` entschieden (duplicate/concurrent/retry/reclaim). Uebernahme haengender oder fehlgeschlagener Belege nur per bedingtem Update. Verarbeitete Belege werden nach 30 Tagen entfernt.
+- Nachweis: 5 neue Vitest-Faelle, Suite 3046 gruen, TypeScript/ESLint/Build sauber; ein echter Parallel-Test gegen Postgres bleibt offen und wird nicht behauptet.
+
 ## Sprint 26 — Abo-Lesart konsistent (02.11.2026)
 - Vorher: Gating verlangte hart `status === active`, die Abrechnungsuebersicht leitete den Tarif allein aus der Preis-ID ab — ein kuendigendes Abo verlor Zugriff oder zeigte gleichzeitig einen Tarif, der nicht nutzbar war.
 - Jetzt: `readSubscriptionLifecycle` ist die einzige Lesart; Gating und Uebersicht nutzen sie, `pausedBehavior` wird persistiert.

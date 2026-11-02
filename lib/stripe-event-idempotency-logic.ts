@@ -180,3 +180,31 @@ export function summarizeWebhookDeliveries(records: readonly WebhookEventRecord[
       : "Alle laufenden Zustellungen liegen innerhalb des Verarbeitungsfensters.";
   return { total: records.length, processed, failed, inFlight, staleInFlight, note };
 }
+
+/**
+ * Ergebnis eines atomaren Claims: Wer den Datensatz zuerst schreibt, darf
+ * verarbeiten. Ein verlorener Claim fuehrt NIE zu doppelter Verarbeitung.
+ */
+export function resolveClaimAttempt(input: {
+  claimed: boolean;
+  prior: WebhookEventRecord | null;
+  nowMs: number;
+}): DeliveryDecision {
+  if (input.claimed) return "process";
+  const prior = input.prior;
+  // Race ohne lesbaren Beleg: lieber erneut zustellen lassen als doppelt buchen.
+  if (!prior) return "concurrent_retry";
+  if (prior.status === "processed") return "duplicate_skip";
+  if (prior.status === "failed") return "retry";
+  return input.nowMs - prior.receivedAtMs >= STALE_PROCESSING_MS
+    ? "reclaim_stale"
+    : "concurrent_retry";
+}
+
+/** Aufbewahrung der Webhook-Belege; aeltere verarbeitete Eintraege werden entfernt. */
+export const WEBHOOK_EVENT_RETENTION_DAYS = 30;
+
+export function pruneCutoffMs(nowMs: number, retentionDays = WEBHOOK_EVENT_RETENTION_DAYS): number {
+  const days = Number.isFinite(retentionDays) && retentionDays > 0 ? retentionDays : WEBHOOK_EVENT_RETENTION_DAYS;
+  return nowMs - days * 24 * 60 * 60 * 1000;
+}
