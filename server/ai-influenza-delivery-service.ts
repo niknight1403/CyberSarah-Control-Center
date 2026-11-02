@@ -8,6 +8,7 @@ import {invokeLLM} from "./_core/llm";
 import {aiInfluenzaTaskCostEventKey,estimateAiInfluenzaUsageCost} from "../lib/ai-influenza-cost-logic";
 import {recordAiInfluenzaCost} from "./ai-influenza-profit-service";
 import {assessAiInfluenzaLaunchReadiness} from "../lib/ai-influenza-launch-readiness-logic";
+import {verifiedAiInfluenzaDeliveryCount} from "../lib/ai-influenza-delivery-evidence-logic";
 
 type TaskPayload={
   businessUnit:string;orderId:string;packageId:string;customerNodeKey:string;
@@ -120,11 +121,9 @@ export async function aiInfluenzaOrderLaunchReadiness(orderId:string){
   const evidence=status.tasks.flatMap((task)=>{
     const payload=task.payload as TaskPayload;
     const result=task.result as Record<string,unknown>|null;
-    if(task.status!=="completed" || !result || result.deliveryVerified!==true ||
-       result.customerApproved!==true || result.orderId!==orderId ||
-       result.taskKind!==payload.taskKind) return [];
-    const count=result.deliveredQuantity;
-    if(typeof count!=="number" || !Number.isSafeInteger(count) || count<0) return [];
+    if(task.status!=="completed" || payload.orderId!==orderId) return [];
+    const count=verifiedAiInfluenzaDeliveryCount(result,orderId,payload.taskKind);
+    if(count===0) return [];
     return [{taskKind:payload.taskKind,deliveredQuantity:count,verified:true,customerApproved:true}];
   });
   return {
