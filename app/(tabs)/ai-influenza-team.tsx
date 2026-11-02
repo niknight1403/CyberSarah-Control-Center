@@ -6,6 +6,8 @@ import {GlassCard,GlowButton,StatusChip} from "@/components/glass/glass-primitiv
 import {NavDrawer,NavDrawerButton,useNavDrawer} from "@/components/responsive/nav-drawer";
 import {glassPalette,glassSurface} from "@/lib/design/future-glass";
 import {trpc} from "@/lib/trpc";
+import {useLocalSearchParams} from "expo-router";
+import {resolveRequestedPackage} from "@/lib/post-login-navigation-logic";
 import {
   AI_INFLUENZA_DASHBOARD_VIEWS,
   buildAiInfluenzaHealthVerdict,
@@ -35,6 +37,12 @@ export default function AiInfluenzaTeamScreen(){
     onSuccess:result=>{void Linking.openURL(result.url);},
   });
   const packages=useMemo(()=>catalog.data?.packages??[],[catalog.data]);
+  // Kommt der Besucher von der Verkaufsseite, ist sein Paket schon gewaehlt.
+  const navParams=useLocalSearchParams<{package?:string}>();
+  const requestedPackage=useMemo(
+    ()=>resolveRequestedPackage(navParams.package,packages.map(p=>p.id)),
+    [navParams.package,packages],
+  );
   const [viewId,setViewId]=useState<AiInfluenzaDashboardViewId>("revenue");
   const activeView=resolveAiInfluenzaDashboardView(viewId);
   const health=buildAiInfluenzaHealthVerdict({
@@ -83,12 +91,14 @@ export default function AiInfluenzaTeamScreen(){
 
         <Text style={s.sectionTitle}>Buchbare Pakete</Text>
         {packages.map(pkg=><GlassCard key={pkg.id} accent={pkg.id==="business"?"magenta":pkg.id==="growth"?"cyan":"blue"} style={s.card}>
-          <View style={s.packageHead}><View style={{flex:1}}><Text style={s.packageName}>{pkg.name}</Text><Text style={s.price}>{money(pkg.monthlyPriceCents)} / Monat</Text></View><StatusChip label="Abo" accent="green"/></View>
+          <View style={s.packageHead}><View style={{flex:1}}><Text style={s.packageName}>{pkg.name}</Text><Text style={s.price}>{money(pkg.monthlyPriceCents)} / Monat</Text></View><StatusChip label={pkg.id===requestedPackage?"deine Wahl":"Abo"} accent={pkg.id===requestedPackage?"magenta":"green"}/></View>
+          {pkg.id===requestedPackage?<Text style={s.notice}>Dieses Paket hattest du auf der Verkaufsseite gewählt. Der Checkout ist der nächste Schritt.</Text>:null}
           {pkg.deliverables.map(item=><Text key={item} style={s.line}>• {item}</Text>)}
           <Text style={s.notice}>{pkg.hypothesisNotice}</Text>
           <GlowButton
             label={checkout.isPending?"Checkout wird vorbereitet …":`${pkg.name} buchen`}
             accent={pkg.id==="business"?"magenta":"cyan"}
+            variant={pkg.id===requestedPackage?"primary":"secondary"}
             disabled={!me.data||checkout.isPending}
             onPress={()=>checkout.mutate({packageId:pkg.id})}
           />

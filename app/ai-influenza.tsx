@@ -18,6 +18,7 @@ import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import { ScreenContainer } from "@/components/screen-container";
 import { AI_INFLUENZA_PACKAGES, type AiInfluenzaPackageId } from "@/lib/ai-influenza-team-logic";
+import { buildPackageLoginPath } from "@/lib/post-login-navigation-logic";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 
 const PACKAGE_ORDER: readonly AiInfluenzaPackageId[] = ["starter", "growth", "business"];
@@ -84,7 +85,8 @@ export default function AiInfluenzaVerkaufsseite() {
                   label="Paket wählen"
                   accent="magenta"
                   variant={pkg.id === "growth" ? "primary" : "secondary"}
-                  onPress={() => router.push("/login")}
+                  // Paket bleibt erhalten: nach dem Login steht der Checkout bereit.
+                  onPress={() => router.push(buildPackageLoginPath(pkg.id) as never)}
                 />
               </GlassCard>
             );
