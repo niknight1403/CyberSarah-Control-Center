@@ -72,6 +72,20 @@ async def test_transition_fsm_rejects_invalid(client: AsyncClient) -> None:
     assert rejected.status_code == 409
 
 
+async def test_transition_terminal_state_rejected(client: AsyncClient) -> None:
+    created = await client.post("/api/tasks", json={"title": "T3"})
+    task_id = created.json()["id"]
+
+    running = await client.post(f"/api/tasks/{task_id}/transition", json={"status": "running"})
+    assert running.status_code == 200
+
+    done = await client.post(f"/api/tasks/{task_id}/transition", json={"status": "succeeded"})
+    assert done.status_code == 200
+
+    rejected = await client.post(f"/api/tasks/{task_id}/transition", json={"status": "cancelled"})
+    assert rejected.status_code == 409
+
+
 async def test_delete_task(client: AsyncClient) -> None:
     created = await client.post("/api/tasks", json={"title": "Weg damit"})
     task_id = created.json()["id"]
