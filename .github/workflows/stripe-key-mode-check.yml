@@ -1,0 +1,23 @@
+name: Stripe Key Modus-Check (read-only)
+
+# Nur manuell. Prueft ausschliesslich, ob ein Schluessel im Test- oder
+# Live-Modus laeuft. Es werden keine Objekte erstellt und keine Betraege bewegt.
+on:
+  workflow_dispatch:
+
+jobs:
+  mode-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v7
+      - name: Node einrichten
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Modi pruefen (ohne Schluesselwerte auszugeben)
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_SECRET_KEY_2: ${{ secrets.STRIPE_SECRET_KEY_2 }}
+        run: node scripts/stripe-key-mode-check.mjs STRIPE_SECRET_KEY STRIPE_SECRET_KEY_2
