@@ -21,14 +21,23 @@ export class AgentCheckpointEngine {
   async saveCheckpoint(state: AgentStepState): Promise<string> {
     if (!state.taskId || !state.agentId || !Number.isSafeInteger(state.stepNumber) || state.stepNumber < 0 || !Number.isSafeInteger(state.timestamp) || state.timestamp <= 0) throw new Error("Invalid checkpoint");
     if (Buffer.byteLength(JSON.stringify(state)) > 65536) throw new Error("Checkpoint too large");
-    const previous = await this.getLastCheckpoint(state.taskId);
-    if (previous && (state.stepNumber < previous.stepNumber || (state.stepNumber === previous.stepNumber && state.timestamp < previous.timestamp))) throw new Error("Stale checkpoint rejected");
-    const result = await this.redis.multi()
-      .xadd(this.streamKey, "*", "taskId", state.taskId, "agentId", state.agentId, "stepNumber", String(state.stepNumber), "status", state.status, "timestamp", String(state.timestamp), "payload", JSON.stringify(state))
-      .set(this.stateKey(state.taskId), JSON.stringify(state))
-      .exec();
-    if (!result || result.some(([err]) => err)) throw new Error("Atomic checkpoint transaction failed");
-    return String(result[0][1]);
+    const script = `
+      local previous = redis.call("GET", KEYS[1])
+      if previous then
+        local ok, parsed = pcall(cjson.decode, previous)
+        if not ok then return redis.error_reply("CORRUPT_CHECKPOINT") end
+        if tonumber(parsed.stepNumber) > tonumber(ARGV[1]) then return redis.error_reply("STALE_CHECKPOINT") end
+        if tonumber(parsed.stepNumber) == tonumber(ARGV[1]) and tonumber(parsed.timestamp) >= tonumber(ARGV[2]) then
+          return redis.error_reply("STALE_CHECKPOINT")
+        end
+      end
+      local eventId = redis.call("XADD", KEYS[2], "*", "taskId", ARGV[3], "agentId", ARGV[4], "stepNumber", ARGV[1], "status", ARGV[5], "timestamp", ARGV[2])
+      redis.call("SET", KEYS[1], ARGV[6])
+      return eventId
+    `;
+    const result = await this.redis.eval(script, 2, this.stateKey(state.taskId), this.streamKey,
+      String(state.stepNumber), String(state.timestamp), state.taskId, state.agentId, state.status, JSON.stringify(state));
+    return String(result);
   }
   async getLastCheckpoint(taskId: string): Promise<AgentStepState | null> {
     const raw = await this.redis.get(this.stateKey(taskId));
