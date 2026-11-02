@@ -5,6 +5,9 @@ name: VillaForge-Ops
 #   mode=list                               -> Host-Erkennung + Villa-Inventar (read-only)
 #   mode=delete, villa_id, confirm_name     -> Villa samt Tasks/Agents/Chats loeschen
 #   mode=status                             -> VM-Gesundheit pruefen (rote Schwelle = Workflow rot)
+#   mode=oracle-ops                         -> LIVE-Hub auf der Oracle-VM pruefen (read-only,
+#                                              braucht Secret ORACLE_SSH_KEY; optional
+#                                              ORACLE_SSH_HOST/ORACLE_SSH_USER)
 #
 # Laeuft zusaetzlich taeglich um 06:00 UTC als Statuswaechter; ein roter Lauf
 # ist das Alarmsignal (Platte >= 90 %, Hub-Prozess fehlt, Port 443 zu).
@@ -47,6 +50,9 @@ jobs:
           # Bei schedule-Laeufen sind inputs leer -> status als Standard.
           MODE: ${{ inputs.mode || 'status' }}
           STATUS_B64: 'ZWNobyAiaG9zdDogJChob3N0bmFtZSkiCmVjaG8gInVwdGltZTogJCh1cHRpbWUgLXAgMj4vZGV2L251bGwgfHwgdXB0aW1lKSIKZWNobyAibG9hZDogJChjdXQgLWQnICcgLWYxLTMgL3Byb2MvbG9hZGF2ZykiCmVjaG8gImRpc2tfcGN0OiAkKGRmIC1QIC8gfCBhd2sgJ05SPT0ye2dzdWIoIiUiLCIiLCQ1KTsgcHJpbnQgJDV9JykiCmVjaG8gImRpc2tfZnJlZTogJChkZiAtaCAvIHwgYXdrICdOUj09MntwcmludCAkNH0nKSIKZWNobyAibWVtOiAkKGZyZWUgLW0gfCBhd2sgJy9NZW06L3twcmludCAidXNlZD0iJDMiTUIgYXZhaWw9IiQ3Ik1CIn0nKSIKZWNobyAiaHViX3Byb2M6ICQocGdyZXAgLWZjICdzZXJ2ZXIvc2VydmVyWy5dbWpzfHZpbGxhZm9yZ2UnIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiCmVjaG8gIm5vZGVfcG9ydHM6ICQoc3MgLWxudHAgMj4vZGV2L251bGwgfCBncmVwIC1vICc6WzAtOV0qICcgfCBzb3J0IC11IHwgdHIgLWQgJyA6JyB8IHRyICdcbicgJyAnKSIKZWNobyAiZGJfc2l6ZTogJChkdSAtaCAvb3B0L3ZpbGxhZm9yZ2UvZGF0YS9odWIuZGIgMj4vZGV2L251bGwgfCBjdXQgLWYxIHx8IGVjaG8gdW5iZWthbm50KSIK' 
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          ORACLE_HOST: ${{ secrets.ORACLE_SSH_HOST || '92.5.177.159' }}
+          ORACLE_USER: ${{ secrets.ORACLE_SSH_USER || 'ubuntu' }}
           VF_HUB_EMAIL: ${{ secrets.VF_HUB_EMAIL }}
           VF_HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
           VILLA_ID: ${{ inputs.villa_id }}
@@ -54,6 +60,10 @@ jobs:
           SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
         run: |
           case "$MODE" in
+            oracle-ops)
+              # Live-Hub auf der Oracle-VM pruefen (read-only). Braucht ORACLE_SSH_KEY.
+              bash .github/scripts/oracle-ops.sh
+              ;;
             list)
               $SSH_CMD 'echo "Y29uc3QgeyBleGVjU3luYyB9ID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpOwpjb25zdCB7IERhdGFiYXNlU3luYyB9ID0gcmVxdWlyZSgnbm9kZTpzcWxpdGUnKTsKY29uc3QgcnVuID0gKGMpID0+IHsgdHJ5IHsgcmV0dXJuIFN0cmluZyhleGVjU3luYyhjLCB7IHNoZWxsOiAnL2Jpbi9iYXNoJyB9KSk7IH0gY2F0Y2ggKGUpIHsgcmV0dXJuICdGRUhMRVI6ICcgKyBTdHJpbmcoZS5tZXNzYWdlKS5zcGxpdCgnXG4nKVswXTsgfSB9Owpjb25zb2xlLmxvZygnPT0gaG9zdCA9PScpOwpjb25zb2xlLmxvZyhydW4oJ2hvc3RuYW1lJykudHJpbSgpKTsKY29uc29sZS5sb2cocnVuKCdob3N0bmFtZSAtSSAyPi9kZXYvbnVsbCcpLnRyaW0oKSk7CmNvbnNvbGUubG9nKCc9PSBwbTItUHJvemVzc2UgPT0nKTsKdHJ5IHsKICBjb25zdCBwcm9jcyA9IEpTT04ucGFyc2UocnVuKCdwbTIgamxpc3QgMj4vZGV2L251bGwnKSk7CiAgY29uc29sZS5sb2cocHJvY3MubWFwKHAgPT4gcC5uYW1lICsgKHAucG0yX2VudiAmJiBwLnBtMl9lbnYucG1fY3dkID8gJyBbJyArIHAucG0yX2Vudi5wbV9jd2QgKyAnXScgOiAnJykpLmpvaW4oJ1xuJykpOwp9IGNhdGNoIChlKSB7IGNvbnNvbGUubG9nKCdwbTI6IG5pY2h0IGxlc2JhcicpOyB9CmNvbnNvbGUubG9nKCc9PSBzZXJ2ZXItUHJvemVzc2UgPT0nKTsKY29uc29sZS5sb2cocnVuKCdwcyBhdXggfCBncmVwIC1pRSAic2VydmVyWy5dbWpzfHZpbGxhZm9yZ2UiIHwgZ3JlcCAtdiBncmVwIHwgaGVhZCAtOCcpKTsKY29uc29sZS5sb2coJz09IGZvcmdlL3ZpbGxhLXZlcnplaWNobmlzc2UgPT0nKTsKY29uc29sZS5sb2cocnVuKCdscyAtZCAvb3B0LyogL29wdC8qLyogL2hvbWUvKi8qIC9yb290LyogL3Nydi8qIDI+L2Rldi9udWxsIHwgZ3JlcCAtaUUgImZvcmdlfHZpbGxhIiB8IGhlYWQnKSk7CmNvbnNvbGUubG9nKCc9PSBkYi1kYXRlaWVuID09Jyk7CmNvbnN0IGZpbGVzID0gcnVuKCdmaW5kIC9vcHQgL2hvbWUgL3Jvb3QgL3NydiAvdmFyL3d3dyAtbWF4ZGVwdGggNyAtbmFtZSAiKi5kYiIgMj4vZGV2L251bGwgfCBoZWFkIC00MCcpLnNwbGl0KCdcbicpLmZpbHRlcihCb29sZWFuKTsKY29uc29sZS5sb2coSlNPTi5zdHJpbmdpZnkoZmlsZXMpKTsKZm9yIChjb25zdCBmIG9mIFsuLi5uZXcgU2V0KGZpbGVzKV0pIHsKICB0cnkgewogICAgY29uc3QgZGIgPSBuZXcgRGF0YWJhc2VTeW5jKGYpOwogICAgY29uc3QgaGFzID0gZGIucHJlcGFyZSgiU0VMRUNUIG5hbWUgRlJPTSBzcWxpdGVfbWFzdGVyIFdIRVJFIHR5cGU9J3RhYmxlJyBBTkQgbmFtZT0ndmlsbGFzJyIpLmdldCgpOwogICAgaWYgKGhhcykgewogICAgICBjb25zb2xlLmxvZygnPT0gVklMTEEtREI6ICcgKyBmKTsKICAgICAgY29uc29sZS5sb2coSlNPTi5zdHJpbmdpZnkoZGIucHJlcGFyZSgnU0VMRUNUIGlkLCBuYW1lLCBzdGF0dXMsIGNyZWF0ZWRfYXQsIHVwZGF0ZWRfYXQgRlJPTSB2aWxsYXMgT1JERVIgQlkgaWQnKS5hbGwoKSwgbnVsbCwgMSkpOwogICAgfSBlbHNlIHsgY29uc29sZS5sb2coJyhvaG5lIHZpbGxhcy1UYWJlbGxlKTogJyArIGYpOyB9CiAgICBkYi5jbG9zZSgpOwogIH0gY2F0Y2ggKGUpIHsgY29uc29sZS5sb2coJ0ZFSExFUiAnICsgZiArICc6ICcgKyBTdHJpbmcoZS5tZXNzYWdlKS5zcGxpdCgnXG4nKVswXSk7IH0KfQo=" | base64 -d | node -'
               ;;
