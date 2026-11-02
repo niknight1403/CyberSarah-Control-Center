@@ -246,6 +246,37 @@ jobs:
                 done
               '
               ;;
+            pg-villas)
+              # Read-only: sucht Villen/Projekte in der CCC-Datenbank. Die
+              # Verbindungszeichenfolge wird nur maskiert ausgegeben, nie im Klartext.
+              $SSH_CMD '
+                ENVF=/opt/cybersarah-control-center/.env
+                sudo -n test -f "$ENVF" && sudo -n cp "$ENVF" /tmp/ccc.env && chmod 600 /tmp/ccc.env || cp "$ENVF" /tmp/ccc.env 2>/dev/null
+                if [ ! -s /tmp/ccc.env ]; then echo "FEHLER: keine .env gefunden"; exit 1; fi
+                DBURL=$(grep -E "^DATABASE_URL=" /tmp/ccc.env | head -1 | cut -d= -f2- | tr -d "\"")
+                [ -z "$DBURL" ] && { echo "FEHLER: DATABASE_URL fehlt"; exit 1; }
+                echo "DB-Host: $(echo "$DBURL" | sed -E "s|.*@([^/:]+).*|\1|")"
+                cd /opt/cybersarah-control-center
+                DBURL="$DBURL" node -e "
+                  (async()=>{
+                    const {Client}=require(\"pg\");
+                    const c=new Client({connectionString:process.env.DBURL,ssl:process.env.DBURL.includes(\"render.com\")?{rejectUnauthorized:false}:undefined});
+                    await c.connect();
+                    const t=await c.query(\"select table_name from information_schema.tables where table_schema=\"public\"\");
+                    for(const {table_name} of t.rows){
+                      if(!/villa|project|app|agent/i.test(table_name)) continue;
+                      const cols=(await c.query(\"select column_name from information_schema.columns where table_schema=\"public\" and table_name=\$1\",[table_name])).rows.map(r=>r.column_name);
+                      if(!cols.includes(\"name\")) continue;
+                      const sel=[\"id\",\"name\"].concat(cols.filter(n=>[\"status\",\"state\",\"phase\",\"progress\",\"created_at\"].includes(n)));
+                      const r=await c.query(\"select \"+sel.join(\",\")+\" from \\\"\"+table_name+\"\\\" order by id limit 20\");
+                      if(r.rows.length) console.log(\"TABLE \"+table_name+\": \"+JSON.stringify(r.rows));
+                    }
+                    await c.end();
+                  })().catch(e=>console.log(\"FEHLER: \"+String(e.message).slice(0,200)));
+                " 2>&1 | grep -v ExperimentalWarning
+                rm -f /tmp/ccc.env
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
