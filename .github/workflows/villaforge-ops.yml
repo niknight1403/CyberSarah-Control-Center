@@ -179,6 +179,26 @@ jobs:
                 echo "== nachher =="; df -h / | tail -1; swapon --show; free -m | head -3
               '
               ;;
+            hub-villas)
+              # Read-only: echte Villen aus der Hub-DB (nicht die stale Kopie in /root).
+              $SSH_CMD '
+                DB=/opt/villaforge/data/hub.db
+                [ -f "$DB" ] || { echo "FEHLER: $DB fehlt"; ls -la /opt/villaforge/data/ 2>/dev/null; exit 1; }
+                echo "DB: $DB"
+                cd /opt/villaforge
+                node --experimental-sqlite -e "
+                  const {DatabaseSync}=require(\"node:sqlite\");
+                  const db=new DatabaseSync(\"$DB\",{readOnly:true});
+                  for(const v of db.prepare(\"SELECT id,name,status,autonomy FROM villas ORDER BY id\").all()){
+                    let c={};
+                    try{c=db.prepare(\"SELECT status,COUNT(*) n FROM tasks WHERE villa_id=? GROUP BY status\").all(v.id).reduce((a,r)=>(a[r.status]=r.n,a),{});}catch{}
+                    const open=Object.entries(c).filter(([k])=>![\"DONE\",\"CANCELLED\",\"CANCELED\"].includes(String(k).toUpperCase())).reduce((s,[,n])=>s+n,0);
+                    console.log(JSON.stringify({id:Number(v.id),name:v.name,status:v.status,autonomy:Number(v.autonomy),openTasks:open,tasks:c}));
+                  }
+                  try{console.log(\"FOKUS:\",JSON.stringify(db.prepare(\"SELECT * FROM villa_focus\").all()));}catch{console.log(\"FOKUS: keine Tabelle\");}
+                " 2>&1 | grep -v ExperimentalWarning | grep -v trace-warnings
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
