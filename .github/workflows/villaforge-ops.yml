@@ -84,21 +84,18 @@ jobs:
               exit $FAIL
               ;;
             hub-diag)
-              # Warum liefert die Hub-UI 502, waehrend /api/health antwortet?
-              # Fokus: Reverse-Proxy (Caddy/nginx), Ports, Hub-Log. Keine Secrets.
+              # Fokus: welcher Port gehoert zum Hub-Prozess und wie routet Caddy.
+              # Caddyfile ist klein und enthaelt keine Secrets.
               $SSH_CMD '
-                echo "== Ports 80/443/3000 =="
-                ss -lntp 2>/dev/null | grep -E ":(80|443|3000|4000|8080) " | head -10
-                echo "== Caddy-Konfiguration =="
-                ls /etc/caddy 2>/dev/null
-                grep -rn "hub.cybersarah-ki\|reverse_proxy\|handle" /etc/caddy/Caddyfile 2>/dev/null | head -25
-                echo "== Caddy-Fehler (letzte 12) =="
-                journalctl -u caddy -n 12 --no-pager 2>/dev/null | tail -12
-                echo "== nginx hub-vhost =="
-                grep -rln "hub" /etc/nginx/sites-enabled/ 2>/dev/null
-                echo "== Hub-Startzeile / Log =="
-                ls -la /opt/villaforge/*.log 2>/dev/null
-                tail -12 /opt/villaforge/*.log 2>/dev/null
+                echo "== Caddyfile =="
+                cat /etc/caddy/Caddyfile 2>/dev/null | head -60
+                echo "== Hub-Prozess =="
+                for p in $(pgrep -f "server/server[.]mjs"); do
+                  echo "pid=$p cwd=$(readlink /proc/$p/cwd 2>/dev/null)"
+                  echo "  cmd=$(tr "\0" " " < /proc/$p/cmdline 2>/dev/null | cut -c1-120)"
+                done
+                echo "== Ports aller node-Prozesse =="
+                ss -lntp 2>/dev/null | grep node | head -10
               '
               ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
