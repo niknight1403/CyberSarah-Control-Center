@@ -164,6 +164,22 @@ export async function countPendingDraftsByKind(): Promise<Record<DraftKind, numb
   return (await pendingDraftCoverage())?.counts ?? null;
 }
 
+function contentSignature(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const payload = value as { topic?: unknown; content?: unknown };
+  return [payload.topic, payload.content].filter(v => typeof v === "string").join(" ")
+    .toLowerCase().normalize("NFKD").replace(/[^a-z0-9äöüß]+/gi, " ").trim().slice(0, 1200);
+}
+
+async function contentWasAlreadySuggested(payload: unknown): Promise<boolean> {
+  const signature = contentSignature(payload);
+  if (!signature) return false;
+  const db = await getDb(); if (!db) return false;
+  const history = await db.select({payload:draftQueue.payload}).from(draftQueue)
+    .where(eq(draftQueue.kind,"content")).orderBy(desc(draftQueue.createdAt)).limit(250);
+  return history.some(row => contentSignature(row.payload) === signature);
+}
+
 export async function insertPendingDraft(kind: DraftKind, title: string, payload: DraftPayloadByKind[DraftKind], createdBy: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Datenbank nicht verfuegbar — Entwurf nicht speicherbar.");
@@ -195,6 +211,7 @@ async function generateContentDraft(llm: (messages: Message[]) => Promise<string
   if (!parsed) return { ok: false, reason: "Content-LLM lieferte nach Reparaturversuch kein auswertbares JSON." };
   const validated = validateDraftPayload("content", parsed);
   if (!validated.valid) return { ok: false, reason: validated.reason };
+  if (await contentWasAlreadySuggested(validated.payload)) return { ok: false, reason: "Content-Duplikat aus der Vorschlagshistorie verworfen." };
   await insertPendingDraft("content", validated.title, validated.payload, "draft-engine");
   return { ok: true };
 }
