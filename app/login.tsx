@@ -13,9 +13,10 @@
  */
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import * as Auth from "@/lib/_core/auth";
+import { resolvePostLoginPath } from "@/lib/post-login-navigation-logic";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { ScreenContainer } from "@/components/screen-container";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
@@ -36,13 +37,16 @@ export default function LoginScreen() {
   const accountQuery = trpc.account.me.useQuery(undefined, { retry: false });
   const googleConfigQuery = trpc.account.googleLoginConfig.useQuery(undefined, { retry: false });
   const googleClientId = googleConfigQuery.data?.enabled ? googleConfigQuery.data.clientId : null;
+  // Wer von der Verkaufsseite kommt, will nach dem Login weiterkaufen.
+  const params = useLocalSearchParams<{ next?: string }>();
+  const afterLogin = resolvePostLoginPath(params.next);
   const busy = loginMutation.isPending || registerMutation.isPending || googleLoginMutation.isPending;
 
   const finishLogin = async (result: { sessionToken: string; user: Awaited<ReturnType<typeof Auth.getUserInfo>> | { id: number; openId: string; name: string | null; email: string | null; loginMethod: string | null; role: "user" | "admin"; lastSignedIn: Date; designTheme: string | null } }) => {
     await Auth.setSessionToken(result.sessionToken);
     await Auth.setUserInfo(result.user as never);
     await accountQuery.refetch();
-    router.replace("/");
+    router.replace(afterLogin as never);
   };
 
   const handleGoogleIdToken = async (idToken: string) => {
@@ -67,7 +71,7 @@ export default function LoginScreen() {
       await Auth.setSessionToken(result.sessionToken);
       await Auth.setUserInfo(result.user);
       await accountQuery.refetch();
-      router.replace("/");
+      router.replace(afterLogin as never);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Die Anmeldung konnte nicht abgeschlossen werden.");
     }
