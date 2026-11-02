@@ -355,6 +355,30 @@ jobs:
                 stat -c "%y %n" /opt/villaforge/server/server.mjs 2>/dev/null
               '
               ;;
+            focus-status)
+              # Read-only: Fortschritt der Fokus-Villen (Aufgaben, Status, letzte Spur).
+              TOK=$(curl -s -m 25 -X POST -H "Content-Type: application/json" \
+                -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+                https://hub.cybersarah-ki.com/api/auth/login | python3 -c "import json,sys; print(json.load(sys.stdin).get('token',''))")
+              [ -n "$TOK" ] || { echo "FEHLER: Login"; exit 1; }
+              TOK="$TOK" python3 <<'PYFOCUS'
+              import json, os, collections, urllib.request
+              TOK=os.environ["TOK"]; BASE="https://hub.cybersarah-ki.com"
+              def get(path):
+                  req=urllib.request.Request(BASE+path, headers={"Authorization":"Bearer "+TOK})
+                  with urllib.request.urlopen(req, timeout=30) as r: return json.loads(r.read().decode() or "{}")
+              for vid in (34, 3):
+                  d=get("/api/villas/%d" % vid)
+                  tasks=d.get("tasks") if isinstance(d.get("tasks"), list) else []
+                  counts=collections.Counter(str(t.get("status")) for t in tasks)
+                  msgs=d.get("messages") if isinstance(d.get("messages"), list) else []
+                  print("#%d %s | %s | tasks=%s | gesamt=%d" % (vid, d.get("name"), d.get("status"), dict(counts), len(tasks)))
+                  if msgs:
+                      last=msgs[-1]
+                      print("   letzte Spur: %s: %s" % (last.get("role"), str(last.get("content"))[:160]))
+
+              PYFOCUS
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
