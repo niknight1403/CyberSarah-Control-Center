@@ -1,40 +1,36 @@
 #!/usr/bin/env bash
-# Read-only: Wo liegen die Villa-Projektordner, und ist nach dem Deploy alles da?
+# Read-only: Quelle (source_path) der Villen und Testaufbau im Projektordner.
 set -uo pipefail
 
-echo "== Dienst-Umgebung =="
-sudo -n systemctl show villaforge -p Environment 2>/dev/null | tr ' ' '\n' | grep -i "VF_\|WORKSPACE" | head -10
-sudo -n grep -i "Environment\|WorkingDirectory\|ExecStart" /etc/systemd/system/villaforge.service 2>/dev/null | head -10
+DB=/opt/villaforge/data/hub.db
 
-echo "== Verzeichnisse unter /opt/villaforge =="
-sudo -n ls -la /opt/villaforge | head -15
+echo "== Hub-Umgebung (nur VF_/WORKSPACE) =="
+sudo -n grep -iE "VF_|WORKSPACE|NODE_ENV" /opt/villaforge/hub.env 2>/dev/null | sed 's/=.*TOKEN.*/=<verdeckt>/' | head -10
 
-echo "== server/data vorhanden? =="
-sudo -n ls -la /opt/villaforge/server/data 2>/dev/null | head -10 || echo "server/data fehlt"
+echo "== Villen in der DB =="
+sudo -n node --experimental-sqlite -e '
+const { DatabaseSync } = require("node:sqlite");
+const db = new DatabaseSync("/opt/villaforge/data/hub.db");
+for (const v of db.prepare("SELECT id, name, status, source_path FROM villas ORDER BY id").all()) {
+  console.log(`${v.id}\t${v.status}\t${v.source_path || "-"}\t${String(v.name).slice(0,40)}`);
+}
+' 2>/dev/null
 
-echo "== Kandidaten für Workspaces =="
-for d in /opt/villaforge/data/workspace /opt/villaforge/server/data/workspace /opt/villaforge/workspace; do
-  if sudo -n test -d "$d"; then
-    echo "vorhanden: $d"
-    sudo -n ls "$d" 2>/dev/null | head -20
-  fi
+echo "== Projektordner der Fokusvillen =="
+for VID in 34 3; do
+  SRC=$(sudo -n node --experimental-sqlite -e "
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync('/opt/villaforge/data/hub.db');
+    const r = db.prepare('SELECT source_path FROM villas WHERE id=?').get($VID);
+    process.stdout.write(r?.source_path || '');
+  " 2>/dev/null)
+  DIR="${SRC:-/opt/villaforge/workspace/villa-$VID/project}"
+  echo "--- Villa $VID: $DIR ---"
+  [ -d "$DIR" ] || { echo "  (fehlt)"; continue; }
+  sudo -n ls -la "$DIR" | head -8
+  echo "  Dateien:"; sudo -n find "$DIR" -maxdepth 2 -not -path "*/node_modules*" -type f 2>/dev/null | head -12
+  echo "  package.json:"; sudo -n head -25 "$DIR/package.json" 2>/dev/null
+  echo "  node_modules: $(sudo -n test -d "$DIR/node_modules" && echo ja || echo nein)"
+  echo "  jest binär: $(sudo -n test -x "$DIR/node_modules/.bin/jest" && echo ja || echo nein)"
+  echo "  Python: $(sudo -n find "$DIR" -name '*.py' -not -path '*/node_modules*' 2>/dev/null | wc -l) Dateien"
 done
-
-echo "== villa-34 irgendwo? =="
-sudo -n find /opt/villaforge -maxdepth 6 -type d -name "villa-34*" 2>/dev/null | head -5
-sudo -n find /opt /root /home -maxdepth 5 -type d -name "villa-34*" 2>/dev/null | head -5
-
-echo "== Projektdateien Villa 34 =="
-for p in /opt/villaforge/data/workspace/villa-34/project /opt/villaforge/server/data/workspace/villa-34/project; do
-  if sudo -n test -d "$p"; then
-    echo "Projekt: $p"
-    sudo -n find "$p" -maxdepth 2 -not -path "*/node_modules*" -type f 2>/dev/null | head -20
-    echo "-- package.json --"
-    sudo -n cat "$p/package.json" 2>/dev/null | head -30
-    echo "-- node_modules? --"
-    sudo -n test -d "$p/node_modules" && echo "ja" || echo "nein"
-  fi
-done
-
-echo "== Sicherungen =="
-sudo -n ls -lh /opt/vf-code-backup-*.tgz /opt/vf-db-backup-*.db 2>/dev/null | awk '{print "  "$9" "$5}'
