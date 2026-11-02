@@ -1,14 +1,22 @@
 import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, cancelAnimation, withDelay, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 
+import { decorativeMotionEnabled } from "@/lib/graphics-motion-runtime";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 
 function Dot({ delayMs }: { delayMs: number }) {
   const opacity = useSharedValue(0.25);
+  const allowMotion = decorativeMotionEnabled();
   useEffect(() => {
+    cancelAnimation(opacity);
+    if (!allowMotion) {
+      opacity.value = 1;
+      return () => cancelAnimation(opacity);
+    }
     opacity.value = withRepeat(withDelay(delayMs, withSequence(withTiming(1, { duration: 380 }), withTiming(0.25, { duration: 380 }))), -1, false);
-  }, [delayMs, opacity]);
+    return () => cancelAnimation(opacity);
+  }, [allowMotion, delayMs, opacity]);
   const animated = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return <Animated.View style={[styles.dot, animated]} />;
 }
