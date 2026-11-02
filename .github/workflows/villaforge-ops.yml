@@ -429,6 +429,10 @@ jobs:
               curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/villas/$VID \
                 | jq -c '(.villa // .) as $v | {id: $v.id, status: $v.status, running, queued, tasks: ((.tasks // []) | group_by(.status) | map({(.[0].status): length}) | add)}'
               ;;
+            villa-project)
+              # Read-only: Projektordner einer Villa untersuchen (Testaufbau, Dateien).
+              $SSH_CMD 'bash -s' -- "${VILLA_ID:-34}" < .github/scripts/villa-project.sh
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
