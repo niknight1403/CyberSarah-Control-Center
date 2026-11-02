@@ -33,6 +33,7 @@ export default function AiInfluenzaTeamScreen(){
   const checkout=trpc.aiInfluenzaTeam.checkout.useMutation({
     onSuccess:result=>{void Linking.openURL(result.url);},
   });
+  const sandbox=trpc.aiInfluenzaTeam.adminSandboxOrder.useMutation();
   const portal=trpc.aiInfluenzaTeam.portal.useMutation({
     onSuccess:result=>{void Linking.openURL(result.url);},
   });
@@ -95,6 +96,13 @@ export default function AiInfluenzaTeamScreen(){
           {pkg.id===requestedPackage?<Text style={s.notice}>Dieses Paket hattest du auf der Verkaufsseite gewählt. Der Checkout ist der nächste Schritt.</Text>:null}
           {pkg.deliverables.map(item=><Text key={item} style={s.line}>• {item}</Text>)}
           <Text style={s.notice}>{pkg.hypothesisNotice}</Text>
+          {isAdmin?<GlowButton
+            label={sandbox.isPending?"Testauftrag wird erstellt …":`Admin-Testauftrag: ${pkg.name}`}
+            accent="green"
+            variant="secondary"
+            disabled={sandbox.isPending}
+            onPress={()=>sandbox.mutate({packageId:pkg.id})}
+          />:null}
           <GlowButton
             label={checkout.isPending?"Checkout wird vorbereitet …":`${pkg.name} buchen`}
             accent={pkg.id==="business"?"magenta":"cyan"}
@@ -103,6 +111,8 @@ export default function AiInfluenzaTeamScreen(){
             onPress={()=>checkout.mutate({packageId:pkg.id})}
           />
         </GlassCard>)}
+        {sandbox.data?<Text style={s.notice}>Admin-Testauftrag erstellt: {sandbox.data.orderId} · Testmodus, keine Zahlung, kein Umsatz.</Text>:null}
+        {sandbox.error?<Text style={s.error}>{sandbox.error.message}</Text>:null}
         {checkout.error?<Text style={s.error}>{checkout.error.message}</Text>:null}
 
         <GlassCard accent="cyan" style={s.card}>
