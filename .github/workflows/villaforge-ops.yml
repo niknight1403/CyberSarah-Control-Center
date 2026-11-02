@@ -98,6 +98,31 @@ jobs:
                 ss -lntp 2>/dev/null | grep node | head -10
               '
               ;;
+            hub-route)
+              # Repariert die fehlende Route fuer hub.cybersarah-ki.com.
+              # Abgesichert: Backup, caddy validate, Reload nur bei gueltiger
+              # Konfiguration, sonst Rollback. Bestehende Route bleibt unangetastet.
+              $SSH_CMD '
+                set -e
+                if grep -q "hub.cybersarah-ki.com" /etc/caddy/Caddyfile; then
+                  echo "Route existiert bereits:"; grep -n -A3 "hub.cybersarah-ki.com" /etc/caddy/Caddyfile
+                  exit 0
+                fi
+                BACKUP=/etc/caddy/Caddyfile.bak-hubroute-$(date +%Y%m%d%H%M%S)
+                sudo -n cp /etc/caddy/Caddyfile "$BACKUP" || cp /etc/caddy/Caddyfile "$BACKUP" || { echo "FEHLER: kein Backup moeglich"; exit 1; }
+                echo "Backup: $BACKUP"
+                printf "\n\nhub.cybersarah-ki.com {\n\tencode gzip\n\treverse_proxy 127.0.0.1:12000\n}\n" | sudo -n tee -a /etc/caddy/Caddyfile >/dev/null || { echo "FEHLER: kein Schreibrecht"; exit 1; }
+                if sudo -n caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -3; then
+                  sudo -n systemctl reload caddy
+                  echo "Caddy neu geladen"
+                else
+                  echo "FEHLER: Konfiguration ungueltig, Rollback"
+                  sudo -n cp "$BACKUP" /etc/caddy/Caddyfile
+                  exit 1
+                fi
+                echo "Hub lokal: $(curl -s -o /dev/null -w "%{http_code}" --max-time 8 http://127.0.0.1:12000/api/health || echo 000)"
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
