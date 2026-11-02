@@ -1,0 +1,114 @@
+name: Villa-Fokus-Wächter
+
+# Nikos Auftrag (02.11.2026): Villa #34 (Kopie von mybabes.ai) und Villa #3
+# (Autonomous Revenue Engine) stellen ihre Projekte erst fertig. Alle anderen
+# Villen bleiben pausiert, solange der Fokus steht - auch wenn eine davon
+# zwischendurch startet.
+#
+# Der Wächter greift nur über die öffentliche Hub-API ein (kein Neustart, kein
+# Code-Deploy) und schaltet sich selbst ab, sobald beide Zielvillen fertig sind.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Nur anzeigen, nichts ändern'
+        type: boolean
+        default: false
+
+concurrency:
+  group: villa-focus-guard
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fokus durchsetzen
+        env:
+          VF_HUB_EMAIL: ${{ secrets.VF_HUB_EMAIL }}
+          VF_HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          FOCUS_IDS: '34,3'
+        run: |
+          set -u
+          TOK=$(curl -s -m 25 -X POST -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+            https://hub.cybersarah-ki.com/api/auth/login \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))')
+          [ -n "$TOK" ] || { echo "FEHLER: Hub-Login fehlgeschlagen"; exit 1; }
+          export TOK
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          TOK = os.environ['TOK']
+          DRY = bool(os.environ.get('DRY_RUN'))
+          TARGETS = [int(x) for x in os.environ.get('FOCUS_IDS', '34,3').split(',') if x.strip()]
+          BASE = 'https://hub.cybersarah-ki.com'
+
+          def call(path, method='GET', body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(BASE + path, data=data, method=method,
+                                           headers={'Authorization': 'Bearer ' + TOK,
+                                                    'Content-Type': 'application/json'})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return r.status, json.loads(r.read().decode() or '{}')
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode()[:200]
+              except Exception as e:
+                  return 0, str(e)[:200]
+
+          status, villas = call('/api/villas')
+          if status != 200 or not isinstance(villas, list):
+              print(f'FEHLER: Villenliste nicht lesbar ({status}): {villas}')
+              raise SystemExit(1)
+
+          by_id = {int(v['id']): v for v in villas}
+          goals = [by_id.get(i) for i in TARGETS]
+          missing = [i for i, g in zip(TARGETS, goals) if not g]
+          if missing:
+              print(f'FEHLER: Fokus-Villen fehlen im Hub: {missing}')
+              raise SystemExit(1)
+
+          print('Fokus-Ziele:')
+          for g in goals:
+              print(f"  #{g['id']} {g['name']} -> {g['status']}")
+          done = [g for g in goals if str(g.get('status')).upper() == 'COMPLETED']
+          if len(done) == len(goals):
+              print('Fokus erfuellt: alle Zielvillen sind COMPLETED. Der Waechter greift nicht mehr ein.')
+              raise SystemExit(0)
+          print(f'Offen: {len(goals) - len(done)} von {len(goals)} Zielvillen.')
+
+          changed = []
+          for v in villas:
+              vid = int(v['id'])
+              st = str(v.get('status')).upper()
+              if vid in TARGETS:
+                  if st in ('PAUSED', 'STOPPING', 'WAITING_FOR_MODEL'):
+                      if DRY:
+                          print(f'  [dry] wuerde starten: #{vid} {v["name"]} ({st})')
+                          continue
+                      code, res = call(f'/api/villas/{vid}/orchestrate', 'POST', {'runToCompletion': True})
+                      print(f'  Start #{vid} {v["name"]}: HTTP {code} {str(res)[:120]}')
+                      changed.append((vid, 'start'))
+                  continue
+              if st in ('RUNNING', 'WAITING_FOR_MODEL'):
+                  if DRY:
+                      print(f'  [dry] wuerde pausieren: #{vid} {v["name"]} ({st})')
+                      continue
+                  code, res = call(f'/api/villas/{vid}/stop', 'POST', {})
+                  print(f'  Pause #{vid} {v["name"]}: HTTP {code} {str(res)[:120]}')
+                  changed.append((vid, 'pause'))
+
+          status, after = call('/api/villas')
+          if status == 200 and isinstance(after, list):
+              print('Stand danach:')
+              for v in after:
+                  mark = '*' if int(v['id']) in TARGETS else ' '
+                  print(f" {mark} #{v['id']} {v['status']:<10} {v['name']}")
+          print(f'Aenderungen: {len(changed)}')
+          PY
