@@ -6,6 +6,7 @@ import { getDb } from "./db";
 import { mergeChannelReach } from "../lib/channel-metric-source";
 import { latestGrowthEvidence } from "../lib/growth-evidence-freshness";
 import { materializeProductionSystem } from "./faceless-multichannel-service";
+import { enqueueApprovedContentDraft } from "./publishing-service";
 
 const PERSONA="automationsklar-editorial";
 const INTERVAL_MS=15*60_000;
@@ -55,9 +56,25 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
 }
 
 export async function channelAutopilotOverview(){
+  const reconciliation=await reconcileApprovedContentDrafts();
   const snapshot=await collectChannelAutopilotSnapshot();
   const decision=decideChannelAutopilot(snapshot);
   return {mode:"24/7-observe-diagnose-draft-learn",snapshot,health:channelAutopilotHealth(snapshot),decision,externalActionsExecuted:0,generatedAt:new Date().toISOString()};
+}
+
+export async function reconcileApprovedContentDrafts(limit=50){
+  const db=await getDb(); if(!db) throw new Error("Datenbank nicht verfügbar.");
+  const rows=await db.select({id:draftQueue.id,payload:draftQueue.payload,decidedBy:draftQueue.decidedBy})
+    .from(draftQueue).where(and(eq(draftQueue.kind,"content"),eq(draftQueue.status,"approved")))
+    .orderBy(desc(draftQueue.decidedAt)).limit(Math.min(Math.max(limit,1),200));
+  let inserted=0,reused=0,invalid=0;
+  for(const row of rows){
+    const p=row.payload as {personaId?:unknown;platform?:unknown;topic?:unknown;content?:unknown};
+    if(!row.decidedBy||![p.personaId,p.platform,p.topic,p.content].every(v=>typeof v==="string")){invalid++;continue;}
+    const result=await enqueueApprovedContentDraft(row.decidedBy,{id:row.id,personaId:String(p.personaId),platform:String(p.platform),topic:String(p.topic),content:String(p.content)});
+    result.inserted?inserted++:reused++;
+  }
+  return {scanned:rows.length,inserted,reused,invalid};
 }
 
 export async function runChannelAutopilot(){
@@ -101,7 +118,7 @@ export async function runChannelAutopilot(){
     }
     return {generated,skipped:null as string|null};
   });
-  return {snapshot,health:channelAutopilotHealth(snapshot),decision,...result,externalActionsExecuted:0};
+  return {snapshot,health:channelAutopilotHealth(snapshot),decision,...result,reconciliation,externalActionsExecuted:0};
 }
 
 async function tick(){
