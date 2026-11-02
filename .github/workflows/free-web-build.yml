@@ -1,0 +1,62 @@
+name: Free Web Build Fallback
+
+# GitHub-hosted build artifact: no Vercel quota, no hosting account or secrets.
+# This exports the client only; the API/server still needs its own deployment.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'lib/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/inject-startup-shell.mjs'
+      - 'scripts/web-export-smoke.mjs'
+      - '.github/workflows/free-web-build.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/free-web-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: free-web-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Seed CSS interop cache
+        run: |
+          mkdir -p node_modules/react-native-css-interop/.cache
+          touch node_modules/react-native-css-interop/.cache/web.css
+      - name: Export web client
+        env:
+          EXPO_PUBLIC_API_BASE_URL: https://app.cybersarah-ki.com
+          EXPO_PUBLIC_APP_VARIANT: admin
+          EXPO_USE_METRO_WORKSPACE_ROOT: '1'
+        run: npx expo export -p web --output-dir web-dist
+      - name: Inject shell and verify export
+        run: |
+          node scripts/inject-startup-shell.mjs web-dist
+          node scripts/web-export-smoke.mjs web-dist
+      - name: Upload portable web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybersarah-web-export-${{ github.sha }}
+          path: web-dist/
+          if-no-files-found: error
+          retention-days: 14
