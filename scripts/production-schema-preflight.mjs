@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import pg from "pg";
-import { deployPgPoolConfig } from "../lib/render-deploy-logic.mjs";
+import { deployPgPoolConfig, validateDatabaseUrl } from "../lib/render-deploy-logic.mjs";
 
 const { Pool } = pg;
-const url=(process.env.DATABASE_URL??"").trim();
-if(!/^postgres(?:ql)?:\/\//i.test(url)){
-  console.error("[schema-preflight] DATABASE_URL fehlt oder ist kein PostgreSQL-URL.");
+const dbCheck=validateDatabaseUrl(process.env.DATABASE_URL??"");
+if(!dbCheck.ok){
+  console.error(`[schema-preflight] DATABASE_URL ungueltig: ${dbCheck.reason}`);
   process.exit(2);
 }
+const url=dbCheck.url;
 
 const required=[
   "revenue_jobs","revenue_offers","revenue_experiments","revenue_attribution_events","revenue_cost_events",
