@@ -178,3 +178,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Assert live CAS and quarantine transitions with 24 concurrent claims
         run: npx tsx scripts/test-publishing-claim-postgres.ts
+      - name: Create influenza_ci database (idempotent)
+        run: |
+          node -e "const{Pool}=require('pg');const p=new Pool({connectionString:'postgresql://postgres:postgres@127.0.0.1:5432/postgres'});p.query('CREATE DATABASE influenza_ci').catch(e=>{if(e.code!=='42P04')throw e}).then(()=>p.end())"
+      - name: Assert AI-Influenza order lifecycle against PostgreSQL
+        env:
+          AI_INFLUENZA_INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/influenza_ci
+        run: npx tsx scripts/test-ai-influenza-order-flow-postgres.ts
