@@ -56,6 +56,13 @@ jobs:
             push("Freigabepflichtig", Array.isArray(body.actions) ? body.actions.filter(a => a.requiresApproval).length : 0);
             push("Gespeichert", body.persisted === true ? "ja" : "nein");
             if (body.verdict) push("Urteil", `${body.verdict.verdict} (${body.verdict.deltaPct ?? "n/a"} %)`);
+            const revenue = body.revenue ?? {};
+            push("Umsatz", `MRR ${revenue.mrrEur ?? "n/a"} EUR, ${revenue.activeSubscriptions ?? "n/a"} Abos, Checkout ${revenue.checkoutSuccessRatePct ?? "n/a"} %`);
+            const reach = body.reach ?? {};
+            push("Reichweite", `Sitzungen ${reach.visits ?? "n/a"}, Anmeldungen ${reach.signups ?? "n/a"}, Stufen ${reach.visitRatePct ?? "n/a"}/${reach.signupRatePct ?? "n/a"}/${reach.activationRatePct ?? "n/a"} %`);
+            const network = body.network ?? {};
+            const stages = Object.entries(network.byStage ?? {}).filter(([, n]) => n > 0).map(([stage, n]) => `${stage}:${n}`).join(" ");
+            push("B2B", `${network.total ?? 0} Kontakte (${stages || "keine"}), ${network.staleCount ?? 0} ohne Bewegung`);
             if (Array.isArray(body.blockers) && body.blockers.length) push("Blocker", body.blockers.join(" | "));
             fs.writeFileSync(process.argv[2], lines.join("\n") + "\n");
           ' "$body_file" "$summary_file"
