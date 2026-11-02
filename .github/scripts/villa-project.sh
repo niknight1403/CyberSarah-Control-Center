@@ -1,48 +1,37 @@
 #!/usr/bin/env bash
-# Read-only: Wo laeuft der echte Hub? Diese VM oder die Oracle-VM?
+# Read-only: Alle Node-Prozesse, ihre Ports und ihre Datenbank.
 set -uo pipefail
 
-echo "== DNS von der VM aus =="
-getent hosts hub.cybersarah-ki.com || echo "  keine Aufloesung"
-echo "  eigene IPs: $(hostname -I 2>/dev/null)"
+echo "== alle node-Prozesse =="
+for P in $(pgrep -f "node" | head -25); do
+  CMD=$(sudo -n tr '\0' ' ' < /proc/$P/cmdline 2>/dev/null | cut -c1-90)
+  CWD=$(sudo -n readlink /proc/$P/cwd 2>/dev/null)
+  DB=$(sudo -n tr '\0' '\n' < /proc/$P/environ 2>/dev/null | grep -E '^VF_DB=' | head -1)
+  PORTS=$(sudo -n ss -lntp 2>/dev/null | grep "pid=$P," | awk '{print $4}' | tr '\n' ' ')
+  echo "  PID $P | $CMD | cwd=$CWD | $DB | ports=${PORTS:-keine}"
+done 2>/dev/null | head -30
 
-echo "== villa-sync.mjs (Kopf) =="
-sudo -n head -40 /opt/villaforge/villa-sync.mjs 2>/dev/null || echo "  nicht vorhanden"
+echo "== hoerende Ports gesamt =="
+sudo -n ss -lntp 2>/dev/null | grep -E ":(12000|12001|12002|3000|3001|3002|4000|8080)\b" | head -10
 
-echo "== Zeitgeber und Cron =="
-sudo -n systemctl list-timers --all --no-pager 2>/dev/null | grep -iE "villa|sync|forge" | head -5
-sudo -n crontab -l 2>/dev/null | grep -iE "villa|sync|forge|oracle" | head -5
-sudo -n ls /etc/cron.d 2>/dev/null | head -10
-
-echo "== Verweise auf die Oracle-IP =="
-sudo -n grep -rl "92\.5\.177\.159" /opt/villaforge /etc/systemd/system /etc/cron* 2>/dev/null | head -8
-
-echo "== Antwortvergleich lokal vs. Domain =="
-echo "  lokal  : $(curl -s -m 8 http://127.0.0.1:12000/api/health | head -c 120)"
-echo "  domain : $(curl -s -m 8 https://hub.cybersarah-ki.com/api/health | head -c 120)"
-
-echo "== kommt die Domain-Antwort von hier? =="
-sudo -n tail -3 /var/log/caddy/access.log 2>/dev/null | head -3 || echo "  kein Caddy-Zugriffslog lesbar"
-
-echo "== Villen laut Domain =="
-TOK=$(curl -s -m 25 -X POST -H 'Content-Type: application/json' \
-  -d "{\"email\":\"${VF_HUB_EMAIL:-}\",\"password\":\"${VF_HUB_PASSWORD:-}\"}" \
-  https://hub.cybersarah-ki.com/api/auth/login | python3 -c "import json,sys; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
-if [ -n "$TOK" ]; then
-  curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/villas | python3 -c '
+echo "== Vergleich lokaler Hub gegen Domain (mit Admin-Token) =="
+TOKEN=$(sudo -n grep -E '^VF_TOKEN=' /opt/villaforge/hub.env 2>/dev/null | cut -d= -f2)
+for BASE in "http://127.0.0.1:12000" "https://hub.cybersarah-ki.com"; do
+  N=$(curl -s -m 15 -H "x-api-key: ${TOKEN}" "$BASE/api/villas" | python3 -c '
 import json,sys
-d=json.load(sys.stdin); d=d if isinstance(d,list) else d.get("villas",[])
-print("  Domain villas:", len(d), "ids:", [v.get("id") for v in d][:20])
-'
-else
-  echo "  (kein Login)"
-fi
-
-echo "== Villen laut lokalem Port =="
-curl -s -m 8 -o /dev/null -w "  lokal /api/villas ohne Token: %{http_code}\n" http://127.0.0.1:12000/api/villas
-
-echo "== SSH von hier zur Oracle-VM? =="
-for K in /root/.ssh/id_ed25519 /root/.ssh/id_rsa /root/.ssh/oracle /opt/villaforge/.ssh/id_ed25519; do
-  [ -f "$K" ] && echo "  Schluessel vorhanden: $K"
+try: d=json.load(sys.stdin)
+except Exception: print("keine JSON-Antwort"); raise SystemExit
+d = d if isinstance(d,list) else d.get("villas", [])
+print(len(d), "Villen", [v.get("id") for v in d][:12])
+' 2>/dev/null)
+  echo "  $BASE -> ${N:-keine Antwort}"
 done
-sudo -n timeout 8 ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@92.5.177.159 'echo oracle-erreichbar; hostname' 2>&1 | head -3
+
+echo "== Kennzahlen aus der lokalen DB vs. API =="
+sudo -n curl -s -m 10 -o /dev/null -w "  lokal /api/villas mit Token: %{http_code}\n" -H "x-api-key: ${TOKEN}" http://127.0.0.1:12000/api/villas
+
+echo "== Caddy: welche Upstreams nutzt es wirklich? =="
+sudo -n grep -n -E "reverse_proxy|:12000|:12001" /etc/caddy/Caddyfile 2>/dev/null | head -12
+
+echo "== kommen Anfragen der Domain hier an? =="
+sudo -n sh -c 'ls -la /var/log/caddy 2>/dev/null | head -5' || echo "  kein Caddy-Log"
