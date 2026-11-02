@@ -45,6 +45,8 @@ jobs:
           # Bei schedule-Laeufen sind inputs leer -> status als Standard.
           MODE: ${{ inputs.mode || 'status' }}
           STATUS_B64: 'ZWNobyAiaG9zdDogJChob3N0bmFtZSkiCmVjaG8gInVwdGltZTogJCh1cHRpbWUgLXAgMj4vZGV2L251bGwgfHwgdXB0aW1lKSIKZWNobyAibG9hZDogJChjdXQgLWQnICcgLWYxLTMgL3Byb2MvbG9hZGF2ZykiCmVjaG8gImRpc2tfcGN0OiAkKGRmIC1QIC8gfCBhd2sgJ05SPT0ye2dzdWIoIiUiLCIiLCQ1KTsgcHJpbnQgJDV9JykiCmVjaG8gImRpc2tfZnJlZTogJChkZiAtaCAvIHwgYXdrICdOUj09MntwcmludCAkNH0nKSIKZWNobyAibWVtOiAkKGZyZWUgLW0gfCBhd2sgJy9NZW06L3twcmludCAidXNlZD0iJDMiTUIgYXZhaWw9IiQ3Ik1CIn0nKSIKZWNobyAiaHViX3Byb2M6ICQocGdyZXAgLWZjICdzZXJ2ZXIvc2VydmVyWy5dbWpzfHZpbGxhZm9yZ2UnIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiCmVjaG8gIm5vZGVfcG9ydHM6ICQoc3MgLWxudHAgMj4vZGV2L251bGwgfCBncmVwIC1vICc6WzAtOV0qICcgfCBzb3J0IC11IHwgdHIgLWQgJyA6JyB8IHRyICdcbicgJyAnKSIKZWNobyAiZGJfc2l6ZTogJChkdSAtaCAvb3B0L3ZpbGxhZm9yZ2UvZGF0YS9odWIuZGIgMj4vZGV2L251bGwgfCBjdXQgLWYxIHx8IGVjaG8gdW5iZWthbm50KSIK' 
+          VF_HUB_EMAIL: ${{ secrets.VF_HUB_EMAIL }}
+          VF_HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
           VILLA_ID: ${{ inputs.villa_id }}
           CONFIRM_NAME: ${{ inputs.confirm_name }}
           SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
