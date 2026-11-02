@@ -88,6 +88,10 @@ jobs:
       - name: Deterministic test suite mit Coverage
         run: npm run test:coverage
 
+      - name: ffmpeg bereitstellen (falls im Runner nicht vorhanden)
+        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - name: AI-Influenza-Video-Paket zu MP4 rendern (ffmpeg)
+        run: npx tsx scripts/test-ai-influenza-video-render.ts
       - name: Coverage-Bericht als Artifact hochladen
         if: always()
         uses: actions/upload-artifact@v7
