@@ -7,6 +7,9 @@ on:
 jobs:
   stripe-test-e2e:
     runs-on: ubuntu-latest
+    # Environment statt Repo-Secret: das Repo hat 100/100 Repo-Secrets
+    # (GitHub-Limit), neue Repo-Secrets lehnt die API mit HTTP 400 ab.
+    environment: ci-stripe-e2e
     timeout-minutes: 12
     services:
       postgres:
