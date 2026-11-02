@@ -14,7 +14,9 @@ import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import Stripe from "stripe";
 
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY ?? "";
+// .trim(): Secrets koennen mit Zeilenumbruch gespeichert sein; ohne Trim
+// scheitert die Praefixpruefung, obwohl der Key stimmt.
+const STRIPE_KEY = (process.env.STRIPE_SECRET_KEY ?? "").trim();
 const DB_URL = process.env.AI_INFLUENZA_INTEGRATION_DATABASE_URL ?? "";
 
 function assertSafety() {
@@ -31,6 +33,7 @@ function assertSafety() {
 
 async function main(): Promise<void> {
   assertSafety();
+  console.log(`Key-Klasse: TEST (Praefix ${STRIPE_KEY.slice(0, 8)}…, ${STRIPE_KEY.length} Zeichen)`);
   const pool = new Pool({ connectionString: DB_URL, max: 2 });
   const ddl = await readFile("tests/fixtures/ai-influenza-test-schema.sql", "utf8");
   for (const stmt of ddl.split("--> statement-breakpoint").map((s) => s.trim()).filter(Boolean)) {
