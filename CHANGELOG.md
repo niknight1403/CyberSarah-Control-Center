@@ -4,7 +4,7 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
-## 01.11.2026 — v2.8.0 (geplant): AI Influenza Team · Phase 7
+## 02.11.2026 — v2.8.0: AI Influenza Team · Phase 7
 
 - **Neue Business-Unit:** AI Influenza Team als integrierte KI-Agentur in CyberSarah Control Center.
 - **3 Servicepakete:** Starter 299 €/Monat, Growth 999 €/Monat, Business 2.499 €/Monat; Preise ausdrücklich als zu validierende Start-Hypothesen.
@@ -16,6 +16,12 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 - **Mobile UI:** eigener AI-Influenza-Team-Bereich im Cyber-Neon/Aurora-Stil mit Paketkatalog, Revenue/Lead/Order-KPIs, Agententeam, Stripe/Portal und Profit-Analytics.
 - **Profit Truth:** Revenue aus verifizierten Stripe-Invoice-Events; Kosten separat in `revenueCostEvents`; Deckungsbeitrag/Marge werden daraus berechnet, nicht aus Paketlistenpreisen.
 - **QA:** vollständige test-only Customer Journey ohne Live-Zahlung oder externen Versand; Release erst nach grüner CI/Gitleaks/Postgres/Build/Render/APK-Pipeline.
+- **Kostenmessung je Auftrag (neu, Sprint 2):** `lib/ai-influenza-cost-logic.ts` rechnet den LLM-`usage`-Block in Cent und bucht ihn als `revenueCostEvents` mit deterministischem Event-Key; `unique(event_key)` macht Wiederholungsläufe idempotent. Unbekanntes Modell oder fehlender Verbrauch ergibt bewusst *keine* Zahl.
+- **Echter Datenbank-Nachweis (neu, Sprint 2):** `scripts/test-ai-influenza-order-flow-postgres.ts` fährt den Lebenszyklus Kunde → Auftrag → Tasks → Renewal gegen echtes PostgreSQL im CI-Job „PostgreSQL Publishing Multi-Worker Gate" (DB `influenza_ci`) und belegt dabei zwei Schutzregeln: sensible Schritte blockieren ohne Freigabe, `paid` ist für echte Aufträge ohne Stripe-Event gesperrt.
+- **Tages-Autopilot (neu, Sprint 3):** `runControlCenterAutopilot` führt einen AI-Influenza-Schritt aus. Er schaltet nur Schritte weiter, die der bestehende Guard ohne Freigabe erlaubt; alles andere wird als „wartet auf Freigabe" gemeldet. Fehler eines Auftrags beenden den Lauf nicht.
+- **Zehn Dashboard-Ansichten (neu, Sprint 7):** Revenue, Agent Team, Lead Pipeline, Kunden, Content Factory, Campaign Manager, Stripe & Subscriptions, Profit Analytics, Autopilot Control Center, System Health & QA sind als navigierbare Ansichten umgesetzt; admin-pflichtige Ansichten sind gesperrt. `Campaign Manager` zeigt bewusst keine Zahlen, weil dafür noch keine Datenquelle existiert.
+- **Belegt durch:** PR #188 (Audit/Plan), #189 (Kostenmessung), #190 (Postgres-Nachweis), #191 (Autopilot), #192 (Dashboard) — jeweils mit grüner CI, Gitleaks und Postgres-Gate auf `main`.
+- **Nicht belegt und nicht behauptet:** echte Zahlungen, echte Kunden, Umsatz. Die Paketpreise bleiben Start-Hypothesen; Geschäftserfolg wird separat gemessen.
 
 ## 03.10.2026 — Postinstall-Inline-Hotfix: Vollständig inline postinstall-Hook für Docker-Layer-Builds
 
