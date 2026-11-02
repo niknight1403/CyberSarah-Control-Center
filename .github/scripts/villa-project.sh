@@ -1,31 +1,40 @@
 #!/usr/bin/env bash
-# Read-only: Projektordner einer Villa auf der VM untersuchen.
+# Read-only: Wo liegen die Villa-Projektordner, und ist nach dem Deploy alles da?
 set -uo pipefail
-VID="${1:-34}"
 
-echo "== Kandidaten =="
-sudo -n find /opt/villaforge -maxdepth 4 -type d \( -name "projects" -o -name "villa-*" -o -name "*${VID}*" \) 2>/dev/null | head -10
+echo "== Dienst-Umgebung =="
+sudo -n systemctl show villaforge -p Environment 2>/dev/null | tr ' ' '\n' | grep -i "VF_\|WORKSPACE" | head -10
+sudo -n grep -i "Environment\|WorkingDirectory\|ExecStart" /etc/systemd/system/villaforge.service 2>/dev/null | head -10
 
-DIR=""
-for c in "/opt/villaforge/data/projects/$VID" "/opt/villaforge/projects/$VID" "/opt/villaforge/data/villas/$VID/project" "/opt/villaforge/data/workspace/$VID"; do
-  [ -d "$c" ] && DIR="$c" && break
+echo "== Verzeichnisse unter /opt/villaforge =="
+sudo -n ls -la /opt/villaforge | head -15
+
+echo "== server/data vorhanden? =="
+sudo -n ls -la /opt/villaforge/server/data 2>/dev/null | head -10 || echo "server/data fehlt"
+
+echo "== Kandidaten für Workspaces =="
+for d in /opt/villaforge/data/workspace /opt/villaforge/server/data/workspace /opt/villaforge/workspace; do
+  if sudo -n test -d "$d"; then
+    echo "vorhanden: $d"
+    sudo -n ls "$d" 2>/dev/null | head -20
+  fi
 done
-if [ -z "$DIR" ]; then
-  DIR=$(sudo -n find /opt/villaforge -maxdepth 5 -type d -name "project" -path "*${VID}*" 2>/dev/null | head -1)
-fi
-echo "== Projektordner: ${DIR:-(nicht gefunden)} =="
-[ -n "$DIR" ] || exit 0
 
-echo "== Inhalt =="
-sudo -n ls -la "$DIR" 2>/dev/null | head -20
-echo "== Dateien (ohne node_modules) =="
-sudo -n find "$DIR" -maxdepth 2 -not -path "*/node_modules*" -type f 2>/dev/null | head -25
-echo "== package.json =="
-sudo -n cat "$DIR/package.json" 2>/dev/null | head -40
-echo "== node_modules/jest =="
-if sudo -n test -d "$DIR/node_modules/jest"; then echo "vorhanden"; else echo "fehlt"; fi
-if sudo -n test -x "$DIR/node_modules/.bin/jest"; then echo "Binary vorhanden"; else echo "Binary fehlt"; fi
-echo "== npm test (roh, 60s) =="
-sudo -n timeout 60 npm test --prefix "$DIR" 2>&1 | tail -12
-echo "== Python-Dateien =="
-sudo -n find "$DIR" -name "*.py" -not -path "*/node_modules*" 2>/dev/null | head -10
+echo "== villa-34 irgendwo? =="
+sudo -n find /opt/villaforge -maxdepth 6 -type d -name "villa-34*" 2>/dev/null | head -5
+sudo -n find /opt /root /home -maxdepth 5 -type d -name "villa-34*" 2>/dev/null | head -5
+
+echo "== Projektdateien Villa 34 =="
+for p in /opt/villaforge/data/workspace/villa-34/project /opt/villaforge/server/data/workspace/villa-34/project; do
+  if sudo -n test -d "$p"; then
+    echo "Projekt: $p"
+    sudo -n find "$p" -maxdepth 2 -not -path "*/node_modules*" -type f 2>/dev/null | head -20
+    echo "-- package.json --"
+    sudo -n cat "$p/package.json" 2>/dev/null | head -30
+    echo "-- node_modules? --"
+    sudo -n test -d "$p/node_modules" && echo "ja" || echo "nein"
+  fi
+done
+
+echo "== Sicherungen =="
+sudo -n ls -lh /opt/vf-code-backup-*.tgz /opt/vf-db-backup-*.db 2>/dev/null | awk '{print "  "$9" "$5}'
