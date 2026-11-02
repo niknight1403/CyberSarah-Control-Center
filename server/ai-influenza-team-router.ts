@@ -31,6 +31,12 @@ export const aiInfluenzaTeamRouter=router({
     pricingNotice:"Startpreise sind Hypothesen; keine Umsatzgarantie.",
   })),
   agents:adminProcedure.query(()=>AI_INFLUENZA_AGENTS),
+  adminEliteAccess:adminProcedure.query(({ctx})=>({
+    packageId:"elite" as const,enabled:true as const,
+    openId:ctx.user.openId,paymentRequired:false as const,
+    paymentStatus:"test-only" as const,recognizedRevenueCents:0 as const,
+    externalActionsRequireApproval:true as const,
+  })),
   overview:adminProcedure.query(()=>aiInfluenzaTeamOverview()),
   testJourney:adminProcedure.input(z.object({packageId})).query(({input})=>simulateAiInfluenzaTestJourney(input.packageId)),
   checkout:protectedProcedure.input(z.object({packageId})).mutation(async({ctx,input})=>{
