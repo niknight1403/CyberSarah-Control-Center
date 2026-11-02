@@ -382,6 +382,8 @@ jobs:
               echo "RAW: TASKS_ART $(jq -c '.tasks | type' /tmp/v.json)"
               echo "RAW: TASKS_N $(jq -c '(.tasks // []) | if type=="array" then length else -1 end' /tmp/v.json)"
               echo "RAW: TASK_COUNTS $(jq -c '[(.tasks // [])[]] | group_by(.status) | map({(.[0].status): length}) | add' /tmp/v.json)"
+              echo "RAW: RUN $(jq -c '{running, queued, taskCounts, agents: ((.agents // []) | map({id, name: (.name // .role // "?"), status: (.status // .state // "?")}) | .[0:6])}' /tmp/v.json)"
+              echo "RAW: NEWEST $(jq -c '[(.tasks // [])[]] | sort_by(.updated_at) | .[-3:] | map({s: .status, t: (.title // .name), up: .updated_at})' /tmp/v.json)"
               echo "RAW: TASK_FELDER $(jq -c '[(.tasks // [])[]][0] | if . == null then null else (keys) end' /tmp/v.json)"
               echo "RAW: DONE_TAIL $(jq -c '[(.tasks // [])[] | select(.status=="DONE")] | .[-8:] | map(.title // .name // "?")' /tmp/v.json)"
               echo "RAW: OFFEN $(jq -c '[(.tasks // [])[] | select(.status != "DONE")] | map({s: .status, t: (.title // .name // "?")}) | .[0:8]' /tmp/v.json)"
