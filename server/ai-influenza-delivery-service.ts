@@ -5,6 +5,8 @@ import {packageForStripeMetadata,type AiInfluenzaOrderPayload} from "../lib/ai-i
 import {getDb} from "./db";
 import {insertPendingDraft} from "./draft-engine";
 import {invokeLLM} from "./_core/llm";
+import {aiInfluenzaTaskCostEventKey,estimateAiInfluenzaUsageCost} from "../lib/ai-influenza-cost-logic";
+import {recordAiInfluenzaCost} from "./ai-influenza-profit-service";
 
 type TaskPayload={
   businessUnit:string;orderId:string;packageId:string;customerNodeKey:string;
@@ -61,6 +63,9 @@ export async function generateAiInfluenzaTaskDraft(taskJobId:number){
     }],
     assetCount:1,
   },"ai-influenza-team");
+  // Sprint 2: tatsaechlichen Verbrauch in Cent umrechnen. Unbekanntes Modell
+  // oder fehlender Verbrauch -> keine Zahl, sondern der Grund im Ergebnis.
+  const cost=estimateAiInfluenzaUsageCost({model:llm.model,usage:llm.usage??null});
   const result={
     draftGenerated:true,
     packageId,
@@ -69,8 +74,23 @@ export async function generateAiInfluenzaTaskDraft(taskJobId:number){
     renderPipeline:brief?.renderPipeline??"draft-only",
     generatedAt:new Date().toISOString(),
     usage:llm.usage??null,
+    llmCost:cost
+      ?{cents:cost.cents,basis:cost.basis,model:cost.model,promptTokens:cost.promptTokens,completionTokens:cost.completionTokens}
+      :{cents:null,basis:"nicht messbar: Modell oder Verbrauch unbekannt",model:llm.model??null},
   };
   await db.update(revenueJobs).set({status:"completed",result,attempts:task.attempts+1,lastError:null,updatedAt:new Date()}).where(eq(revenueJobs.id,task.id));
+  if(cost){
+    try{
+      await recordAiInfluenzaCost({
+        orderId:payload.orderId,category:"llm",amountCents:cost.cents,
+        note:`Task ${task.id} · ${cost.model} · ${cost.promptTokens}/${cost.completionTokens} Token`,
+        actorOpenId:"system:ai-influenza-team",
+        eventKey:aiInfluenzaTaskCostEventKey(payload.orderId,task.id),
+      });
+    }catch{
+      // Die Kostenbuchung darf eine fertige Lieferung nicht scheitern lassen.
+    }
+  }
   return {reused:false,taskId:task.id,result};
 }
 
