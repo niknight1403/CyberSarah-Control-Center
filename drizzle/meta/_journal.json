@@ -169,6 +169,13 @@
       "when": 1793472000000,
       "tag": "0023_product_release_events",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793473000000,
+      "tag": "0024_stripe_webhook_events",
+      "breakpoints": true
     }
   ]
 }

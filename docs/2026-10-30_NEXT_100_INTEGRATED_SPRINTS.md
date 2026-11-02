@@ -27,7 +27,7 @@ Definition: Ein Sprint ist ein integriertes, testbares Nutzer- oder Betriebsziel
 | 22 | Stripe-Produktvarianten mit steuerlicher/zeitlicher Gültigkeit vergleichen | CODE+CI — `lib/stripe-variant-validity-logic.ts` (Preiskollisionen je Waehrung/Intervall, ueberholte aktive Varianten, fehlende Erstellzeitpunkte, Steuer-Mix, Abweichung vom Standardpreis), in der Katalogprojektion aktiv, 9 Tests |
 | 23 | Doppelte Stripe-IDs und verwaiste lokale Offers sicher behandeln | OFFEN |
 | 24 | Checkout-Messung mit Stripe-Testmode-End-to-End abnehmen | OFFEN |
-| 25 | Webhook-Wiederholungen bei Bestellung/Refund idempotent verarbeiten | OFFEN |
+| 25 | Webhook-Wiederholungen bei Bestellung/Refund idempotent verarbeiten | CODE+CI — `lib/stripe-event-idempotency-logic.ts` (Zustellentscheidung, Out-of-order-Schutz je Aggregat, kumulativer Refund-Deckel), dauerhafte Belege in `stripe_webhook_events` (Migration 0024) via `server/stripe-webhook-ledger.ts`, Handler nutzt Ledger mit Speicher-Fallback, 11 Tests |
 | 26 | Abonnements mit Kündigung, Retention und Wiederaufnahme konsistent lesen | OFFEN |
 | 27 | Produktrechte und Affiliate-Kennzeichnung als prüfbare Freigaben speichern | OFFEN |
 | 28 | Produkt-Matching über Herkunftsquellen ohne stillen Importkollisionsverlust | OFFEN |

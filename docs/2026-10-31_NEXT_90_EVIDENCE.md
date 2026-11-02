@@ -29,6 +29,12 @@ Stand: 31.10.2026
 - Ursache: `.github/release-requests/version.txt` pinnte 2.8.0; der Workflow uebergab das als Wunschversion und lud neue APKs mit `--clobber` erneut in `v2.8.0-apk`. Neue Staende waren an der Nummer nicht erkennbar.
 - Fix: `resolveBuildVersion` behandelt Wuensche als Mindeststand, erhoeht belegte Versionen auf die naechste freie Patch-Version und verhindert Downgrades; Skript und Workflow nutzen die Funktion. 6 zusaetzliche Tests (Suite 3011 gruen), TypeScript/ESLint/Build sauber.
 
+## Nachtrag Sprint 25 (02.11.2026)
+- Webhook-Idempotenz ist nicht mehr nur im Speicher: `stripe_webhook_events` (Migration 0024) haelt Zustellungen dauerhaft fest; Status processing/processed/failed, Versuche und letzter Fehler. Parallel laufende Zustellungen werden blockiert, haengende Verarbeitung nach 5 Minuten zur erneuten Zustellung freigegeben.
+- Out-of-order-Schutz je Aggregat (subscription/invoice/charge/checkout): ein spaeter eintreffendes aelteres Event ueberschreibt keinen neueren Zustand.
+- Refund-Buchhaltung ist kumulativ und auf den urspruenglichen Zahlbetrag gedeckelt; doppelte Event-IDs buchen nichts.
+- Nachweis: 11 neue Vitest-Faelle, Suite 3027 gruen, TypeScript/ESLint/Build sauber. Stripe-E2E im Testmode bleibt offen.
+
 ## Neue, auf main übernommene Code-Verbesserungen
 | Bereich/Sprint | Nachweis | Status |
 |---|---|---|
