@@ -43,7 +43,8 @@ export class ComputeCascadingRouter {
     const start = Date.now();
     const tokens = estimateTokens(task.prompt + (task.systemPrompt ?? ""));
     const initial = initialComputeTier(tokens, task.complexityHint);
-    const maxOutput = Math.max(1, Math.min(8192, task.maxTokens ?? 1024));
+    if (task.maxTokens !== undefined && (!Number.isSafeInteger(task.maxTokens) || task.maxTokens < 1 || task.maxTokens > 8192)) throw new Error("Invalid maxTokens");
+    const maxOutput = task.maxTokens ?? 1024;
     const local: Endpoint = {tier: ComputeTier.TIER_1_LOCAL, url: cleanUrl(process.env.OLLAMA_ENDPOINT ?? "http://127.0.0.1:11434"), model: process.env.OLLAMA_MODEL ?? "qwen2.5-coder:7b", timeout: 30000};
     const free: Endpoint = {tier: ComputeTier.TIER_2_FREE_CLOUD, url: cleanUrl(process.env.FREE_CLOUD_ENDPOINT ?? "https://openrouter.ai/api/v1"), model: process.env.FREE_CLOUD_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free", key: process.env.FREE_CLOUD_API_KEY, timeout: 20000};
     const paid: Endpoint = {tier: ComputeTier.TIER_3_PAID_API, url: cleanUrl(process.env.PAID_API_ENDPOINT ?? "https://api.openai.com/v1"), model: process.env.PAID_API_MODEL ?? "gpt-4o", key: process.env.PAID_API_KEY, timeout: 30000};
@@ -53,6 +54,7 @@ export class ComputeCascadingRouter {
     for (const endpoint of candidates) {
       if (!canUseTier(task, endpoint.tier, pricing)) continue;
       if (endpoint.tier !== ComputeTier.TIER_1_LOCAL && !endpoint.key) continue;
+      if (endpoint.tier === ComputeTier.TIER_3_PAID_API && !Number.isFinite(task.maxCostUSD)) continue;
       try {
         let output: string;
         let costUSD = 0;
