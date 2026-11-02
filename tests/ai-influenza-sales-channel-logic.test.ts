@@ -4,6 +4,7 @@ import {
   planDigistore24CatalogEntry,
   planSalesCatalog,
   planStripeCatalogEntry,
+  resolveDigistore24Urls,
   stripeIdempotencyKey,
   stripeLookupKey,
   toMajorUnits,
@@ -152,5 +153,40 @@ describe("planSalesCatalog", () => {
     });
     expect(result.plans.every((plan) => plan.channel !== "stripe" || plan.action === "skip")).toBe(true);
     expect(result.creatable).toBe(2);
+  });
+});
+
+describe("resolveDigistore24Urls", () => {
+  it("zeigt ohne Konfiguration auf die eigenen Seiten", () => {
+    const urls = resolveDigistore24Urls({});
+    expect(urls.salespageUrl).toBe("https://app.cybersarah-ki.com/ai-influenza");
+    expect(urls.thankyouUrl).toBe("https://app.cybersarah-ki.com/ai-influenza-danke");
+  });
+
+  it("nimmt APP_BASE_URL und schneidet Schraegstriche ab", () => {
+    const urls = resolveDigistore24Urls({ APP_BASE_URL: "https://shop.example.com/" });
+    expect(urls.salespageUrl).toBe("https://shop.example.com/ai-influenza");
+    expect(urls.thankyouUrl).toBe("https://shop.example.com/ai-influenza-danke");
+  });
+
+  it("laesst sich einzeln ueberschreiben", () => {
+    const urls = resolveDigistore24Urls({ DIGISTORE24_SALES_URL: "https://d24.example.com/p" });
+    expect(urls.salespageUrl).toBe("https://d24.example.com/p");
+    expect(urls.thankyouUrl).toBe("https://app.cybersarah-ki.com/ai-influenza-danke");
+  });
+
+  it("macht ohne Schluessel nur noch den Schluessel zum Blocker", () => {
+    const result = planSalesCatalog({ env: {} });
+    const starter = result.plans.find((plan) => plan.channel === "digistore24" && plan.packageId === "starter");
+    expect(starter?.blockers).toEqual(["DIGISTORE24_API_KEY fehlt."]);
+  });
+
+  it("weist eine unverschluesselte Verkaufsseite zurueck", () => {
+    const plan = planDigistore24CatalogEntry("starter", {
+      salespageUrl: "http://example.com/p",
+      thankyouUrl: "https://example.com/t",
+      apiKeyConfigured: true,
+    });
+    expect(plan.blockers).toContain("salespage_url muss https sein.");
   });
 });

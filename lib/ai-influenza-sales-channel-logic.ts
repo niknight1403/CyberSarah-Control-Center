@@ -49,6 +49,24 @@ export function toMajorUnits(cents: number): number {
   return Math.round(cents) / 100;
 }
 
+/**
+ * Adressen fuer Digistore24. Die App liefert beide Seiten selbst, deshalb sind
+ * sie ohne Extra-Konfiguration gesetzt; DIGISTORE24_SALES_URL und
+ * DIGISTORE24_THANKYOU_URL ueberschreiben sie, wenn woanders gehostet wird.
+ */
+export const DIGISTORE24_PAGE_PATHS = { salespage: "/ai-influenza", thankyou: "/ai-influenza-danke" } as const;
+
+export function resolveDigistore24Urls(env: Record<string, string | undefined> = {}): {
+  salespageUrl: string;
+  thankyouUrl: string;
+} {
+  const base = (env.APP_BASE_URL?.trim() || "https://app.cybersarah-ki.com").replace(/\/+$/, "");
+  return {
+    salespageUrl: env.DIGISTORE24_SALES_URL?.trim() || `${base}${DIGISTORE24_PAGE_PATHS.salespage}`,
+    thankyouUrl: env.DIGISTORE24_THANKYOU_URL?.trim() || `${base}${DIGISTORE24_PAGE_PATHS.thankyou}`,
+  };
+}
+
 export function stripeLookupKey(packageId: AiInfluenzaPackageId): string {
   return `ai-influenza-${packageId}`;
 }
@@ -173,6 +191,7 @@ export function planDigistore24CatalogEntry(
 
   if (!options.apiKeyConfigured) blockers.push("DIGISTORE24_API_KEY fehlt.");
   if (!options.salespageUrl) blockers.push("salespage_url fehlt — Digistore24 braucht eine Verkaufsseite.");
+  else if (!options.salespageUrl.startsWith("https://")) blockers.push("salespage_url muss https sein.");
   if (!options.thankyouUrl) blockers.push("thankyou_url fehlt — ohne Danke-Seite keine Auslieferung.");
 
   const idempotencyKey = `ai-influenza-d24-${packageId}-${pkg.monthlyPriceCents}`;
@@ -224,12 +243,13 @@ export function planSalesCatalog(
   } = {},
 ): { plans: ChannelPlan[]; creatable: number; blocked: number; needsReview: number } {
   const env = options.env ?? {};
+  const digistore24 = { ...resolveDigistore24Urls(env), ...options.digistore24 };
   const plans: ChannelPlan[] = [];
   for (const packageId of Object.keys(AI_INFLUENZA_PACKAGES) as AiInfluenzaPackageId[]) {
     plans.push(planStripeCatalogEntry(packageId, { existingPriceId: env[AI_INFLUENZA_PRICE_ENV[packageId]] }));
     plans.push(
       planDigistore24CatalogEntry(packageId, {
-        ...options.digistore24,
+        ...digistore24,
         apiKeyConfigured: Boolean(env.DIGISTORE24_API_KEY?.trim()),
         existingProductId: env[`DIGISTORE24_PRODUCT_ID_${packageId.toUpperCase()}`],
       }),
