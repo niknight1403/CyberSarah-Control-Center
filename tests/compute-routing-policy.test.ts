@@ -19,6 +19,8 @@ describe("compute routing security policy", () => {
     expect(canUseTier(base, ComputeTier.TIER_3_PAID_API, pricing)).toBe(true);
   });
   it("rejects invalid pricing and output bounds", () => {
+    expect(estimateMaximumPaidCost({ ...base, maxTokens: NaN }, pricing)).toBeNull();
+    expect(estimateMaximumPaidCost({ ...base, maxTokens: -1 }, pricing)).toBeNull();
     expect(estimateMaximumPaidCost(base, { inputUsdPerMillion: NaN, outputUsdPerMillion: 2 })).toBeNull();
     expect(estimateMaximumPaidCost({ ...base, maxTokens: 9000 }, pricing)).toBeNull();
     expect(estimateMaximumPaidCost(base, pricing)).toBeGreaterThan(0);
