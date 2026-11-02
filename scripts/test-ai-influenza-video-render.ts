@@ -8,7 +8,7 @@
  * gruenen Schein zurueck.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -52,6 +52,9 @@ function probeDurationSeconds(file: string): number {
   return Number.parseFloat(out.trim());
 }
 
+const releaseLabel = process.argv[2]?.trim() || "2026-11-02";
+const orderId = `release-v${releaseLabel}`;
+
 function main(): void {
   if (!ffmpegAvailable()) {
     console.error("FAIL: ffmpeg fehlt in dieser Umgebung — kein Render-Nachweis moeglich.");
@@ -61,8 +64,8 @@ function main(): void {
   console.log(`ffmpeg vorhanden · libass/Untertitel: ${withSubs ? "ja" : "nein (Untertitel nur als SRT-Datei)"}`);
 
   const built = buildAiInfluenzaVideoPackage({
-    orderId: "render-proof-2026-11-02",
-    taskLabel: "Render-Nachweis Kurzvideo",
+    orderId: orderId,
+    taskLabel: `Kurzvideo Release ${releaseLabel}`,
     script: FIXTURE_SCRIPT,
   });
   const blocked = built.notes.filter((note) => note.startsWith("Paket unvollstaendig") || note.includes("ueberschreitet"));
@@ -121,6 +124,13 @@ function main(): void {
     throw new Error(`MP4-Dauer ${seconds}s weicht vom Paket (${approved.durationSeconds}s) ab.`);
   const header = readFileSync(output).subarray(4, 8).toString("ascii");
   if (header !== "ftyp") throw new Error("Datei ist kein MP4-Container.");
+  const keep = process.argv[3]?.trim();
+  if (keep) {
+    mkdirSync(keep, { recursive: true });
+    copyFileSync(output, path.join(keep, `ai-influenza-reel-v${releaseLabel}.mp4`));
+    copyFileSync(srtPath, path.join(keep, `ai-influenza-reel-v${releaseLabel}.srt`));
+    console.log(`Artefakte kopiert nach ${keep}`);
+  }
   console.log(`PASS: MP4 gerendert (${(size / 1024).toFixed(0)} KB, ${seconds.toFixed(2)}s, SRT ${approved.subtitlesSrt.split("\n").filter(Boolean).length} Zeilen), publishingTriggered=${approved.publishingTriggered}.`);
 }
 
