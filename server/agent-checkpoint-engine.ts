@@ -49,13 +49,23 @@ export class AgentCheckpointEngine {
     const token = randomUUID();
     const acquired = await this.redis.set(this.lockKey(taskId), token, "PX", 60000, "NX");
     if (acquired !== "OK") return false;
+    let leaseLost = false;
+    const heartbeat = setInterval(() => {
+      void this.redis.eval(
+        'if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("PEXPIRE", KEYS[1], ARGV[2]) else return 0 end',
+        1, this.lockKey(taskId), token, "60000"
+      ).then((renewed) => { if (renewed !== 1) leaseLost = true; }).catch(() => { leaseLost = true; });
+    }, 15000);
+    heartbeat.unref();
     try {
       const latest = await this.getLastCheckpoint(taskId);
       if (!latest || latest.status !== "IN_PROGRESS" || latest.timestamp !== current.timestamp) return false;
       // Do not mark the step completed before the callback succeeds.
       await resumeCallback({...latest});
+      if (leaseLost) throw new Error("Recovery lease lost during callback");
       return true;
     } finally {
+      clearInterval(heartbeat);
       await this.redis.eval(
         'if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end',
         1, this.lockKey(taskId), token
