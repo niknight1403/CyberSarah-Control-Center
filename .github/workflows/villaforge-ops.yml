@@ -44,7 +44,7 @@ jobs:
         env:
           # Bei schedule-Laeufen sind inputs leer -> status als Standard.
           MODE: ${{ inputs.mode || 'status' }}
-          STATUS_B64: 'ZWNobyAiaG9zdDogJChob3N0bmFtZSkiCmVjaG8gInVwdGltZTogJCh1cHRpbWUgLXAgMj4vZGV2L251bGwgfHwgdXB0aW1lKSIKZWNobyAibG9hZDogJChjdXQgLWQnICcgLWYxLTMgL3Byb2MvbG9hZGF2ZykiCmVjaG8gImRpc2tfcGN0OiAkKGRmIC1QIC8gfCBhd2sgJ05SPT0ye2dzdWIoIiUiLCIiLCQ1KTsgcHJpbnQgJDV9JykiCmVjaG8gImRpc2tfZnJlZTogJChkZiAtaCAvIHwgYXdrICdOUj09MntwcmludCAkNH0nKSIKZWNobyAibWVtOiAkKGZyZWUgLW0gfCBhd2sgJy9NZW06L3twcmludCAidXNlZD0iJDMiTUIgYXZhaWw9IiQ3Ik1CIn0nKSIKZWNobyAiaHViX3Byb2M6ICQocGdyZXAgLWZjIHZpbGxhZm9yZ2UgMj4vZGV2L251bGwgfHwgZWNobyAwKSIKZWNobyAicG9ydDQ0MzogJChzcyAtbG50IDI+L2Rldi9udWxsIHwgZ3JlcCAtYyAnOjQ0MyAnIHx8IGVjaG8gMCkiCmVjaG8gImRiX3NpemU6ICQoZHUgLWggL29wdC92aWxsYWZvcmdlL2RhdGEvaHViLmRiIDI+L2Rldi9udWxsIHwgY3V0IC1mMSB8fCBlY2hvIHVuYmVrYW5udCkiCmVjaG8gImh0dHA6ICQoY3VybCAtc2sgLW8gL2Rldi9udWxsIC13ICcle2h0dHBfY29kZX0nIC0tbWF4LXRpbWUgOCBodHRwczovLzEyNy4wLjAuMS8gLUggJ0hvc3Q6IGh1Yi5jeWJlcnNhcmFoLWtpLmNvbScgMj4vZGV2L251bGwgfHwgZWNobyAwMDApIgo=' 
+          STATUS_B64: 'ZWNobyAiaG9zdDogJChob3N0bmFtZSkiCmVjaG8gInVwdGltZTogJCh1cHRpbWUgLXAgMj4vZGV2L251bGwgfHwgdXB0aW1lKSIKZWNobyAibG9hZDogJChjdXQgLWQnICcgLWYxLTMgL3Byb2MvbG9hZGF2ZykiCmVjaG8gImRpc2tfcGN0OiAkKGRmIC1QIC8gfCBhd2sgJ05SPT0ye2dzdWIoIiUiLCIiLCQ1KTsgcHJpbnQgJDV9JykiCmVjaG8gImRpc2tfZnJlZTogJChkZiAtaCAvIHwgYXdrICdOUj09MntwcmludCAkNH0nKSIKZWNobyAibWVtOiAkKGZyZWUgLW0gfCBhd2sgJy9NZW06L3twcmludCAidXNlZD0iJDMiTUIgYXZhaWw9IiQ3Ik1CIn0nKSIKcG0yIGxpc3QgMj4vZGV2L251bGwgfCBzZWQgLW4gJzMsMTBwJyB8IHNlZCAncy9eL3BtMjogLycKZWNobyAiaHViX3Byb2M6ICQocGdyZXAgLWZjICd2aWxsYWZvcmdlfGFnZW50Zm9yZ2UnIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiCmVjaG8gInBvcnQ0NDM6ICQoc3MgLWxudCAyPi9kZXYvbnVsbCB8IGdyZXAgLWMgJzo0NDMgJyB8fCBlY2hvIDApIgplY2hvICJkYl9zaXplOiAkKGR1IC1oIC9vcHQvdmlsbGFmb3JnZS9kYXRhL2h1Yi5kYiAyPi9kZXYvbnVsbCB8IGN1dCAtZjEgfHwgZWNobyB1bmJla2FubnQpIgplY2hvICJodHRwOiAkKGN1cmwgLXNrIC0tcmVzb2x2ZSBodWIuY3liZXJzYXJhaC1raS5jb206NDQzOjEyNy4wLjAuMSAtbyAvZGV2L251bGwgLXcgJyV7aHR0cF9jb2RlfScgLS1tYXgtdGltZSA4IGh0dHBzOi8vaHViLmN5YmVyc2FyYWgta2kuY29tLyAyPi9kZXYvbnVsbCB8fCBlY2hvIDAwMCkiCg==' 
           VILLA_ID: ${{ inputs.villa_id }}
           CONFIRM_NAME: ${{ inputs.confirm_name }}
           SSH_CMD: ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -o BatchMode=yes ${{ secrets.PRODUCTION_SSH_USER2 || secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST2 || secrets.PRODUCTION_SSH_HOST }}
@@ -79,7 +79,10 @@ jobs:
               FAIL=0
               if [ -n "$DISK" ] && [ "$DISK" -ge 90 ]; then echo "::error::Platte zu voll: ${DISK}% belegt"; FAIL=1; fi
               if [ -n "$HUB" ] && [ "$HUB" -lt 1 ]; then echo "::error::Kein VillaForge-Prozess gefunden"; FAIL=1; fi
-              if [ "$HTTP" = "000" ]; then echo "::warning::Hub antwortet nicht auf HTTP"; fi
+              case "$HTTP" in
+                200|301|302|401|403) : ;;
+                *) echo "::error::Hub antwortet nicht (HTTP ${HTTP:-000})"; FAIL=1 ;;
+              esac
               echo "disk=${DISK}% hub_proc=$HUB http=$HTTP"
               exit $FAIL
               ;;
