@@ -221,6 +221,31 @@ jobs:
                 done
               '
               ;;
+            hub-db)
+              # Read-only: DB-Pfad aus dem laufenden Hub-Prozess lesen und die
+              # Villen aus genau dieser Datei zeigen.
+              $SSH_CMD '
+                PID=$(pgrep -f "server/server[.]mjs" | head -1)
+                echo "hub_pid: $PID"
+                if [ -n "$PID" ]; then
+                  echo "== Prozessumgebung (DB/Port) =="
+                  sudo -n tr "\0" "\n" < /proc/$PID/environ 2>/dev/null | grep -Ei "^(VF_DB|DB_PATH|PORT|NODE_ENV)=" || tr "\0" "\n" < /proc/$PID/environ 2>/dev/null | grep -Ei "^(VF_DB|DB_PATH|PORT|NODE_ENV)="
+                  echo "== offene DB-Dateien =="
+                  sudo -n ls -l /proc/$PID/fd 2>/dev/null | grep -Ei "\.db" | sed "s/.*-> //" | sort -u
+                fi
+                echo "== .env im Hub-Verzeichnis =="
+                sudo -n grep -Ei "^(VF_DB|PORT)=" /opt/villaforge/.env 2>/dev/null || echo "keine .env/kein Zugriff"
+                echo "== DB-Kandidaten mit Villen =="
+                for f in $(sudo -n find /opt/villaforge /opt/cybersarah-control-center /root -maxdepth 4 -type f -name "*.db" -size +10k 2>/dev/null | head -12); do
+                  N=$(node --experimental-sqlite -e "
+                    try{const {DatabaseSync}=require(\"node:sqlite\");const db=new DatabaseSync(\"$f\",{readOnly:true});
+                    const rows=db.prepare(\"SELECT id,name,status FROM villas ORDER BY id LIMIT 15\").all();
+                    console.log(rows.length+\" Villen: \"+JSON.stringify(rows));}catch(e){}
+                  " 2>/dev/null)
+                  [ -n "$N" ] && echo "$f -> $N"
+                done
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
