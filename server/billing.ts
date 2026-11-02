@@ -17,6 +17,8 @@ import {
   type SubscriptionTier,
 } from "../lib/subscription-tiers-logic";
 import { normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-webhook-logic";
+import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
+import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
 import {buildAiInfluenzaStripeLineItem,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
 import {recordAiInfluenzaInvoice,syncAiInfluenzaSubscription} from "./ai-influenza-stripe-sync";
 
@@ -402,9 +404,42 @@ export async function processStripeWebhook(
   }
 
   const seen = deps?.markEventSeen ?? markEventSeen;
+  // Sprint 25 — dauerhafte Idempotenz zuerst: Postgres-Beleg je Event-ID.
+  // Die In-Memory-Pruefung bleibt als Fallback, wenn keine Datenbank erreichbar ist.
+  let ledgerActive = false;
+  if (event.id && !deps?.markEventSeen) {
+    try {
+      const claim = await claimStripeWebhookEvent({
+        eventId: event.id,
+        type: event.type,
+        aggregateKey: webhookAggregateKey({
+          type: event.type,
+          object: (event.data?.object ?? {}) as unknown as Record<string, unknown>,
+        }),
+        createdAtMs: typeof event.created === "number" ? event.created * 1000 : null,
+      });
+      ledgerActive = claim.available;
+      if (claim.available) {
+        if (claim.decision === "duplicate_skip") {
+          return { received: true, eventType: event.type, duplicate: true as const };
+        }
+        if (claim.decision === "concurrent_retry") {
+          throw new StripeWebhookProcessingError("Stripe-Event wird bereits verarbeitet; erneut zustellen.");
+        }
+        if (claim.decision === "stale_out_of_order") {
+          // Aelteres Event zu einem bereits neueren Zustand: nichts ueberschreiben.
+          await completeStripeWebhookEvent(event.id, "stale_out_of_order");
+          return { received: true, eventType: event.type, duplicate: true as const };
+        }
+      }
+    } catch (ledgerError) {
+      if (ledgerError instanceof StripeWebhookProcessingError) throw ledgerError;
+      console.warn("[StripeWebhook] Idempotenz-Beleg nicht schreibbar; Fallback auf Speicher-Dedupe.", String(ledgerError));
+    }
+  }
   // A failed delivery must NEVER be acknowledged as processed. Check only
   // committed in-memory IDs here; mark after all required side effects finish.
-  if (event.id && !deps?.markEventSeen && seenEventIds.has(event.id)) {
+  if (!ledgerActive && event.id && !deps?.markEventSeen && seenEventIds.has(event.id)) {
     return { received: true, eventType: event.type, duplicate: true as const };
   }
   if (event.id && processingEventIds.has(event.id)) {
@@ -449,13 +484,19 @@ export async function processStripeWebhook(
     }
   } catch (error) {
     markRevenueWebhookFailure("stripe","processing",event.type);
+    if (ledgerActive && event.id) {
+      await failStripeWebhookEvent(event.id, error instanceof Error ? error.message : "Verarbeitung fehlgeschlagen.");
+    }
     throw new StripeWebhookProcessingError(
       error instanceof Error ? error.message : "Verarbeitung fehlgeschlagen.",
     );
   } finally {
     if (event.id) processingEventIds.delete(event.id);
   }
-  const firstDelivery = event.id ? seen(event.id) : true;
+  if (ledgerActive && event.id) {
+    await completeStripeWebhookEvent(event.id);
+  }
+  const firstDelivery = ledgerActive ? true : event.id ? seen(event.id) : true;
   markRevenueWebhookSuccess("stripe",event.type);
   return { received: true, eventType: event.type, duplicate: !firstDelivery };
 }

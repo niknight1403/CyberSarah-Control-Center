@@ -624,6 +624,27 @@ export const productReleaseEvents = pgTable("product_release_events", {
   index("product_release_events_actor_idx").on(table.actorOpenId, table.createdAt),
 ]);
 
+
+/**
+ * Sprint 25 — dauerhafte Belege je Stripe-Webhook-Event. Ersetzt die reine
+ * In-Memory-Dedupe, die bei Neustart und parallelen Instanzen versagt.
+ */
+export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
+  eventId: text("event_id").primaryKey(),
+  type: text("type").notNull(),
+  aggregateKey: text("aggregate_key"),
+  status: text("status").notNull(),
+  eventCreatedAt: timestamp("event_created_at", { withTimezone: true }),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+  attempts: integer("attempts").notNull().default(1),
+  lastError: text("last_error"),
+}, (table) => [
+  index("stripe_webhook_events_aggregate_idx").on(table.aggregateKey, table.eventCreatedAt),
+  index("stripe_webhook_events_status_idx").on(table.status, table.receivedAt),
+]);
+
+export type StripeWebhookEventRow = typeof stripeWebhookEvents.$inferSelect;
 export type ProductReleaseEventRow = typeof productReleaseEvents.$inferSelect;
 
 export type B2BNetworkNodeRow = typeof b2bNetworkNodes.$inferSelect;
