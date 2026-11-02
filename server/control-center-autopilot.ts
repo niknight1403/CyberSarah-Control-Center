@@ -146,6 +146,10 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (salesCatalogError) blocked.push(`AI Influenza Katalog: ${salesCatalogError}`);
   if (salesCatalog) {
     if (salesCatalog.executed > 0) realActions.push(`${salesCatalog.executed} Stripe-Katalogpreis(e) autonom angelegt`);
+    if (salesCatalog.reused.length > 0)
+      deferred.push(
+        `AI Influenza Katalog: ${salesCatalog.reused.length} vorhandene(r) Stripe-Preis(e) wiederverwendet, IDs als STRIPE_AI_INFLUENZA_PRICE_ID_* übernehmen`,
+      );
     if (salesCatalog.dryRun && salesCatalog.plans > 0) deferred.push(`AI Influenza Katalog: Trockenlauf über ${salesCatalog.plans} Pläne`);
     if (salesCatalog.needsReview > 0)
       deferred.push(

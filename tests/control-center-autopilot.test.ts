@@ -37,7 +37,7 @@ describe("control center autopilot", () => {
   const aiInfluenza = async () => ({ considered: 0, advanced: 0, waiting: 0, failed: 0, details: [], error: null });
   // Katalog-Schritt ebenfalls als Fake: er wuerde sonst Plaene aus der
   // Umgebung bauen und den Test von Secrets abhaengig machen.
-  const salesCatalog = async () => ({ dryRun: true, plans: 0, executed: 0, skipped: 0, needsReview: 0, created: [], blocked: [], error: null });
+  const salesCatalog = async () => ({ dryRun: true, plans: 0, executed: 0, skipped: 0, needsReview: 0, created: [], reused: [], blocked: [], error: null });
   const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput, aiInfluenza, salesCatalog };
 
   it("orchestriert echte Scans, Revenue und Drafts in einem Lauf", async () => {
@@ -62,7 +62,10 @@ describe("control center autopilot", () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
     const executed = async () => ({
       dryRun: false, plans: 6, executed: 2, skipped: 1, needsReview: 3,
-      created: [], blocked: ["digistore24/starter: DIGISTORE24_API_KEY fehlt."], error: null,
+      created: [],
+      reused: [{ channel: "stripe" as const, packageId: "growth" as const, priceId: "price_bestehend", envTarget: "STRIPE_AI_INFLUENZA_PRICE_ID_GROWTH" }],
+      blocked: ["digistore24/starter: DIGISTORE24_API_KEY fehlt."],
+      error: null,
     });
     const result = await runControlCenterAutopilot({ scan, revenue, drafts, ...growthDeps, salesCatalog: executed });
     // ok bleibt false, solange etwas wartet: der Katalog ist noch nicht fertig.
@@ -71,6 +74,7 @@ describe("control center autopilot", () => {
     expect(result.realActions.join(" ")).toContain("2 Stripe-Katalogpreis(e) autonom angelegt");
     expect(result.deferred.join(" ")).toContain("1 offener Punkt");
     expect(result.deferred.join(" ")).toContain("3 Zahlungsplan-Entwürfe warten");
+    expect(result.deferred.join(" ")).toContain("1 vorhandene(r) Stripe-Preis(e) wiederverwendet");
     expect(result.blocked).toEqual([]);
   });
 

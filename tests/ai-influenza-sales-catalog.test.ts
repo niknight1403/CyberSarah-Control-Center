@@ -1,17 +1,25 @@
 import { describe, it, expect, vi } from "vitest";
 import { runSalesCatalogStep, type StripeCatalogExecutor } from "../server/ai-influenza-sales-catalog";
 
-function fakeExecutor(): StripeCatalogExecutor & {
+function fakeExecutor(existingLookupKeys: string[] = []): StripeCatalogExecutor & {
   products: Record<string, unknown>[];
   prices: Record<string, unknown>[];
   productKeys: string[];
   priceKeys: string[];
+  lookedUp: string[];
 } {
   const products: Record<string, unknown>[] = [];
   const prices: Record<string, unknown>[] = [];
   const productKeys: string[] = [];
   const priceKeys: string[] = [];
+  const lookedUp: string[] = [];
   return {
+    lookedUp,
+    async findPriceByLookupKey(lookupKey) {
+      lookedUp.push(lookupKey);
+      if (!existingLookupKeys.includes(lookupKey)) return null;
+      return { id: `price_bestehend_${lookupKey}` };
+    },
     products,
     prices,
     productKeys,
@@ -83,6 +91,25 @@ describe("runSalesCatalogStep", () => {
     expect(result.created.map((row) => row.packageId)).toEqual(["starter", "business"]);
   });
 
+  it("prueft vor dem Anlegen den Lookup-Key und legt nichts doppelt an", async () => {
+    const executor = fakeExecutor(["ai-influenza-growth"]);
+    const result = await runSalesCatalogStep({ env: AUTOCREATE, executor });
+    expect(executor.lookedUp).toEqual(["ai-influenza-starter", "ai-influenza-growth", "ai-influenza-business"]);
+    expect(result.executed).toBe(2);
+    expect(result.reused).toEqual([
+      {
+        channel: "stripe",
+        packageId: "growth",
+        priceId: "price_bestehend_ai-influenza-growth",
+        envTarget: "STRIPE_AI_INFLUENZA_PRICE_ID_GROWTH",
+      },
+    ]);
+    expect(executor.products.map((row) => (row.metadata as Record<string, unknown>).packageId)).toEqual([
+      "starter",
+      "business",
+    ]);
+  });
+
   it("meldet Digistore24 als Freigabe- und Blockerfall, statt es zu erzwingen", async () => {
     const executor = fakeExecutor();
     const result = await runSalesCatalogStep({ env: AUTOCREATE, executor });
@@ -93,6 +120,7 @@ describe("runSalesCatalogStep", () => {
   it("bricht bei einem Fehler nicht ab, sondern sammelt Blocker", async () => {
     const executor = fakeExecutor();
     const failing: StripeCatalogExecutor = {
+      findPriceByLookupKey: vi.fn().mockResolvedValue(null),
       createProduct: vi.fn().mockResolvedValue({ id: "prod_1" }),
       createPrice: vi
         .fn()

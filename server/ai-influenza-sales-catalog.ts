@@ -21,6 +21,13 @@ import {
 } from "../lib/ai-influenza-sales-channel-logic";
 import type { AiInfluenzaPackageId } from "../lib/ai-influenza-team-logic";
 
+export type SalesCatalogReused = {
+  channel: "stripe";
+  packageId: AiInfluenzaPackageId;
+  priceId: string;
+  envTarget?: string;
+};
+
 export type SalesCatalogCreated = {
   channel: "stripe";
   packageId: AiInfluenzaPackageId;
@@ -36,11 +43,15 @@ export type SalesCatalogRunResult = {
   skipped: number;
   needsReview: number;
   created: SalesCatalogCreated[];
+  /** Bereits vorhandene Preise, per Lookup-Key gefunden statt neu angelegt. */
+  reused: SalesCatalogReused[];
   blocked: string[];
   error: string | null;
 };
 
 export type StripeCatalogExecutor = {
+  /** Vorhandenen Preis am Lookup-Key finden, damit kein zweiter entsteht. */
+  findPriceByLookupKey: (lookupKey: string) => Promise<{ id: string } | null>;
   createProduct: (payload: Record<string, unknown>, options: { idempotencyKey: string }) => Promise<{ id: string }>;
   createPrice: (
     payload: Record<string, unknown>,
@@ -59,6 +70,12 @@ export type SalesCatalogDeps = {
 export function createStripeCatalogExecutor(secretKey: string): StripeCatalogExecutor {
   const client = new Stripe(secretKey);
   return {
+    async findPriceByLookupKey(lookupKey) {
+      // Stripe erlaubt nur aktive Preise mit Lookup-Key; inaktive sind ersetzt.
+      const listed = await client.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 });
+      const first = listed.data?.[0];
+      return first ? { id: first.id } : null;
+    },
     async createProduct(payload, options) {
       const product = await client.products.create(payload as unknown as Stripe.ProductCreateParams, {
         idempotencyKey: options.idempotencyKey,
@@ -101,6 +118,7 @@ export async function runSalesCatalogStep(deps: SalesCatalogDeps = {}): Promise<
     skipped: plan.plans.filter((entry) => entry.action === "skip").length,
     needsReview: plan.needsReview,
     created: [],
+    reused: [],
     blocked,
     error: null,
   };
@@ -120,6 +138,22 @@ export async function runSalesCatalogStep(deps: SalesCatalogDeps = {}): Promise<
     if (!productStep || !priceStep) continue;
 
     try {
+      // Zuerst nachsehen: Stripe-Idempotenz-Schluessel verfallen nach 24 Stunden.
+      // Ohne diese Pruefung wuerde der naechste Tageslauf Produkte duplizieren.
+      const lookupKey = String(priceStep.payload.lookup_key ?? "");
+      if (lookupKey) {
+        const existing = await executor.findPriceByLookupKey(lookupKey);
+        if (existing) {
+          result.reused.push({
+            channel: "stripe",
+            packageId: entry.packageId,
+            priceId: existing.id,
+            envTarget: entry.envTarget,
+          });
+          result.skipped += 1;
+          continue;
+        }
+      }
       const product = await executor.createProduct(productStep.payload, {
         idempotencyKey: `${entry.idempotencyKey}-produkt`,
       });
