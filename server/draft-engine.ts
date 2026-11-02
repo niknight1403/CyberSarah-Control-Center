@@ -13,7 +13,7 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "./db";
-import { draftQueue, type DraftQueueRow, type InsertDraftQueueRow } from "../drizzle/schema";
+import { affiliateProducts, draftQueue, revenueOffers, type DraftQueueRow, type InsertDraftQueueRow } from "../drizzle/schema";
 import {
   DRAFT_MAX_PENDING_BY_KIND,
   REVENUE_HUBS,
@@ -187,15 +187,27 @@ export async function insertPendingDraft(kind: DraftKind, title: string, payload
   await db.insert(draftQueue).values(row);
 }
 
+async function contentCatalogBrief(): Promise<string> {
+  const db=await getDb(); if(!db) return "";
+  const [offers,affiliates]=await Promise.all([
+    db.select({name:revenueOffers.name,kind:revenueOffers.kind}).from(revenueOffers).where(eq(revenueOffers.status,"active")).limit(5),
+    db.select({title:affiliateProducts.title,score:affiliateProducts.score}).from(affiliateProducts).orderBy(desc(affiliateProducts.score)).limit(5),
+  ]);
+  const items=[...offers.map(x=>`${x.name} (${x.kind})`),...affiliates.map(x=>`${x.title} (Affiliate${x.score==null?"":`, Score ${x.score}`})`)];
+  return items.length ? `Aktueller Produktkatalog (nur passend und wahrheitsgemäß verwenden): ${items.join("; ")}` : "";
+}
+
 async function generateContentDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number): Promise<{ ok: true } | { ok: false; reason: string }> {
   const persona = INFLUENCER_PERSONAS[slotOffset % INFLUENCER_PERSONAS.length];
   const platformRound = Math.floor(slotOffset / INFLUENCER_PERSONAS.length);
   const platform = CONTENT_PLATFORMS[(slotOffset + platformRound) % CONTENT_PLATFORMS.length];
   const topic = CONTENT_TOPIC_SEEDS[seedIndexForDay(nowMs, slotOffset)];
   const b2bBrief=selectB2BAffinityBrief(persona.id,slotOffset);
+  const catalogBrief=await contentCatalogBrief();
   const prompt = [
     buildInfluencerPrompt(persona, topic, platform),
     ...(b2bBrief?[formatB2BAffinityPrompt(b2bBrief)]:[]),
+    ...(catalogBrief?[catalogBrief]:[]),
     "Der Content muss den KI-Charakter transparent halten und darf keine erfundenen persoenlichen Erlebnisse enthalten.",
     'Antworte NUR mit einem JSON-Objekt: {"personaId": "' + persona.id + '", "platform": "' + platform + '", "topic": "<Thema>", "content": "<fertiger Content>"}',
   ].join("\\n");
