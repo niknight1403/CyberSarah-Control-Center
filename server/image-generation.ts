@@ -45,7 +45,7 @@ function kvCacheAdapter(): ImageCacheAdapter {
 }
 
 export type GenerateImageResult =
-  | { ok: true; source: "cache" | "provider"; dataUrl: string; note: string }
+  | { ok: true; source: "cache" | "provider" | "local"; dataUrl: string; note: string }
   | { ok: false; reason: string; retryHint: string | null; configured: boolean };
 
 async function fetchFromHuggingFace(
@@ -115,6 +115,13 @@ export async function generateSceneImageForPipeline(
   return { ok: true, dataUrl: result.dataUrl, source: result.source, note: result.note };
 }
 
+function localPosterDataUrl(prompt: string, size: ImageSize): string {
+  const dims = size === "landscape" ? [1280,768] : size === "portrait" ? [768,1280] : [1024,1024];
+  const safe = prompt.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c] ?? c)).slice(0,180);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${dims[0]}" height="${dims[1]}" viewBox="0 0 ${dims[0]} ${dims[1]}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111827"/><stop offset="1" stop-color="#312e81"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><circle cx="82%" cy="18%" r="160" fill="#fff" opacity=".08"/><text x="8%" y="48%" fill="white" font-family="sans-serif" font-size="42" font-weight="700">CyberSarah</text><foreignObject x="8%" y="54%" width="84%" height="30%"><div xmlns="http://www.w3.org/1999/xhtml" style="color:#dbeafe;font:28px sans-serif;line-height:1.35">${safe}</div></foreignObject></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
 export async function generateImageForUser(
   openId: string,
   input: { prompt: string; size?: ImageSize; seed?: number | null; approved: boolean },
@@ -135,7 +142,8 @@ export async function generateImageForUser(
   );
 
   if (!result.ok) {
-    return { ok: false, reason: result.reason, retryHint: result.retryHint, configured };
+    const size = input.size ?? "square";
+    return { ok: true, source: "local", dataUrl: localPosterDataUrl(input.prompt, size), note: `Kostenloser lokaler SVG-Entwurf erzeugt; externer Bildprovider nicht verfügbar: ${result.reason.slice(0,120)}` };
   }
   if (!result.dataUrl) {
     return { ok: false, reason: "Bild erzeugt, aber Bytes fehlen — ehrlich ein Fehler, kein Dummy.", retryHint: "Erneut senden.", configured };
