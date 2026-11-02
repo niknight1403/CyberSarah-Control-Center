@@ -56,7 +56,6 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
 }
 
 export async function channelAutopilotOverview(){
-  const reconciliation=await reconcileApprovedContentDrafts();
   const snapshot=await collectChannelAutopilotSnapshot();
   const decision=decideChannelAutopilot(snapshot);
   return {mode:"24/7-observe-diagnose-draft-learn",snapshot,health:channelAutopilotHealth(snapshot),decision,externalActionsExecuted:0,generatedAt:new Date().toISOString()};
@@ -79,6 +78,7 @@ export async function reconcileApprovedContentDrafts(limit=50){
 
 export async function runChannelAutopilot(){
   const db=await getDb(); if(!db) throw new Error("Datenbank nicht verfügbar.");
+  const reconciliation=await reconcileApprovedContentDrafts();
   const snapshot=await collectChannelAutopilotSnapshot();
   const decision=decideChannelAutopilot(snapshot);
   const cooldownBucket=Math.floor(Date.now()/(6*60*60_000));
