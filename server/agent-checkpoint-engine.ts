@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Redis from "ioredis";
 
 export interface AgentStepState {
@@ -34,7 +35,7 @@ export class AgentCheckpointEngine {
   async monitorAndSelfHeal(taskId: string, maxStaleMs = 30000, resumeCallback: (state: AgentStepState) => Promise<void>): Promise<boolean> {
     const current = await this.getLastCheckpoint(taskId);
     if (!current || current.status !== "IN_PROGRESS" || Date.now() - current.timestamp <= maxStaleMs) return false;
-    const token = `${process.pid}:${Date.now()}:${Math.random()}`;
+    const token = randomUUID();
     const acquired = await this.redis.set(this.lockKey(taskId), token, "PX", 60000, "NX");
     if (acquired !== "OK") return false;
     try {
