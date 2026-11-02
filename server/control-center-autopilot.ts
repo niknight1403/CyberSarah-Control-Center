@@ -6,6 +6,7 @@ import { b2bNetworkOverview, refreshInfluencerLearning } from "./growth-network-
 import { runGrowthPulse } from "./always-on-growth";
 import { assertControlCenterAutopilotEnabled } from "../lib/control-center-operator-policy";
 import { revenueThroughputOverview } from "./revenue-throughput-service";
+import { runAiInfluenzaAutopilotStep, type AiInfluenzaAutopilotResult } from "./ai-influenza-autopilot";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -30,6 +31,8 @@ export type ControlCenterAutopilotResult = {
   };
   growthPulse: Awaited<ReturnType<typeof runGrowthPulse>> | null;
   throughput: Awaited<ReturnType<typeof revenueThroughputOverview>> | null;
+  /** AI Influenza Team: autonom weitergeschaltete Auftragsschritte des Tageslaufs. */
+  aiInfluenza: AiInfluenzaAutopilotResult | null;
   realActions: string[];
   deferred: string[];
   blocked: string[];
@@ -45,6 +48,7 @@ export type ControlCenterAutopilotDeps = {
   b2bOverview?: typeof b2bNetworkOverview;
   growth?: typeof runGrowthPulse;
   throughput?: typeof revenueThroughputOverview;
+  aiInfluenza?: typeof runAiInfluenzaAutopilotStep;
 };
 
 async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
@@ -76,6 +80,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   const getB2BOverview = deps.b2bOverview ?? b2bNetworkOverview;
   const growthRunner = deps.growth ?? runGrowthPulse;
   const throughputRunner = deps.throughput ?? revenueThroughputOverview;
+  const influenzaRunner = deps.aiInfluenza ?? runAiInfluenzaAutopilotStep;
 
   const [hara, expansion] = await Promise.all([scan("hara/scan", trigger), scan("expansion/scan", trigger)]);
   const revenue = await runRevenue(5);
@@ -98,10 +103,14 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   let throughput: Awaited<ReturnType<typeof revenueThroughputOverview>> | null = null;
   let growthError: string | null = null;
   let throughputError: string | null = null;
+  let aiInfluenza: AiInfluenzaAutopilotResult | null = null;
+  let aiInfluenzaError: string | null = null;
   try { growthPulse = await growthRunner(); }
   catch (error) { growthError = error instanceof Error ? error.message : "Growth Pulse fehlgeschlagen"; }
   try { throughput = await throughputRunner(); }
   catch (error) { throughputError = error instanceof Error ? error.message : "Revenue Throughput Supervisor fehlgeschlagen"; }
+  try { aiInfluenza = await influenzaRunner(); }
+  catch (error) { aiInfluenzaError = error instanceof Error ? error.message : "AI-Influenza-Autopilot fehlgeschlagen"; }
   const deferred: string[] = [];
   const blocked: string[] = [];
   if (hara.ok) realActions.push("HARA-Live-Scan gestartet"); else blocked.push(`HARA: ${hara.detail}`);
@@ -119,6 +128,12 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (growthPulse?.generated) realActions.push(`${growthPulse.generated} datenbasierte Reichweiten-/Funnel-Entwuerfe erzeugt`);
   if (growthError) blocked.push(`Growth Pulse: ${growthError}`);
   if (throughputError) blocked.push(`Revenue Throughput: ${throughputError}`);
+  if (aiInfluenzaError) blocked.push(`AI Influenza: ${aiInfluenzaError}`);
+  if (aiInfluenza) {
+    if (aiInfluenza.advanced > 0) realActions.push(`${aiInfluenza.advanced} AI-Influenza-Auftragsschritte autonom weitergeschaltet`);
+    if (aiInfluenza.waiting > 0) deferred.push(`AI Influenza: ${aiInfluenza.waiting} Schritt(e) warten auf Freigabe`);
+    if (aiInfluenza.failed > 0) blocked.push(`AI Influenza: ${aiInfluenza.failed} Schritt(e) fehlgeschlagen${aiInfluenza.error ? ` (${aiInfluenza.error})` : ""}`);
+  }
   if (throughput) {
     if (throughput.status === "repair") blocked.push(...throughput.blockers.map(item => `Revenue: ${item}`));
     else realActions.push(`Revenue Throughput stabil · 30d Run-Rate ${throughput.revenueVelocity.monthlyRunRateEur.toLocaleString("de-DE")} EUR`);
@@ -139,6 +154,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     growth,
     growthPulse,
     throughput,
+    aiInfluenza,
     realActions,
     deferred,
     blocked,
