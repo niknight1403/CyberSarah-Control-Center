@@ -4,7 +4,12 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
-## 02.11.2026 — v2.8.0: AI Influenza Team · Phase 7
+## 02.11.2026 — v2.8.6 (APK) · Phase 7 / v2.8.0 (Release-Plan): AI Influenza Team
+
+> Versionshinweis: der Android-Build-Workflow inkrementiert die Patch-Version gegenüber
+> der zuletzt gebauten APK (`scripts/next-release-version.mjs`). Angefragt war `2.8.0`,
+> gebaut wurde `2.8.6` (versionCode 20806). Tag und Release tragen deshalb `v2.8.6`.
+
 
 - **Neue Business-Unit:** AI Influenza Team als integrierte KI-Agentur in CyberSarah Control Center.
 - **3 Servicepakete:** Starter 299 €/Monat, Growth 999 €/Monat, Business 2.499 €/Monat; Preise ausdrücklich als zu validierende Start-Hypothesen.
