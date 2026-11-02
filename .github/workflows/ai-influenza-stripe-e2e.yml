@@ -1,0 +1,37 @@
+name: AI Influenza Stripe Test-Modus E2E
+
+# Manuell: erzeugt echte Test-Objekte bei Stripe. Nie automatisch, nie live.
+on:
+  workflow_dispatch:
+
+jobs:
+  stripe-test-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: influenza_stripe_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d influenza_stripe_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Assert Stripe test-mode customer journey
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          AI_INFLUENZA_INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/influenza_stripe_ci
+        run: npx tsx scripts/test-ai-influenza-stripe-test-mode-e2e.ts
