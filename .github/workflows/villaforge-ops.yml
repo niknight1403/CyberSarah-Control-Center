@@ -199,6 +199,28 @@ jobs:
                 " 2>&1 | grep -v ExperimentalWarning | grep -v trace-warnings
               '
               ;;
+            villas-all)
+              # Read-only: findet alle SQLite-Dateien mit einer Villen-Tabelle
+              # und zeigt deren Villen (Name, Status). Sucht nach den gesuchten Namen.
+              $SSH_CMD '
+                echo "== Kandidaten-DBs =="
+                sudo -n find /opt /root /srv /home -maxdepth 4 -type f \( -name "*.db" -o -name "*.sqlite" -o -name "*.sqlite3" \) -size +10k 2>/dev/null | grep -v node_modules | head -20
+                echo "== Villen je DB =="
+                for f in $(sudo -n find /opt /root /srv /home -maxdepth 4 -type f \( -name "*.db" -o -name "*.sqlite" -o -name "*.sqlite3" \) -size +10k 2>/dev/null | grep -v node_modules | head -20); do
+                  OUT=$(node --experimental-sqlite -e "
+                    try{
+                      const {DatabaseSync}=require(\"node:sqlite\");
+                      const db=new DatabaseSync(\"$f\",{readOnly:true});
+                      const t=db.prepare(\"SELECT name FROM sqlite_master WHERE type=\\"table\\" AND name LIKE \\"%villa%\\"\").all().map(r=>r.name);
+                      if(!t.length) process.exit(0);
+                      const rows=db.prepare(\"SELECT id,name,status FROM villas ORDER BY id LIMIT 12\").all();
+                      console.log(\"TABELLEN:\"+t.join(\",\")+\" VILLEN:\"+JSON.stringify(rows));
+                    }catch(e){}
+                  " 2>/dev/null)
+                  [ -n "$OUT" ] && echo "$f -> $OUT"
+                done
+              '
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
