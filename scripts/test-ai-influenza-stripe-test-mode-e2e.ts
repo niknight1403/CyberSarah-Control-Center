@@ -19,6 +19,19 @@ import Stripe from "stripe";
 const STRIPE_KEY = (process.env.STRIPE_SECRET_KEY ?? "").trim();
 const DB_URL = process.env.AI_INFLUENZA_INTEGRATION_DATABASE_URL ?? "";
 
+function keyDiagnostics(key: string): string {
+  const flags = [
+    key.startsWith("sk_test_") ? "praefix=sk_test_" : null,
+    key.startsWith("rk_test_") ? "praefix=rk_test_" : null,
+    key.startsWith("sk_live_") ? "praefix=sk_live_" : null,
+    key.startsWith("rk_live_") ? "praefix=rk_live_" : null,
+    /["'`]/.test(key) ? "enthaelt_anfuehrungszeichen" : null,
+    /\s/.test(key) ? "enthaelt_whitespace" : null,
+    key.charCodeAt(0) > 126 ? `erstes_zeichen_code=${key.charCodeAt(0)}` : null,
+  ].filter(Boolean);
+  return `laenge=${key.length} ${flags.join(" ") || "kein_bekanntes_praefix"}`;
+}
+
 function assertSafety() {
   if (!STRIPE_KEY.startsWith("sk_test_") && !STRIPE_KEY.startsWith("rk_test_"))
     throw new Error("Safety gate: nur Test-Keys (sk_test_/rk_test_).");
