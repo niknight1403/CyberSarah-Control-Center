@@ -413,6 +413,22 @@ jobs:
               echo '== Stand =='
               curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/focus | jq -c '{active, reason, history: [.history[]? | {action, reason}] }'
               ;;
+            villa-kick)
+              # Stoesst eine Villa an (orchestrate). Nach einem Hub-Neustart ist
+              # die Arbeit eingereiht, aber kein Agent greift zu.
+              VID="${VILLA_ID:-34}"
+              TOK=$(curl -s -m 25 -X POST -H 'Content-Type: application/json' \
+                -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+                https://hub.cybersarah-ki.com/api/auth/login | python3 -c "import json,sys; print(json.load(sys.stdin).get('token',''))")
+              [ -n "$TOK" ] || { echo 'FEHLER: Login fehlgeschlagen'; exit 1; }
+              echo "== Anstoss Villa $VID =="
+              curl -s -m 30 -X POST -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+                -d '{"runToCompletion":true}' https://hub.cybersarah-ki.com/api/villas/$VID/orchestrate | head -c 400; echo
+              sleep 20
+              echo "== Zustand danach =="
+              curl -s -m 25 -H "Authorization: Bearer $TOK" https://hub.cybersarah-ki.com/api/villas/$VID \
+                | jq -c '(.villa // .) as $v | {id: $v.id, status: $v.status, running, queued, tasks: ((.tasks // []) | group_by(.status) | map({(.[0].status): length}) | add)}'
+              ;;
             *) echo "Unbekannter Modus: $MODE"; exit 1;;
           esac
       - name: Hub von aussen pruefen
