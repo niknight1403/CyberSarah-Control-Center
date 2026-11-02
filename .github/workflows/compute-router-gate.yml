@@ -1,0 +1,29 @@
+name: Compute Router Integration Gate
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "server/compute-*.ts"
+      - "server/agent-checkpoint-engine.ts"
+      - "tests/compute-*.test.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/compute-router-gate.yml"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Verify lockfile is synchronized
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: TypeScript check
+        run: npm run check
+      - name: Router unit tests
+        run: npx vitest run tests/compute-cascading-router.test.ts tests/compute-routing-policy.test.ts
