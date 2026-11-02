@@ -45,19 +45,60 @@ const OPENAI_TTS_MODEL = "tts-1";
 const OPENAI_VOICE = "nova";
 
 /**
+ * Alle brauchbaren Anbieter in Wunschreihenfolge. Wichtig, weil ein einzelner
+ * Schluessel bei Kontingent (HTTP 429) ausfaellt: dann geht es mit dem
+ * naechsten weiter, statt still auf Stille zurueckzufallen.
+ *
+ * Gemini zuerst (derselbe Schluessel liefert auch Motive), danach der
+ * Gemini-Reserveschluessel, zuletzt OpenAI.
+ */
+export function resolveVoiceTargets(env: Record<string, string | undefined>): VoiceTarget[] {
+  const targets: VoiceTarget[] = [];
+  const push = (apiKey: string | undefined, provider: VoiceProvider) => {
+    const key = apiKey?.trim();
+    if (!key) return;
+    if (targets.some((entry) => entry.apiKey === key && entry.provider === provider)) return;
+    targets.push(
+      provider === "gemini"
+        ? { provider, apiKey: key, voice: GEMINI_VOICE, model: GEMINI_TTS_MODEL }
+        : { provider, apiKey: key, voice: OPENAI_VOICE, model: OPENAI_TTS_MODEL },
+    );
+  };
+  push(env.GEMINI_API_KEY, "gemini");
+  push(env.GEMINI_BACKUP_KEY, "gemini");
+  push(env.OPENAI_API_KEY, "openai");
+  push(env.OPENAI_BACKUP_KEY, "openai");
+  return targets;
+}
+
+/** Schluessel fuer Bildmotive, in derselben Reihenfolge. */
+export function resolveImageKeys(env: Record<string, string | undefined>): string[] {
+  const keys = [env.GEMINI_API_KEY?.trim(), env.GEMINI_BACKUP_KEY?.trim()].filter(
+    (key): key is string => Boolean(key && key.length > 0),
+  );
+  return Array.from(new Set(keys));
+}
+
+/** Kontingent und voruebergehende Serverfehler sind es wert, es nochmal zu versuchen. */
+export function shouldRetryStatus(status: number): boolean {
+  return status === 429 || status === 408 || (status >= 500 && status <= 599);
+}
+
+/** Wartezeit vor dem naechsten Versuch; Retry-After des Anbieters hat Vorrang. */
+export function retryDelayMs(attempt: number, retryAfterSeconds?: number | null): number {
+  if (retryAfterSeconds && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return Math.min(30_000, retryAfterSeconds * 1000);
+  }
+  const schedule = [2_000, 6_000, 14_000];
+  return schedule[Math.min(Math.max(attempt, 0), schedule.length - 1)];
+}
+
+/**
  * Waehlt den Anbieter anhand der gesetzten Schluessel. Gemini zuerst, weil
  * derselbe Schluessel auch Bildmotive liefert; OpenAI nur als Rueckfall.
  */
 export function resolveVoiceTarget(env: Record<string, string | undefined>): VoiceTarget | null {
-  const gemini = env.GEMINI_API_KEY?.trim();
-  if (gemini) {
-    return { provider: "gemini", apiKey: gemini, voice: GEMINI_VOICE, model: GEMINI_TTS_MODEL };
-  }
-  const openai = env.OPENAI_API_KEY?.trim();
-  if (openai) {
-    return { provider: "openai", apiKey: openai, voice: OPENAI_VOICE, model: OPENAI_TTS_MODEL };
-  }
-  return null;
+  return resolveVoiceTargets(env)[0] ?? null;
 }
 
 /** Anfrage fuer eine Szene. Text wird nie gekuerzt, nur getrimmt. */
@@ -190,8 +231,6 @@ export function parseMotifImage(payload: unknown): Buffer | null {
 
 /** Kurzfassung fuer Meldungen: warum keine Vertonung entstand. */
 export function explainMissingVoice(env: Record<string, string | undefined>): string {
-  const hasGemini = Boolean(env.GEMINI_API_KEY?.trim());
-  const hasOpenai = Boolean(env.OPENAI_API_KEY?.trim());
-  if (hasGemini || hasOpenai) return "Anbieter vorhanden, aber keine Audiodaten in der Antwort.";
-  return "Kein GEMINI_API_KEY und kein OPENAI_API_KEY gesetzt — Vertonung bleibt Stille.";
+  if (resolveVoiceTargets(env).length > 0) return "Anbieter vorhanden, aber keine Audiodaten in der Antwort.";
+  return "Kein GEMINI_API_KEY, GEMINI_BACKUP_KEY oder OPENAI_KEY gesetzt — Vertonung bleibt Stille.";
 }

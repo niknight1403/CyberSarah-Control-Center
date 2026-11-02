@@ -27,7 +27,10 @@ import {
   parseMotifImage,
   parseTtsAudio,
   pcm16ToWav,
-  resolveVoiceTarget,
+  resolveImageKeys,
+  resolveVoiceTargets,
+  retryDelayMs,
+  shouldRetryStatus,
   type VoiceTarget,
 } from "../lib/ai-influenza-voice-logic";
 import { buildMotifPpm, paletteFor } from "../lib/ai-influenza-motif-logic";
@@ -75,72 +78,88 @@ function probeSeconds(file: string): number {
   return Number.parseFloat(out.trim());
 }
 
-/** Holt die Vertonung einer Szene. Gibt null zurueck, wenn keine Audiodaten kommen. */
+/**
+ * Anfrage mit Wiederholung: 429 und 5xx sind kein Endzustand. Retry-After des
+ * Anbieters wird respektiert, sonst waechst die Pause (2s, 6s, 14s).
+ */
+async function fetchWithRetry(
+  request: { url: string; headers: Record<string, string>; body: string },
+  label: string,
+  attempts = 3,
+): Promise<Response | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const response = await fetch(request.url, { method: "POST", headers: request.headers, body: request.body });
+    if (response.ok) return response;
+    const retryable = shouldRetryStatus(response.status);
+    const last = attempt === attempts - 1;
+    if (!retryable || last) {
+      console.log(`  ${label}: HTTP ${response.status}${retryable ? " (Versuche erschoepft)" : ""} — wechsle Quelle.`);
+      return null;
+    }
+    const retryAfter = Number(response.headers.get("retry-after") ?? "");
+    const wait = retryDelayMs(attempt, Number.isFinite(retryAfter) ? retryAfter : null);
+    console.log(`  ${label}: HTTP ${response.status}, neuer Versuch in ${(wait / 1000).toFixed(0)}s.`);
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+  return null;
+}
+
+/** Holt die Vertonung einer Szene; geht die Anbieterkette entlang, bis einer liefert. */
 async function synthesizeSceneVoice(
-  target: VoiceTarget | null,
+  targets: VoiceTarget[],
   text: string,
   workDir: string,
   index: number,
 ): Promise<{ file: string; source: string; seconds: number } | null> {
-  if (!target) return null;
-  const request = buildTtsRequest(target, text);
-  const response = await fetch(request.url, { method: "POST", headers: request.headers, body: request.body });
-  if (!response.ok) {
-    console.log(`  Szene ${index + 1}: ${target.provider} antwortet HTTP ${response.status} — Stille.`);
-    return null;
-  }
-  const contentType = response.headers.get("content-type") ?? "";
+  for (const target of targets) {
+    const request = buildTtsRequest(target, text);
+    const response = await fetchWithRetry(request, `Szene ${index + 1} ${target.provider}`);
+    if (!response) continue;
 
-  let payload: unknown;
-  if (contentType.includes("application/json")) {
-    payload = await response.json();
-  } else {
-    payload = { __bytes: new Uint8Array(await response.arrayBuffer()) };
-  }
+    const contentType = response.headers.get("content-type") ?? "";
+    const payload: unknown = contentType.includes("application/json")
+      ? await response.json()
+      : { __bytes: new Uint8Array(await response.arrayBuffer()) };
+    const audio = parseTtsAudio(target, payload);
+    if (!audio) {
+      console.log(`  Szene ${index + 1}: ${target.provider} liefert keine Audiodaten (${contentType}).`);
+      continue;
+    }
 
-  const audio = parseTtsAudio(target, payload);
-  if (!audio) {
-    console.log(`  Szene ${index + 1}: Antwort ohne Audiodaten (${contentType}) — Stille.`);
-    return null;
+    const file = path.join(workDir, `scene-${index + 1}-voice.${audio.container === "mp3" ? "mp3" : "wav"}`);
+    if (audio.container === "mp3") {
+      const rawPath = path.join(workDir, `scene-${index + 1}.mp3`);
+      writeFileSync(rawPath, audio.bytes);
+      execFileSync("ffmpeg", ["-y", "-i", rawPath, file], { stdio: "ignore" });
+    } else {
+      writeFileSync(file, pcm16ToWav(audio.bytes, audio.sampleRate, audio.channels));
+    }
+    const seconds = probeSeconds(file);
+    if (!Number.isFinite(seconds) || seconds <= 0) continue;
+    return { file, source: target.provider, seconds };
   }
-
-  const rawPath = path.join(workDir, `scene-${index + 1}.${audio.container === "mp3" ? "mp3" : "pcm"}`);
-  const file = path.join(workDir, `scene-${index + 1}-voice.${audio.container === "mp3" ? "mp3" : "wav"}`);
-  if (audio.container === "mp3") {
-    writeFileSync(rawPath, audio.bytes);
-    execFileSync("ffmpeg", ["-y", "-i", rawPath, file], { stdio: "ignore" });
-  } else {
-    writeFileSync(file, pcm16ToWav(audio.bytes, audio.sampleRate, audio.channels));
-  }
-  const seconds = probeSeconds(file);
-  if (!Number.isFinite(seconds) || seconds <= 0) return null;
-  return { file, source: target.provider, seconds };
+  return null;
 }
 
-/** Erzeugt das Bildmotiv. Ohne Schluessel bleibt es bei einer Farbflaeche. */
+/** Erzeugt das Bildmotiv; ohne Kontingent bleibt es beim Markenmotiv. */
 async function buildSceneMotif(
-  apiKey: string | undefined,
+  keys: string[],
   prompt: string,
   workDir: string,
   index: number,
   packageId: string,
 ): Promise<{ file: string; source: string }> {
   const output = path.join(workDir, `scene-${index + 1}.png`);
-  if (apiKey?.trim()) {
+  for (const key of keys) {
     try {
-      const request = buildMotifRequest(apiKey, prompt);
-      const response = await fetch(request.url, { method: "POST", headers: request.headers, body: request.body });
-      if (response.ok) {
-        const image = parseMotifImage(await response.json());
-        if (image) {
-          writeFileSync(output, image);
-          if (statSync(output).size > 5000) return { file: output, source: "gemini-image" };
-        }
-      } else {
-        console.log(`  Szene ${index + 1}: Motiv-Anbieter HTTP ${response.status} — Farbflaeche.`);
-      }
+      const response = await fetchWithRetry(buildMotifRequest(key, prompt), `Szene ${index + 1} Motiv`);
+      if (!response) continue;
+      const image = parseMotifImage(await response.json());
+      if (!image) continue;
+      writeFileSync(output, image);
+      if (statSync(output).size > 5000) return { file: output, source: "gemini-image" };
     } catch (error) {
-      console.log(`  Szene ${index + 1}: Motiv fehlgeschlagen (${(error as Error).message}) — Farbflaeche.`);
+      console.log(`  Szene ${index + 1}: Motiv fehlgeschlagen (${(error as Error).message}).`);
     }
   }
   // Kein Bilddienst: Markenmotiv aus reiner Rechnung, kein leeres Farbfeld.
@@ -172,10 +191,11 @@ async function main(): Promise<void> {
     approvedAt: new Date().toISOString(),
   });
 
-  const voiceTarget = resolveVoiceTarget(process.env);
-  const imageKey = process.env.GEMINI_API_KEY;
+  const voiceTargets = resolveVoiceTargets(process.env);
+  const imageKeys = resolveImageKeys(process.env);
+  const voiceTarget = voiceTargets[0] ?? null;
   console.log(`Paket ${packageId}: ${approved.scenes.length} Szenen`);
-  console.log(`Vertonung: ${voiceTarget ? voiceTarget.provider : "keine"} · Motive: ${imageKey ? "gemini, sonst Markenmotiv" : "Markenmotiv"}`);
+  console.log(`Vertonung: ${voiceTarget ? voiceTarget.provider : "keine"} · Motive: ${imageKeys.length > 0 ? "gemini, sonst Markenmotiv" : "Markenmotiv"}`);
   if (!voiceTarget) console.log(`Hinweis: ${explainMissingVoice(process.env)}`);
 
   const workDir = mkdtempSync(path.join(tmpdir(), `content-${packageId}-`));
@@ -191,7 +211,7 @@ async function main(): Promise<void> {
   // Schritt 1: Stimme und Motiv je Szene, Laenge aus der echten Sprachdauer.
   const prepared: { index: number; seconds: number; audioPath: string; imagePath: string; scene: ReelStoryboardScene; voiceSource: string; motifSource: string }[] = [];
   for (const [index, scene] of approved.scenes.entries()) {
-    const voice = await synthesizeSceneVoice(voiceTarget, scene.voiceover, workDir, index);
+    const voice = await synthesizeSceneVoice(voiceTargets, scene.voiceover, workDir, index);
     const planned = scene.endSeconds - scene.startSeconds;
     // Szenenlaenge folgt der echten Sprachdauer, damit kein Wort abgeschnitten wird.
     const seconds = voice ? Math.max(2, Math.ceil(voice.seconds + 0.3)) : planned;
@@ -208,7 +228,7 @@ async function main(): Promise<void> {
     }
 
     const motif = await buildSceneMotif(
-      imageKey,
+      imageKeys,
       buildMotifPrompt({ visual: scene.visual, sceneIndex: index, packageName: packageId }),
       workDir,
       index,
@@ -318,11 +338,21 @@ async function main(): Promise<void> {
 
   const withVoice = manifestScenes.filter((scene) => scene.voiceSource !== "silence").length;
   const withMotif = manifestScenes.filter((scene) => scene.motifSource === "gemini-image").length;
-  console.log(
-    `PASS: ${stem}.mp4 (${(size / 1024).toFixed(0)} KB, ${seconds.toFixed(2)}s), ` +
-      `${withVoice}/${manifestScenes.length} Szenen vertont, ${withMotif}/${manifestScenes.length} mit generiertem Motiv, ` +
-      `publishingTriggered=${approved.publishingTriggered}`,
-  );
+  const summary =
+    `${stem}.mp4 (${(size / 1024).toFixed(0)} KB, ${seconds.toFixed(2)}s), ` +
+    `${withVoice}/${manifestScenes.length} Szenen vertont, ${withMotif}/${manifestScenes.length} mit generiertem Motiv, ` +
+    `publishingTriggered=${approved.publishingTriggered}`;
+
+  // Ein halb vertontes Paket ist kein Erfolg. In der CI muss das rot werden.
+  const requiresComplete = process.env.REQUIRE_COMPLETE_PACKAGE === "1";
+  const complete = withVoice === manifestScenes.length;
+  if (!complete && requiresComplete) {
+    console.error(`FAIL: ${summary}`);
+    console.error(`Unvollstaendig: ${manifestScenes.length - withVoice} Szene(n) ohne Stimme. Ursache pruefen statt gruen winken.`);
+    process.exit(1);
+  }
+  console.log(`PASS: ${summary}`);
+  if (!complete) console.log("Hinweis: Paket ohne vollstaendige Vertonung — lokal gebaut, nicht als fertig gemeldet.");
 }
 
 main().catch((error) => {
