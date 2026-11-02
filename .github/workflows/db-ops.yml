@@ -21,6 +21,7 @@ on:
           - user-status
           - user-set-password
           - quota-diagnose
+          - migrate-pending
         default: chat-clear-preview
       email:
           description: "E-Mail fuer user-status/user-set-password"
@@ -94,6 +95,30 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install pg --no-audit --no-fund >/dev/null 2>&1
           node publishing-live-test.mjs
+
+      - name: Migrationen anwenden (nur ausstehende)
+        if: github.event.inputs.operation == 'migrate-pending'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1
+          echo "== Journal vorher =="
+          node scripts/ops/stamp-migrations.mjs 2>&1 | tail -5 || true
+          echo "== Migrationslauf =="
+          npx drizzle-kit migrate 2>&1 | tail -8
+          echo "== Kontrolle: neue Tabelle =="
+          node -e '
+            const { Client } = require("pg");
+            (async () => {
+              const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+              await client.connect();
+              const res = await client.query("select to_regclass($1) as tbl", ["public.revenue_loop_runs"]);
+              console.log("revenue_loop_runs:", res.rows[0].tbl ?? "FEHLT");
+              await client.end();
+            })().catch((error) => { console.error("Kontrolle fehlgeschlagen:", error.message); process.exit(1); });
+          '
 
       - name: Quota-Diagnose (schreibgeschuetzt)
         if: github.event.inputs.operation == 'quota-diagnose'
