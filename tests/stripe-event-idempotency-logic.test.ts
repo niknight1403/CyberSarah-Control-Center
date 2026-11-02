@@ -6,6 +6,9 @@ import {
   summarizeWebhookDeliveries,
   webhookAggregateKey,
   type WebhookEventRecord,
+  resolveClaimAttempt,
+  pruneCutoffMs,
+  WEBHOOK_EVENT_RETENTION_DAYS,
 } from "../lib/stripe-event-idempotency-logic";
 
 const NOW = Date.parse("2026-11-02T00:00:00Z");
@@ -134,5 +137,49 @@ describe("Sprint 25 – Webhook-Wiederholungen idempotent verarbeiten", () => {
     const summary = summarizeWebhookDeliveries(rows);
     expect(summary).toMatchObject({ total: 4, processed: 1, failed: 1, inFlight: 2, staleInFlight: 1 });
     expect(summary.note).toContain("abgebrochen");
+  });
+});
+
+describe("Sprint 25.1 — atomarer Claim und Aufbewahrung", () => {
+  const NOW = Date.UTC(2026, 10, 2, 0, 30, 0);
+  const record = (over: Partial<WebhookEventRecord> = {}): WebhookEventRecord => ({
+    eventId: "evt_race",
+    type: "invoice.paid",
+    aggregateKey: "invoice:in_1",
+    status: "processing",
+    receivedAtMs: NOW - 10_000,
+    processedAtMs: null,
+    eventCreatedAtMs: NOW - 20_000,
+    ...over,
+  });
+
+  it("verarbeitet nur, wer den Claim tatsaechlich gewonnen hat", () => {
+    expect(resolveClaimAttempt({ claimed: true, prior: null, nowMs: NOW })).toBe("process");
+  });
+
+  it("laesst einen verlorenen Claim ohne Beleg nicht doppelt verarbeiten", () => {
+    expect(resolveClaimAttempt({ claimed: false, prior: null, nowMs: NOW })).toBe("concurrent_retry");
+  });
+
+  it("erkennt einen bereits abgeschlossenen Claim als Duplikat", () => {
+    expect(resolveClaimAttempt({ claimed: false, prior: record({ status: "processed" }), nowMs: NOW })).toBe("duplicate_skip");
+  });
+
+  it("wiederholt fehlgeschlagene Claims und gibt haengende frei", () => {
+    expect(resolveClaimAttempt({ claimed: false, prior: record({ status: "failed" }), nowMs: NOW })).toBe("retry");
+    expect(resolveClaimAttempt({
+      claimed: false,
+      prior: record({ receivedAtMs: NOW - STALE_PROCESSING_MS - 1 }),
+      nowMs: NOW,
+    })).toBe("reclaim_stale");
+    expect(resolveClaimAttempt({ claimed: false, prior: record(), nowMs: NOW })).toBe("concurrent_retry");
+  });
+
+  it("haelt Belege 30 Tage und faellt bei unsinniger Frist auf den Standard zurueck", () => {
+    const day = 24 * 60 * 60 * 1000;
+    expect(pruneCutoffMs(NOW)).toBe(NOW - 30 * day);
+    expect(pruneCutoffMs(NOW, 7)).toBe(NOW - 7 * day);
+    expect(pruneCutoffMs(NOW, 0)).toBe(NOW - WEBHOOK_EVENT_RETENTION_DAYS * day);
+    expect(pruneCutoffMs(NOW, Number.NaN)).toBe(NOW - WEBHOOK_EVENT_RETENTION_DAYS * day);
   });
 });

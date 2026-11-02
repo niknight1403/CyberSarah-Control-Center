@@ -7,11 +7,13 @@
  * aus, wird das ehrlich als "unbekannt" behandelt und der Aufrufer entscheidet
  * mit seinem In-Memory-Fallback weiter.
  */
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { stripeWebhookEvents } from "../drizzle/schema";
 import {
   decideWebhookDelivery,
+  pruneCutoffMs,
+  resolveClaimAttempt,
   type DeliveryDecision,
   type IncomingWebhookEvent,
   type WebhookEventRecord,
@@ -42,15 +44,11 @@ export async function claimStripeWebhookEvent(event: IncomingWebhookEvent): Prom
   const db = await getDb();
   if (!db) return { available: false, decision: "process" };
 
-  const [priorRow] = await db
-    .select()
-    .from(stripeWebhookEvents)
-    .where(eq(stripeWebhookEvents.eventId, event.eventId))
-    .limit(1);
-  const prior = priorRow ? toRecord(priorRow) : null;
+  const nowMs = Date.now();
+  const now = new Date(nowMs);
 
+  // Wasserstand des Aggregats NUR fuer die Out-of-order-Pruefung.
   let lastProcessedEventCreatedAtMs: number | null = null;
-  let lastProcessedAggregateKey: string | null = null;
   if (event.aggregateKey) {
     const [latest] = await db
       .select()
@@ -58,41 +56,85 @@ export async function claimStripeWebhookEvent(event: IncomingWebhookEvent): Prom
       .where(and(eq(stripeWebhookEvents.aggregateKey, event.aggregateKey), eq(stripeWebhookEvents.status, "processed")))
       .orderBy(desc(stripeWebhookEvents.eventCreatedAt))
       .limit(1);
-    if (latest?.eventCreatedAt) {
-      lastProcessedEventCreatedAtMs = latest.eventCreatedAt.getTime();
-      lastProcessedAggregateKey = event.aggregateKey;
-    }
+    if (latest?.eventCreatedAt) lastProcessedEventCreatedAtMs = latest.eventCreatedAt.getTime();
   }
 
-  const decision = decideWebhookDelivery({
+  const outOfOrder = decideWebhookDelivery({
     event,
-    prior,
-    nowMs: Date.now(),
+    prior: null,
+    nowMs,
     lastProcessedEventCreatedAtMs,
-    lastProcessedAggregateKey,
-  });
+    lastProcessedAggregateKey: event.aggregateKey,
+  }) === "stale_out_of_order";
 
-  const now = new Date();
-  if (!prior) {
-    await db.insert(stripeWebhookEvents).values({
+  // Atomarer Claim: nur wer den Datensatz schreibt, darf Seiteneffekte
+  // ausloesen. Zwei parallele Zustellungen koennen damit nicht beide
+  // "process" gewinnen (vorher: select, dann insert -> Doppelverarbeitung).
+  const [claimedRow] = await db
+    .insert(stripeWebhookEvents)
+    .values({
       eventId: event.eventId,
       type: event.type,
       aggregateKey: event.aggregateKey,
-      status: decision === "process" || decision === "stale_out_of_order" ? "processing" : "processing",
+      status: "processing",
       eventCreatedAt: event.createdAtMs === null ? null : new Date(event.createdAtMs),
       receivedAt: now,
       attempts: 1,
-    }).onConflictDoNothing({ target: stripeWebhookEvents.eventId });
-  } else if (decision === "retry" || decision === "reclaim_stale") {
-    await db.update(stripeWebhookEvents).set({
-      status: "processing",
-      receivedAt: now,
-      attempts: sql`${stripeWebhookEvents.attempts} + 1`,
-      lastError: null,
-    }).where(eq(stripeWebhookEvents.eventId, event.eventId));
+    })
+    .onConflictDoNothing({ target: stripeWebhookEvents.eventId })
+    .returning({ eventId: stripeWebhookEvents.eventId });
+
+  await pruneStripeWebhookEvents(db, nowMs);
+
+  if (outOfOrder) {
+    // Beleg anlegen, aber niemals anwenden.
+    await completeStripeWebhookEvent(event.eventId, "stale_out_of_order");
+    return { available: true, decision: "stale_out_of_order" };
+  }
+
+  if (claimedRow) return { available: true, decision: "process" };
+
+  // Claim verloren: Zustand neu lesen und ehrlich entscheiden.
+  const [priorRow] = await db
+    .select()
+    .from(stripeWebhookEvents)
+    .where(eq(stripeWebhookEvents.eventId, event.eventId))
+    .limit(1);
+  const prior = priorRow ? toRecord(priorRow) : null;
+  const decision = resolveClaimAttempt({ claimed: false, prior, nowMs });
+
+  if (decision === "retry" || decision === "reclaim_stale") {
+    // Uebernahme nur, wenn der Zustand unveraendert ist.
+    const taken = await db
+      .update(stripeWebhookEvents)
+      .set({ status: "processing", receivedAt: now, attempts: sql`${stripeWebhookEvents.attempts} + 1`, lastError: null })
+      .where(and(
+        eq(stripeWebhookEvents.eventId, event.eventId),
+        eq(stripeWebhookEvents.status, prior?.status ?? "failed"),
+        eq(stripeWebhookEvents.receivedAt, priorRow?.receivedAt ?? now),
+      ))
+      .returning({ eventId: stripeWebhookEvents.eventId });
+    return { available: true, decision: taken.length > 0 ? "process" : "concurrent_retry" };
   }
 
   return { available: true, decision };
+}
+
+/**
+ * Entfernt verarbeitete Belege nach der Aufbewahrungsfrist, damit die Tabelle
+ * nicht unbegrenzt waechst. Fehler hier duerfen die Zustellung nicht stoppen.
+ */
+async function pruneStripeWebhookEvents(db: Awaited<ReturnType<typeof getDb>>, nowMs: number): Promise<void> {
+  if (!db) return;
+  try {
+    const cutoff = new Date(pruneCutoffMs(nowMs));
+    await db.delete(stripeWebhookEvents).where(and(
+      eq(stripeWebhookEvents.status, "processed"),
+      lt(stripeWebhookEvents.processedAt, cutoff),
+    ));
+  } catch {
+    // Aufraeumen ist Hygiene, nicht Zustellkritisch.
+  }
 }
 
 export async function completeStripeWebhookEvent(eventId: string, note?: string): Promise<void> {
