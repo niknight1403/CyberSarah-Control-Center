@@ -70,3 +70,10 @@ Stand: 31.10.2026
 5. **24/7:** Render Free ist kein garantiert permanenter Worker; GitHub-Cron/Heartbeat, externes Monitoring und Recovery unter echter Last sind separat nachzuweisen.
 
 Verbindlich: Kein ungeprüfter Stripe-Write, keine automatischen Finanzverpflichtungen und keine fremden Social-Publikationen ohne Freigabe. Der ursprüngliche 100-Sprint-Plan bleibt die maßgebliche Aufgabenliste; diese Datei ergänzt nur den evidenzbasierten Fortschritt.
+
+## Wartungsupdate 02.11.2026 — Abhaengigkeiten und Sicherheitslage
+
+- `npm update` innerhalb der bestehenden Semver-Ranges (nur `package-lock.json` veraendert, keine Range-Aenderung): 30 auf 20 Schwachstellen, die beiden kritischen (`proxy-addr`, `shell-quote`) und die Haelfte der hohen Befunde (12 auf 6) entfallen.
+- `npm audit fix` bricht in diesem Baum mit einem npm-internen Fehler ab (`Cannot read properties of null (reading 'edgesOut')`); die Aktualisierung erfolgte deshalb ueber `npm update`.
+- Verifikation: `tsc --noEmit` sauber, Vitest 3069 Tests gruen, ESLint ohne Befund, Build erfolgreich.
+- Verbleibend: 6 hohe Befunde, alle nur mit Major-Spruengen loesbar (`expo`/`@expo/cli`/`expo-router`-Kette). Das ist eine eigene Expo-Migration und wird hier nicht behauptet.
