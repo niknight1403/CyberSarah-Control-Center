@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isHandledEventType,
+  isSuccessfulInvoicePaymentEvent,
   mapStripeEventToEffect,
   normalizeSubscriptionStatus,
   subscriptionPriceId,
@@ -67,6 +68,12 @@ describe("stripe-webhook-logic", () => {
 
   it("ignoriert invoice.payment_succeeded idempotent (Status kommt via subscription.updated)", () => {
     expect(mapStripeEventToEffect(event("invoice.payment_succeeded", SUBSCRIPTION))).toEqual({ kind: "ignore" });
+  });
+
+  it("behandelt beide Stripe-Erfolgsereignisse fuer bezahlte Rechnungen gleich", () => {
+    expect(isSuccessfulInvoicePaymentEvent("invoice.paid")).toBe(true);
+    expect(isSuccessfulInvoicePaymentEvent("invoice.payment_succeeded")).toBe(true);
+    expect(isSuccessfulInvoicePaymentEvent("invoice.payment_failed")).toBe(false);
   });
 
   it("ignoriert unbekannte und ungueltige Events", () => {
