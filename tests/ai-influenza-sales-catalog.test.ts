@@ -108,6 +108,7 @@ describe("runSalesCatalogStep", () => {
     expect(executor.products.map((row) => (row.metadata as Record<string, unknown>).packageId)).toEqual([
       "starter",
       "business",
+      "elite",
     ]);
   });
 
