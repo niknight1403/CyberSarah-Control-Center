@@ -106,8 +106,7 @@
     "superjson": "^2.2.6",
     "tailwind-merge": "^3.6.0",
     "tar": "^7.5.22",
-    "zod": "^4.2.1",
-    "ioredis": "^5.4.2"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
