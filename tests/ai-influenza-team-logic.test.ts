@@ -9,11 +9,12 @@ import {
 } from "../lib/ai-influenza-team-logic";
 
 describe("AI Influenza Team domain",()=>{
-  it("defines the three bookable packages and eight specialist agents",()=>{
-    expect(Object.keys(AI_INFLUENZA_PACKAGES)).toEqual(["starter","growth","business"]);
+  it("defines the four bookable packages and eight specialist agents",()=>{
+    expect(Object.keys(AI_INFLUENZA_PACKAGES)).toEqual(["starter","growth","business","elite"]);
     expect(AI_INFLUENZA_PACKAGES.starter.monthlyPriceCents).toBe(29900);
     expect(AI_INFLUENZA_PACKAGES.growth.monthlyPriceCents).toBe(99900);
     expect(AI_INFLUENZA_PACKAGES.business.monthlyPriceCents).toBe(249900);
+    expect(AI_INFLUENZA_PACKAGES.elite.monthlyPriceCents).toBe(499900);
     expect(AI_INFLUENZA_AGENTS).toHaveLength(8);
     expect(AI_INFLUENZA_AGENTS.every(agent=>agent.externalActionAllowed===false)).toBe(true);
   });
