@@ -1158,6 +1158,7 @@ export async function handleDevelopmentChat(input: {
   githubToken?: string;
   branch?: string;
   userOpenId?: string;
+  userId?: number;
   sessionId?: string;
 }): Promise<DevelopmentChatResult> {
   if (input.workspaceId) {
