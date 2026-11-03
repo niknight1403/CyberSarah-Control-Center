@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-03T03:34:44",
-  "aktiv": "gemini",
-  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
-  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemma-4-26b-a4b-it",
+  "stand": "2026-11-03T11:36:25",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "openai/gpt-oss-20b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "VERFUEGBAR",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
       "http_status": null,
-      "modell": "gemma-4-26b-a4b-it",
-      "detail": "gemma-4-26b-a4b-it",
+      "modell": "gemma-4-31b-it",
+      "detail": "000 gemma-4-31b-it",
       "hinweis": null
     },
     {
