@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   isHandledEventType,
   isSuccessfulInvoicePaymentEvent,
+  invoiceSubscriptionMetadata,
+  invoiceSubscriptionReference,
   mapStripeEventToEffect,
   normalizeSubscriptionStatus,
   subscriptionPriceId,
@@ -74,6 +76,13 @@ describe("stripe-webhook-logic", () => {
     expect(isSuccessfulInvoicePaymentEvent("invoice.paid")).toBe(true);
     expect(isSuccessfulInvoicePaymentEvent("invoice.payment_succeeded")).toBe(true);
     expect(isSuccessfulInvoicePaymentEvent("invoice.payment_failed")).toBe(false);
+  });
+
+  it("liest moderne und Legacy-Stripe-Invoice-Subscription-Felder", () => {
+    expect(invoiceSubscriptionReference({ parent: { subscription_details: { subscription: "sub_modern" } } })).toBe("sub_modern");
+    expect(invoiceSubscriptionReference({ subscription: "sub_legacy" })).toBe("sub_legacy");
+    expect(invoiceSubscriptionReference({ subscription_details: { subscription: { id: "sub_legacy_details" } } })).toEqual({ id: "sub_legacy_details" });
+    expect(invoiceSubscriptionMetadata({ subscription_details: { metadata: { businessUnit: "ai-influenza-team", orderId: "order_1" } } })).toEqual({ businessUnit: "ai-influenza-team", orderId: "order_1" });
   });
 
   it("ignoriert unbekannte und ungueltige Events", () => {
