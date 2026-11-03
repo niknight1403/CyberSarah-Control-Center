@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   isHandledEventType,
+  isSuccessfulInvoicePaymentEvent,
   mapStripeEventToEffect,
   normalizeSubscriptionStatus,
   subscriptionPriceId,
 } from "../lib/stripe-webhook-logic";
+import { invoiceSubscriptionMetadata, invoiceSubscriptionReference } from "../lib/stripe-invoice-logic";
 
 const SUBSCRIPTION = {
   id: "sub_123",
@@ -67,6 +69,19 @@ describe("stripe-webhook-logic", () => {
 
   it("ignoriert invoice.payment_succeeded idempotent (Status kommt via subscription.updated)", () => {
     expect(mapStripeEventToEffect(event("invoice.payment_succeeded", SUBSCRIPTION))).toEqual({ kind: "ignore" });
+  });
+
+  it("behandelt beide Stripe-Erfolgsereignisse fuer bezahlte Rechnungen gleich", () => {
+    expect(isSuccessfulInvoicePaymentEvent("invoice.paid")).toBe(true);
+    expect(isSuccessfulInvoicePaymentEvent("invoice.payment_succeeded")).toBe(true);
+    expect(isSuccessfulInvoicePaymentEvent("invoice.payment_failed")).toBe(false);
+  });
+
+  it("liest moderne und Legacy-Stripe-Invoice-Subscription-Felder", () => {
+    expect(invoiceSubscriptionReference({ parent: { subscription_details: { subscription: "sub_modern" } } })).toBe("sub_modern");
+    expect(invoiceSubscriptionReference({ subscription: "sub_legacy" })).toBe("sub_legacy");
+    expect(invoiceSubscriptionReference({ subscription_details: { subscription: { id: "sub_legacy_details" } } })).toEqual({ id: "sub_legacy_details" });
+    expect(invoiceSubscriptionMetadata({ subscription_details: { metadata: { businessUnit: "ai-influenza-team", orderId: "order_1" } } })).toEqual({ businessUnit: "ai-influenza-team", orderId: "order_1" });
   });
 
   it("ignoriert unbekannte und ungueltige Events", () => {

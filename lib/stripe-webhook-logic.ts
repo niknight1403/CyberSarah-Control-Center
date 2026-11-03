@@ -131,6 +131,13 @@ export function mapStripeEventToEffect(
   }
 }
 
+/** Stripe sendet erfolgreiche Rechnungszahlungen je nach API-Version/Event-Flow
+ * als invoice.paid oder invoice.payment_succeeded. Beide muessen denselben
+ * idempotenten Umsatz-/Abo-Sync ausloesen. */
+export function isSuccessfulInvoicePaymentEvent(type: string): boolean {
+  return type === "invoice.paid" || type === "invoice.payment_succeeded";
+}
+
 /** Welche Events der Handler verarbeiten muss (Sortierung fuer Doku/Tests). */
 export function isHandledEventType(type: string): type is SubscriptionEventType {
   return (SUBSCRIPTION_EVENT_TYPES as readonly string[]).includes(type);

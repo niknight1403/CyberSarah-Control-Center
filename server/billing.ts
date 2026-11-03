@@ -16,7 +16,8 @@ import {
   entitlementsForRole,
   type SubscriptionTier,
 } from "../lib/subscription-tiers-logic";
-import { normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-webhook-logic";
+import { isSuccessfulInvoicePaymentEvent, normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-webhook-logic";
+import { invoiceSubscriptionReference } from "../lib/stripe-invoice-logic";
 import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
 import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
 import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
@@ -333,13 +334,10 @@ async function syncInvoiceSubscription(
   stripe: Stripe,
   invoice: Stripe.Invoice,
 ) {
-  const subscriptionReference =
-    invoice.parent?.subscription_details?.subscription;
+  const subscriptionReference = invoiceSubscriptionReference(invoice);
   if (!subscriptionReference) return;
-  const subscription =
-    typeof subscriptionReference === "string"
-      ? await stripe.subscriptions.retrieve(subscriptionReference)
-      : subscriptionReference;
+  const subscriptionId = typeof subscriptionReference === "string" ? subscriptionReference : subscriptionReference.id;
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   await syncStripeSubscription(subscription);
 }
 
@@ -453,7 +451,7 @@ export async function processStripeWebhook(
       await syncStripeSubscription(event.data.object as Stripe.Subscription);
     }
     if (
-      event.type === "invoice.paid" ||
+      isSuccessfulInvoicePaymentEvent(event.type) ||
       event.type === "invoice.payment_failed"
     ) {
       const invoice=event.data.object as Stripe.Invoice;

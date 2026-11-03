@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import {eq} from "drizzle-orm";
 import {revenueAttributionEvents,revenueJobs} from "../drizzle/schema";
 import {packageForStripeMetadata,type AiInfluenzaOrderPayload} from "../lib/ai-influenza-team-logic";
+import {invoiceSubscriptionMetadata} from "../lib/stripe-invoice-logic";
 import {getDb} from "./db";
 import {enqueueAiInfluenzaDeliveryTasks} from "./ai-influenza-team-service";
 
@@ -58,11 +59,6 @@ export async function syncAiInfluenzaSubscription(subscription:Stripe.Subscripti
   }).where(eq(revenueJobs.id,job.id));
   if(shouldMarkPaid)await enqueueAiInfluenzaDeliveryTasks(updated);
   return {handled:true as const,orderUpdated:true as const,paymentStatus,deliveryQueued:shouldMarkPaid};
-}
-
-function invoiceSubscriptionMetadata(invoice:Stripe.Invoice):Record<string,string>|null{
-  const details=invoice.parent?.subscription_details as {metadata?:Record<string,string>}|null|undefined;
-  return details?.metadata??null;
 }
 
 export async function recordAiInfluenzaInvoice(invoice:Stripe.Invoice){

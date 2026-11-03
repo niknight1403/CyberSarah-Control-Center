@@ -6,7 +6,6 @@ import {
   getMonetizationAccount,
   grantCreditPack,
   recordCloudTokenUsage,
-  resolvePlanForUser,
 } from "./monetization";
 import { CREDIT_PACKS, PLAN_LIMITS } from "../lib/monetization-logic";
 
@@ -57,12 +56,8 @@ export const monetizationRouter = router({
   /** Echtzeit-Kontostand des angemeldeten Nutzers. */
   account: protectedProcedure.query(async ({ ctx }) => {
     const isAdmin = ctx.user.role === "admin";
-    const [state, plan] = await Promise.all([
-      getMonetizationAccount(ctx.user.openId, { isAdmin }),
-      // Sprint 144 — Admin-Elite-Garantie: Billing-Plan des Admins ist
-      // dauerhaft "expert", unabhaengig von Subscription-Zyklen.
-      isAdmin ? Promise.resolve("expert" as const) : resolvePlanForUser(ctx.user.id),
-    ]);
+    const state = await getMonetizationAccount(ctx.user.openId, { isAdmin, userId: ctx.user.id });
+    const plan = state.plan;
     const limits = PLAN_LIMITS[plan];
     return {
       plan,
@@ -73,7 +68,7 @@ export const monetizationRouter = router({
         monthTokens: state.monthCloudTokens,
         creditBalanceTokens: state.creditBalanceTokens,
       },
-      enforcement: process.env.QUOTA_ENFORCEMENT === "enforce" ? ("enforce" as const) : ("monitor" as const),
+      enforcement: process.env.QUOTA_ENFORCEMENT === "monitor" ? ("monitor" as const) : ("enforce" as const),
     };
   }),
 
@@ -99,6 +94,7 @@ export const monetizationRouter = router({
     .mutation(async ({ ctx, input }) => {
       const state = await recordCloudTokenUsage(ctx.user.openId, input.tokens, {
         isAdmin: ctx.user.role === "admin",
+        userId: ctx.user.id,
       });
       return {
         todayTokens: state.dayCloudTokens,

@@ -337,6 +337,23 @@ export async function getModelRouterSetting<T>(key: string): Promise<T | null> {
   return (result[0]?.value as T | undefined) ?? null;
 }
 
+/** Atomare KV-Read/Modify/Write-Operation fuer Zaehler und Credits. */
+export async function updateModelRouterSettingAtomic<T>(key: string, update: (current: T | null) => T): Promise<T> {
+  if (modelRouterKvOverride) {
+    const next = update((modelRouterKvOverride.get(key) as T | undefined) ?? null);
+    modelRouterKvOverride.set(key, next);
+    return next;
+  }
+  const database = await getDb();
+  if (!database) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+  return database.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
+    const [row] = await tx.select({ value: modelRouterSettings.value }).from(modelRouterSettings).where(eq(modelRouterSettings.key, key)).limit(1);
+    const next = update((row?.value as T | undefined) ?? null);
+    await tx.insert(modelRouterSettings).values({ key, value: next as never }).onConflictDoUpdate({ target: modelRouterSettings.key, set: { value: next as never } });
+    return next;
+  });
+}
 export async function setModelRouterSetting(key: string, value: unknown): Promise<void> {
   if (modelRouterKvOverride) {
     modelRouterKvOverride.set(key, value);

@@ -16,6 +16,19 @@
 
 export type MonetizationPlan = "free" | "lite" | "pro" | "expert";
 
+/** Deterministische Tier-Zuordnung: unbekannte Stripe-Preise erhalten keine Paid-Entitlements. */
+export function planForBillingPrice(
+  priceId: string | null | undefined,
+  configured: { lite?: string; pro?: string; expert?: string },
+): MonetizationPlan {
+  if (!priceId) return "free";
+  if (configured.expert && priceId === configured.expert) return "expert";
+  if (configured.pro && priceId === configured.pro) return "pro";
+  if (configured.lite && priceId === configured.lite) return "lite";
+  return "free";
+}
+
+
 export interface PlanLimits {
   label: string;
   /** Max. verwaltete Cloud-Token pro Tag (eigene Provider immer frei). */
@@ -192,10 +205,19 @@ export function consumeQuota(
   actualTokens: number,
   now = new Date(),
 ): MonetizationAccountState {
-  const limits = PLAN_LIMITS[state.plan];
   let rolled = rollPeriods(state, now);
+  if (rolled.adminGuaranteed === true) {
+    return {
+      ...rolled,
+      dayCloudTokens: rolled.dayCloudTokens + Math.max(0, actualTokens),
+      monthCloudTokens: rolled.monthCloudTokens + Math.max(0, actualTokens),
+      updatedAt: now.toISOString(),
+    };
+  }
+  const limits = PLAN_LIMITS[state.plan];
   const remainingToday = Math.max(0, limits.dailyCloudTokens - rolled.dayCloudTokens);
-  const fromPlan = Math.min(actualTokens, remainingToday);
+  const remainingThisMonth = Math.max(0, limits.monthlyCloudTokens - rolled.monthCloudTokens);
+  const fromPlan = Math.min(actualTokens, remainingToday, remainingThisMonth);
   const overflow = actualTokens - fromPlan;
 
   rolled = {

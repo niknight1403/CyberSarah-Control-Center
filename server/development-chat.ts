@@ -22,7 +22,7 @@ import {
 import { buildQuotaUpgradePrompt } from "../lib/upgrade-prompt-logic";
 import { tierPriceId } from "../lib/subscription-tiers-logic";
 import { guardFileWrite } from "../lib/code-safety-logic";
-import { getMonetizationAccount } from "./monetization";
+import { enforceCloudQuotaForUser, getMonetizationAccount, recordCloudTokenUsage } from "./monetization";
 import {
   isFeatureEnabled,
   parseFeatureFlagOverrides,
@@ -280,7 +280,7 @@ async function callManaged(messages: ChatMessage[], requestedModel?: string) {
       model: requestedModel,
       maxTokens: 1_800,
     });
-    return { content: extractContent(result), model: result.model };
+    return { content: extractContent(result), model: result.model, usage: result.usage };
   } catch (error) {
     if (error instanceof Error && /OPENAI_API_KEY/.test(error.message)) {
       throw new TRPCError({
@@ -333,12 +333,29 @@ function getFallbackProviders(provider: ProviderId) {
   );
 }
 
-async function callProvider(provider: ProviderId, messages: ChatMessage[], model?: string) {
+async function callProvider(
+  provider: ProviderId,
+  messages: ChatMessage[],
+  model?: string,
+  quotaUser?: { id: number; openId: string; role?: string },
+) {
   if (isProviderDisabledRuntime(provider)) {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: `${provider} ist administrativ deaktiviert.` });
   }
-  if (provider === "auto") return callManaged(messages, model);
-  if (provider === "managed") return callManaged(messages, model);
+  if (provider === "auto" || provider === "managed") {
+    if (quotaUser) {
+      const estimatedInput = messages.reduce((sum, message) => sum + Math.ceil(message.content.length / 4), 0);
+      const decision = await enforceCloudQuotaForUser(quotaUser, estimatedInput + 1_800);
+      if (!decision.allowed) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: decision.reason ?? "Cloud-Kontingent aufgebraucht." });
+      }
+      const reply = await callManaged(messages, model);
+      const measuredTokens = reply.usage?.total_tokens ?? estimatedInput + Math.ceil(reply.content.length / 4);
+      await recordCloudTokenUsage(quotaUser.openId, measuredTokens, { isAdmin: quotaUser.role === "admin", userId: quotaUser.id });
+      return reply;
+    }
+    return callManaged(messages, model);
+  }
   if (provider === "anthropic") return callAnthropic(messages, model);
   return callOpenAICompatibleProvider(provider, messages, model);
 }
@@ -490,7 +507,7 @@ export const developmentChatRouter = router({
           console.warn("[developmentChat] Secret-Verarbeitung uebersprungen:", error);
         }
       }
-      const result = await handleDevelopmentChat({ ...input, role: ctx.user.role, userOpenId: ctx.user.openId });
+      const result = await handleDevelopmentChat({ ...input, role: ctx.user.role, userOpenId: ctx.user.openId, userId: ctx.user.id });
       if (storedSecretNames.length > 0) {
         result.content = `${result.content}${buildSecretStoredNotice(storedSecretNames)}`;
       }
@@ -707,9 +724,20 @@ async function callProviderWithTools(
   messages: Message[],
   requestedModel: string | undefined,
   tools: Tool[] | undefined,
+  quotaUser?: { id: number; openId: string; role?: string },
 ): Promise<InvokeResult> {
   if (provider === "managed" || provider === "auto") {
-    return invokeLLM({ messages, tools, model: requestedModel, maxTokens: 1_800 });
+    const estimatedInput = messages.reduce((sum, message) => sum + Math.ceil(String(message.content ?? "").length / 4), 0);
+    if (quotaUser) {
+      const decision = await enforceCloudQuotaForUser(quotaUser, estimatedInput + 1_800);
+      if (!decision.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: decision.reason ?? "Cloud-Kontingent aufgebraucht." });
+    }
+    const result = await invokeLLM({ messages, tools, model: requestedModel, maxTokens: 1_800 });
+    if (quotaUser) {
+      const measuredTokens = result.usage?.total_tokens ?? estimatedInput + Math.ceil(extractContent(result).length / 4);
+      await recordCloudTokenUsage(quotaUser.openId, measuredTokens, { isAdmin: quotaUser.role === "admin", userId: quotaUser.id });
+    }
+    return result;
   }
   if (provider === "anthropic") {
     throw new TRPCError({
@@ -770,6 +798,7 @@ type AgentToolChatInput = {
   githubToken?: string;
   branch?: string;
   userOpenId?: string;
+  userId?: number;
   sessionId?: string;
 };
 
@@ -891,7 +920,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
     let payload: InvokeResult;
     try {
-      payload = await callProviderWithTools(provider, conversation, input.model, tools);
+      payload = await callProviderWithTools(provider, conversation, input.model, tools, input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined);
     } catch (error) {
       // Sobald ein Tool bereits erfolgreich/fehlgeschlagen ausgefuehrt wurde,
       // darf ein Providerwechsel den Loop nicht vom Originalprompt neu starten:
@@ -940,7 +969,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   // Tool-Side-Effects kein Provider-Restart vom Originalzustand zulassen.
   let payload: InvokeResult;
   try {
-    payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+    payload = await callProviderWithTools(provider, conversation, input.model, undefined, input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined);
   } catch (error) {
     if (toolsUsedInTurn.size > 0) {
       throw new TRPCError({
@@ -1038,7 +1067,7 @@ async function buildSuperagentContext() {
  * den Superagent-Briefing-Kontext (Live-Status, Logs, Workspace).
  */
 async function handleAutoRoutedChat(
-  input: { messages: ChatMessage[]; model?: string; role?: string | null },
+  input: { messages: ChatMessage[]; model?: string; role?: string | null; quotaUser?: { id: number; openId: string; role?: string } },
 ): Promise<DevelopmentChatResult> {
   const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const classification = classifyPrompt(lastUserMessage);
@@ -1074,7 +1103,7 @@ async function handleAutoRoutedChat(
   for (const provider of candidates) {
     const startedAt = Date.now();
     try {
-      const reply = await callProvider(provider, messages as ChatMessage[], input.model);
+      const reply = await callProvider(provider, messages as ChatMessage[], input.model, input.quotaUser);
       recordRouterOutcome(provider, { kind: "success", latencyMs: Date.now() - startedAt }, Date.now());
       return {
         ...reply,
@@ -1129,6 +1158,7 @@ export async function handleDevelopmentChat(input: {
   githubToken?: string;
   branch?: string;
   userOpenId?: string;
+  userId?: number;
   sessionId?: string;
 }): Promise<DevelopmentChatResult> {
   if (input.workspaceId) {
@@ -1144,11 +1174,11 @@ export async function handleDevelopmentChat(input: {
     : input.messages;
 
   if (input.provider === "auto") {
-    return handleAutoRoutedChat({ messages: runtimeMessages, model: input.model, role: input.role });
+    return handleAutoRoutedChat({ messages: runtimeMessages, model: input.model, role: input.role, quotaUser: input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined });
   }
   const primaryStartedAt = Date.now();
   try {
-    const reply = await callProvider(input.provider, runtimeMessages, input.model);
+    const reply = await callProvider(input.provider, runtimeMessages, input.model, input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined);
     recordRouterOutcome(input.provider, { kind: "success", latencyMs: Date.now() - primaryStartedAt }, Date.now());
     return { ...reply, providerUsed: input.provider, fallbackUsed: false, receivedAt: new Date().toISOString() };
   } catch (error) {
@@ -1164,7 +1194,7 @@ export async function handleDevelopmentChat(input: {
     if (isFatalProviderAuthError(error)) {
       const managedStartedAt = Date.now();
       try {
-        const reply = await callProvider("managed", input.messages, input.model);
+        const reply = await callProvider("managed", input.messages, input.model, input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined);
         recordRouterOutcome("managed", { kind: "success", latencyMs: Date.now() - managedStartedAt }, Date.now());
         return { ...reply, providerUsed: "managed", fallbackUsed: true, receivedAt: new Date().toISOString() };
       } catch (managedError) {
@@ -1182,7 +1212,7 @@ export async function handleDevelopmentChat(input: {
       for (const fallbackProvider of getFallbackProviders(input.provider)) {
         const fallbackStartedAt = Date.now();
         try {
-          const reply = await callProvider(fallbackProvider, runtimeMessages, input.model);
+          const reply = await callProvider(fallbackProvider, runtimeMessages, input.model, input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined);
           recordRouterOutcome(fallbackProvider, { kind: "success", latencyMs: Date.now() - fallbackStartedAt }, Date.now());
           return { ...reply, providerUsed: fallbackProvider, fallbackUsed: true, receivedAt: new Date().toISOString() };
         } catch (fallbackError) {

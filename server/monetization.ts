@@ -6,9 +6,8 @@
  * Orchestrator-State-Store). Bietet Echtzeit-Tracking und Limitierung:
  *
  *   - enforceCloudQuotaForUser: Pruefung VOR verwalteten Cloud-Aufrufen.
- *     Rollout-Sicherheit: ENV QUOTA_ENFORCEMENT="monitor" (Standard) warnt
- *     nur, "enforce" blockiert aktiv. So wird nichts kaputtgerollt, bis der
- *     Admin den Enforcement-Modus bewusst aktiviert.
+ *     Default: "enforce" blockiert aktiv; "monitor" ist ein expliziter, zeitlich
+ *     begrenzter Diagnose-Override und darf nicht als Produktionsstandard dienen.
  *   - recordCloudTokenUsage: Verbuchung NACH dem Aufruf (echte Token-Zahl).
  *   - Plan-Loesung ueber die bestehende Billing-Subscription (lite/pro/expert),
  *     ohne Abo = "free".
@@ -22,12 +21,13 @@ import {
   ensureAdminElitePlan,
   freshAccountState,
   rollPeriods,
+  planForBillingPrice,
   type MonetizationAccountState,
   type QuotaCheck,
 } from "../lib/monetization-logic";
 
 const KEY_PREFIX = "monetization.account.";
-const ENFORCEMENT_MODE = () => (process.env.QUOTA_ENFORCEMENT === "enforce" ? "enforce" : "monitor");
+const ENFORCEMENT_MODE = () => (process.env.QUOTA_ENFORCEMENT === "monitor" ? "monitor" : "enforce");
 
 function accountKey(openId: string): string {
   return `${KEY_PREFIX}${openId}`;
@@ -36,19 +36,24 @@ function accountKey(openId: string): string {
 /** Account-State laden (auto-initialisiert, nie null). */
 export async function getMonetizationAccount(
   openId: string,
-  options?: { isAdmin?: boolean },
+  options?: { isAdmin?: boolean; userId?: number },
 ): Promise<MonetizationAccountState> {
   let state: MonetizationAccountState;
-  try {
+  {
     const stored = await db.getModelRouterSetting<MonetizationAccountState>(accountKey(openId));
     if (stored && typeof stored === "object" && stored.plan) {
       state = rollPeriods(stored);
     } else {
       state = freshAccountState();
     }
-  } catch {
-    // Fehlgeschlagener Lesezugriff -> lokaler Default, nie blockieren.
-    state = freshAccountState();
+  }
+  // Paid-Entitlements werden bei jedem authentifizierten Zugriff aus dem aktuellen Billing-Lifecycle synchronisiert.
+  if (options?.userId !== undefined) {
+    const plan = await resolvePlanForUser(options.userId);
+    if (state.plan !== plan) {
+      state = { ...state, plan, updatedAt: new Date().toISOString() };
+      await saveMonetizationAccount(openId, state);
+    }
   }
   // Sprint 144 — Dauerhafte Admin-Elite-Garantie: Admin-Konten haben
   // immer das Expert-Paket mit unbegrenzter Quota (einmalig persistiert).
@@ -72,7 +77,6 @@ async function saveMonetizationAccount(openId: string, state: MonetizationAccoun
  * schreiben beide in billingSubscriptions.
  */
 export async function resolvePlanForUser(userId: number): Promise<"free" | "lite" | "pro" | "expert"> {
-  try {
     const subscription = await db.getBillingSubscriptionForUser(userId);
     // Sprint 26: Zugriff entscheidet die Lebenszyklus-Lesart, nicht nur
     // "status === active". Ein zum Periodenende gekuendigtes Abo behaelt
@@ -89,16 +93,12 @@ export async function resolvePlanForUser(userId: number): Promise<"free" | "lite
       // Tier aus dem konfigurierten Preis-Env loesen (kanal-agnostisch:
       // Stripe-Checkout und Google-Play-Billing schreiben beide nur die
       // stripePriceId des gebuchten Preises).
-      const price = subscription.stripePriceId;
-      if (price && price === (process.env.STRIPE_PRICE_ID_EXPERT ?? "__expert__")) return "expert";
-      if (price && price === (process.env.STRIPE_PRICE_ID_PRO ?? "__pro__")) return "pro";
-      if (price && price === (process.env.STRIPE_PRICE_ID_LITE ?? "__lite__")) return "lite";
-      // Aktiver Preis ohne bekannte Tier-Zuordnung -> wohlwollend "lite".
-      return "lite";
+      return planForBillingPrice(subscription.stripePriceId, {
+        expert: process.env.STRIPE_PRICE_ID_EXPERT,
+        pro: process.env.STRIPE_PRICE_ID_PRO,
+        lite: process.env.STRIPE_PRICE_ID_LITE,
+      });
     }
-  } catch {
-    // Billing nicht verfuegbar -> free.
-  }
   return "free";
 }
 
@@ -109,14 +109,14 @@ export interface QuotaDecision extends QuotaCheck {
 
 /**
  * Echtzeit-Quota-Pruefung vor verwalteten Cloud-Aufrufen.
- * Im Monitor-Modus wird nur geloggt und erlaubt — aktives Blockieren
- * passiert erst, nachdem QUOTA_ENFORCEMENT=enforce gesetzt wurde.
+ * Im Standardmodus wird blockiert. Nur ein explizites QUOTA_ENFORCEMENT=monitor
+ * erlaubt voruebergehend Warnungen ohne Blockierung.
  */
 export async function enforceCloudQuotaForUser(
   user: { id: number; openId: string; role?: string },
   estimatedTokens: number,
 ): Promise<QuotaDecision> {
-  const account = await getMonetizationAccount(user.openId, { isAdmin: user.role === "admin" });
+  const account = await getMonetizationAccount(user.openId, { isAdmin: user.role === "admin", userId: user.id });
   const decision = checkQuota(account, Math.max(1, Math.ceil(estimatedTokens)));
   const enforcement = ENFORCEMENT_MODE();
 
@@ -137,20 +137,27 @@ export async function enforceCloudQuotaForUser(
 export async function recordCloudTokenUsage(
   openId: string,
   actualTokens: number,
-  options?: { isAdmin?: boolean },
+  options?: { isAdmin?: boolean; userId?: number },
 ): Promise<MonetizationAccountState> {
-  const account = await getMonetizationAccount(openId, options);
-  const updated = consumeQuota(account, Math.max(0, Math.ceil(actualTokens)));
-  await saveMonetizationAccount(openId, updated);
-  return updated;
+  await getMonetizationAccount(openId, options);
+  return db.updateModelRouterSettingAtomic<MonetizationAccountState>(accountKey(openId), (stored) => {
+    const account = stored && typeof stored === "object" && stored.plan ? rollPeriods(stored) : freshAccountState();
+    const prepared = options?.isAdmin ? ensureAdminElitePlan(account) : account;
+    return consumeQuota(prepared, Math.max(0, Math.ceil(actualTokens)));
+  });
 }
 
 /** Guthaben eines Credit-Packs gutschreiben (nach validiertem Play-Kauf). */
 export async function grantCreditPack(openId: string, packId: string): Promise<boolean> {
-  const account = await getMonetizationAccount(openId);
+  await getMonetizationAccount(openId);
   const { applyCreditPack } = await import("../lib/monetization-logic");
-  const updated = applyCreditPack(account, packId);
-  if (!updated) return false;
-  await saveMonetizationAccount(openId, updated);
+  const current = await getMonetizationAccount(openId);
+  if (!applyCreditPack(current, packId)) return false;
+  await db.updateModelRouterSettingAtomic<MonetizationAccountState>(accountKey(openId), (stored) => {
+    const account = stored && stored.plan ? stored : freshAccountState();
+    const updated = applyCreditPack(account, packId);
+    if (!updated) throw new Error("Unbekanntes Credit-Pack.");
+    return updated;
+  });
   return true;
 }
