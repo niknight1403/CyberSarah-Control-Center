@@ -3,12 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   isHandledEventType,
   isSuccessfulInvoicePaymentEvent,
-  invoiceSubscriptionMetadata,
-  invoiceSubscriptionReference,
   mapStripeEventToEffect,
   normalizeSubscriptionStatus,
   subscriptionPriceId,
 } from "../lib/stripe-webhook-logic";
+import { invoiceSubscriptionMetadata, invoiceSubscriptionReference } from "../lib/stripe-invoice-logic";
 
 const SUBSCRIPTION = {
   id: "sub_123",
