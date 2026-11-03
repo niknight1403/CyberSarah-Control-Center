@@ -6,9 +6,8 @@
  * Orchestrator-State-Store). Bietet Echtzeit-Tracking und Limitierung:
  *
  *   - enforceCloudQuotaForUser: Pruefung VOR verwalteten Cloud-Aufrufen.
- *     Rollout-Sicherheit: ENV QUOTA_ENFORCEMENT="monitor" (Standard) warnt
- *     nur, "enforce" blockiert aktiv. So wird nichts kaputtgerollt, bis der
- *     Admin den Enforcement-Modus bewusst aktiviert.
+ *     Default: "enforce" blockiert aktiv; "monitor" ist ein expliziter, zeitlich
+ *     begrenzter Diagnose-Override und darf nicht als Produktionsstandard dienen.
  *   - recordCloudTokenUsage: Verbuchung NACH dem Aufruf (echte Token-Zahl).
  *   - Plan-Loesung ueber die bestehende Billing-Subscription (lite/pro/expert),
  *     ohne Abo = "free".
@@ -28,7 +27,7 @@ import {
 } from "../lib/monetization-logic";
 
 const KEY_PREFIX = "monetization.account.";
-const ENFORCEMENT_MODE = () => (process.env.QUOTA_ENFORCEMENT === "enforce" ? "enforce" : "monitor");
+const ENFORCEMENT_MODE = () => (process.env.QUOTA_ENFORCEMENT === "monitor" ? "monitor" : "enforce");
 
 function accountKey(openId: string): string {
   return `${KEY_PREFIX}${openId}`;
@@ -110,8 +109,8 @@ export interface QuotaDecision extends QuotaCheck {
 
 /**
  * Echtzeit-Quota-Pruefung vor verwalteten Cloud-Aufrufen.
- * Im Monitor-Modus wird nur geloggt und erlaubt — aktives Blockieren
- * passiert erst, nachdem QUOTA_ENFORCEMENT=enforce gesetzt wurde.
+ * Im Standardmodus wird blockiert. Nur ein explizites QUOTA_ENFORCEMENT=monitor
+ * erlaubt voruebergehend Warnungen ohne Blockierung.
  */
 export async function enforceCloudQuotaForUser(
   user: { id: number; openId: string; role?: string },
