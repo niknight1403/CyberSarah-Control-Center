@@ -62,8 +62,8 @@ describe("runSalesCatalogStep", () => {
     expect(result.dryRun).toBe(false);
     expect(result.executed).toBe(3);
     expect(result.created.map((row) => row.priceId)).toEqual(["price_1", "price_2", "price_3"]);
-    expect(executor.products).toHaveLength(3);
-    expect(executor.prices).toHaveLength(3);
+    expect(executor.products).toHaveLength(4);
+    expect(executor.prices).toHaveLength(4);
     expect(executor.prices[0].product).toBe("prod_1");
     expect(executor.prices[0].lookup_key).toBe("ai-influenza-starter");
     expect(result.created[0].envTarget).toBe("STRIPE_AI_INFLUENZA_PRICE_ID_STARTER");
@@ -130,6 +130,6 @@ describe("runSalesCatalogStep", () => {
     const result = await runSalesCatalogStep({ env: AUTOCREATE, executor: { ...executor, ...failing } });
     expect(result.error).toBe("rate_limit");
     expect(result.blocked.some((line) => line.includes("stripe/starter: rate_limit"))).toBe(true);
-    expect(result.created).toHaveLength(2);
+    expect(result.created).toHaveLength(3);
   });
 });
