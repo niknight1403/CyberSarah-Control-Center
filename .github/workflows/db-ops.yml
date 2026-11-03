@@ -157,7 +157,9 @@ jobs:
           echo "== Spalten vorher =="
           show
           echo "== Migration 0026 anwenden =="
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f drizzle/0026_approved_content_pipeline.sql
+          # Die Produktions-DSN zeigt auf eine IP; das Zertifikat nennt einen
+          # Hostnamen. libpq verschluesselt mit require, prueft den Namen aber nicht.
+          PGSSLMODE=require psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f drizzle/0026_approved_content_pipeline.sql
           echo "== Spalten nachher =="
           show
           echo "== Pruefung =="
