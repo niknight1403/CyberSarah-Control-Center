@@ -205,10 +205,18 @@ export function consumeQuota(
   actualTokens: number,
   now = new Date(),
 ): MonetizationAccountState {
-  const limits = PLAN_LIMITS[state.plan];
   let rolled = rollPeriods(state, now);
+  if (rolled.adminGuaranteed === true) {
+    return {
+      ...rolled,
+      dayCloudTokens: rolled.dayCloudTokens + Math.max(0, actualTokens),
+      monthCloudTokens: rolled.monthCloudTokens + Math.max(0, actualTokens),
+      updatedAt: now.toISOString(),
+    };
+  }
+  const limits = PLAN_LIMITS[state.plan];
   const remainingToday = Math.max(0, limits.dailyCloudTokens - rolled.dayCloudTokens);
-  const fromPlan = Math.min(actualTokens, remainingToday);
+  const fromPlan = Math.min(actualTokens, remainingToday, remainingThisMonth);
   const overflow = actualTokens - fromPlan;
 
   rolled = {
