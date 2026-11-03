@@ -15,6 +15,7 @@ import {
   IMAGE_LIMITS,
   buildImageCacheKey,
   generateImageWithCache,
+  validateImageRequest,
   type ImageCacheAdapter,
   type ImageCacheEntry,
   type ImageSize,
@@ -115,7 +116,7 @@ export async function generateSceneImageForPipeline(
   return { ok: true, dataUrl: result.dataUrl, source: result.source, note: result.note };
 }
 
-function localPosterDataUrl(prompt: string, size: ImageSize): string {
+export function localPosterDataUrl(prompt: string, size: ImageSize): string {
   const dims = size === "landscape" ? [1280,768] : size === "portrait" ? [768,1280] : [1024,1024];
   const safe = prompt.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c] ?? c)).slice(0,180);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${dims[0]}" height="${dims[1]}" viewBox="0 0 ${dims[0]} ${dims[1]}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111827"/><stop offset="1" stop-color="#312e81"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><circle cx="82%" cy="18%" r="160" fill="#fff" opacity=".08"/><text x="8%" y="48%" fill="white" font-family="sans-serif" font-size="42" font-weight="700">CyberSarah</text><foreignObject x="8%" y="54%" width="84%" height="30%"><div xmlns="http://www.w3.org/1999/xhtml" style="color:#dbeafe;font:28px sans-serif;line-height:1.35">${safe}</div></foreignObject></svg>`;
@@ -130,6 +131,8 @@ export async function generateImageForUser(
   if (!input.approved) {
     return { ok: false, reason: "Bild-Generierung braucht deine ausdrückliche Freigabe — kein Auto-Render.", retryHint: null, configured };
   }
+  const validation = validateImageRequest({ prompt: input.prompt, size: input.size ?? "square", seed: input.seed ?? null });
+  if (!validation.valid) return { ok: false, reason: validation.reason, retryHint: null, configured };
   const quota = await checkAndConsumeDailyQuota(openId);
   if (!quota.ok) return { ok: false, reason: quota.reason, retryHint: null, configured };
 
