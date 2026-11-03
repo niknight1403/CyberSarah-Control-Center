@@ -51,10 +51,22 @@ async function main(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
-    const migration = await readFile("drizzle/0021_publishing_atomic_dispatch.sql", "utf8");
-    for (const statement of migration.split("--> statement-breakpoint").map(x=>x.trim()).filter(Boolean)) {
-      await setup.query(statement);
-      await setup.query(statement); // migration must be idempotent
+    // Reihenfolge zaehlt: 0021 legt Status und Spalten an, 0026 ergaenzt
+    // content_override und source_draft_id. Ohne 0026 fragt Drizzle Spalten ab,
+    // die es in dieser Testtabelle nicht gibt ("column does not exist").
+    for (const file of ["drizzle/0021_publishing_atomic_dispatch.sql", "drizzle/0026_approved_content_pipeline.sql"]) {
+      const migration = await readFile(file, "utf8");
+      for (const statement of migration.split("--> statement-breakpoint").map(x=>x.trim()).filter(Boolean)) {
+        await setup.query(statement);
+        await setup.query(statement); // migration must be idempotent
+      }
+    }
+    // Drift sichtbar machen, statt spaeter an einer kryptischen SQL-Meldung zu scheitern.
+    const columns = (await setup.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name='publishingJobs'"
+    )).rows.map(row => row.column_name as string);
+    for (const required of ["content_override", "source_draft_id"]) {
+      assert(columns.includes(required), `publishingJobs braucht die Spalte ${required} (aus 0026).`);
     }
     const present = (await setup.query(
       "SELECT enumlabel FROM pg_enum WHERE enumtypid = 'publishing_status'::regtype"

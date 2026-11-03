@@ -9,7 +9,7 @@ import {
   stripeLookupKey,
   toMajorUnits,
 } from "../lib/ai-influenza-sales-channel-logic";
-import { AI_INFLUENZA_PACKAGES } from "../lib/ai-influenza-team-logic";
+import { AI_INFLUENZA_PACKAGES, AI_INFLUENZA_PACKAGE_IDS } from "../lib/ai-influenza-team-logic";
 
 describe("toMajorUnits", () => {
   it("rechnet Cent in Hauptwaehrung", () => {
@@ -116,18 +116,20 @@ describe("planDigistore24CatalogEntry", () => {
 });
 
 describe("planSalesCatalog", () => {
-  it("deckt drei Pakete auf zwei Kanaelen ab", () => {
+  it("deckt jedes Paket auf beiden Kanaelen ab", () => {
+    const packages = AI_INFLUENZA_PACKAGE_IDS.length;
     const result = planSalesCatalog({ env: {} });
-    expect(result.plans).toHaveLength(6);
-    expect(result.plans.filter((plan) => plan.channel === "stripe")).toHaveLength(3);
-    expect(result.plans.filter((plan) => plan.channel === "digistore24")).toHaveLength(3);
+    expect(result.plans).toHaveLength(packages * 2);
+    expect(result.plans.filter((plan) => plan.channel === "stripe")).toHaveLength(packages);
+    expect(result.plans.filter((plan) => plan.channel === "digistore24")).toHaveLength(packages);
   });
 
   it("ohne Schluessel und Seiten ist der Digistore24-Teil blockiert, Stripe nicht", () => {
+    const packages = AI_INFLUENZA_PACKAGE_IDS.length;
     const result = planSalesCatalog({ env: {} });
-    expect(result.blocked).toBe(3);
-    expect(result.creatable).toBe(3);
-    expect(result.needsReview).toBe(3);
+    expect(result.blocked).toBe(packages);
+    expect(result.creatable).toBe(packages);
+    expect(result.needsReview).toBe(packages);
   });
 
   it("mit vollstaendiger Konfiguration bleibt nur die Freigabe offen", () => {
@@ -135,24 +137,28 @@ describe("planSalesCatalog", () => {
       env: { DIGISTORE24_API_KEY: "key" },
       digistore24: { salespageUrl: "https://x.de/p", thankyouUrl: "https://x.de/t" },
     });
+    const packages = AI_INFLUENZA_PACKAGE_IDS.length;
     expect(result.blocked).toBe(0);
-    expect(result.creatable).toBe(6);
-    expect(result.needsReview).toBe(3);
+    expect(result.creatable).toBe(packages * 2);
+    expect(result.needsReview).toBe(packages);
   });
 
   it("respektiert vorhandene Preis- und Produkt-IDs", () => {
+    // Preise fuer alle Pakete, Digistore24-Produkt nur fuer Starter.
+    const stripeEnv = Object.fromEntries(
+      AI_INFLUENZA_PACKAGE_IDS.map((id) => [`STRIPE_AI_INFLUENZA_PRICE_ID_${id.toUpperCase()}`, `price_${id}`]),
+    );
     const result = planSalesCatalog({
       env: {
-        STRIPE_AI_INFLUENZA_PRICE_ID_STARTER: "price_a",
-        STRIPE_AI_INFLUENZA_PRICE_ID_GROWTH: "price_b",
-        STRIPE_AI_INFLUENZA_PRICE_ID_BUSINESS: "price_c",
+        ...stripeEnv,
         DIGISTORE24_API_KEY: "key",
         DIGISTORE24_PRODUCT_ID_STARTER: "111",
       },
       digistore24: { salespageUrl: "https://x.de/p", thankyouUrl: "https://x.de/t" },
     });
     expect(result.plans.every((plan) => plan.channel !== "stripe" || plan.action === "skip")).toBe(true);
-    expect(result.creatable).toBe(2);
+    // Nur das vorhandene Starter-Produkt wird uebersprungen, der Rest ist neu.
+    expect(result.creatable).toBe(AI_INFLUENZA_PACKAGE_IDS.length - 1);
   });
 });
 
