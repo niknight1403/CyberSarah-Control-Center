@@ -87,7 +87,14 @@ jobs:
           node user-set-password.mjs
 
       - name: Publishing Live-Test Operation (Sprint 370)
-        if: startsWith(github.event.inputs.operation, 'publishing-') || startsWith(github.event.inputs.operation, 'x-')
+        # Bewusst explizit statt startsWith('publishing-'): die Spalten-Operation
+        # heisst auch publishing-*, ist aber kein Live-Test und wurde sonst vom
+        # Live-Test-Skript mit "Unbekannte Publishing-Operation" abgewiesen.
+        if: >-
+          github.event.inputs.operation == 'publishing-enqueue-live-test' ||
+          github.event.inputs.operation == 'publishing-status' ||
+          github.event.inputs.operation == 'publishing-diagnose' ||
+          startsWith(github.event.inputs.operation, 'x-')
         working-directory: scripts/db-ops
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
