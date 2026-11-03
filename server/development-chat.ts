@@ -280,7 +280,7 @@ async function callManaged(messages: ChatMessage[], requestedModel?: string) {
       model: requestedModel,
       maxTokens: 1_800,
     });
-    return { content: extractContent(result), model: result.model };
+    return { content: extractContent(result), model: result.model, usage: result.usage };
   } catch (error) {
     if (error instanceof Error && /OPENAI_API_KEY/.test(error.message)) {
       throw new TRPCError({
@@ -724,9 +724,20 @@ async function callProviderWithTools(
   messages: Message[],
   requestedModel: string | undefined,
   tools: Tool[] | undefined,
+  quotaUser?: { id: number; openId: string; role?: string },
 ): Promise<InvokeResult> {
   if (provider === "managed" || provider === "auto") {
-    return invokeLLM({ messages, tools, model: requestedModel, maxTokens: 1_800 });
+    const estimatedInput = messages.reduce((sum, message) => sum + Math.ceil(String(message.content ?? "").length / 4), 0);
+    if (quotaUser) {
+      const decision = await enforceCloudQuotaForUser(quotaUser, estimatedInput + 1_800);
+      if (!decision.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: decision.reason ?? "Cloud-Kontingent aufgebraucht." });
+    }
+    const result = await invokeLLM({ messages, tools, model: requestedModel, maxTokens: 1_800 });
+    if (quotaUser) {
+      const measuredTokens = result.usage?.total_tokens ?? estimatedInput + Math.ceil(extractContent(result).length / 4);
+      await recordCloudTokenUsage(quotaUser.openId, measuredTokens, { isAdmin: quotaUser.role === "admin", userId: quotaUser.id });
+    }
+    return result;
   }
   if (provider === "anthropic") {
     throw new TRPCError({
@@ -909,7 +920,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   for (let iteration = 0; iteration < MAX_AGENT_TOOL_ITERATIONS; iteration += 1) {
     let payload: InvokeResult;
     try {
-      payload = await callProviderWithTools(provider, conversation, input.model, tools);
+      payload = await callProviderWithTools(provider, conversation, input.model, tools, input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined);
     } catch (error) {
       // Sobald ein Tool bereits erfolgreich/fehlgeschlagen ausgefuehrt wurde,
       // darf ein Providerwechsel den Loop nicht vom Originalprompt neu starten:
@@ -958,7 +969,7 @@ async function runAgentToolLoop(provider: ProviderId, input: AgentToolChatInput)
   // Tool-Side-Effects kein Provider-Restart vom Originalzustand zulassen.
   let payload: InvokeResult;
   try {
-    payload = await callProviderWithTools(provider, conversation, input.model, undefined);
+    payload = await callProviderWithTools(provider, conversation, input.model, undefined, input.userId && input.userOpenId ? { id: input.userId, openId: input.userOpenId, role: input.role ?? undefined } : undefined);
   } catch (error) {
     if (toolsUsedInTurn.size > 0) {
       throw new TRPCError({
