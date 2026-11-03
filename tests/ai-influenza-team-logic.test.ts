@@ -2,6 +2,7 @@ import {describe,it,expect} from "vitest";
 import {
   AI_INFLUENZA_AGENTS,
   AI_INFLUENZA_PACKAGES,
+  AI_INFLUENZA_PACKAGE_IDS,
   buildAiInfluenzaMonthlyPlan,
   calculateAiInfluenzaUnitEconomics,
   canAdvanceAiInfluenzaStep,
@@ -9,8 +10,8 @@ import {
 } from "../lib/ai-influenza-team-logic";
 
 describe("AI Influenza Team domain",()=>{
-  it("defines the three bookable packages and eight specialist agents",()=>{
-    expect(Object.keys(AI_INFLUENZA_PACKAGES)).toEqual(["starter","growth","business"]);
+  it("defines every bookable package and eight specialist agents",()=>{
+    expect(Object.keys(AI_INFLUENZA_PACKAGES)).toEqual([...AI_INFLUENZA_PACKAGE_IDS]);
     expect(AI_INFLUENZA_PACKAGES.starter.monthlyPriceCents).toBe(29900);
     expect(AI_INFLUENZA_PACKAGES.growth.monthlyPriceCents).toBe(99900);
     expect(AI_INFLUENZA_PACKAGES.business.monthlyPriceCents).toBe(249900);
