@@ -65,3 +65,68 @@ export function evaluateEmailSend(
   }
   return { outcome: { status: "sent", messageId: `mail-${input.idempotencyKey.slice(0, 16)}` }, validation };
 }
+
+// ---------------------------------------------------------------------------
+// Resend-Konfiguration
+//
+// Zwei Stellen im System fragen die Absenderadresse unter verschiedenen Namen
+// ab: der Einrichtungs-Assistent und die Revenue-Connectoren nutzen
+// OUTREACH_FROM_ADDRESS, der Versanddienst liest RESEND_FROM_EMAIL. Wer nur
+// einen davon setzt, bekam bisher "nicht konfiguriert" zu sehen, obwohl der
+// Wert existiert. Diese Funktion liest beide und sagt, woher der Wert kommt.
+// ---------------------------------------------------------------------------
+
+export type ResendConfig = {
+  apiKey: string | null;
+  from: string | null;
+  /** Woher die Absenderadresse stammt; null heisst: nirgends gesetzt. */
+  fromSource: "RESEND_FROM_EMAIL" | "OUTREACH_FROM_ADDRESS" | null;
+  configured: boolean;
+  issues: string[];
+};
+
+const FROM_ENV_NAMES = ["RESEND_FROM_EMAIL", "OUTREACH_FROM_ADDRESS"] as const;
+
+export function resolveResendConfig(env: Record<string, string | undefined>): ResendConfig {
+  const apiKey = env.RESEND_API_KEY?.trim() || null;
+  const issues: string[] = [];
+
+  let from: string | null = null;
+  let fromSource: ResendConfig["fromSource"] = null;
+  for (const name of FROM_ENV_NAMES) {
+    const value = env[name]?.trim();
+    if (value) {
+      from = value;
+      fromSource = name;
+      break;
+    }
+  }
+
+  const conflicts = FROM_ENV_NAMES.map((name) => env[name]?.trim()).filter(
+    (value): value is string => Boolean(value),
+  );
+  if (conflicts.length > 1 && new Set(conflicts).size > 1) {
+    issues.push(
+      `RESEND_FROM_EMAIL und OUTREACH_FROM_ADDRESS unterscheiden sich ("${conflicts[0]}" / "${conflicts[1]}") — es gilt RESEND_FROM_EMAIL.`,
+    );
+  }
+
+  if (!apiKey) issues.push("RESEND_API_KEY fehlt.");
+  else if (!apiKey.startsWith("re_")) issues.push("RESEND_API_KEY sieht nicht wie ein Resend-Schluessel aus (erwartet re_…).");
+
+  if (!from) issues.push("Absenderadresse fehlt (RESEND_FROM_EMAIL oder OUTREACH_FROM_ADDRESS).");
+  else if (!isValidEmail(from)) issues.push(`Absenderadresse "${from}" ist keine gueltige E-Mail-Adresse.`);
+  else if (/(@resend\.dev|@example\.|@test\.)/i.test(from)) {
+    issues.push(
+      `Absender "${from}" ist nur fuer Tests geeignet — Resend verlangt eine verifizierte Domain fuer echten Versand.`,
+    );
+  }
+
+  return {
+    apiKey,
+    from,
+    fromSource,
+    configured: issues.length === 0,
+    issues,
+  };
+}
