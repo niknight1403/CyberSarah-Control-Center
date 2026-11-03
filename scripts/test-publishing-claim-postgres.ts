@@ -33,6 +33,8 @@ async function main(): Promise<void> {
       user_open_id TEXT NOT NULL,
       product TEXT NOT NULL,
       goal TEXT NOT NULL,
+      content_override TEXT,
+      source_draft_id INTEGER,
       persona TEXT NOT NULL,
       platform TEXT NOT NULL,
       campaign_day INTEGER NOT NULL,
