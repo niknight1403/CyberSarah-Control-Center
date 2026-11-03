@@ -142,11 +142,18 @@ jobs:
           set -euo pipefail
           test -n "$DATABASE_URL"
           npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1
+
+          # Die Produktions-DSN zeigt auf eine IP, das Zertifikat nennt einen
+          # Hostnamen. sslmode aus der URL entfernen und selbst festlegen:
+          # pg behandelt sslmode=require inzwischen wie verify-full.
+          export PGSSLMODE=require
+          NOSSL="$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])sslmode=[^&]*/\1/; s/[?&]+$//')"
+
           show() {
-            node -e '
+            PGCONN="$NOSSL" node -e '
               const { Client } = require("pg");
               (async () => {
-                const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+                const c = new Client({ connectionString: process.env.PGCONN, ssl: { rejectUnauthorized: false } });
                 await c.connect();
                 const r = await c.query("select column_name from information_schema.columns where table_name = $1 order by column_name", ["publishingJobs"]);
                 console.log(r.rows.map(x => x.column_name).join(", ") || "(Tabelle fehlt)");
@@ -154,19 +161,18 @@ jobs:
               })().catch(e => { console.error("Lesen fehlgeschlagen:", e.message); process.exit(1); });
             '
           }
+
           echo "== Spalten vorher =="
           show
           echo "== Migration 0026 anwenden =="
-          # Die Produktions-DSN zeigt auf eine IP; das Zertifikat nennt einen
-          # Hostnamen. libpq verschluesselt mit require, prueft den Namen aber nicht.
-          PGSSLMODE=require psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f drizzle/0026_approved_content_pipeline.sql
+          psql "$NOSSL" -v ON_ERROR_STOP=1 -q -f drizzle/0026_approved_content_pipeline.sql
           echo "== Spalten nachher =="
           show
           echo "== Pruefung =="
-          node -e '
+          PGCONN="$NOSSL" node -e '
             const { Client } = require("pg");
             (async () => {
-              const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+              const c = new Client({ connectionString: process.env.PGCONN, ssl: { rejectUnauthorized: false } });
               await c.connect();
               const r = await c.query("select column_name from information_schema.columns where table_name = $1", ["publishingJobs"]);
               const have = new Set(r.rows.map(x => x.column_name));
