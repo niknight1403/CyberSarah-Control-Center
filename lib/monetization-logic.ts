@@ -16,6 +16,19 @@
 
 export type MonetizationPlan = "free" | "lite" | "pro" | "expert";
 
+/** Deterministische Tier-Zuordnung: unbekannte Stripe-Preise erhalten keine Paid-Entitlements. */
+export function planForBillingPrice(
+  priceId: string | null | undefined,
+  configured: { lite?: string; pro?: string; expert?: string },
+): MonetizationPlan {
+  if (!priceId) return "free";
+  if (configured.expert && priceId === configured.expert) return "expert";
+  if (configured.pro && priceId === configured.pro) return "pro";
+  if (configured.lite && priceId === configured.lite) return "lite";
+  return "free";
+}
+
+
 export interface PlanLimits {
   label: string;
   /** Max. verwaltete Cloud-Token pro Tag (eigene Provider immer frei). */
