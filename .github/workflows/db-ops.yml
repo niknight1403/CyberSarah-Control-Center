@@ -22,6 +22,7 @@ on:
           - user-set-password
           - quota-diagnose
           - migrate-pending
+          - publishing-columns-ensure
         default: chat-clear-preview
       email:
           description: "E-Mail fuer user-status/user-set-password"
@@ -118,6 +119,53 @@ jobs:
               console.log("revenue_loop_runs:", res.rows[0].tbl ?? "FEHLT");
               await client.end();
             })().catch((error) => { console.error("Kontrolle fehlgeschlagen:", error.message); process.exit(1); });
+          '
+
+      # Drift-Fix: drizzle-kit ueberspringt Migrationen, die im Journal schon als
+      # angewandt gelten. Genau das ist am 03.11. passiert — 0026 stand im
+      # Journal, die Spalten fehlten aber in der Produktion, und jede Abfrage
+      # auf publishingJobs endete mit "column content_override does not exist".
+      # Diese Operation spielt 0026 ein (rein additiv, IF NOT EXISTS) und prueft
+      # danach, statt dem Journal zu glauben.
+      - name: Publishing-Spalten sicherstellen (idempotent)
+        if: github.event.inputs.operation == 'publishing-columns-ensure'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1
+          show() {
+            node -e '
+              const { Client } = require("pg");
+              (async () => {
+                const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+                await c.connect();
+                const r = await c.query("select column_name from information_schema.columns where table_name = $1 order by column_name", ["publishingJobs"]);
+                console.log(r.rows.map(x => x.column_name).join(", ") || "(Tabelle fehlt)");
+                await c.end();
+              })().catch(e => { console.error("Lesen fehlgeschlagen:", e.message); process.exit(1); });
+            '
+          }
+          echo "== Spalten vorher =="
+          show
+          echo "== Migration 0026 anwenden =="
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f drizzle/0026_approved_content_pipeline.sql
+          echo "== Spalten nachher =="
+          show
+          echo "== Pruefung =="
+          node -e '
+            const { Client } = require("pg");
+            (async () => {
+              const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+              await c.connect();
+              const r = await c.query("select column_name from information_schema.columns where table_name = $1", ["publishingJobs"]);
+              const have = new Set(r.rows.map(x => x.column_name));
+              await c.end();
+              const missing = ["content_override", "source_draft_id"].filter(x => !have.has(x));
+              if (missing.length) { console.error("FEHLT weiterhin:", missing.join(", ")); process.exit(1); }
+              console.log("OK: content_override und source_draft_id vorhanden.");
+            })().catch(e => { console.error("Pruefung fehlgeschlagen:", e.message); process.exit(1); });
           '
 
       - name: Quota-Diagnose (schreibgeschuetzt)
