@@ -140,18 +140,21 @@ export async function recordCloudTokenUsage(
   actualTokens: number,
   options?: { isAdmin?: boolean; userId?: number },
 ): Promise<MonetizationAccountState> {
-  const account = await getMonetizationAccount(openId, options);
-  const updated = consumeQuota(account, Math.max(0, Math.ceil(actualTokens)));
-  await saveMonetizationAccount(openId, updated);
-  return updated;
+  await getMonetizationAccount(openId, options);
+  return db.updateModelRouterSettingAtomic<MonetizationAccountState>(accountKey(openId), (stored) => {
+    const account = stored && typeof stored === "object" && stored.plan ? rollPeriods(stored) : freshAccountState();
+    const prepared = options?.isAdmin ? ensureAdminElitePlan(account) : account;
+    return consumeQuota(prepared, Math.max(0, Math.ceil(actualTokens)));
+  });
 }
 
 /** Guthaben eines Credit-Packs gutschreiben (nach validiertem Play-Kauf). */
 export async function grantCreditPack(openId: string, packId: string): Promise<boolean> {
-  const account = await getMonetizationAccount(openId);
+  await getMonetizationAccount(openId);
   const { applyCreditPack } = await import("../lib/monetization-logic");
-  const updated = applyCreditPack(account, packId);
-  if (!updated) return false;
-  await saveMonetizationAccount(openId, updated);
-  return true;
+  const updated = await db.updateModelRouterSettingAtomic<MonetizationAccountState | null>(accountKey(openId), (stored) => {
+    const account = stored && stored.plan ? stored : freshAccountState();
+    return applyCreditPack(account, packId);
+  });
+  return updated !== null;
 }
