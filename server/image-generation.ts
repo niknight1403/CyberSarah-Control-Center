@@ -68,7 +68,7 @@ async function fetchFromHuggingFace(
     });
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!response.ok) {
-      const text = (await response.text().catch(() => "")).slice(0, 120);
+      const text = buffer.toString("utf8").slice(0, 120);
       return { ok: false, reason: `HuggingFace antwortete ${response.status}: ${text || "ohne Nachricht"}` };
     }
     if (buffer.byteLength === 0) return { ok: false, reason: "HuggingFace lieferte ein leeres Bild." };
