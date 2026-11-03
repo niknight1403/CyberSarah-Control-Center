@@ -152,9 +152,13 @@ export async function recordCloudTokenUsage(
 export async function grantCreditPack(openId: string, packId: string): Promise<boolean> {
   await getMonetizationAccount(openId);
   const { applyCreditPack } = await import("../lib/monetization-logic");
-  const updated = await db.updateModelRouterSettingAtomic<MonetizationAccountState | null>(accountKey(openId), (stored) => {
+  const current = await getMonetizationAccount(openId);
+  if (!applyCreditPack(current, packId)) return false;
+  await db.updateModelRouterSettingAtomic<MonetizationAccountState>(accountKey(openId), (stored) => {
     const account = stored && stored.plan ? stored : freshAccountState();
-    return applyCreditPack(account, packId);
+    const updated = applyCreditPack(account, packId);
+    if (!updated) throw new Error("Unbekanntes Credit-Pack.");
+    return updated;
   });
-  return updated !== null;
+  return true;
 }
