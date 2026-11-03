@@ -96,7 +96,7 @@ describe("runSalesCatalogStep", () => {
     const executor = fakeExecutor(["ai-influenza-growth"]);
     const result = await runSalesCatalogStep({ env: AUTOCREATE, executor });
     expect(executor.lookedUp).toEqual(["ai-influenza-starter", "ai-influenza-growth", "ai-influenza-business", "ai-influenza-elite"]);
-    expect(result.executed).toBe(2);
+    expect(result.executed).toBe(3);
     expect(result.reused).toEqual([
       {
         channel: "stripe",
