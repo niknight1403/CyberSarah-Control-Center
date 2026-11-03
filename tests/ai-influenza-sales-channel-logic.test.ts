@@ -116,18 +116,18 @@ describe("planDigistore24CatalogEntry", () => {
 });
 
 describe("planSalesCatalog", () => {
-  it("deckt drei Pakete auf zwei Kanaelen ab", () => {
+  it("deckt vier Pakete auf zwei Kanaelen ab", () => {
     const result = planSalesCatalog({ env: {} });
-    expect(result.plans).toHaveLength(6);
-    expect(result.plans.filter((plan) => plan.channel === "stripe")).toHaveLength(3);
-    expect(result.plans.filter((plan) => plan.channel === "digistore24")).toHaveLength(3);
+    expect(result.plans).toHaveLength(8);
+    expect(result.plans.filter((plan) => plan.channel === "stripe")).toHaveLength(4);
+    expect(result.plans.filter((plan) => plan.channel === "digistore24")).toHaveLength(4);
   });
 
   it("ohne Schluessel und Seiten ist der Digistore24-Teil blockiert, Stripe nicht", () => {
     const result = planSalesCatalog({ env: {} });
-    expect(result.blocked).toBe(3);
-    expect(result.creatable).toBe(3);
-    expect(result.needsReview).toBe(3);
+    expect(result.blocked).toBe(4);
+    expect(result.creatable).toBe(4);
+    expect(result.needsReview).toBe(4);
   });
 
   it("mit vollstaendiger Konfiguration bleibt nur die Freigabe offen", () => {
@@ -136,8 +136,8 @@ describe("planSalesCatalog", () => {
       digistore24: { salespageUrl: "https://x.de/p", thankyouUrl: "https://x.de/t" },
     });
     expect(result.blocked).toBe(0);
-    expect(result.creatable).toBe(6);
-    expect(result.needsReview).toBe(3);
+    expect(result.creatable).toBe(8);
+    expect(result.needsReview).toBe(4);
   });
 
   it("respektiert vorhandene Preis- und Produkt-IDs", () => {
@@ -146,13 +146,14 @@ describe("planSalesCatalog", () => {
         STRIPE_AI_INFLUENZA_PRICE_ID_STARTER: "price_a",
         STRIPE_AI_INFLUENZA_PRICE_ID_GROWTH: "price_b",
         STRIPE_AI_INFLUENZA_PRICE_ID_BUSINESS: "price_c",
+        STRIPE_AI_INFLUENZA_PRICE_ID_ELITE: "price_d",
         DIGISTORE24_API_KEY: "key",
         DIGISTORE24_PRODUCT_ID_STARTER: "111",
       },
       digistore24: { salespageUrl: "https://x.de/p", thankyouUrl: "https://x.de/t" },
     });
     expect(result.plans.every((plan) => plan.channel !== "stripe" || plan.action === "skip")).toBe(true);
-    expect(result.creatable).toBe(2);
+    expect(result.creatable).toBe(3);
   });
 });
 
