@@ -3,7 +3,7 @@
  * Tageslimit, ehrlicher Nicht-Konfiguriert-Zustand.
  */
 import * as db from "./db";
-import { EMAIL_LIMITS, evaluateEmailSend, type EmailDispatchInput, type EmailSendOutcome } from "../lib/email-logic";
+import { EMAIL_LIMITS, evaluateEmailSend, resolveResendConfig, type EmailDispatchInput, type EmailSendOutcome } from "../lib/email-logic";
 
 const SENT_KEY_PREFIX = "email.sent.";
 const DAY_COUNT_KEY = "email.daycount.";
@@ -15,11 +15,18 @@ function dayKey(): string {
 export type EmailServiceResult = EmailSendOutcome & { configured: boolean };
 
 export async function dispatchTransactionalEmail(input: EmailDispatchInput): Promise<EmailServiceResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
-  const configured = Boolean(apiKey && from);
-  if (!configured) {
-    return { status: "rejected", reason: "Resend ist nicht konfiguriert (RESEND_API_KEY / RESEND_FROM_EMAIL) — Mail wird ehrlich nicht versendet.", configured: false };
+  // Liest RESEND_FROM_EMAIL und OUTREACH_FROM_ADDRESS: beide Namen sind im
+  // System in Gebrauch, und nur einer davon zu setzen reicht jetzt trotzdem.
+  const resend = resolveResendConfig(process.env);
+  const apiKey = resend.apiKey ?? undefined;
+  const from = resend.from ?? undefined;
+  const configured = resend.configured;
+  if (!configured || !apiKey || !from) {
+    return {
+      status: "rejected",
+      reason: `Resend ist nicht konfiguriert: ${resend.issues.join(" ")} — Mail wird ehrlich nicht versendet.`,
+      configured: false,
+    };
   }
 
   const dayCountKey = `${DAY_COUNT_KEY}${dayKey()}`;
