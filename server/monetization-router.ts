@@ -68,7 +68,7 @@ export const monetizationRouter = router({
         monthTokens: state.monthCloudTokens,
         creditBalanceTokens: state.creditBalanceTokens,
       },
-      enforcement: process.env.QUOTA_ENFORCEMENT === "enforce" ? ("enforce" as const) : ("monitor" as const),
+      enforcement: process.env.QUOTA_ENFORCEMENT === "monitor" ? ("monitor" as const) : ("enforce" as const),
     };
   }),
 
