@@ -56,9 +56,8 @@ export const monetizationRouter = router({
   /** Echtzeit-Kontostand des angemeldeten Nutzers. */
   account: protectedProcedure.query(async ({ ctx }) => {
     const isAdmin = ctx.user.role === "admin";
-    const [state, plan] = await Promise.all([
-      getMonetizationAccount(ctx.user.openId, { isAdmin, userId: ctx.user.id }),
-    ]);
+    const state = await getMonetizationAccount(ctx.user.openId, { isAdmin, userId: ctx.user.id });
+    const plan = state.plan;
     const limits = PLAN_LIMITS[plan];
     return {
       plan,
