@@ -216,6 +216,7 @@ export function consumeQuota(
   }
   const limits = PLAN_LIMITS[state.plan];
   const remainingToday = Math.max(0, limits.dailyCloudTokens - rolled.dayCloudTokens);
+  const remainingThisMonth = Math.max(0, limits.monthlyCloudTokens - rolled.monthCloudTokens);
   const fromPlan = Math.min(actualTokens, remainingToday, remainingThisMonth);
   const overflow = actualTokens - fromPlan;
 
