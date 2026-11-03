@@ -51,6 +51,11 @@ async function main(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
+    const contentPipelineMigration = await readFile("drizzle/0026_approved_content_pipeline.sql", "utf8");
+    for (const statement of contentPipelineMigration.split("--> statement-breakpoint").map(x=>x.trim()).filter(Boolean)) {
+      await setup.query(statement);
+      await setup.query(statement); // migration must be idempotent
+    }
     const migration = await readFile("drizzle/0021_publishing_atomic_dispatch.sql", "utf8");
     for (const statement of migration.split("--> statement-breakpoint").map(x=>x.trim()).filter(Boolean)) {
       await setup.query(statement);
