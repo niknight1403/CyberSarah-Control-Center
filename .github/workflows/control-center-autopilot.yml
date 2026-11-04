@@ -35,15 +35,34 @@ jobs:
           trap 'rm -f "$body_file"' EXIT
           http_code="$(curl --silent --show-error --max-time 180             --output "$body_file" --write-out '%{http_code}' --request POST             --header "Authorization: Bearer $TOKEN"             "${BASE_URL%/}/api/cron/control-center-autopilot")"
           # Never echo raw response bodies: they may include internal revenue or customer data.
-          if [ "$http_code" != "200" ]; then
+          #
+          # 200 = Lauf vollstaendig durch, 207 = Lauf durch, aber Punkte warten
+          # (fehlende Schluessel, offene Freigaben). Der Server unterscheidet das
+          # bewusst: wartende Konfiguration ist kein Defekt und darf den
+          # 24/7-Lauf nicht rot faerben. Echte Blockaden stehen in
+          # `result.blocked` und werden unten weiterhin hart geprueft.
+          if [ "$http_code" != "200" ] && [ "$http_code" != "207" ]; then
             echo "::error::Control-Center-Cron antwortet mit HTTP $http_code; keine Rohdaten in Actions-Logs."
             exit 1
           fi
-          jq -e '.ok == true and .result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growthPulse != null) and (.result.growthPulse.generated >= 0) and (.result.growthPulse.externalActionsExecuted == 0) and (.result.growthPulse.plan.spendingAuthorized == false) and (.result.growthPulse.plan.publishingAuthorized == false) and (.result.growthPulse.plan.priceChangesAuthorized == false) and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
+          blocked_count="$(jq -r '(.result.blocked // []) | length' "$body_file")"
+          deferred_count="$(jq -r '(.result.deferred // []) | length' "$body_file")"
+          if [ "$blocked_count" != "0" ]; then
+            echo "::error::Control-Center-Cron meldet $blocked_count echte Blockade(n); Details stehen im Server-Log."
+            exit 1
+          fi
+          if [ "$http_code" = "207" ] || [ "$deferred_count" != "0" ]; then
+            echo "::warning::Control-Center-Cron wartet auf $deferred_count Konfigurationspunkt(e). Kein Defekt, aber nicht vollstaendig abgeschlossen."
+          fi
+          jq -e '.result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growthPulse != null) and (.result.growthPulse.generated >= 0) and (.result.growthPulse.externalActionsExecuted == 0) and (.result.growthPulse.plan.spendingAuthorized == false) and (.result.growthPulse.plan.publishingAuthorized == false) and (.result.growthPulse.plan.priceChangesAuthorized == false) and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
           # Signed-in diagnostics stay in GitHub Actions: no invented reach or
           # revenue metrics and never echo the authentication token.
           {
             echo "### CyberSarah 24/7 Growth Pulse"
-            jq -r '"- Fokus: \(.result.growthPulse.focus)\n- Neue Entwürfe: \(.result.growthPulse.generated)\n- Externe Aktionen: \(.result.growthPulse.externalActionsExecuted)\n- Blocker: \(.result.blocked | length)\n- Ergebnis: \(.ok)"' "$body_file"
+            jq -r '"- Fokus: \(.result.growthPulse.focus)\n- Neue Entwürfe: \(.result.growthPulse.generated)\n- Externe Aktionen: \(.result.growthPulse.externalActionsExecuted)\n- Blocker: \(.result.blocked | length)\n- Wartet auf: \(.result.deferred | length)\n- Ergebnis: \(.ok)"' "$body_file"
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "Control-Center-Autopilot einschließlich Growth Pulse vollständig bestätigt."
+          if [ "$deferred_count" = "0" ]; then
+            echo "Control-Center-Autopilot einschließlich Growth Pulse vollständig bestätigt."
+          else
+            echo "Control-Center-Autopilot einschließlich Growth Pulse ausgeführt; $deferred_count Punkt(e) warten auf Konfiguration oder Freigabe."
+          fi
