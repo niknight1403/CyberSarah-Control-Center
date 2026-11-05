@@ -1,0 +1,103 @@
+name: Hub-Inspect
+
+# Rein lesender Statusabruf am Live-Hub (Agentforge2 auf der Oracle-VM).
+# Der SSH-Weg dorthin ist nicht verfügbar (ORACLE_SSH_KEY fehlt), die Hub-API
+# aber schon: Login mit VF_HUB_EMAIL/VF_HUB_PASSWORD aus den Repo-Secrets.
+# Es wird ausschließlich gelesen (GET), nichts gestartet oder geändert.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "villas | projects | both"
+        default: "both"
+      villa_id:
+        description: "Optional: nur diese Villa ausgeben"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Hub lesen
+        env:
+          HUB_URL: ${{ secrets.HUB_URL || 'https://hub.cybersarah-ki.com' }}
+          HUB_EMAIL: ${{ secrets.VF_HUB_EMAIL }}
+          HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
+          MODE: ${{ inputs.mode || 'both' }}
+          VILLA_ID: ${{ inputs.villa_id }}
+        run: |
+          node - <<'JS'
+          const base = (process.env.HUB_URL || 'https://hub.cybersarah-ki.com').replace(/\/+$/, '');
+          const email = process.env.HUB_EMAIL;
+          const password = process.env.HUB_PASSWORD;
+          const mode = process.env.MODE || 'both';
+          const onlyVilla = process.env.VILLA_ID;
+
+          if (!email || !password) {
+            console.error('FEHLER: VF_HUB_EMAIL/VF_HUB_PASSWORD fehlen in den Repo-Secrets.');
+            process.exit(1);
+          }
+
+          let cookie = '';
+          async function call(path, init = {}) {
+            const res = await fetch(base + path, {
+              ...init,
+              headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}), ...(init.headers || {}) },
+            });
+            const setCookie = res.headers.getSetCookie?.() ?? [];
+            if (setCookie.length) cookie = setCookie.map((c) => c.split(';')[0]).join('; ');
+            const text = await res.text();
+            let body = null;
+            try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
+            return { status: res.status, body };
+          }
+
+          const login = await call('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password }),
+          });
+          if (login.status !== 200) {
+            console.error(`FEHLER: Login am Hub abgelehnt (HTTP ${login.status}).`);
+            process.exit(1);
+          }
+          console.log(`Login ok (HTTP ${login.status}).`);
+
+          if (mode === 'villas' || mode === 'both') {
+            const villas = await call('/api/villas');
+            if (villas.status !== 200) {
+              console.error(`FEHLER: /api/villas -> HTTP ${villas.status}`);
+            } else {
+              const rows = Array.isArray(villas.body) ? villas.body : [];
+              const filtered = onlyVilla ? rows.filter((v) => String(v.id) === String(onlyVilla)) : rows;
+              console.log(`\n== Villen (${filtered.length} von ${rows.length}) ==`);
+              for (const v of filtered) {
+                const pct = v.tasks_total ? Math.round((100 * v.tasks_done) / v.tasks_total) : 0;
+                console.log(
+                  `#${v.id} ${v.name} | ${v.status} | Aufgaben ${v.tasks_done}/${v.tasks_total} (${pct} %)` +
+                  ` | offen ${v.openCount ?? '?'} | fehlgeschlagen ${v.tasks_failed ?? 0}` +
+                  ` | aktiv ${v.executing ? 'ja' : 'nein'}${v.queued ? ', Warteschlange' : ''}` +
+                  `${v.retry ? ' | retry: ' + JSON.stringify(v.retry).slice(0, 160) : ''}`,
+                );
+              }
+            }
+          }
+
+          if (mode === 'projects' || mode === 'both') {
+            const projects = await call('/api/deep/projects');
+            if (projects.status !== 200) {
+              console.error(`FEHLER: /api/deep/projects -> HTTP ${projects.status}`);
+            } else {
+              const rows = Array.isArray(projects.body) ? projects.body : (projects.body.projects || []);
+              console.log(`\n== Projekte (${rows.length}) ==`);
+              for (const p of rows) {
+                const bits = [`#${p.id}`, p.name || p.title || '(ohne Namen)', p.status || '', p.stage || ''];
+                if (p.tasks_total !== undefined) bits.push(`Aufgaben ${p.tasks_done ?? '?'}/${p.tasks_total}`);
+                console.log(bits.filter(Boolean).join(' | '));
+              }
+            }
+          }
+          JS
