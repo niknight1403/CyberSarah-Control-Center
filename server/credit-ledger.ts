@@ -14,6 +14,7 @@
  *  - "settle"    Nachbuchung, wenn der Lauf teurer war als reserviert (negativ)
  */
 import { sql } from "drizzle-orm";
+import { computeRefundDelta } from "../lib/entitlement-logic";
 import { getDb } from "./db";
 import { CREDIT_PACKS_CANONICAL } from "../lib/pricing-config";
 
@@ -193,14 +194,15 @@ export async function grantCreditsDetailed(input: {
   tokens: number;
   reason: string;
   executionKey: string;
+  paymentIntent?: string | null;
 }): Promise<GrantResult> {
   const tokens = Math.max(0, Math.ceil(input.tokens));
   if (tokens === 0) return { booked: false, duplicate: false };
   const db = await getDb();
   if (!db) throw new Error("Kontodatenbank nicht verfuegbar — Gutschrift nicht gebucht.");
   const result = await db.execute(sql`
-    INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key")
-    VALUES (${input.openId}, ${tokens}, 'grant', ${input.reason}, ${input.executionKey})
+    INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key", "payment_intent")
+    VALUES (${input.openId}, ${tokens}, 'grant', ${input.reason}, ${input.executionKey}, ${input.paymentIntent ?? null})
     ON CONFLICT ("user_open_id", "execution_key", "kind") DO NOTHING
     RETURNING "id";
   `);
@@ -221,6 +223,151 @@ export async function grantCredits(input: {
   executionKey: string;
 }): Promise<boolean> {
   return (await grantCreditsDetailed(input)).booked;
+}
+
+export interface RefundResult {
+  booked: boolean;
+  duplicate: boolean;
+  /** Wahr, wenn die Erstattung den Rahmen des Kaufs uebersteigt. */
+  cappedByBalance: boolean;
+  tokens: number;
+  reason: string;
+}
+
+export interface RefundDeps {
+  grantedTokensByPaymentIntent?: (paymentIntent: string) => Promise<{ openId: string; tokens: number } | null>;
+  refundedTokensByPaymentIntent?: (openId: string, paymentIntent: string) => Promise<number>;
+  balanceOf?: (openId: string) => Promise<number | null>;
+  bookNegative?: (input: {
+    openId: string;
+    tokens: number;
+    reason: string;
+    executionKey: string;
+    paymentIntent: string;
+  }) => Promise<GrantResult>;
+}
+
+/** Gutschrift zu einer Zahlung nachschlagen (Anker fuer Erstattungen). */
+export async function findGrantByPaymentIntent(
+  paymentIntent: string,
+): Promise<{ openId: string; tokens: number } | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Kontodatenbank nicht verfuegbar.");
+  const result = await db.execute(sql`
+    SELECT "user_open_id", SUM("delta_tokens")::int AS "tokens"
+    FROM "credit_ledger_entries"
+    WHERE "payment_intent" = ${paymentIntent} AND "kind" = 'grant'
+    GROUP BY "user_open_id"
+    LIMIT 1;
+  `);
+  const row = resultRows(result)[0];
+  if (!row) return null;
+  const tokens = Number(row.tokens ?? 0);
+  if (!Number.isFinite(tokens) || tokens <= 0) return null;
+  return { openId: String(row.user_open_id ?? ""), tokens };
+}
+
+/** Bereits entzogene Tokens zu einer Zahlung. */
+export async function refundedTokensForPaymentIntent(openId: string, paymentIntent: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Kontodatenbank nicht verfuegbar.");
+  const result = await db.execute(sql`
+    SELECT COALESCE(-SUM("delta_tokens"), 0)::int AS "tokens"
+    FROM "credit_ledger_entries"
+    WHERE "user_open_id" = ${openId} AND "payment_intent" = ${paymentIntent} AND "kind" = 'refund';
+  `);
+  const tokens = Number(resultRows(result)[0]?.tokens ?? 0);
+  return Number.isFinite(tokens) && tokens > 0 ? tokens : 0;
+}
+
+/** Gegenbuchung als Ledger-Eintrag (negativ, eigene Art). */
+async function bookRefundEntry(input: {
+  openId: string;
+  tokens: number;
+  reason: string;
+  executionKey: string;
+  paymentIntent: string;
+}): Promise<GrantResult> {
+  const tokens = Math.max(0, Math.floor(input.tokens));
+  if (tokens === 0) return { booked: false, duplicate: false };
+  const db = await getDb();
+  if (!db) throw new Error("Kontodatenbank nicht verfuegbar — Erstattung nicht gebucht.");
+  const result = await db.execute(sql`
+    INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key", "payment_intent")
+    VALUES (${input.openId}, ${-tokens}, 'refund', ${input.reason}, ${input.executionKey}, ${input.paymentIntent})
+    ON CONFLICT ("user_open_id", "execution_key", "kind") DO NOTHING
+    RETURNING "id";
+  `);
+  return { booked: resultRows(result).length > 0, duplicate: resultRows(result).length === 0 };
+}
+
+/**
+ * Erstattung verbuchen.
+ *
+ * Die Zielmenge richtet sich nach dem kumuliert erstatteten Betrag, gebucht wird
+ * nur die Differenz zu bereits entzogenen Tokens. Der Schluessel enthaelt den
+ * kumulierten Erstattungsbetrag, damit wiederholte Zustellungen desselben
+ * Events nichts doppeln, spaetere Teil-Erstattungen aber nachziehen.
+ * Mehr als das vorhandene Guthaben wird nie entzogen: kein Negativsaldo.
+ */
+export async function refundCreditsForCharge(
+  input: {
+    chargeId: string;
+    paymentIntent: string;
+    paidCents: number;
+    refundedCents: number;
+  },
+  deps: RefundDeps = {},
+): Promise<RefundResult> {
+  const findGrant = deps.grantedTokensByPaymentIntent ?? findGrantByPaymentIntent;
+  const sumRefunded = deps.refundedTokensByPaymentIntent ?? refundedTokensForPaymentIntent;
+  const balanceOf = deps.balanceOf ?? readCreditBalance;
+  const bookNegative = deps.bookNegative ?? bookRefundEntry;
+
+  const grant = await findGrant(input.paymentIntent);
+  if (!grant) {
+    return {
+      booked: false,
+      duplicate: false,
+      cappedByBalance: false,
+      tokens: 0,
+      reason: "Keine Guthaben-Gutschrift zu dieser Zahlung — nichts zu erstatten.",
+    };
+  }
+  const already = await sumRefunded(grant.openId, input.paymentIntent);
+  const balance = await balanceOf(grant.openId);
+  const plan = computeRefundDelta({
+    grantedTokens: grant.tokens,
+    paidCents: input.paidCents,
+    refundedCents: input.refundedCents,
+    alreadyRefundedTokens: already,
+    availableBalance: balance,
+  });
+  if (plan.delta === 0) {
+    return {
+      booked: false,
+      duplicate: true,
+      cappedByBalance: plan.cappedByBalance,
+      tokens: 0,
+      reason: `Nichts zu erstatten (bereits ${plan.already} von ${plan.target} Tokens entzogen).`,
+    };
+  }
+  const result = await bookNegative({
+    openId: grant.openId,
+    tokens: plan.delta,
+    reason: `Stripe-Erstattung ${input.chargeId}`.slice(0, 120),
+    executionKey: `stripe_refund:${input.chargeId}:${Math.max(0, Math.floor(input.refundedCents))}`.slice(0, 190),
+    paymentIntent: input.paymentIntent,
+  });
+  return {
+    booked: result.booked,
+    duplicate: result.duplicate,
+    cappedByBalance: plan.cappedByBalance,
+    tokens: result.booked ? plan.delta : 0,
+    reason: plan.cappedByBalance
+      ? `${plan.delta} Tokens erstattet, Rest nicht gedeckt (Guthaben bereits verbraucht).`
+      : `${plan.delta} Tokens erstattet.`,
+  };
 }
 
 function resultRows(result: unknown): Array<Record<string, unknown>> {

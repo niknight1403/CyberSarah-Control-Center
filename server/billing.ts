@@ -21,6 +21,7 @@ import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
 import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
 import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
 import { provisionCheckoutEntitlement } from "./entitlements";
+import { refundCreditsForCharge } from "./credit-ledger";
 import { findCreditPack, stripePriceIdFor } from "../lib/pricing-config";
 import {buildAiInfluenzaStripeLineItem,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
 import {recordAiInfluenzaInvoice,syncAiInfluenzaSubscription} from "./ai-influenza-stripe-sync";
@@ -415,6 +416,10 @@ async function bookCheckoutEvent(event: Stripe.Event): Promise<void> {
     paymentStatus: session.payment_status,
     amountTotal: session.amount_total,
     currency: session.currency,
+    paymentIntent:
+      typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : session.payment_intent?.id ?? null,
     customerId,
     subscriptionId:
       typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null,
@@ -443,6 +448,42 @@ async function bookCheckoutEvent(event: Stripe.Event): Promise<void> {
     throw new StripeWebhookProcessingError(`Checkout-Freischaltung nicht angewandt: ${provision.reason}`);
   }
   console.warn(`[Stripe] ${label}: nicht gebucht — ${provision.reason}`);
+}
+
+/**
+ * Erstattung eines Stripe-Charge auf das Guthaben zurueckbuchen.
+ *
+ * Nur Einmalzahlungen mit Guthaben-Bezug: die Buchung wird ueber die
+ * payment_intent im Ledger gefunden. Abo-Erstattungen haben dort keine
+ * Gutschrift und bleiben unberuehrt. Fehlt die Datenbank, wirft der Aufruf,
+ * damit Stripe erneut zustellt statt die Gegenbuchung zu verlieren.
+ */
+async function refundChargeCredits(event: Stripe.Event): Promise<void> {
+  const charge = event.data.object as Stripe.Charge;
+  const paymentIntent =
+    typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id ?? null;
+  if (!paymentIntent) {
+    console.info(`[Stripe] Erstattung ${charge.id ?? "ohne ID"}: keine payment_intent, nichts zu buchen.`);
+    return;
+  }
+  try {
+    const result = await refundCreditsForCharge({
+      chargeId: charge.id ?? `unbekannt-${event.id ?? Date.now()}`,
+      paymentIntent,
+      paidCents: charge.amount ?? 0,
+      refundedCents: charge.amount_refunded ?? charge.amount ?? 0,
+    });
+    const label = `Erstattung ${charge.id ?? "ohne ID"}`;
+    if (result.booked) {
+      console.info(`[Stripe] ${label}: ${result.reason}`);
+      return;
+    }
+    console.info(`[Stripe] ${label}: ${result.reason}`);
+  } catch (error) {
+    throw new StripeWebhookProcessingError(
+      `Erstattung nicht gebucht: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 export async function processStripeWebhook(
@@ -534,6 +575,12 @@ export async function processStripeWebhook(
     // buchen bewusst nichts.
     if (isCheckoutBookingEvent(event.type)) {
       await bookCheckoutEvent(event);
+    }
+    // Rueckzahlung: gehoert das Geld zu einem Guthaben-Kauf, wird der Anteil
+    // wieder entzogen. Kein Retry-Sturm bei inhaltlichen Faellen, aber ein
+    // Fehler bei fehlender Datenbank.
+    if (event.type === "charge.refunded") {
+      await refundChargeCredits(event);
     }
     // Umsatzkritische Events verdienen einen Ops-Alert — ehrlich, ohne Panic:
     // payment_failed heißt nicht sofort Kündigung, subscription.deleted schon.
