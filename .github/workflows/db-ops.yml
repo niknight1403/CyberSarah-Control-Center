@@ -25,6 +25,7 @@ on:
           - apply-telemetry
           - reconcile-journal
           - migrate-status
+          - refund-verify
           - migrate-baseline
           - migrate-apply
           - publishing-columns-ensure
@@ -119,6 +120,15 @@ jobs:
           FILE=drizzle/0027_billing_telemetry.sql \
           TABLES=revenue_loop_runs,agent_executions,credit_ledger_entries \
           npx tsx scripts/db-ops/apply-sql.ts
+
+      - name: "Erstattung gegen die Produktionsdatenbank pruefen (nur lesen + ROLLBACK)"
+        if: github.event.inputs.operation == 'refund-verify'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1
+          npx tsx scripts/db-ops/refund-verify.ts
 
       - name: "Migrationsregister-Status (nur lesen)"
         if: github.event.inputs.operation == 'migrate-status'
