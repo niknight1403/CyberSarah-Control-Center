@@ -10,7 +10,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import * as db from "./db";
-import { grantCredits, readCreditBalance } from "./credit-ledger";
+import { getUserTotalCredits, grantCredits } from "./credit-ledger";
 import { resolvePlanForUser } from "./monetization";
 import {
   buildEntitlementView,
@@ -19,13 +19,9 @@ import {
   type EntitlementView,
 } from "../lib/entitlement-logic";
 
-const CHECKOUT_OPENID_CACHE_LIMIT = 500;
-const openIdCache = new Map<number, string | null>();
-
 /** Numerische Nutzer-ID → openId (Guthaben hängt an der openId). */
 export async function openIdForUserId(userId: number): Promise<string | null> {
   if (!Number.isSafeInteger(userId) || userId <= 0) return null;
-  if (openIdCache.has(userId)) return openIdCache.get(userId) ?? null;
   const database = await getDb();
   if (!database) return null;
   try {
@@ -37,8 +33,6 @@ export async function openIdForUserId(userId: number): Promise<string | null> {
       : (((result as { rows?: Record<string, unknown>[] }).rows) ?? []);
     const value = rows[0]?.open_id;
     const openId = typeof value === "string" && value.length > 0 ? value : null;
-    if (openIdCache.size >= CHECKOUT_OPENID_CACHE_LIMIT) openIdCache.clear();
-    openIdCache.set(userId, openId);
     return openId;
   } catch (error) {
     console.warn(
@@ -47,6 +41,29 @@ export async function openIdForUserId(userId: number): Promise<string | null> {
     );
     return null;
   }
+}
+
+/**
+ * Checkout kann die openId (String) oder die numerische Nutzer-ID tragen.
+ * Beides wird akzeptiert, damit ein Checkout-Link nicht davon abhängt, welches
+ * Format der Ersteller gewählt hat.
+ */
+export async function resolveCheckoutOwner(session: CheckoutSummary): Promise<{
+  userId: number | null;
+  openId: string | null;
+}> {
+  const reference = String(session.clientReferenceId ?? "").trim();
+  const metadataOpenId = String(session.metadata?.userOpenId ?? session.metadata?.openId ?? "").trim();
+  if (metadataOpenId) return { userId: session.userId ?? null, openId: metadataOpenId };
+  if (reference) {
+    if (/^\d+$/.test(reference)) {
+      const userId = Number(reference);
+      return { userId, openId: await openIdForUserId(userId) };
+    }
+    return { userId: null, openId: reference };
+  }
+  const userId = session.userId ?? null;
+  return { userId, openId: userId ? await openIdForUserId(userId) : null };
 }
 
 export interface ProvisionResult {
@@ -68,8 +85,8 @@ export async function provisionCheckoutEntitlement(session: CheckoutSummary): Pr
     return { applied: false, kind: "none", reason: decision.reason, idempotencyKey: decision.idempotencyKey };
   }
 
-  const userId = session.userId ?? null;
-  const openId = userId ? await openIdForUserId(userId) : null;
+  const owner = await resolveCheckoutOwner(session);
+  const openId = owner.openId;
   if (!openId) {
     return {
       applied: false,
@@ -84,7 +101,7 @@ export async function provisionCheckoutEntitlement(session: CheckoutSummary): Pr
       openId,
       tokens: decision.tokens,
       reason: `Stripe-Checkout ${session.id ?? ""}`.trim(),
-      executionKey: decision.idempotencyKey ?? `stripe_checkout:${session.id}`,
+      executionKey: `stripe_payment:${session.id}`,
     });
     return {
       applied: booked,
@@ -116,7 +133,7 @@ export async function readEntitlements(input: {
     const [plan, subscription, balance] = await Promise.all([
       resolvePlanForUser(input.userId),
       db.getBillingSubscriptionForUser(input.userId),
-      readCreditBalance(input.openId),
+      getUserTotalCredits(input.openId),
     ]);
     return {
       available: true,

@@ -43,7 +43,7 @@ describe("decideCheckoutEntitlement", () => {
     });
     expect(paid.kind).toBe("credits");
     expect(paid.tokens).toBe(5000);
-    expect(paid.idempotencyKey).toBe("stripe_checkout:cs_1");
+    expect(paid.idempotencyKey).toBe("stripe_payment:cs_1");
 
     const unpaid = decideCheckoutEntitlement({
       id: "cs_2",

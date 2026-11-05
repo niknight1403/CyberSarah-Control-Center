@@ -21,6 +21,7 @@ import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
 import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
 import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
 import { provisionCheckoutEntitlement } from "./entitlements";
+import { findCreditPack, stripePriceIdFor } from "../lib/pricing-config";
 import {buildAiInfluenzaStripeLineItem,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
 import {recordAiInfluenzaInvoice,syncAiInfluenzaSubscription} from "./ai-influenza-stripe-sync";
 
@@ -486,6 +487,7 @@ export async function processStripeWebhook(
           subscriptionId:
             typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null,
           userId,
+          clientReferenceId: session.client_reference_id ?? null,
           metadata: (session.metadata ?? null) as Record<string, string | undefined> | null,
         });
         if (!provision.applied && provision.kind !== "none") {
@@ -625,6 +627,69 @@ export async function createAiInfluenzaPackageCheckoutSession(
   });
   if(!session.url)throw new Error("Stripe hat keine Checkout-URL zurückgegeben.");
   return {url:session.url,sessionId:session.id,packageId,orderId};
+}
+
+
+/**
+ * Einmal-Checkout für ein Token-Paket (`mode: "payment"`).
+ *
+ * Zweck: Guthaben auch über Stripe verkaufen, nicht nur über Google Play.
+ * Die Token-Menge kommt aus lib/pricing-config.ts — nicht aus dem Aufrufer,
+ * damit Webhook und Anzeige dieselbe Zahl sehen.
+ *
+ * `client_reference_id` trägt die openId (Guthaben hängt an der openId);
+ * zusätzlich steht sie in den Metadaten, falls ein Konto sie später ändert.
+ */
+export async function createTokenPackageCheckoutSession(user: BillingUser & { openId: string }, packId: string) {
+  const pack = findCreditPack(packId);
+  if (!pack) throw new Error(`Unbekanntes Token-Paket "${packId}".`);
+  const priceId = stripePriceIdFor(pack);
+  if (!priceId)
+    throw new Error(
+      `Für das Paket "${pack.id}" ist keine Stripe-Preis-ID konfiguriert (${pack.stripePriceEnv} fehlt).`,
+    );
+
+  const stripe = assertLiveStripeConfiguration();
+  const customerId =
+    user.stripeCustomerId ||
+    (
+      await stripe.customers.create({
+        email: user.email ?? undefined,
+        name: user.name ?? undefined,
+        metadata: { cyberSarahUserId: String(user.id), userOpenId: user.openId },
+      })
+    ).id;
+  if (!user.stripeCustomerId) await db.setStripeCustomerId(user.id, customerId);
+
+  const baseUrl = getAppBaseUrl();
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: customerId,
+    client_reference_id: user.openId,
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${baseUrl}/account?checkout=success&pack=${pack.id}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${baseUrl}/account?checkout=cancelled&pack=${pack.id}`,
+    allow_promotion_codes: false,
+    metadata: {
+      cyberSarahUserId: String(user.id),
+      userOpenId: user.openId,
+      creditPackageId: pack.id,
+      tokens: String(pack.tokens),
+      source: "cybersarah-control-center",
+      kind: "credit_pack",
+    },
+    // Stripe kopiert Metadaten nicht automatisch in die Zahlung; für die
+    // Nachvollziehbarkeit im Dashboard zusätzlich dort hinterlegen.
+    payment_intent_data: {
+      metadata: {
+        cyberSarahUserId: String(user.id),
+        creditPackageId: pack.id,
+        tokens: String(pack.tokens),
+      },
+    },
+  });
+  if (!session.url) throw new Error("Stripe hat keine Checkout-URL zurückgegeben.");
+  return { url: session.url, sessionId: session.id, packId: pack.id, tokens: pack.tokens, priceEur: pack.priceEur };
 }
 
 /** Kündigung zum Periodenende (benutzerfreundlich, jederzeit widerrufbar). */

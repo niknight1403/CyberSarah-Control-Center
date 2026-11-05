@@ -26,7 +26,7 @@ import { CREDIT_PACKS } from "../lib/monetization-logic";
 import { getDb } from "./db";
 import { sdk } from "./_core/sdk";
 import { invokeLLM, type Message } from "./_core/llm";
-import { creditPacksForCheckout, readCreditBalance, reserveCredits, settleCredits } from "./credit-ledger";
+import { creditPacksForCheckout, getUserTotalCredits, reserveCredits, settleCredits } from "./credit-ledger";
 import { readUsageAnalytics, recordAgentExecution } from "./usage-metering";
 import { readEntitlements } from "./entitlements";
 import { requireCredits } from "./credit-guard";
@@ -192,7 +192,7 @@ export function registerApiV1Routes(app: Express): void {
         reason: surface === "agent" ? "Agenten-Lauf" : "LLM-Kaskade",
       });
       if (!reservation.ok) {
-        const balance = reservation.balanceTokens ?? (await readCreditBalance(user.openId));
+        const balance = reservation.balanceTokens ?? (await getUserTotalCredits(user.openId));
         await recordAgentExecution({
           executionKey,
           userOpenId: user.openId,
@@ -328,7 +328,7 @@ export function registerApiV1Routes(app: Express): void {
       days: Number.isFinite(days) ? days : 30,
       planValueEurPerMonth: Number.isFinite(planValue) ? planValue : null,
     });
-    const balance = await readCreditBalance(user.openId);
+    const balance = await getUserTotalCredits(user.openId);
     res.status(summary.available ? 200 : 207).json({
       ok: summary.available,
       available: summary.available,

@@ -14,6 +14,7 @@
  *    Events mehrfach; die Buchung darf dadurch nicht doppelt entstehen.
  */
 import { CREDIT_PACKS, PLAN_LIMITS, type MonetizationPlan } from "./monetization-logic";
+import { CREDIT_PACKS_CANONICAL, findCreditPack, findCreditPackByPriceId } from "./pricing-config";
 
 export type CheckoutEntitlementKind = "credits" | "plan" | "none";
 
@@ -26,6 +27,8 @@ export interface CheckoutSummary {
   customerId?: string | null;
   subscriptionId?: string | null;
   userId?: number | null;
+  /** `client_reference_id` aus Stripe (Nutzer-ID oder openId). */
+  clientReferenceId?: string | null;
   metadata?: Record<string, string | undefined> | null;
 }
 
@@ -55,17 +58,31 @@ export function resolveCreditTokens(metadata: Record<string, string | undefined>
     const parsed = Number.parseInt(String(direct).trim(), 10);
     if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
   }
-  const packId = (metadata.creditPackage ?? metadata.credit_package ?? metadata.pack ?? "").trim();
-  if (!packId) return null;
-  const pack = CREDIT_PACKS.find((entry) => entry.id === packId);
-  return pack ? pack.tokens : null;
+  // Kanonische Kennung zuerst (credit_pack_*), danach Altbestand (credits_*).
+  const packId = (
+    metadata.creditPackageId ??
+    metadata.creditPackage ??
+    metadata.credit_package ??
+    metadata.pack ??
+    ""
+  ).trim();
+  if (packId) {
+    const canonical = findCreditPack(packId);
+    if (canonical) return canonical.tokens;
+    const legacy = CREDIT_PACKS.find((entry) => entry.id === packId);
+    if (legacy) return legacy.tokens;
+    return null;
+  }
+  // Ohne Kennung, aber mit Preis: Paket über die Stripe-Preis-ID bestimmen.
+  const priced = findCreditPackByPriceId(metadata.stripePriceId ?? metadata.priceId ?? null);
+  return priced ? priced.tokens : null;
 }
 
 /**
  * Was folgt aus diesem Checkout? Reine Entscheidung, keine Buchung.
  */
 export function decideCheckoutEntitlement(session: CheckoutSummary): CheckoutEntitlement {
-  const key = session.id ? `stripe_checkout:${session.id}` : null;
+  const key = session.id ? `stripe_payment:${session.id}` : null;
   const metadata = session.metadata ?? {};
   const paid = String(session.paymentStatus ?? "").toLowerCase() === "paid";
   const mode = String(session.mode ?? "").toLowerCase();
@@ -75,7 +92,7 @@ export function decideCheckoutEntitlement(session: CheckoutSummary): CheckoutEnt
   }
 
   const tokens = resolveCreditTokens(metadata);
-  const plan = asPlan(metadata.plan ?? metadata.planType ?? metadata.plan_type);
+  const plan = asPlan(metadata.tier ?? metadata.plan ?? metadata.planType ?? metadata.plan_type);
 
   // Guthaben-Kauf: nur mit bestätigter Zahlung.
   if (tokens !== null) {
@@ -182,7 +199,7 @@ export function buildEntitlementView(input: {
       maxParallelAgents: limits.maxParallelAgents,
       cloudWorkflows: limits.cloudWorkflows,
     },
-    creditPacks: CREDIT_PACKS.map((pack) => ({
+    creditPacks: CREDIT_PACKS_CANONICAL.map((pack) => ({
       id: pack.id,
       label: pack.label,
       tokens: pack.tokens,
