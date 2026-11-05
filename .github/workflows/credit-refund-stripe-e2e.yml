@@ -1,0 +1,45 @@
+name: Credit-Erstattung Stripe Test-Modus E2E
+
+# Manuell: erzeugt echte Test-Objekte bei Stripe (Zahlung + Erstattung) und
+# bucht sie durch unsere echten Ledger-Funktionen auf einer Wegwerf-Postgres.
+# Nie automatisch, nie live: das Skript lehnt einen Live-Key selbst ab.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  credit-refund-e2e:
+    runs-on: ubuntu-latest
+    # Gleiches Environment wie der AI-Influenza-E2E: das Repo hat das
+    # GitHub-Limit an Repo-Secrets erreicht.
+    environment: ci-stripe-e2e
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: credit_refund_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d credit_refund_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Erstattungskette mit echtem Stripe-Testkauf pruefen
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+          CREDIT_REFUND_E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/credit_refund_ci
+        run: npx tsx scripts/test-credit-refund-stripe-e2e.ts
