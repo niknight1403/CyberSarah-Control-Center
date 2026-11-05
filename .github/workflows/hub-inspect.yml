@@ -8,10 +8,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "villas | projects | both"
+        description: "villas | projects | both | villa-detail"
         default: "both"
       villa_id:
-        description: "Optional: nur diese Villa ausgeben"
+        description: "Villa-ID (Pflicht bei villa-detail, sonst Filter)"
         default: ""
       base_url:
         description: "Hub-Basis-URL (leer = oeffentliche Domain)"
@@ -96,6 +96,30 @@ jobs:
                   ` | aktiv ${v.executing ? 'ja' : 'nein'}${v.queued ? ', Warteschlange' : ''}` +
                   `${v.retry ? ' | retry: ' + JSON.stringify(v.retry).slice(0, 160) : ''}`,
                 );
+              }
+            }
+          }
+
+          if (mode === 'villa-detail') {
+            if (!onlyVilla) {
+              console.error('FEHLER: villa-detail braucht villa_id.');
+              process.exit(1);
+            }
+            // Offene und fehlgeschlagene Aufgaben einer Villa, inklusive
+            // Gate-Grund im result-Feld. Rein lesend.
+            for (const status of ['RUNNING', 'READY', 'PENDING', 'REVIEW', 'FAILED', 'BLOCKED']) {
+              const res = await call(`/api/villas/${onlyVilla}/tasks?status=${status}&limit=50`);
+              if (res.status !== 200) {
+                console.error(`FEHLER: Aufgaben (${status}) -> HTTP ${res.status}`);
+                continue;
+              }
+              const rows = Array.isArray(res.body) ? res.body : [];
+              if (!rows.length) continue;
+              console.log(`\n== ${status} (${rows.length}) ==`);
+              for (const t of rows) {
+                const detail = String(t.result || t.error || '').replace(/\s+/g, ' ').slice(0, 220);
+                console.log(`#${t.id} [P${t.priority ?? '?'}] ${t.title}`);
+                if (detail) console.log(`   ${detail}`);
               }
             }
           }
