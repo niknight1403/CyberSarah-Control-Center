@@ -380,6 +380,71 @@ function markEventSeen(id: string): boolean {
   return true;
 }
 
+/** Ereignisse, die eine Guthaben-Buchung ausloesen koennen. */
+export function isCheckoutBookingEvent(eventType: string): boolean {
+  return (
+    eventType === "checkout.session.completed" ||
+    eventType === "checkout.session.async_payment_succeeded"
+  );
+}
+
+/**
+ * Bucht Guthaben aus einem Checkout-Ereignis.
+ *
+ * Regeln:
+ *  - Die Customer-ID wird auch ohne Buchung verknuepft (Zahlung ist ein Beleg
+ *    fuer die Zuordnung).
+ *  - Tokens stammen aus der kanonischen Preis-Konfiguration; Metadaten allein
+ *    bestimmen nie die Menge (siehe lib/entitlement-logic.ts).
+ *  - Nur ein *wiederholbarer* Fehler (z. B. Datenbank weg) wirft, damit Stripe
+ *    erneut zustellt. Eine inhaltliche Ablehnung (Waehrung falsch, Betrag 0,
+ *    Abo mit Paket) ist kein Retry-Fall und wird protokolliert.
+ */
+async function bookCheckoutEvent(event: Stripe.Event): Promise<void> {
+  const session = event.data.object as Stripe.Checkout.Session;
+  const userId = Number(session.client_reference_id ?? session.metadata?.cyberSarahUserId);
+  const customerId =
+    typeof session.customer === "string" ? session.customer : session.customer?.id;
+  if (Number.isSafeInteger(userId) && userId > 0 && customerId) {
+    await db.setStripeCustomerId(userId, customerId);
+  }
+
+  const provision = await provisionCheckoutEntitlement({
+    id: session.id,
+    mode: session.mode,
+    paymentStatus: session.payment_status,
+    amountTotal: session.amount_total,
+    currency: session.currency,
+    customerId,
+    subscriptionId:
+      typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null,
+    userId: Number.isSafeInteger(userId) && userId > 0 ? userId : null,
+    clientReferenceId: session.client_reference_id ?? null,
+    metadata: (session.metadata ?? null) as Record<string, string | undefined> | null,
+  });
+
+  const label = `Checkout ${session.id ?? "ohne ID"} (${event.type})`;
+  if (provision.kind === "none") {
+    console.info(`[Stripe] ${label}: ${provision.reason}`);
+    return;
+  }
+  if (provision.applied && provision.duplicate) {
+    console.info(`[Stripe] ${label}: ${provision.reason}`);
+    return;
+  }
+  if (provision.applied) {
+    console.info(
+      `[Stripe] ${label}: ${provision.kind === "credits" ? `${provision.tokens} Tokens gebucht` : `Plan ${provision.plan}`} — ${provision.reason}`,
+    );
+    return;
+  }
+  if (provision.retryable) {
+    // Datenbank/Infrastruktur: Stripe soll erneut zustellen.
+    throw new StripeWebhookProcessingError(`Checkout-Freischaltung nicht angewandt: ${provision.reason}`);
+  }
+  console.warn(`[Stripe] ${label}: nicht gebucht — ${provision.reason}`);
+}
+
 export async function processStripeWebhook(
   payload: Buffer,
   signature: string | undefined,
@@ -462,44 +527,13 @@ export async function processStripeWebhook(
       await syncInvoiceSubscription(stripe, invoice);
       await recordAiInfluenzaInvoice(invoice);
     }
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const userId = Number(
-        session.client_reference_id ?? session.metadata?.cyberSarahUserId,
-      );
-      const customerId =
-        typeof session.customer === "string"
-          ? session.customer
-          : session.customer?.id;
-      if (Number.isSafeInteger(userId) && userId > 0 && customerId)
-        await db.setStripeCustomerId(userId, customerId);
-      // Freischalten statt nur verknüpfen: Guthaben-Kauf bucht Tokens
-      // (idempotent über die Session-ID), Abo-Checkout wird bestätigt. Ohne
-      // bestätigte Zahlung wird nichts gebucht — der Grund steht im ProvisionResult.
-      if (Number.isSafeInteger(userId) && userId > 0) {
-        const provision = await provisionCheckoutEntitlement({
-          id: session.id,
-          mode: session.mode,
-          paymentStatus: session.payment_status,
-          amountTotal: session.amount_total,
-          currency: session.currency,
-          customerId,
-          subscriptionId:
-            typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null,
-          userId,
-          clientReferenceId: session.client_reference_id ?? null,
-          metadata: (session.metadata ?? null) as Record<string, string | undefined> | null,
-        });
-        if (!provision.applied && provision.kind !== "none") {
-          // Nicht stillschweigend schlucken: Stripe soll erneut zustellen.
-          throw new StripeWebhookProcessingError(
-            `Checkout-Freischaltung nicht angewandt: ${provision.reason}`,
-          );
-        }
-        if (provision.kind === "none") {
-          console.info(`[Stripe] Checkout ${session.id ?? "ohne ID"}: ${provision.reason}`);
-        }
-      }
+    // Checkout-Ereignisse mit Guthaben-Bezug: sofortige Zahlung (completed)
+    // und verzoegerte Zahlarten (async_payment_succeeded). Beide laufen durch
+    // denselben Pfad und denselben Idempotenz-Schluessel, damit eine zweite
+    // Zustellung nichts doppelt bucht. Fehlgeschlagene verzoegerte Zahlungen
+    // buchen bewusst nichts.
+    if (isCheckoutBookingEvent(event.type)) {
+      await bookCheckoutEvent(event);
     }
     // Umsatzkritische Events verdienen einen Ops-Alert — ehrlich, ohne Panic:
     // payment_failed heißt nicht sofort Kündigung, subscription.deleted schon.

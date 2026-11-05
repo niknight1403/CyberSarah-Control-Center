@@ -14,7 +14,7 @@ function deps(overrides: Partial<Record<"openIdForUserId" | "grantCredits", unkn
   deps: EntitlementDeps;
   grantCredits: ReturnType<typeof vi.fn>;
 } {
-  const grantCredits = vi.fn(async () => true);
+  const grantCredits = vi.fn(async () => ({ booked: true, duplicate: false }));
   const openIdForUserId = vi.fn(async () => "open_from_db");
   const merged: EntitlementDeps = {
     openIdForUserId: (overrides.openIdForUserId as EntitlementDeps["openIdForUserId"]) ?? openIdForUserId,
@@ -101,7 +101,7 @@ describe("provisionCheckoutEntitlement", () => {
   });
 
   it("meldet ehrlich, wenn die Buchung nicht durchging", async () => {
-    const { deps: d } = deps({ grantCredits: vi.fn(async () => false) });
+    const { deps: d } = deps({ grantCredits: vi.fn(async () => ({ booked: false, duplicate: false })) });
     const result = await provisionCheckoutEntitlement(
       {
         id: "cs_fail",
@@ -152,9 +152,9 @@ describe("provisionCheckoutEntitlement", () => {
   it("bucht dasselbe Paket nicht doppelt, wenn Stripe zweimal zustellt", async () => {
     const booked = new Set<string>();
     const grantCredits = vi.fn(async (input: { executionKey: string }) => {
-      if (booked.has(input.executionKey)) return false;
+      if (booked.has(input.executionKey)) return { booked: false, duplicate: true };
       booked.add(input.executionKey);
-      return true;
+      return { booked: true, duplicate: false };
     });
     const { deps: d } = deps({ grantCredits });
     const session = {
@@ -167,8 +167,52 @@ describe("provisionCheckoutEntitlement", () => {
     const first = await provisionCheckoutEntitlement(session, d);
     const second = await provisionCheckoutEntitlement(session, d);
     expect(first.applied).toBe(true);
-    expect(second.applied).toBe(false);
+    expect(first.duplicate).toBe(false);
+    // Zweite Zustellung gilt als erledigt (kein Retry-Sturm), bucht aber nichts.
+    expect(second.applied).toBe(true);
+    expect(second.duplicate).toBe(true);
     expect(grantCredits).toHaveBeenCalledTimes(2);
     expect(booked.size).toBe(1);
+  });
+});
+
+describe("provisionCheckoutEntitlement: Wiederholbarkeit", () => {
+  it("markiert einen Datenbankfehler als wiederholbar", async () => {
+    const { deps: d } = deps({
+      grantCredits: vi.fn(async () => {
+        throw new Error("Kontodatenbank nicht verfügbar");
+      }),
+    });
+    const result = await provisionCheckoutEntitlement(
+      {
+        id: "cs_db_down",
+        mode: "payment",
+        paymentStatus: "paid",
+        clientReferenceId: "open_1",
+        metadata: { creditPackageId: "credit_pack_small" },
+      },
+      d,
+    );
+    expect(result.applied).toBe(false);
+    expect(result.retryable).toBe(true);
+    expect(result.reason).toContain("Kontodatenbank");
+  });
+
+  it("bucht bei verzögerter Zahlart erst nach Bestätigung", async () => {
+    const { deps: d, grantCredits } = deps();
+    const session = {
+      id: "cs_async",
+      mode: "payment" as const,
+      clientReferenceId: "open_1",
+      metadata: { creditPackageId: "credit_pack_medium" },
+    };
+    const offen = await provisionCheckoutEntitlement({ ...session, paymentStatus: "unpaid" }, d);
+    expect(offen.kind).toBe("none");
+    expect(grantCredits).not.toHaveBeenCalled();
+
+    const bestaetigt = await provisionCheckoutEntitlement({ ...session, paymentStatus: "paid" }, d);
+    expect(bestaetigt.kind).toBe("credits");
+    expect(bestaetigt.tokens).toBe(250_000);
+    expect(grantCredits).toHaveBeenCalledTimes(1);
   });
 });

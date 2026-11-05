@@ -10,7 +10,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import * as db from "./db";
-import { getUserTotalCredits, grantCredits } from "./credit-ledger";
+import { getUserTotalCredits, grantCreditsDetailed } from "./credit-ledger";
 import { resolvePlanForUser } from "./monetization";
 import {
   buildEntitlementView,
@@ -55,7 +55,7 @@ export interface EntitlementDeps {
     tokens: number;
     reason: string;
     executionKey: string;
-  }) => Promise<boolean>;
+  }) => Promise<{ booked: boolean; duplicate: boolean }>;
 }
 
 export async function resolveCheckoutOwner(
@@ -82,6 +82,10 @@ export async function resolveCheckoutOwner(
 
 export interface ProvisionResult {
   applied: boolean;
+  /** Wahr, wenn ein erneuter Zustellversuch die Buchung nachholen kann. */
+  retryable?: boolean;
+  /** Wahr, wenn die Buchung bereits vorhanden war (Doppelzustellung). */
+  duplicate?: boolean;
   kind: "credits" | "plan" | "none";
   reason: string;
   tokens?: number;
@@ -114,20 +118,49 @@ export async function provisionCheckoutEntitlement(
   }
 
   if (decision.kind === "credits" && decision.tokens) {
-    const book = deps.grantCredits ?? grantCredits;
-    const booked = await book({
-      openId,
-      tokens: decision.tokens,
-      reason: `Stripe-Checkout ${session.id ?? ""}`.trim(),
-      executionKey: `stripe_payment:${session.id}`,
-    });
-    return {
-      applied: booked,
-      kind: "credits",
-      reason: booked ? decision.reason : "Gutschrift nicht gebucht (Datenbank nicht verfügbar oder bereits gebucht).",
-      tokens: decision.tokens,
-      idempotencyKey: decision.idempotencyKey,
-    };
+    const book = deps.grantCredits ?? grantCreditsDetailed;
+    try {
+      const result = await book({
+        openId,
+        tokens: decision.tokens,
+        reason: `Stripe-Checkout ${session.id ?? ""}`.trim(),
+        executionKey: `stripe_payment:${session.id}`,
+      });
+      if (result.booked) {
+        return {
+          applied: true,
+          duplicate: false,
+          kind: "credits",
+          reason: decision.reason,
+          tokens: decision.tokens,
+          idempotencyKey: decision.idempotencyKey,
+        };
+      }
+      if (result.duplicate) {
+        return {
+          applied: true,
+          duplicate: true,
+          kind: "credits",
+          reason: "Bereits gebucht — Doppelzustellung ohne zweite Gutschrift.",
+          tokens: decision.tokens,
+          idempotencyKey: decision.idempotencyKey,
+        };
+      }
+      return {
+        applied: false,
+        kind: "credits",
+        reason: "Gutschrift nicht gebucht.",
+        idempotencyKey: decision.idempotencyKey,
+      };
+    } catch (error) {
+      return {
+        applied: false,
+        retryable: true,
+        kind: "credits",
+        reason: `Gutschrift fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+        idempotencyKey: decision.idempotencyKey,
+      };
+    }
   }
 
   // Plan: die Wahrheit steht im Abo (billingSubscriptions). Hier nur die
