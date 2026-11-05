@@ -1,9 +1,22 @@
 # CyberSarah Control Center — app.cybersarah-ki.com
 User-agent: *
 Allow: /
-# Anmeldung, API und interne Kennzahlen haben im Index nichts zu suchen.
+Allow: /landing
+Allow: /ai-influenza
+
+# Angemeldeter Bereich, API und interne Ansichten gehoeren nicht in den Index.
 Disallow: /api/
+Disallow: /admin
+Disallow: /companion
+Disallow: /data
+Disallow: /dev
 Disallow: /login
+Disallow: /meetings
+Disallow: /memory
+Disallow: /oauth
+Disallow: /onboarding
+Disallow: /plugins
 Disallow: /settings
+Disallow: /storage-manager
 
 Sitemap: https://app.cybersarah-ki.com/sitemap.xml

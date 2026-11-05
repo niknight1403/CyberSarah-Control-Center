@@ -66,11 +66,36 @@ describe("Crawler-Dateien", () => {
     expect(robots).toContain("Allow: /");
   });
 
+  it("sperrt den angemeldeten Bereich, aber nicht die oeffentlichen Seiten", () => {
+    const robots = readFileSync("public/robots.txt", "utf8");
+    for (const path of ["/admin", "/settings", "/memory", "/data", "/companion", "/login"]) {
+      expect(robots).toContain(`Disallow: ${path}`);
+    }
+    for (const path of ["/landing", "/ai-influenza"]) {
+      expect(robots).toContain(`Allow: ${path}`);
+      expect(robots).not.toContain(`Disallow: ${path}`);
+    }
+  });
+
   it("sitemap.xml ist wohlgeformt und enthaelt die Startseite", () => {
     const sitemap = readFileSync("public/sitemap.xml", "utf8");
     expect(sitemap.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
     expect(sitemap).toContain("<urlset");
     expect(sitemap).toContain("<loc>https://app.cybersarah-ki.com/</loc>");
     expect(sitemap.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/)).not.toBeNull();
+  });
+
+  it("fuehrt die oeffentlichen Verkaufsseiten auf", () => {
+    const sitemap = readFileSync("public/sitemap.xml", "utf8");
+    expect(sitemap).toContain("<loc>https://app.cybersarah-ki.com/landing</loc>");
+    expect(sitemap).toContain("<loc>https://app.cybersarah-ki.com/ai-influenza</loc>");
+    // Jede <url> braucht loc, lastmod und priority — sonst meckern Crawler.
+    const urls = sitemap.split("<url>").slice(1);
+    expect(urls).toHaveLength(3);
+    for (const entry of urls) {
+      expect(entry).toContain("<loc>");
+      expect(entry).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+      expect(entry).toContain("<priority>");
+    }
   });
 });
