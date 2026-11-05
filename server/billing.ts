@@ -20,6 +20,7 @@ import { normalizeSubscriptionStatus, subscriptionPriceId } from "../lib/stripe-
 import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
 import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
 import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
+import { provisionCheckoutEntitlement } from "./entitlements";
 import {buildAiInfluenzaStripeLineItem,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
 import {recordAiInfluenzaInvoice,syncAiInfluenzaSubscription} from "./ai-influenza-stripe-sync";
 
@@ -471,6 +472,32 @@ export async function processStripeWebhook(
           : session.customer?.id;
       if (Number.isSafeInteger(userId) && userId > 0 && customerId)
         await db.setStripeCustomerId(userId, customerId);
+      // Freischalten statt nur verknüpfen: Guthaben-Kauf bucht Tokens
+      // (idempotent über die Session-ID), Abo-Checkout wird bestätigt. Ohne
+      // bestätigte Zahlung wird nichts gebucht — der Grund steht im ProvisionResult.
+      if (Number.isSafeInteger(userId) && userId > 0) {
+        const provision = await provisionCheckoutEntitlement({
+          id: session.id,
+          mode: session.mode,
+          paymentStatus: session.payment_status,
+          amountTotal: session.amount_total,
+          currency: session.currency,
+          customerId,
+          subscriptionId:
+            typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null,
+          userId,
+          metadata: (session.metadata ?? null) as Record<string, string | undefined> | null,
+        });
+        if (!provision.applied && provision.kind !== "none") {
+          // Nicht stillschweigend schlucken: Stripe soll erneut zustellen.
+          throw new StripeWebhookProcessingError(
+            `Checkout-Freischaltung nicht angewandt: ${provision.reason}`,
+          );
+        }
+        if (provision.kind === "none") {
+          console.info(`[Stripe] Checkout ${session.id ?? "ohne ID"}: ${provision.reason}`);
+        }
+      }
     }
     // Umsatzkritische Events verdienen einen Ops-Alert — ehrlich, ohne Panic:
     // payment_failed heißt nicht sofort Kündigung, subscription.deleted schon.
