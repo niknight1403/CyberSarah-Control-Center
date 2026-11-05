@@ -48,22 +48,36 @@ export async function openIdForUserId(userId: number): Promise<string | null> {
  * Beides wird akzeptiert, damit ein Checkout-Link nicht davon abhängt, welches
  * Format der Ersteller gewählt hat.
  */
-export async function resolveCheckoutOwner(session: CheckoutSummary): Promise<{
+export interface EntitlementDeps {
+  openIdForUserId?: (userId: number) => Promise<string | null>;
+  grantCredits?: (input: {
+    openId: string;
+    tokens: number;
+    reason: string;
+    executionKey: string;
+  }) => Promise<boolean>;
+}
+
+export async function resolveCheckoutOwner(
+  session: CheckoutSummary,
+  deps: EntitlementDeps = {},
+): Promise<{
   userId: number | null;
   openId: string | null;
 }> {
+  const resolve = deps.openIdForUserId ?? openIdForUserId;
   const reference = String(session.clientReferenceId ?? "").trim();
   const metadataOpenId = String(session.metadata?.userOpenId ?? session.metadata?.openId ?? "").trim();
   if (metadataOpenId) return { userId: session.userId ?? null, openId: metadataOpenId };
   if (reference) {
     if (/^\d+$/.test(reference)) {
       const userId = Number(reference);
-      return { userId, openId: await openIdForUserId(userId) };
+      return { userId, openId: await resolve(userId) };
     }
     return { userId: null, openId: reference };
   }
   const userId = session.userId ?? null;
-  return { userId, openId: userId ? await openIdForUserId(userId) : null };
+  return { userId, openId: userId ? await resolve(userId) : null };
 }
 
 export interface ProvisionResult {
@@ -79,13 +93,16 @@ export interface ProvisionResult {
  * Nach `checkout.session.completed`: Guthaben gutschreiben oder Plan bestätigen.
  * Idempotent über die Checkout-Session-ID; eine Wiederholung bucht nichts nach.
  */
-export async function provisionCheckoutEntitlement(session: CheckoutSummary): Promise<ProvisionResult> {
+export async function provisionCheckoutEntitlement(
+  session: CheckoutSummary,
+  deps: EntitlementDeps = {},
+): Promise<ProvisionResult> {
   const decision = decideCheckoutEntitlement(session);
   if (decision.kind === "none") {
     return { applied: false, kind: "none", reason: decision.reason, idempotencyKey: decision.idempotencyKey };
   }
 
-  const owner = await resolveCheckoutOwner(session);
+  const owner = await resolveCheckoutOwner(session, deps);
   const openId = owner.openId;
   if (!openId) {
     return {
@@ -97,7 +114,8 @@ export async function provisionCheckoutEntitlement(session: CheckoutSummary): Pr
   }
 
   if (decision.kind === "credits" && decision.tokens) {
-    const booked = await grantCredits({
+    const book = deps.grantCredits ?? grantCredits;
+    const booked = await book({
       openId,
       tokens: decision.tokens,
       reason: `Stripe-Checkout ${session.id ?? ""}`.trim(),
