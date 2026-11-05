@@ -134,6 +134,60 @@ export default function Root({ children }: { children?: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+        {/* Share-Vorschau und Suchergebnis: absolute URLs, damit WhatsApp,
+            LinkedIn und X ein Bild statt eines nackten Links zeigen. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <title>CyberSarah Control Center — KI-Agenten für Umsatz und Reichweite</title>
+        <meta
+          name="description"
+          content="CyberSarah Control Center: KI-Agenten bauen, betreiben und überwachen Apps und Umsatz-Automatisierungen. Live-Kennzahlen, Freigaben für alles, was nach außen geht."
+        />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <meta name="theme-color" content="#0A0D12" />
+        <meta name="color-scheme" content="dark light" />
+        <link rel="canonical" href="https://app.cybersarah-ki.com/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="CyberSarah Control Center" />
+        <meta property="og:locale" content="de_DE" />
+        <meta property="og:url" content="https://app.cybersarah-ki.com/" />
+        <meta property="og:title" content="CyberSarah Control Center — KI-Agenten für Umsatz und Reichweite" />
+        <meta
+          property="og:description"
+          content="KI-Agenten bauen, betreiben und überwachen Apps und Umsatz-Automatisierungen. Live-Kennzahlen, Freigaben für alles, was nach außen geht."
+        />
+        <meta property="og:image" content="https://app.cybersarah-ki.com/assets/assets/images/icon.png" />
+        <meta property="og:image:alt" content="CyberSarah Control Center" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="CyberSarah Control Center — KI-Agenten für Umsatz und Reichweite" />
+        <meta
+          name="twitter:description"
+          content="KI-Agenten bauen, betreiben und überwachen Apps und Umsatz-Automatisierungen."
+        />
+        <meta name="twitter:image" content="https://app.cybersarah-ki.com/assets/assets/images/icon.png" />
+        <link rel="icon" href="/assets/assets/images/favicon.png" />
+        <link rel="apple-touch-icon" href="/assets/assets/images/icon.png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "CyberSarah Control Center",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web, Android",
+              url: "https://app.cybersarah-ki.com/",
+              inLanguage: "de-DE",
+              description:
+                "KI-Agenten bauen, betreiben und überwachen Apps und Umsatz-Automatisierungen. Live-Kennzahlen, Freigaben für alles, was nach außen geht.",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "EUR",
+                description: "Kostenloser Einstieg mit Tageslimit; Upgrade und Token-Pakete im Abo.",
+              },
+            }),
+          }}
+        />
         <ScrollViewStyleReset />
         <div dangerouslySetInnerHTML={{ __html: STARTUP_SHELL }} />
         <script dangerouslySetInnerHTML={{ __html: DIAG_SCRIPT }} />

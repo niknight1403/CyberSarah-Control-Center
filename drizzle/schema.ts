@@ -680,3 +680,50 @@ export const revenueLoopRuns = pgTable("revenue_loop_runs", {
 });
 
 export type RevenueLoopRunRow = typeof revenueLoopRuns.$inferSelect;
+
+/**
+ * Ausführungsprotokoll für Agenten- und LLM-Läufe: Grundlage für das
+ * Nutzungs-/ROI-Update des Nutzers und für Kostenkontrolle. Nur Kennzahlen,
+ * keine Prompt-Inhalte.
+ */
+export const agentExecutions = pgTable("agent_executions", {
+  id: serial("id").primaryKey(),
+  executionKey: varchar("execution_key", { length: 190 }).notNull().unique(),
+  userOpenId: varchar("user_open_id", { length: 64 }).notNull(),
+  agentId: varchar("agent_id", { length: 64 }),
+  surface: varchar("surface", { length: 40 }).notNull().default("api"),
+  provider: varchar("provider", { length: 32 }).notNull().default("unknown"),
+  model: varchar("model", { length: 120 }),
+  status: varchar("status", { length: 16 }).notNull().default("ok"),
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  costEur: numeric("cost_eur", { precision: 12, scale: 4 }),
+  durationMs: integer("duration_ms"),
+  errorCode: varchar("error_code", { length: 60 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("agent_executions_user_created_idx").on(table.userOpenId, table.createdAt),
+  index("agent_executions_agent_idx").on(table.agentId),
+]);
+
+export type AgentExecutionRow = typeof agentExecutions.$inferSelect;
+
+/**
+ * Guthaben-Buchungen (append-only). Positiv = Aufladung, negativ = Verbrauch.
+ * Der Kontostand ist die Summe; Reserve/Settle laufen unter einer Advisory-Lock,
+ * damit parallele Läufe kein Guthaben doppelt ausgeben.
+ */
+export const creditLedgerEntries = pgTable("credit_ledger_entries", {
+  id: serial("id").primaryKey(),
+  userOpenId: varchar("user_open_id", { length: 64 }).notNull(),
+  deltaTokens: integer("delta_tokens").notNull(),
+  kind: varchar("kind", { length: 24 }).notNull(),
+  reason: varchar("reason", { length: 120 }),
+  executionKey: varchar("execution_key", { length: 190 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("credit_ledger_user_idx").on(table.userOpenId, table.createdAt),
+  uniqueIndex("credit_ledger_execution_idx").on(table.userOpenId, table.executionKey, table.kind),
+]);
+
+export type CreditLedgerEntryRow = typeof creditLedgerEntries.$inferSelect;

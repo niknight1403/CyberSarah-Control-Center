@@ -291,6 +291,13 @@ class SDKServer {
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId(userInfo.openId);
+        // Erststart ohne leeres Dashboard: Vorlagen-Agenten im Hintergrund
+        // anlegen (idempotent, blockiert den Login nicht).
+        if (user) {
+          void import("../api-v1")
+            .then((module) => module.ensureTemplateAgents(user!.openId))
+            .catch(() => undefined);
+        }
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
         throw ForbiddenError("Failed to sync user info");
