@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractRequiredObjects,
+  judgeBaseline,
   migrationHash,
   planJournalReconciliation,
   planPendingMigrations,
@@ -164,5 +166,65 @@ describe("planPendingMigrations", () => {
     const plan = planPendingMigrations(entries, ["0001_a", "0002_b", "0003_c"], readSql);
     expect(plan.pending).toHaveLength(0);
     expect(plan.applied).toHaveLength(3);
+  });
+});
+
+describe("extractRequiredObjects", () => {
+  it("erkennt Tabellen, Indizes und Spalten", () => {
+    const sql = [
+      'CREATE TABLE IF NOT EXISTS "revenue_loop_runs" (id serial primary key);',
+      "--> statement-breakpoint",
+      'CREATE INDEX IF NOT EXISTS "revenue_loop_runs_created_idx" ON "revenue_loop_runs" ("created_at");',
+      "--> statement-breakpoint",
+      'ALTER TABLE "credit_ledger_entries" ADD COLUMN IF NOT EXISTS "note" text;',
+    ].join("\n");
+    const required = extractRequiredObjects(sql);
+    expect(required.tables).toEqual(["revenue_loop_runs"]);
+    expect(required.indexes).toContain("revenue_loop_runs_created_idx");
+    expect(required.columns).toContainEqual({ table: "credit_ledger_entries", column: "note" });
+  });
+
+  it("erkennt unquoted Schreibweisen", () => {
+    const required = extractRequiredObjects("create table users (id int); create unique index users_email on users (email);");
+    expect(required.tables).toEqual(["users"]);
+    expect(required.indexes).toEqual(["users_email"]);
+  });
+
+  it("liefert für reine Datenmigrationen nichts", () => {
+    const required = extractRequiredObjects("update users set active = true;");
+    expect(required).toEqual({ tables: [], indexes: [], columns: [] });
+  });
+});
+
+describe("judgeBaseline", () => {
+  const existing = (tables: string[], indexes: string[] = [], columns: string[] = []) => ({
+    tables: new Set(tables),
+    indexes: new Set(indexes),
+    columns: new Set(columns),
+  });
+
+  it("gibt frei, wenn alle Objekte existieren", () => {
+    const required = { tables: ["a"], indexes: ["a_idx"], columns: [{ table: "b", column: "c" }] };
+    expect(judgeBaseline(required, existing(["a", "b"], ["a_idx"], ["b.c"]))).toEqual({
+      verdict: "ready",
+      missing: [],
+    });
+  });
+
+  it("benennt fehlende Objekte statt freizugeben", () => {
+    const required = { tables: ["a", "b"], indexes: [], columns: [] };
+    const judged = judgeBaseline(required, existing(["a"]));
+    expect(judged.verdict).toBe("incomplete");
+    expect(judged.missing).toContain("Tabelle b");
+  });
+
+  it("gibt Dateien ohne prüfbare Objekte nicht frei", () => {
+    const judged = judgeBaseline({ tables: [], indexes: [], columns: [] }, existing(["a"]));
+    expect(judged.verdict).toBe("unknown");
+  });
+
+  it("meldet fehlende Spalten mit Pfad", () => {
+    const judged = judgeBaseline({ tables: [], indexes: [], columns: [{ table: "b", column: "x" }] }, existing(["b"]));
+    expect(judged.missing).toEqual(["Spalte b.x"]);
   });
 });
