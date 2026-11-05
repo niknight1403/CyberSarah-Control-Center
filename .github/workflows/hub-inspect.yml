@@ -13,6 +13,9 @@ on:
       villa_id:
         description: "Optional: nur diese Villa ausgeben"
         default: ""
+      base_url:
+        description: "Hub-Basis-URL (leer = oeffentliche Domain)"
+        default: ""
 
 permissions:
   contents: read
@@ -24,14 +27,20 @@ jobs:
     steps:
       - name: Hub lesen
         env:
-          HUB_URL: ${{ secrets.HUB_URL || 'https://hub.cybersarah-ki.com' }}
+          # HUB_URL im Repo zeigt auf die interne Oracle-Adresse (:12000) und ist
+          # von GitHub-Runnern nicht erreichbar. Standard ist deshalb die
+          # oeffentliche Domain; HUB_URL wird nur genutzt, wenn sie https ist.
+          HUB_URL: ${{ inputs.base_url || secrets.HUB_URL }}
           HUB_EMAIL: ${{ secrets.VF_HUB_EMAIL }}
           HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
           MODE: ${{ inputs.mode || 'both' }}
           VILLA_ID: ${{ inputs.villa_id }}
         run: |
           node - <<'JS'
-          const base = (process.env.HUB_URL || 'https://hub.cybersarah-ki.com').replace(/\/+$/, '');
+          const PUBLIC_HUB = 'https://hub.cybersarah-ki.com';
+          const configured = (process.env.HUB_URL || '').trim();
+          const base = (configured.startsWith('https://') ? configured : PUBLIC_HUB).replace(/\/+$/, '');
+          console.log(`Hub: ${base}${configured && configured !== base ? ' (HUB_URL ignoriert: keine https-Adresse)' : ''}`);
           const email = process.env.HUB_EMAIL;
           const password = process.env.HUB_PASSWORD;
           const mode = process.env.MODE || 'both';
