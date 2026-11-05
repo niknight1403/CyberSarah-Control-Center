@@ -8,10 +8,16 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "villas | projects | both | villa-detail"
+        description: "villas | projects | both | villa-detail | retry-task"
         default: "both"
       villa_id:
         description: "Villa-ID (Pflicht bei villa-detail, sonst Filter)"
+        default: ""
+      task_id:
+        description: "Aufgaben-ID (Pflicht bei retry-task)"
+        default: ""
+      confirm:
+        description: "Bestaetigung fuer retry-task: exakt die Aufgaben-ID"
         default: ""
       base_url:
         description: "Hub-Basis-URL (leer = oeffentliche Domain)"
@@ -35,6 +41,8 @@ jobs:
           HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
           MODE: ${{ inputs.mode || 'both' }}
           VILLA_ID: ${{ inputs.villa_id }}
+          TASK_ID: ${{ inputs.task_id }}
+          CONFIRM: ${{ inputs.confirm }}
         run: |
           node - <<'JS'
           const PUBLIC_HUB = 'https://hub.cybersarah-ki.com';
@@ -98,6 +106,22 @@ jobs:
                 );
               }
             }
+          }
+
+          if (mode === 'retry-task') {
+            // Einziger schreibender Zweig. Bewusst doppelt gesichert: villa_id
+            // und task_id muessen gesetzt sein, confirm muss die Aufgaben-ID
+            // exakt wiederholen. Sonst passiert nichts.
+            const taskId = String(process.env.TASK_ID || '');
+            const confirm = String(process.env.CONFIRM || '');
+            if (!onlyVilla || !/^[0-9]+$/.test(taskId) || confirm !== taskId) {
+              console.error('FEHLER: retry-task braucht villa_id, task_id und confirm = task_id.');
+              process.exit(1);
+            }
+            const res = await call(`/api/villas/${onlyVilla}/tasks/${taskId}/retry`, { method: 'POST', body: '{}' });
+            console.log(`retry #${taskId}: HTTP ${res.status}`);
+            console.log(JSON.stringify(res.body).slice(0, 600));
+            if (res.status >= 300) process.exit(1);
           }
 
           if (mode === 'villa-detail') {
