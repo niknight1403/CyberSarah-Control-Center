@@ -15,6 +15,9 @@ RUN npx expo export -p web --output-dir web-dist
 # Expo output:single übernimmt app/+html.tsx nicht in die ausgelieferte index.html.
 # Die Startup-Shell wird deshalb deterministisch nach dem Export injiziert.
 RUN node scripts/inject-web-startup-shell.mjs web-dist
+# Expo output:single setzt auch keine SEO-Tags (Titel, OG, canonical).
+# Der Kopf wird ebenfalls deterministisch nach dem Export injiziert.
+RUN node scripts/inject-web-head.mjs web-dist
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runtime

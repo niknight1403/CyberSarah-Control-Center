@@ -155,17 +155,25 @@ export default function Root({ children }: { children?: ReactNode }) {
           property="og:description"
           content="KI-Agenten bauen, betreiben und überwachen Apps und Umsatz-Automatisierungen. Live-Kennzahlen, Freigaben für alles, was nach außen geht."
         />
-        <meta property="og:image" content="https://app.cybersarah-ki.com/assets/assets/images/icon.png" />
-        <meta property="og:image:alt" content="CyberSarah Control Center" />
+        {/* Das Bild liegt in public/ und wird mit dem Web-Export ausgeliefert.
+            Vorher zeigte og:image auf /assets/assets/images/icon.png — dieser
+            Pfad antwortete mit 404, jede geteilte Vorschau blieb ohne Bild. */}
+        <meta property="og:image" content="https://app.cybersarah-ki.com/og-image.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="CyberSarah Control Center — KI-Agenten für Umsatz und Reichweite" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="CyberSarah Control Center — KI-Agenten für Umsatz und Reichweite" />
         <meta
           name="twitter:description"
           content="KI-Agenten bauen, betreiben und überwachen Apps und Umsatz-Automatisierungen."
         />
-        <meta name="twitter:image" content="https://app.cybersarah-ki.com/assets/assets/images/icon.png" />
-        <link rel="icon" href="/assets/assets/images/favicon.png" />
-        <link rel="apple-touch-icon" href="/assets/assets/images/icon.png" />
+        <meta name="twitter:image" content="https://app.cybersarah-ki.com/og-image.png" />
+        <meta name="twitter:image:alt" content="CyberSarah Control Center — KI-Agenten für Umsatz und Reichweite" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
