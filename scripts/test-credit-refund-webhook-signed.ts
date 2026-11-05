@@ -108,14 +108,19 @@ async function main(): Promise<void> {
     if (!condition) failures += 1;
   };
 
-  // 1) Teilerstattung: die Haelfte zurueck
-  await deliver("evt_e2e_partial", Math.floor(paidCents / 2), 1_760_000_000);
-  const expectedPartial = Math.floor(granted / 2);
+  // 1) Teilerstattung: der Erstattungsbetrag in Cent zaehlt, nicht die Haelfte
+  //    des Pakets. 999 von 1999 Cent sind 49,97 Prozent, also 124.937 Tokens
+  //    (abgerundet). Erlaubt ist eine Abweichung von einem Token fuer die
+  //    Rundung.
+  const partialCents = Math.floor(paidCents / 2);
+  await deliver("evt_e2e_partial", partialCents, 1_760_000_000);
   const afterPartial = await balance();
+  const partialRefunded = granted - afterPartial;
+  const partialExpected = (granted * partialCents) / paidCents;
   check(
     "Teilerstattung ueber Webhook",
-    afterPartial === granted - expectedPartial,
-    `Saldo ${afterPartial} (erwartet ${granted - expectedPartial})`,
+    Math.abs(partialRefunded - partialExpected) <= 1,
+    `${partialRefunded} Tokens entzogen (proportional ${partialExpected.toFixed(1)}), Saldo ${afterPartial}`,
   );
 
   // 2) Volle Erstattung: Rest wird nachgezogen
@@ -128,13 +133,15 @@ async function main(): Promise<void> {
   const afterRepeat = await balance();
   check("Wiederholte Zustellung bucht nichts", afterRepeat === 0, `Saldo ${afterRepeat}`);
 
+  // Zwei Events mit unterschiedlichem Erstattungsstand ergeben zwei Buchungen;
+  // zusammen duerfen sie die Gutschrift genau aufbrauchen, nie ueberziehen.
   const refunds = await pool.query(
     "SELECT COUNT(*)::int AS n, COALESCE(-SUM(delta_tokens),0)::int AS tokens FROM credit_ledger_entries WHERE kind='refund'",
   );
   check(
-    "Genau eine Erstattungsbuchung",
-    num(refunds.rows[0]?.n) === 1 && num(refunds.rows[0]?.tokens) === granted,
-    `${num(refunds.rows[0]?.n)} Buchung(en), ${num(refunds.rows[0]?.tokens)} Tokens`,
+    "Erstattungsbuchungen decken die Gutschrift genau",
+    num(refunds.rows[0]?.tokens) === granted,
+    `${num(refunds.rows[0]?.n)} Buchung(en), zusammen ${num(refunds.rows[0]?.tokens)} von ${granted} Tokens`,
   );
 
   const events = await pool.query(
