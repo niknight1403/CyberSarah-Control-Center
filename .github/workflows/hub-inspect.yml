@@ -51,14 +51,18 @@ jobs:
             process.exit(1);
           }
 
-          let cookie = '';
+          // Der Hub gibt beim Login ein Token zurueck und erwartet es als
+          // Authorization: Bearer ... (Cookie-Sessions gibt es hier nicht).
+          let token = '';
           async function call(path, init = {}) {
             const res = await fetch(base + path, {
               ...init,
-              headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}), ...(init.headers || {}) },
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                ...(init.headers || {}),
+              },
             });
-            const setCookie = res.headers.getSetCookie?.() ?? [];
-            if (setCookie.length) cookie = setCookie.map((c) => c.split(';')[0]).join('; ');
             const text = await res.text();
             let body = null;
             try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
@@ -69,11 +73,12 @@ jobs:
             method: 'POST',
             body: JSON.stringify({ email, password }),
           });
-          if (login.status !== 200) {
+          if (login.status !== 200 || !login.body?.token) {
             console.error(`FEHLER: Login am Hub abgelehnt (HTTP ${login.status}).`);
             process.exit(1);
           }
-          console.log(`Login ok (HTTP ${login.status}).`);
+          token = String(login.body.token);
+          console.log(`Login ok (HTTP ${login.status}), Rolle ${login.body?.user?.role ?? '?'}.`);
 
           if (mode === 'villas' || mode === 'both') {
             const villas = await call('/api/villas');
