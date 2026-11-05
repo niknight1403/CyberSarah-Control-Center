@@ -117,7 +117,60 @@ export function planJournalReconciliation(
   return { toStamp, alreadyApplied, unreadable };
 }
 
+
+export interface PendingPlan {
+  /** Noch nicht angewandte Migrationen, in Journal-Reihenfolge. */
+  pending: Array<{ idx: number; tag: string; hash: string }>;
+  /** Bereits im eigenen Register vermerkt. */
+  applied: string[];
+  /** Dateien, die das Journal nennt, die es aber nicht gibt. */
+  unreadable: string[];
+  /** Doppelte Indizes oder Tags — ein Hinweis auf einen kaputten Journal. */
+  anomalies: string[];
+}
+
+/**
+ * Was ist noch offen? Grundlage für das eigene Migrationsregister
+ * (public.schema_migrations). Das Register gehört dem Anwendungsnutzer, damit
+ * Migrationen nicht an Rechten in einem fremden Schema scheitern.
+ */
+export function planPendingMigrations(
+  entries: readonly JournalEntry[],
+  appliedTags: readonly string[],
+  readSql: (tag: string) => string | null,
+): PendingPlan {
+  const done = new Set(appliedTags.filter((tag): tag is string => typeof tag === "string" && tag.length > 0));
+  const pending: PendingPlan["pending"] = [];
+  const applied: string[] = [];
+  const unreadable: string[] = [];
+  const anomalies: string[] = [];
+
+  const sorted = [...entries].sort((a, b) => a.idx - b.idx);
+  const seenTags = new Set<string>();
+  const seenIdx = new Set<number>();
+  for (const entry of sorted) {
+    if (seenTags.has(entry.tag)) anomalies.push(`Tag doppelt: ${entry.tag}`);
+    if (seenIdx.has(entry.idx)) anomalies.push(`Index doppelt: ${entry.idx}`);
+    seenTags.add(entry.tag);
+    seenIdx.add(entry.idx);
+
+    const sql = readSql(entry.tag);
+    if (sql === null) {
+      unreadable.push(entry.tag);
+      continue;
+    }
+    if (done.has(entry.tag)) {
+      applied.push(entry.tag);
+      continue;
+    }
+    pending.push({ idx: entry.idx, tag: entry.tag, hash: migrationHash(sql) });
+  }
+
+  return { pending, applied, unreadable, anomalies };
+}
+
 /** SQL-Datei in einzelne Anweisungen zerlegen (drizzle-Trenner). */
+
 export function splitStatements(sql: string): string[] {
   return sql
     .split("--> statement-breakpoint")

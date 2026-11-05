@@ -24,6 +24,9 @@ on:
           - migrate-pending
           - apply-telemetry
           - reconcile-journal
+          - migrate-status
+          - migrate-baseline
+          - migrate-apply
           - publishing-columns-ensure
         default: chat-clear-preview
       email:
@@ -116,6 +119,33 @@ jobs:
           FILE=drizzle/0027_billing_telemetry.sql \
           TABLES=revenue_loop_runs,agent_executions,credit_ledger_entries \
           npx tsx scripts/db-ops/apply-sql.ts
+
+      - name: "Migrationsregister-Status (nur lesen)"
+        if: github.event.inputs.operation == 'migrate-status'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1
+          npx tsx scripts/db-ops/migrate-runner.ts --status
+
+      - name: "Migrationsregister-Baseline setzen (kein SQL)"
+        if: github.event.inputs.operation == 'migrate-baseline'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1
+          npx tsx scripts/db-ops/migrate-runner.ts --baseline
+
+      - name: "Migrationsregister offene Migrationen anwenden"
+        if: github.event.inputs.operation == 'migrate-apply'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1
+          npx tsx scripts/db-ops/migrate-runner.ts --apply
 
       - name: Journal-Abgleich (Hashes nachtragen, kein SQL)
         if: github.event.inputs.operation == 'reconcile-journal'
