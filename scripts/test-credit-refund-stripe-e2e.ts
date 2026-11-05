@@ -21,13 +21,22 @@ const DB_URL = process.env.CREDIT_REFUND_E2E_DATABASE_URL ?? "";
 
 async function assertSafety(): Promise<void> {
   assert.ok(STRIPE_KEY, "STRIPE_SECRET_KEY fehlt (Testmodus).");
-  // Stripe ist die Autoritaet, nicht das Praefix: ein Live-Key wird abgelehnt.
-  const res = await fetch("https://api.stripe.com/v1/customers?limit=1", {
-    headers: { Authorization: `Bearer ${STRIPE_KEY}` },
-  });
-  if (!res.ok) throw new Error(`Safety gate: Key nicht pruefbar (HTTP ${res.status}).`);
-  const body = (await res.json()) as { livemode?: boolean };
-  if (body.livemode !== false) throw new Error("Safety gate: Key ist LIVE — Testlauf abgebrochen.");
+  // Ein Test-Praefix ist eindeutig: sk_test_/rk_test_ erreichen nur Testdaten.
+  const testPrefix = STRIPE_KEY.startsWith("sk_test_") || STRIPE_KEY.startsWith("rk_test_");
+  if (testPrefix) {
+    console.log("Safety: Schluessel traegt Test-Praefix (nur Testdaten erreichbar).");
+  } else {
+    // Sonst entscheidet Stripe: /v1/balance liefert livemode direkt.
+    // (Listen-Antworten wie /v1/customers enthalten kein livemode — eine
+    // Pruefung darauf wuerde jeden Key faelschlich als live einstufen.)
+    const res = await fetch("https://api.stripe.com/v1/balance", {
+      headers: { Authorization: `Bearer ${STRIPE_KEY}` },
+    });
+    if (!res.ok) throw new Error(`Safety gate: Key nicht pruefbar (HTTP ${res.status}).`);
+    const body = (await res.json()) as { livemode?: boolean };
+    if (body.livemode !== false) throw new Error("Safety gate: Key ist LIVE — Testlauf abgebrochen.");
+    console.log("Safety: Stripe meldet livemode=false, Testbetrieb bestaetigt.");
+  }
 
   const target = new URL(DB_URL);
   const localDb =
