@@ -169,7 +169,64 @@ export function planPendingMigrations(
   return { pending, applied, unreadable, anomalies };
 }
 
+
+export interface RequiredObjects {
+  tables: string[];
+  indexes: string[];
+  columns: { table: string; column: string }[];
+}
+
+/**
+ * Welche Objekte muss eine Migration hinterlassen haben? Nur die eindeutig
+ * erkennbaren Formen (CREATE TABLE, CREATE INDEX, ADD COLUMN) — bewusst
+ * konservativ: was nicht erkannt wird, gilt nicht als Beleg.
+ */
+export function extractRequiredObjects(sql: string): RequiredObjects {
+  const tables = new Set<string>();
+  const indexes = new Set<string>();
+  const columns: { table: string; column: string }[] = [];
+
+  const createTable = /create\s+table\s+(?:if\s+not\s+exists\s+)?"?([A-Za-z0-9_]+)"?/gi;
+  for (const match of sql.matchAll(createTable)) tables.add(match[1]);
+
+  const createIndex = /create\s+(?:unique\s+)?index\s+(?:if\s+not\s+exists\s+)?"?([A-Za-z0-9_]+)"?/gi;
+  for (const match of sql.matchAll(createIndex)) indexes.add(match[1]);
+
+  const addColumn = /alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?"?([A-Za-z0-9_]+)"?\s+add\s+column\s+(?:if\s+not\s+exists\s+)?"?([A-Za-z0-9_]+)"?/gi;
+  for (const match of sql.matchAll(addColumn)) columns.push({ table: match[1], column: match[2] });
+
+  return { tables: [...tables], indexes: [...indexes], columns };
+}
+
+export type BaselineVerdict = "ready" | "incomplete" | "unknown";
+
+/**
+ * Basisentscheidung für die Baseline: darf diese Migration als "im Schema
+ * enthalten" vermerkt werden?
+ *  - "ready": alle erkannten Objekte existieren (oder die Datei nennt keine)
+ *  - "incomplete": mindestens ein erkanntes Objekt fehlt
+ *  - "unknown": keine erkennbaren Objekte — dann wird nicht gestempelt
+ */
+export function judgeBaseline(
+  required: RequiredObjects,
+  existing: { tables: ReadonlySet<string>; indexes: ReadonlySet<string>; columns: ReadonlySet<string> },
+): { verdict: BaselineVerdict; missing: string[] } {
+  const missing: string[] = [];
+  for (const table of required.tables) if (!existing.tables.has(table)) missing.push(`Tabelle ${table}`);
+  for (const index of required.indexes) {
+    if (!existing.indexes.has(index)) missing.push(`Index ${index}`);
+  }
+  for (const { table, column } of required.columns) {
+    if (!existing.columns.has(`${table}.${column}`)) missing.push(`Spalte ${table}.${column}`);
+  }
+  const known = required.tables.length + required.indexes.length + required.columns.length;
+  if (missing.length > 0) return { verdict: "incomplete", missing };
+  if (known === 0) return { verdict: "unknown", missing };
+  return { verdict: "ready", missing };
+}
+
 /** SQL-Datei in einzelne Anweisungen zerlegen (drizzle-Trenner). */
+
 
 export function splitStatements(sql: string): string[] {
   return sql

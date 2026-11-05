@@ -21,6 +21,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import pg from "pg";
 import {
+  extractRequiredObjects,
+  judgeBaseline,
   planPendingMigrations,
   splitSslMode,
   splitStatements,
@@ -29,6 +31,12 @@ import {
 } from "../../lib/migration-journal-logic";
 
 const REGISTER = "public.schema_migrations";
+
+
+async function readSet(client: pg.Client, query: string, column: string): Promise<Set<string>> {
+  const result = await client.query(query);
+  return new Set(result.rows.map((row: Record<string, unknown>) => String(row[column])));
+}
 
 async function main(): Promise<void> {
   const status = process.argv.includes("--status");
@@ -106,18 +114,45 @@ async function main(): Promise<void> {
         console.log("Baseline: nichts zu vermerken.");
         return;
       }
-      // Kein SQL: das Schema enthält diese Migrationen bereits (per Push oder
-      // Hand angelegt). Das wird als "baseline" gekennzeichnet, damit später
-      // nachvollziehbar bleibt, was wirklich per Runner lief.
+      // Kein pauschales Stempeln: je Migration wird geprüft, ob ihre Objekte
+      // wirklich in der DB liegen. Nur dann gilt sie als "im Schema enthalten".
+      const tables = await readSet(
+        client,
+        "select table_name from information_schema.tables where table_schema = 'public'",
+        "table_name",
+      );
+      const indexes = await readSet(
+        client,
+        "select indexname from pg_indexes where schemaname = 'public'",
+        "indexname",
+      );
+      const columns = await readSet(
+        client,
+        "select table_name || '.' || column_name as col from information_schema.columns where table_schema = 'public'",
+        "col",
+      );
+      let stamped = 0;
+      const skipped: string[] = [];
       for (const entry of plan.pending) {
-        await client.query(
-          `insert into ${REGISTER} (tag, hash, mode) values ($1, $2, 'baseline') on conflict (tag) do nothing`,
-          [entry.tag, entry.hash],
-        );
-        console.log(`  baseline: ${entry.tag}`);
+        const required = extractRequiredObjects(readSql(entry.tag) as string);
+        const judged = judgeBaseline(required, { tables, indexes, columns });
+        if (judged.verdict === "ready") {
+          await client.query(
+            `insert into ${REGISTER} (tag, hash, mode) values ($1, $2, 'baseline') on conflict (tag) do nothing`,
+            [entry.tag, entry.hash],
+          );
+          console.log(`  baseline: ${entry.tag} (${required.tables.length} Tabellen, ${required.indexes.length} Indizes, ${required.columns.length} Spalten belegt)`);
+          stamped += 1;
+        } else if (judged.verdict === "incomplete") {
+          console.log(`  offen gelassen: ${entry.tag} — fehlt: ${judged.missing.slice(0, 5).join(", ")}`);
+          skipped.push(entry.tag);
+        } else {
+          console.log(`  offen gelassen: ${entry.tag} — keine prüfbaren Objekte in der Datei`);
+          skipped.push(entry.tag);
+        }
       }
       const after = await client.query(`select count(*)::int as n from ${REGISTER}`);
-      console.log(`Baseline gesetzt. Einträge jetzt: ${after.rows[0].n}`);
+      console.log(`Baseline: ${stamped} vermerkt, ${skipped.length} offen gelassen. Register: ${after.rows[0].n}`);
       return;
     }
 
