@@ -38,7 +38,14 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+      - name: Signierte charge.refunded-Events durch den echten Handler
+        env:
+          CREDIT_REFUND_E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/credit_refund_ci
+        run: npx tsx scripts/test-credit-refund-webhook-signed.ts
       - name: Erstattungskette mit echtem Stripe-Testkauf pruefen
+        # Braucht einen echten Test-Key. Solange dort ein Live-Key liegt,
+        # bricht das Skript selbst ab (Safety gate) und der Job wird rot.
+        continue-on-error: true
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
           CREDIT_REFUND_E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/credit_refund_ci
