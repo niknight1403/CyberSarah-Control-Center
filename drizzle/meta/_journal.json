@@ -190,6 +190,13 @@
       "when": 1793650000000,
       "tag": "0026_approved_content_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793906038574,
+      "tag": "0027_billing_telemetry",
+      "breakpoints": true
     }
   ]
 }

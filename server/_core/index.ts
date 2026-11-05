@@ -61,6 +61,7 @@ import {
 import { agenticLoopTelemetryBus } from "../agentic-loop-telemetry";
 import { isValidLoopSessionId } from "../../lib/agentic-loop-telemetry-logic";
 import { registerAgentforgeTelemetryRoutes } from "../agentforge-telemetry";
+import { registerApiV1Routes } from "../api-v1";
 import { revenueLoopHistory, runRevenueLoopIteration } from "../revenue-loop-orchestrator";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
@@ -152,6 +153,8 @@ async function startServer() {
   // Agentforge-Telemetrie: POST /api/agentforge/events,
   // POST /api/agentforge/checkpoints, GET /api/agentforge/stream
   registerAgentforgeTelemetryRoutes(app);
+  // v1-API: Health, Agenten-Lauf, LLM-Kaskade, Nutzungsbericht, Onboarding.
+  registerApiV1Routes(app);
 
   registerStorageProxy(app);
   registerRenderProxy(app);
