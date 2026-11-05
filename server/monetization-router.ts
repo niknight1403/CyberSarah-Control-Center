@@ -9,6 +9,8 @@ import {
   resolvePlanForUser,
 } from "./monetization";
 import { CREDIT_PACKS, PLAN_LIMITS } from "../lib/monetization-logic";
+import { findCreditPack } from "../lib/pricing-config";
+import { getUserTotalCredits, grantCredits } from "./credit-ledger";
 
 /**
  * Sprint 124 — Monetarisierungs-Router (nutzerbezogen, protected).
@@ -145,9 +147,30 @@ export const monetizationRouter = router({
           return { success: false, configured: true, message: `Kauf nicht abgeschlossen (purchaseState=${purchaseState}).` };
         }
         const granted = await grantCreditPack(ctx.user.openId, input.productId);
-        return granted
-          ? { success: true, configured: true, message: "Credit-Pack gutgeschrieben." }
-          : { success: false, configured: true, message: `Unbekanntes Produkt "${input.productId}".` };
+        if (!granted) {
+          return { success: false, configured: true, message: `Unbekanntes Produkt "${input.productId}".` };
+        }
+        // Spiegelung in das Ledger: eine Wahrheit für Stripe und Play.
+        // Schlüssel = Kauf-Token, der Unique-Index verhindert Doppelbuchungen
+        // bei Wiederholungen des Callbacks.
+        const pack = findCreditPack(input.productId);
+        const mirrored = pack
+          ? await grantCredits({
+              openId: ctx.user.openId,
+              tokens: pack.tokens,
+              reason: `Google-Play-Kauf ${pack.id}`,
+              executionKey: `play:${input.purchaseToken}`,
+            })
+          : false;
+        const balance = await getUserTotalCredits(ctx.user.openId);
+        return {
+          success: true,
+          configured: true,
+          message: "Credit-Pack gutgeschrieben.",
+          tokens: pack?.tokens ?? null,
+          ledgerMirrored: mirrored,
+          balanceTokens: balance,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return { success: false, configured: true, message: `Play-Validierung fehlgeschlagen: ${message}` };

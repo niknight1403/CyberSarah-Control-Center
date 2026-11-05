@@ -32,6 +32,7 @@ import { createContext } from "./context";
 import {
   createLiveBillingPortalSession,
   createLiveCheckoutSession,
+  createTokenPackageCheckoutSession,
   processStripeWebhook,
   StripeWebhookSignatureError,
 } from "../billing";
@@ -128,6 +129,27 @@ async function startServer() {
       res
         .status(502)
         .json({ error: "Checkout konnte nicht vorbereitet werden." });
+    }
+  });
+
+  app.post("/api/billing/stripe/token-packs/checkout", async (req, res) => {
+    const user = await requireBillingUser(req, res);
+    if (!user) return;
+    const packId = String((req.body as { packId?: unknown; packageId?: unknown } | null)?.packId
+      ?? (req.body as { packageId?: unknown } | null)?.packageId
+      ?? "");
+    if (!packId) {
+      res.status(400).json({ error: "Feld 'packId' erforderlich.", code: "invalid_request" });
+      return;
+    }
+    try {
+      res.status(201).json(await createTokenPackageCheckoutSession(user, packId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unbekannter Fehler";
+      // Unbekanntes Paket oder fehlende Preis-ID ist ein Konfigurationsfehler,
+      // kein Serverfehler: ehrlich benennen statt 502.
+      const status = /Unbekanntes Token-Paket|keine Stripe-Preis-ID/.test(message) ? 400 : 502;
+      res.status(status).json({ error: message, code: status === 400 ? "invalid_pack" : "checkout_failed" });
     }
   });
 

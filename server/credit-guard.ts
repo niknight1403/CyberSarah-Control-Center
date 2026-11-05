@@ -12,7 +12,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { buildPaymentRequiredPayload } from "../lib/usage-metering-logic";
 import { canAfford } from "../lib/entitlement-logic";
-import { creditPacksForCheckout, readCreditBalance } from "./credit-ledger";
+import { creditPacksForCheckout, getUserTotalCredits } from "./credit-ledger";
 
 export interface CreditGuardOptions {
   /** Wie viele Tokens der Lauf mindestens braucht. */
@@ -52,7 +52,7 @@ export function requireCredits(options: CreditGuardOptions) {
       return;
     }
 
-    const balance = await readCreditBalance(openId);
+    const balance = await getUserTotalCredits(openId);
     const decision = canAfford(balance, options.requiredTokens);
     if (decision.allowed) {
       res.locals.creditBalanceTokens = balance;

@@ -14,6 +14,7 @@
  *    Events mehrfach; die Buchung darf dadurch nicht doppelt entstehen.
  */
 import { CREDIT_PACKS, PLAN_LIMITS, type MonetizationPlan } from "./monetization-logic";
+import { CREDIT_PACKS_CANONICAL, findCreditPack, findCreditPackByPriceId } from "./pricing-config";
 
 export type CheckoutEntitlementKind = "credits" | "plan" | "none";
 
@@ -26,6 +27,8 @@ export interface CheckoutSummary {
   customerId?: string | null;
   subscriptionId?: string | null;
   userId?: number | null;
+  /** `client_reference_id` aus Stripe (Nutzer-ID oder openId). */
+  clientReferenceId?: string | null;
   metadata?: Record<string, string | undefined> | null;
 }
 
@@ -48,24 +51,84 @@ function asPlan(value: string | undefined): MonetizationPlan | null {
   return (PLAN_NAMES.find((plan) => plan === clean) as MonetizationPlan | undefined) ?? null;
 }
 
-/** Token-Menge aus Metadaten: direkte Zahl oder Paket-Kennung. */
-export function resolveCreditTokens(metadata: Record<string, string | undefined>): number | null {
+/**
+ * Herkunft der Gutschrift. Die kanonische Paket-Kennung gewinnt immer gegen
+ * frei gesetzte Token-Zahlen in den Metadaten — sonst könnte ein manipuliertes
+ * oder falsch gesetztes Feld die Gutschrift bestimmen.
+ */
+export type CreditGrant =
+  | { source: "pack"; packId: string; tokens: number; currency: string; priceCents: number }
+  | { source: "declared"; tokens: number }
+  | { source: "unknown_pack"; packId: string }
+  | { source: "none" };
+
+/** Groesstes kanonisches Paket — Obergrenze fuer frei deklarierte Tokens. */
+const MAX_DECLARED_TOKENS = Math.max(...CREDIT_PACKS_CANONICAL.map((pack) => pack.tokens));
+
+export function resolveCreditGrant(metadata: Record<string, string | undefined>): CreditGrant {
+  const packId = (
+    metadata.creditPackageId ??
+    metadata.creditPackage ??
+    metadata.credit_package ??
+    metadata.pack ??
+    ""
+  ).trim();
+
+  if (packId) {
+    const canonical = findCreditPack(packId);
+    if (canonical) {
+      return {
+        source: "pack",
+        packId: canonical.id,
+        tokens: canonical.tokens,
+        currency: "eur",
+        priceCents: Math.round(canonical.priceEur * 100),
+      };
+    }
+    const legacy = CREDIT_PACKS.find((entry) => entry.id === packId);
+    if (legacy) {
+      return {
+        source: "pack",
+        packId: legacy.id,
+        tokens: legacy.tokens,
+        currency: "eur",
+        priceCents: Math.round(legacy.priceEur * 100),
+      };
+    }
+    // Unbekannte Kennung: nicht raten, nicht auf eine Zahl ausweichen.
+    return { source: "unknown_pack", packId };
+  }
+
+  const byPriceId = findCreditPackByPriceId(metadata.stripePriceId ?? metadata.priceId ?? null);
+  if (byPriceId) {
+    return {
+      source: "pack",
+      packId: byPriceId.id,
+      tokens: byPriceId.tokens,
+      currency: "eur",
+      priceCents: Math.round(byPriceId.priceEur * 100),
+    };
+  }
+
   const direct = metadata.credits ?? metadata.tokens ?? metadata.credit_tokens;
   if (direct !== undefined) {
     const parsed = Number.parseInt(String(direct).trim(), 10);
-    if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+    if (Number.isSafeInteger(parsed) && parsed > 0) {
+      // Altbestand ohne Paket-Kennung: nur bis zur Groesse des groessten Pakets.
+      return { source: "declared", tokens: Math.min(parsed, MAX_DECLARED_TOKENS) };
+    }
   }
-  const packId = (metadata.creditPackage ?? metadata.credit_package ?? metadata.pack ?? "").trim();
-  if (!packId) return null;
-  const pack = CREDIT_PACKS.find((entry) => entry.id === packId);
-  return pack ? pack.tokens : null;
+  return { source: "none" };
 }
 
-/**
- * Was folgt aus diesem Checkout? Reine Entscheidung, keine Buchung.
- */
+/** Token-Menge aus Metadaten (Kompatibilitaets-Wrapper). */
+export function resolveCreditTokens(metadata: Record<string, string | undefined>): number | null {
+  const grant = resolveCreditGrant(metadata);
+  return grant.source === "pack" || grant.source === "declared" ? grant.tokens : null;
+}
+
 export function decideCheckoutEntitlement(session: CheckoutSummary): CheckoutEntitlement {
-  const key = session.id ? `stripe_checkout:${session.id}` : null;
+  const key = session.id ? `stripe_payment:${session.id}` : null;
   const metadata = session.metadata ?? {};
   const paid = String(session.paymentStatus ?? "").toLowerCase() === "paid";
   const mode = String(session.mode ?? "").toLowerCase();
@@ -74,11 +137,27 @@ export function decideCheckoutEntitlement(session: CheckoutSummary): CheckoutEnt
     return { kind: "none", reason: "Checkout ohne Session-ID — keine Buchung möglich.", idempotencyKey: null };
   }
 
-  const tokens = resolveCreditTokens(metadata);
-  const plan = asPlan(metadata.plan ?? metadata.planType ?? metadata.plan_type);
+  const grant = resolveCreditGrant(metadata);
+  const plan = asPlan(metadata.tier ?? metadata.plan ?? metadata.planType ?? metadata.plan_type);
 
-  // Guthaben-Kauf: nur mit bestätigter Zahlung.
-  if (tokens !== null) {
+  if (grant.source === "unknown_pack") {
+    return {
+      kind: "none",
+      reason: `Unbekanntes Token-Paket "${grant.packId}" — keine Buchung.`,
+      idempotencyKey: key,
+    };
+  }
+
+  // Guthaben: ausschliesslich Einmalzahlungen. Ein Abo-Checkout darf nie
+  // nebenbei Tokens buchen, auch wenn Metadaten ein Paket nennen.
+  if (grant.source === "pack" || grant.source === "declared") {
+    if (mode === "subscription") {
+      return {
+        kind: "none",
+        reason: "Abo-Checkout nennt ein Token-Paket — bei Abos werden keine Tokens gebucht.",
+        idempotencyKey: key,
+      };
+    }
     if (!paid) {
       return {
         kind: "none",
@@ -86,44 +165,66 @@ export function decideCheckoutEntitlement(session: CheckoutSummary): CheckoutEnt
         idempotencyKey: key,
       };
     }
+    if (typeof session.amountTotal === "number" && session.amountTotal <= 0) {
+      return {
+        kind: "none",
+        reason: "Betrag ist 0 — kein Guthaben ohne Zahlung.",
+        idempotencyKey: key,
+      };
+    }
+    if (grant.source === "pack" && session.currency) {
+      const currency = session.currency.trim().toLowerCase();
+      if (currency !== grant.currency) {
+        return {
+          kind: "none",
+          reason: `Waehrung ${currency.toUpperCase()} passt nicht zum Paket (${grant.currency.toUpperCase()}) — keine Buchung.`,
+          idempotencyKey: key,
+        };
+      }
+    }
+    const delta =
+      grant.source === "pack" && typeof session.amountTotal === "number"
+        ? session.amountTotal - grant.priceCents
+        : 0;
+    const note =
+      delta === 0
+        ? ""
+        : ` (gezahlt ${((session.amountTotal ?? 0) / 100).toFixed(2)} EUR statt ${(grant.source === "pack" ? grant.priceCents / 100 : 0).toFixed(2)} EUR)`;
     return {
       kind: "credits",
-      tokens,
-      reason: `Guthaben-Kauf über ${tokens} Tokens bestätigt.`,
+      tokens: grant.tokens,
+      reason:
+        grant.source === "pack"
+          ? `Guthaben-Kauf ${grant.packId}: ${grant.tokens} Tokens${note}.`
+          : `Guthaben-Kauf ueber ${grant.tokens} Tokens (ohne Paket-Kennung)${note}.`,
       idempotencyKey: key,
     };
   }
 
   // Abo: der Plan kommt aus dem Abo, nicht aus dem Betrag. Ohne Metadaten bleibt
-  // die Plan-Freischaltung dem Subscription-Sync überlassen.
+  // die Plan-Freischaltung dem Subscription-Sync ueberlassen.
   if (mode === "subscription") {
     if (!plan) {
       return {
         kind: "none",
-        reason: "Abo-Checkout ohne Plan-Angabe; Freischaltung erfolgt über den Subscription-Sync.",
+        reason: "Abo-Checkout ohne Plan-Angabe; Freischaltung erfolgt ueber den Subscription-Sync.",
         idempotencyKey: key,
       };
     }
     return {
       kind: "plan",
       plan,
-      reason: `Abo-Checkout für Plan ${plan}.`,
+      reason: `Abo-Checkout fuer Plan ${plan}.`,
       idempotencyKey: key,
     };
   }
 
   // Einmalzahlung ohne Guthaben-Angabe: nichts erfinden, nur benennen.
-  if (paid && tokens === null) {
-    return {
-      kind: "none",
-      reason: "Zahlung bestätigt, aber keine Guthaben- oder Plan-Angabe in den Metadaten.",
-      idempotencyKey: key,
-    };
-  }
-
   return {
     kind: "none",
-    reason: `Kein Handlungsbedarf (mode=${session.mode ?? "unbekannt"}, payment_status=${session.paymentStatus ?? "unbekannt"}).`,
+    reason: paid
+      ? "Zahlung bestaetigt, aber keine Guthaben- oder Plan-Angabe in den Metadaten."
+      : `Zahlung nicht bestaetigt (payment_status=${session.paymentStatus ?? "unbekannt"}).`,
     idempotencyKey: key,
   };
 }
@@ -182,7 +283,7 @@ export function buildEntitlementView(input: {
       maxParallelAgents: limits.maxParallelAgents,
       cloudWorkflows: limits.cloudWorkflows,
     },
-    creditPacks: CREDIT_PACKS.map((pack) => ({
+    creditPacks: CREDIT_PACKS_CANONICAL.map((pack) => ({
       id: pack.id,
       label: pack.label,
       tokens: pack.tokens,

@@ -10,7 +10,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import * as db from "./db";
-import { grantCredits, readCreditBalance } from "./credit-ledger";
+import { getUserTotalCredits, grantCreditsDetailed } from "./credit-ledger";
 import { resolvePlanForUser } from "./monetization";
 import {
   buildEntitlementView,
@@ -19,13 +19,9 @@ import {
   type EntitlementView,
 } from "../lib/entitlement-logic";
 
-const CHECKOUT_OPENID_CACHE_LIMIT = 500;
-const openIdCache = new Map<number, string | null>();
-
 /** Numerische Nutzer-ID → openId (Guthaben hängt an der openId). */
 export async function openIdForUserId(userId: number): Promise<string | null> {
   if (!Number.isSafeInteger(userId) || userId <= 0) return null;
-  if (openIdCache.has(userId)) return openIdCache.get(userId) ?? null;
   const database = await getDb();
   if (!database) return null;
   try {
@@ -37,8 +33,6 @@ export async function openIdForUserId(userId: number): Promise<string | null> {
       : (((result as { rows?: Record<string, unknown>[] }).rows) ?? []);
     const value = rows[0]?.open_id;
     const openId = typeof value === "string" && value.length > 0 ? value : null;
-    if (openIdCache.size >= CHECKOUT_OPENID_CACHE_LIMIT) openIdCache.clear();
-    openIdCache.set(userId, openId);
     return openId;
   } catch (error) {
     console.warn(
@@ -49,8 +43,49 @@ export async function openIdForUserId(userId: number): Promise<string | null> {
   }
 }
 
+/**
+ * Checkout kann die openId (String) oder die numerische Nutzer-ID tragen.
+ * Beides wird akzeptiert, damit ein Checkout-Link nicht davon abhängt, welches
+ * Format der Ersteller gewählt hat.
+ */
+export interface EntitlementDeps {
+  openIdForUserId?: (userId: number) => Promise<string | null>;
+  grantCredits?: (input: {
+    openId: string;
+    tokens: number;
+    reason: string;
+    executionKey: string;
+  }) => Promise<{ booked: boolean; duplicate: boolean }>;
+}
+
+export async function resolveCheckoutOwner(
+  session: CheckoutSummary,
+  deps: EntitlementDeps = {},
+): Promise<{
+  userId: number | null;
+  openId: string | null;
+}> {
+  const resolve = deps.openIdForUserId ?? openIdForUserId;
+  const reference = String(session.clientReferenceId ?? "").trim();
+  const metadataOpenId = String(session.metadata?.userOpenId ?? session.metadata?.openId ?? "").trim();
+  if (metadataOpenId) return { userId: session.userId ?? null, openId: metadataOpenId };
+  if (reference) {
+    if (/^\d+$/.test(reference)) {
+      const userId = Number(reference);
+      return { userId, openId: await resolve(userId) };
+    }
+    return { userId: null, openId: reference };
+  }
+  const userId = session.userId ?? null;
+  return { userId, openId: userId ? await resolve(userId) : null };
+}
+
 export interface ProvisionResult {
   applied: boolean;
+  /** Wahr, wenn ein erneuter Zustellversuch die Buchung nachholen kann. */
+  retryable?: boolean;
+  /** Wahr, wenn die Buchung bereits vorhanden war (Doppelzustellung). */
+  duplicate?: boolean;
   kind: "credits" | "plan" | "none";
   reason: string;
   tokens?: number;
@@ -62,14 +97,17 @@ export interface ProvisionResult {
  * Nach `checkout.session.completed`: Guthaben gutschreiben oder Plan bestätigen.
  * Idempotent über die Checkout-Session-ID; eine Wiederholung bucht nichts nach.
  */
-export async function provisionCheckoutEntitlement(session: CheckoutSummary): Promise<ProvisionResult> {
+export async function provisionCheckoutEntitlement(
+  session: CheckoutSummary,
+  deps: EntitlementDeps = {},
+): Promise<ProvisionResult> {
   const decision = decideCheckoutEntitlement(session);
   if (decision.kind === "none") {
     return { applied: false, kind: "none", reason: decision.reason, idempotencyKey: decision.idempotencyKey };
   }
 
-  const userId = session.userId ?? null;
-  const openId = userId ? await openIdForUserId(userId) : null;
+  const owner = await resolveCheckoutOwner(session, deps);
+  const openId = owner.openId;
   if (!openId) {
     return {
       applied: false,
@@ -80,19 +118,49 @@ export async function provisionCheckoutEntitlement(session: CheckoutSummary): Pr
   }
 
   if (decision.kind === "credits" && decision.tokens) {
-    const booked = await grantCredits({
-      openId,
-      tokens: decision.tokens,
-      reason: `Stripe-Checkout ${session.id ?? ""}`.trim(),
-      executionKey: decision.idempotencyKey ?? `stripe_checkout:${session.id}`,
-    });
-    return {
-      applied: booked,
-      kind: "credits",
-      reason: booked ? decision.reason : "Gutschrift nicht gebucht (Datenbank nicht verfügbar oder bereits gebucht).",
-      tokens: decision.tokens,
-      idempotencyKey: decision.idempotencyKey,
-    };
+    const book = deps.grantCredits ?? grantCreditsDetailed;
+    try {
+      const result = await book({
+        openId,
+        tokens: decision.tokens,
+        reason: `Stripe-Checkout ${session.id ?? ""}`.trim(),
+        executionKey: `stripe_payment:${session.id}`,
+      });
+      if (result.booked) {
+        return {
+          applied: true,
+          duplicate: false,
+          kind: "credits",
+          reason: decision.reason,
+          tokens: decision.tokens,
+          idempotencyKey: decision.idempotencyKey,
+        };
+      }
+      if (result.duplicate) {
+        return {
+          applied: true,
+          duplicate: true,
+          kind: "credits",
+          reason: "Bereits gebucht — Doppelzustellung ohne zweite Gutschrift.",
+          tokens: decision.tokens,
+          idempotencyKey: decision.idempotencyKey,
+        };
+      }
+      return {
+        applied: false,
+        kind: "credits",
+        reason: "Gutschrift nicht gebucht.",
+        idempotencyKey: decision.idempotencyKey,
+      };
+    } catch (error) {
+      return {
+        applied: false,
+        retryable: true,
+        kind: "credits",
+        reason: `Gutschrift fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+        idempotencyKey: decision.idempotencyKey,
+      };
+    }
   }
 
   // Plan: die Wahrheit steht im Abo (billingSubscriptions). Hier nur die
@@ -116,7 +184,7 @@ export async function readEntitlements(input: {
     const [plan, subscription, balance] = await Promise.all([
       resolvePlanForUser(input.userId),
       db.getBillingSubscriptionForUser(input.userId),
-      readCreditBalance(input.openId),
+      getUserTotalCredits(input.openId),
     ]);
     return {
       available: true,

@@ -43,7 +43,7 @@ describe("decideCheckoutEntitlement", () => {
     });
     expect(paid.kind).toBe("credits");
     expect(paid.tokens).toBe(5000);
-    expect(paid.idempotencyKey).toBe("stripe_checkout:cs_1");
+    expect(paid.idempotencyKey).toBe("stripe_payment:cs_1");
 
     const unpaid = decideCheckoutEntitlement({
       id: "cs_2",
@@ -147,5 +147,90 @@ describe("canAfford", () => {
 
   it("behandelt kostenlose Läufe als gedeckt", () => {
     expect(canAfford(0, 0).allowed).toBe(true);
+  });
+});
+
+describe("Guthaben-Buchung: Missbrauch und Sonderfälle", () => {
+  const base = { id: "cs_rules", mode: "payment", paymentStatus: "paid", currency: "eur" };
+
+  it("nimmt Tokens aus der kanonischen Konfiguration, nicht aus den Metadaten", () => {
+    const decision = decideCheckoutEntitlement({
+      ...base,
+      metadata: { creditPackageId: "credit_pack_small", tokens: "999999999" },
+    });
+    expect(decision.kind).toBe("credits");
+    expect(decision.tokens).toBe(50_000);
+  });
+
+  it("bucht keine Tokens in einem Abo-Checkout", () => {
+    const decision = decideCheckoutEntitlement({
+      ...base,
+      mode: "subscription",
+      metadata: { tier: "pro", creditPackageId: "credit_pack_large" },
+    });
+    expect(decision.kind).not.toBe("credits");
+  });
+
+  it("lehnt eine fremde Währung ab", () => {
+    const decision = decideCheckoutEntitlement({
+      ...base,
+      currency: "usd",
+      metadata: { creditPackageId: "credit_pack_medium" },
+    });
+    expect(decision.kind).toBe("none");
+    expect(decision.reason).toContain("USD");
+  });
+
+  it("bucht nichts bei Betrag 0", () => {
+    const decision = decideCheckoutEntitlement({
+      ...base,
+      amountTotal: 0,
+      metadata: { creditPackageId: "credit_pack_medium" },
+    });
+    expect(decision.kind).toBe("none");
+  });
+
+  it("lehnt ein unbekanntes Paket ab, statt zu raten", () => {
+    const decision = decideCheckoutEntitlement({
+      ...base,
+      metadata: { creditPackageId: "credit_pack_riesig" },
+    });
+    expect(decision.kind).toBe("none");
+    expect(decision.reason).toContain("credit_pack_riesig");
+  });
+
+  it("begrenzt frei deklarierte Tokens auf die größte Paketmenge", () => {
+    const decision = decideCheckoutEntitlement({
+      ...base,
+      metadata: { tokens: "50000000" },
+    });
+    expect(decision.kind).toBe("credits");
+    expect(decision.tokens).toBe(1_000_000);
+  });
+
+  it("nennt eine abweichende Zahlung im Grund", () => {
+    const decision = decideCheckoutEntitlement({
+      ...base,
+      amountTotal: 499,
+      metadata: { creditPackageId: "credit_pack_medium" },
+    });
+    expect(decision.kind).toBe("credits");
+    expect(decision.reason).toContain("4.99");
+  });
+
+  it("erkennt die verzögerte Zahlung als buchbar, sobald sie bestätigt ist", () => {
+    const offen = decideCheckoutEntitlement({
+      ...base,
+      paymentStatus: "unpaid",
+      metadata: { creditPackageId: "credit_pack_small" },
+    });
+    const bezahlt = decideCheckoutEntitlement({
+      ...base,
+      paymentStatus: "paid",
+      metadata: { creditPackageId: "credit_pack_small" },
+    });
+    expect(offen.kind).toBe("none");
+    expect(bezahlt.kind).toBe("credits");
+    expect(bezahlt.idempotencyKey).toBe("stripe_payment:cs_rules");
   });
 });

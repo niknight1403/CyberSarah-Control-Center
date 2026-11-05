@@ -16,9 +16,11 @@
 
 import * as db from "./db";
 import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
+import { PLAN_LIMITS } from "../lib/monetization-logic";
 import {
   checkQuota,
   consumeQuota,
+  decideQuotaWithLedger,
   ensureAdminElitePlan,
   freshAccountState,
   rollPeriods,
@@ -117,7 +119,16 @@ export async function enforceCloudQuotaForUser(
   estimatedTokens: number,
 ): Promise<QuotaDecision> {
   const account = await getMonetizationAccount(user.openId, { isAdmin: user.role === "admin" });
-  const decision = checkQuota(account, Math.max(1, Math.ceil(estimatedTokens)));
+  // Ledger-Guthaben mitberuecksichtigen: Stripe- und Play-Kaeufe liegen dort,
+  // nicht mehr nur im KV-Konto.
+  const { getUserTotalCredits } = await import("./credit-ledger");
+  const ledgerBalance = await getUserTotalCredits(user.openId);
+  const requestedTokens = Math.max(1, Math.ceil(estimatedTokens));
+  const decision = decideQuotaWithLedger(
+    checkQuota(account, requestedTokens),
+    ledgerBalance,
+    requestedTokens,
+  );
   const enforcement = ENFORCEMENT_MODE();
 
   if (!decision.allowed) {
@@ -140,8 +151,25 @@ export async function recordCloudTokenUsage(
   options?: { isAdmin?: boolean },
 ): Promise<MonetizationAccountState> {
   const account = await getMonetizationAccount(openId, options);
-  const updated = consumeQuota(account, Math.max(0, Math.ceil(actualTokens)));
+  const tokens = Math.max(0, Math.ceil(actualTokens));
+  // Wieviel deckt das Abo-Kontingent? Alles darüber geht zu Lasten des Ledgers.
+  const limits = PLAN_LIMITS[account.plan];
+  const remainingToday = Math.max(0, limits.dailyCloudTokens - account.dayCloudTokens);
+  const coveredByPlan = account.adminGuaranteed === true ? tokens : Math.min(tokens, remainingToday);
+  const overflow = Math.max(0, tokens - coveredByPlan);
+
+  const updated = consumeQuota(account, tokens);
   await saveMonetizationAccount(openId, updated);
+
+  if (overflow > 0) {
+    const { debitCredits } = await import("./credit-ledger");
+    await debitCredits({
+      openId,
+      tokens: overflow,
+      reason: "Verbrauch über Abo-Kontingent",
+      executionKey: `usage:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`,
+    });
+  }
   return updated;
 }
 

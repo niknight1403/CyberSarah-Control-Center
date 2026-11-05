@@ -218,3 +218,36 @@ export function applyCreditPack(state: MonetizationAccountState, packId: string,
     updatedAt: now.toISOString(),
   };
 }
+
+/**
+ * Kontingent-Entscheidung mit Ledger-Guthaben (Sprint: Unified Credit Ledger).
+ *
+ * Bisher entschied `checkQuota` allein über `creditBalanceTokens` aus dem
+ * KV-Konto; Stripe-Käufe lagen im Ledger und waren hier unsichtbar. Diese
+ * Funktion führt beides zusammen: das Abo-Kontingent bleibt zuerst dran, ein
+ * Fehlbetrag wird aus dem Ledger gedeckt — unabhängig vom Kaufkanal.
+ */
+export function decideQuotaWithLedger(
+  decision: QuotaCheck,
+  ledgerBalanceTokens: number | null,
+  requestedTokens: number,
+): QuotaCheck & { fundedBy: "plan" | "ledger" | "none" } {
+  if (decision.allowed) return { ...decision, fundedBy: decision.usesCredits ? "ledger" : "plan" };
+  if (ledgerBalanceTokens === null) return { ...decision, fundedBy: "none" };
+
+  // Fehlbetrag = angeforderte Tokens minus das, was Kontingent noch deckt.
+  const requested = Math.max(0, Math.ceil(requestedTokens));
+  const covered = Math.max(0, Math.min(decision.remainingToday, decision.remainingThisMonth));
+  const deficit = Math.max(0, requested - covered);
+  if (deficit === 0) return { ...decision, fundedBy: "none" };
+  if (ledgerBalanceTokens < deficit) return { ...decision, fundedBy: "none" };
+
+  return {
+    ...decision,
+    allowed: true,
+    usesCredits: true,
+    fundedBy: "ledger",
+    reason: "Abo-Kontingent ausgeschöpft — Lauf wird aus dem Guthaben bezahlt.",
+  };
+}
+

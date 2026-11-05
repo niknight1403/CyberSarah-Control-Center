@@ -15,9 +15,9 @@
  */
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { CREDIT_PACKS } from "../lib/monetization-logic";
+import { CREDIT_PACKS_CANONICAL } from "../lib/pricing-config";
 
-export type LedgerKind = "grant" | "reserve" | "refund" | "settle";
+export type LedgerKind = "grant" | "reserve" | "refund" | "settle" | "usage";
 
 export interface ReservationResult {
   ok: boolean;
@@ -28,12 +28,47 @@ export interface ReservationResult {
 }
 
 export function creditPacksForCheckout() {
-  return CREDIT_PACKS.map((pack) => ({
+  return CREDIT_PACKS_CANONICAL.map((pack) => ({
     id: pack.id,
     label: pack.label,
     tokens: pack.tokens,
     priceEur: pack.priceEur,
   }));
+}
+
+/**
+ * Einzige Wahrheit für das Guthaben: Summe aller Buchungen.
+ * Stripe-Käufe, Play-Käufe und Verbrauch landen alle hier.
+ */
+export async function getUserTotalCredits(userOpenId: string): Promise<number | null> {
+  return readCreditBalance(userOpenId);
+}
+
+/**
+ * Verbrauch abbuchen (nach einem Lauf). Idempotent über den Schlüssel —
+ * `kind: "usage"` unterscheidet sich bewusst von Reservierung und Abgleich.
+ */
+export async function debitCredits(input: {
+  openId: string;
+  tokens: number;
+  reason: string;
+  executionKey: string;
+}): Promise<boolean> {
+  const tokens = Math.max(0, Math.ceil(input.tokens));
+  if (tokens === 0) return false;
+  const db = await getDb();
+  if (!db) return false;
+  try {
+    await db.execute(sql`
+      INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key")
+      VALUES (${input.openId}, -${tokens}, 'usage', ${input.reason}, ${input.executionKey})
+      ON CONFLICT ("user_open_id", "execution_key", "kind") DO NOTHING;
+    `);
+    return true;
+  } catch (error) {
+    console.warn("[credit-ledger] Verbrauch nicht gebucht:", error instanceof Error ? error.message : String(error));
+    return false;
+  }
 }
 
 /** Aktueller Kontostand (Summe aller Buchungen). */
@@ -137,27 +172,55 @@ export async function settleCredits(input: {
 }
 
 /** Aufladung buchen (z. B. nach Stripe-Checkout oder Play-Kauf). */
+export interface GrantResult {
+  /** Wahr, wenn diese Anfrage die Buchung tatsaechlich angelegt hat. */
+  booked: boolean;
+  /** Wahr, wenn derselbe Schluessel bereits gebucht war (Doppelzustellung). */
+  duplicate: boolean;
+}
+
+/**
+ * Gutschrift mit ehrlichem Ergebnis.
+ *
+ * `ON CONFLICT DO NOTHING` allein reicht nicht: ohne `RETURNING` sieht der
+ * Aufrufer keinen Unterschied zwischen "gebucht" und "war schon da". Genau
+ * diese Unterscheidung entscheidet aber, ob ein Stripe-Webhook als erledigt
+ * gilt. Datenbankfehler werden geworfen, damit der Aufrufer erneut zustellen
+ * laesst statt die Gutschrift stillschweigend zu verlieren.
+ */
+export async function grantCreditsDetailed(input: {
+  openId: string;
+  tokens: number;
+  reason: string;
+  executionKey: string;
+}): Promise<GrantResult> {
+  const tokens = Math.max(0, Math.ceil(input.tokens));
+  if (tokens === 0) return { booked: false, duplicate: false };
+  const db = await getDb();
+  if (!db) throw new Error("Kontodatenbank nicht verfuegbar — Gutschrift nicht gebucht.");
+  const result = await db.execute(sql`
+    INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key")
+    VALUES (${input.openId}, ${tokens}, 'grant', ${input.reason}, ${input.executionKey})
+    ON CONFLICT ("user_open_id", "execution_key", "kind") DO NOTHING
+    RETURNING "id";
+  `);
+  const inserted = resultRows(result).length > 0;
+  if (!inserted) {
+    console.info(
+      `[credit-ledger] Gutschrift ${input.executionKey} war bereits gebucht — keine Doppelbuchung.`,
+    );
+  }
+  return { booked: inserted, duplicate: !inserted };
+}
+
+/** Kompatibilitaets-Wrapper: true nur bei tatsaechlicher Buchung. */
 export async function grantCredits(input: {
   openId: string;
   tokens: number;
   reason: string;
   executionKey: string;
 }): Promise<boolean> {
-  const tokens = Math.max(0, Math.ceil(input.tokens));
-  if (tokens === 0) return false;
-  const db = await getDb();
-  if (!db) return false;
-  try {
-    await db.execute(sql`
-      INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key")
-      VALUES (${input.openId}, ${tokens}, 'grant', ${input.reason}, ${input.executionKey})
-      ON CONFLICT ("user_open_id", "execution_key", "kind") DO NOTHING;
-    `);
-    return true;
-  } catch (error) {
-    console.warn("[credit-ledger] Aufladung fehlgeschlagen:", error instanceof Error ? error.message : String(error));
-    return false;
-  }
+  return (await grantCreditsDetailed(input)).booked;
 }
 
 function resultRows(result: unknown): Array<Record<string, unknown>> {
