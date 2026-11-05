@@ -28,12 +28,22 @@ import { sdk } from "./_core/sdk";
 import { invokeLLM, type Message } from "./_core/llm";
 import { creditPacksForCheckout, readCreditBalance, reserveCredits, settleCredits } from "./credit-ledger";
 import { readUsageAnalytics, recordAgentExecution } from "./usage-metering";
+import { readEntitlements } from "./entitlements";
+import { requireCredits } from "./credit-guard";
 
 const MAX_PROMPT_CHARS = 24_000;
 const DEFAULT_MAX_TOKENS = 900;
 const CHECKOUT_PATH = "/api/billing/stripe/checkout";
 
 type ApiUser = { id: number; openId: string; role?: string; name?: string | null };
+
+/** Authentifiziert einmal und legt den Nutzer in res.locals ab. */
+async function attachApiUser(req: Request, res: Response, next: () => void): Promise<void> {
+  const user = await requireApiUser(req, res);
+  if (!user) return;
+  res.locals.user = user;
+  next();
+}
 
 async function requireApiUser(req: Request, res: Response): Promise<ApiUser | null> {
   try {
@@ -145,8 +155,11 @@ export function registerApiV1Routes(app: Express): void {
 
   /** Ausführungsroute für Agenten-Läufe mit Guthaben-Prüfung. */
   const runHandler = (surface: "agent" | "llm") => async (req: Request, res: Response) => {
-    const user = await requireApiUser(req, res);
-    if (!user) return;
+    const user = res.locals.user as ApiUser | undefined;
+    if (!user) {
+      res.status(401).json({ error: "Authentifizierung erforderlich.", code: "unauthenticated" });
+      return;
+    }
 
     const messages = readMessages(req.body);
     if (!messages) {
@@ -284,8 +297,25 @@ export function registerApiV1Routes(app: Express): void {
     }
   };
 
-  app.post("/api/v1/agent/run", runHandler("agent"));
-  app.post("/api/v1/llm/cascade", runHandler("llm"));
+  // Reihenfolge: Auth → billige Guthaben-Vorprüfung (402 mit Handlungsoption)
+  // → Lauf mit atomarer Reservierung. Der Wächter bucht nichts.
+  app.post("/api/v1/agent/run", attachApiUser, requireCredits({ requiredTokens: 1, upgradePlan: "pro" }), runHandler("agent"));
+  app.post("/api/v1/llm/cascade", attachApiUser, requireCredits({ requiredTokens: 1, upgradePlan: "pro" }), runHandler("llm"));
+
+  /** Berechtigungen des angemeldeten Nutzers (Plan, Status, Guthaben, Limits). */
+  app.get("/api/v1/entitlements", attachApiUser, async (_req, res) => {
+    const user = res.locals.user as ApiUser;
+    const result = await readEntitlements({
+      userId: user.id,
+      openId: user.openId,
+      isAdmin: user.role === "admin",
+    });
+    if (!result.available || !result.view) {
+      res.status(207).json({ ok: false, available: false, note: "Berechtigungen derzeit nicht lesbar." });
+      return;
+    }
+    res.json({ ok: true, available: true, ...result.view });
+  });
 
   /** Nutzungs- und ROI-Bericht des angemeldeten Nutzers. */
   app.get("/api/v1/analytics/usage", async (req, res) => {
