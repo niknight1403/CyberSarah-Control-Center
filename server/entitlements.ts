@@ -55,6 +55,7 @@ export interface EntitlementDeps {
     tokens: number;
     reason: string;
     executionKey: string;
+    paymentIntent?: string | null;
   }) => Promise<{ booked: boolean; duplicate: boolean }>;
 }
 
@@ -125,6 +126,7 @@ export async function provisionCheckoutEntitlement(
         tokens: decision.tokens,
         reason: `Stripe-Checkout ${session.id ?? ""}`.trim(),
         executionKey: `stripe_payment:${session.id}`,
+        paymentIntent: session.paymentIntent ?? null,
       });
       if (result.booked) {
         return {

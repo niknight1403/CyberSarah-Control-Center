@@ -720,9 +720,12 @@ export const creditLedgerEntries = pgTable("credit_ledger_entries", {
   kind: varchar("kind", { length: 24 }).notNull(),
   reason: varchar("reason", { length: 120 }),
   executionKey: varchar("execution_key", { length: 190 }),
+  /** Stripe payment_intent der Gutschrift — Anker fuer Erstattungen. */
+  paymentIntent: varchar("payment_intent", { length: 190 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("credit_ledger_user_idx").on(table.userOpenId, table.createdAt),
+  index("credit_ledger_payment_intent_idx").on(table.paymentIntent),
   uniqueIndex("credit_ledger_execution_idx").on(table.userOpenId, table.executionKey, table.kind),
 ]);
 

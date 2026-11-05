@@ -24,6 +24,8 @@ export interface CheckoutSummary {
   paymentStatus?: string | null;
   amountTotal?: number | null;
   currency?: string | null;
+  /** Stripe payment_intent — Anker fuer spaetere Erstattungen. */
+  paymentIntent?: string | null;
   customerId?: string | null;
   subscriptionId?: string | null;
   userId?: number | null;
@@ -301,4 +303,43 @@ export function canAfford(balanceTokens: number | null, requiredTokens: number):
   const required = Math.max(0, Math.ceil(requiredTokens));
   const missing = required - balanceTokens;
   return { allowed: missing <= 0, missingTokens: missing > 0 ? missing : 0 };
+}
+
+/**
+ * Tokens, die zu einer Erstattung gehoeren.
+ *
+ * Anteilig zum erstatteten Betrag, abgerundet: bei Teil-Erstattung werden nie
+ * mehr Tokens entzogen als bezahlt wurden, bei voller Erstattung genau die
+ * gutgeschriebene Menge.
+ */
+export function computeRefundTokens(input: {
+  grantedTokens: number;
+  paidCents: number;
+  refundedCents: number;
+}): number {
+  const granted = Math.max(0, Math.floor(input.grantedTokens));
+  if (granted === 0) return 0;
+  const paid = Math.max(0, Math.floor(input.paidCents));
+  const refunded = Math.max(0, Math.floor(input.refundedCents));
+  if (paid === 0 || refunded === 0) return 0;
+  if (refunded >= paid) return granted;
+  return Math.min(granted, Math.floor((granted * refunded) / paid));
+}
+
+/** Noch zu entziehende Tokens aus kumulierter Erstattung. */
+export function computeRefundDelta(input: {
+  grantedTokens: number;
+  paidCents: number;
+  refundedCents: number;
+  alreadyRefundedTokens: number;
+  availableBalance: number | null;
+}): { delta: number; target: number; already: number; cappedByBalance: boolean } {
+  const target = computeRefundTokens(input);
+  const already = Math.max(0, Math.floor(input.alreadyRefundedTokens));
+  const open = Math.max(0, target - already);
+  if (open === 0) return { delta: 0, target, already, cappedByBalance: false };
+  if (input.availableBalance === null) return { delta: open, target, already, cappedByBalance: false };
+  const available = Math.max(0, Math.floor(input.availableBalance));
+  const delta = Math.min(open, available);
+  return { delta, target, already, cappedByBalance: delta < open };
 }

@@ -65,7 +65,26 @@ describe("provisionCheckoutEntitlement", () => {
       tokens: 250_000,
       reason: expect.stringContaining("cs_paid_1"),
       executionKey: "stripe_payment:cs_paid_1",
+      paymentIntent: null,
     });
+  });
+
+  it("reicht die payment_intent als Anker für Erstattungen weiter", async () => {
+    const { deps: d, grantCredits } = deps();
+    await provisionCheckoutEntitlement(
+      {
+        id: "cs_pi",
+        mode: "payment",
+        paymentStatus: "paid",
+        paymentIntent: "pi_anchor_1",
+        clientReferenceId: "open_1",
+        metadata: { creditPackageId: "credit_pack_small" },
+      },
+      d,
+    );
+    expect(grantCredits).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentIntent: "pi_anchor_1" }),
+    );
   });
 
   it("bucht nichts, wenn die Zahlung nicht bestätigt ist", async () => {
