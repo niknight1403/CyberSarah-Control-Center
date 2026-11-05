@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   migrationHash,
   planJournalReconciliation,
+  planPendingMigrations,
   splitSslMode,
   splitStatements,
   sslOptionsFor,
@@ -113,5 +114,55 @@ describe("splitStatements", () => {
   it("liefert für leere Dateien nichts", () => {
     expect(splitStatements("")).toEqual([]);
     expect(splitStatements("-- nur ein Kommentar")).toEqual([]);
+  });
+});
+
+describe("planPendingMigrations", () => {
+  const entries: JournalEntry[] = [
+    { idx: 1, tag: "0001_a", when: 1000 },
+    { idx: 2, tag: "0002_b", when: 2000 },
+    { idx: 3, tag: "0003_c", when: 3000 },
+  ];
+  const files: Record<string, string> = { "0001_a": "a", "0002_b": "b", "0003_c": "c" };
+  const readSql = (tag: string) => files[tag] ?? null;
+
+  it("meldet alles als offen, wenn das Register leer ist", () => {
+    const plan = planPendingMigrations(entries, [], readSql);
+    expect(plan.pending.map((entry) => entry.tag)).toEqual(["0001_a", "0002_b", "0003_c"]);
+    expect(plan.applied).toEqual([]);
+  });
+
+  it("überspringt vermerkte Migrationen und behält die Reihenfolge", () => {
+    const plan = planPendingMigrations(entries, ["0001_a"], readSql);
+    expect(plan.applied).toEqual(["0001_a"]);
+    expect(plan.pending.map((entry) => entry.tag)).toEqual(["0002_b", "0003_c"]);
+    expect(plan.pending[0].idx).toBe(2);
+  });
+
+  it("trägt den Hash der Datei mit", () => {
+    const plan = planPendingMigrations(entries, [], readSql);
+    expect(plan.pending[2].hash).toBe(migrationHash("c"));
+  });
+
+  it("meldet fehlende Dateien, ohne sie zu erfinden", () => {
+    const plan = planPendingMigrations(entries, [], (tag) => (tag === "0002_b" ? null : files[tag]));
+    expect(plan.unreadable).toEqual(["0002_b"]);
+    expect(plan.pending.map((entry) => entry.tag)).toEqual(["0001_a", "0003_c"]);
+  });
+
+  it("erkennt doppelte Tags und Indizes als Auffälligkeit", () => {
+    const broken: JournalEntry[] = [
+      { idx: 1, tag: "0001_a", when: 1000 },
+      { idx: 1, tag: "0001_a", when: 1000 },
+    ];
+    const plan = planPendingMigrations(broken, [], readSql);
+    expect(plan.anomalies.length).toBeGreaterThan(0);
+    expect(plan.anomalies.join(" ")).toContain("0001_a");
+  });
+
+  it("ist bei vollständigem Register zufrieden", () => {
+    const plan = planPendingMigrations(entries, ["0001_a", "0002_b", "0003_c"], readSql);
+    expect(plan.pending).toHaveLength(0);
+    expect(plan.applied).toHaveLength(3);
   });
 });
