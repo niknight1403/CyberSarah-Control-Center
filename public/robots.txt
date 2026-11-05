@@ -1,0 +1,9 @@
+# CyberSarah Control Center — app.cybersarah-ki.com
+User-agent: *
+Allow: /
+# Anmeldung, API und interne Kennzahlen haben im Index nichts zu suchen.
+Disallow: /api/
+Disallow: /login
+Disallow: /settings
+
+Sitemap: https://app.cybersarah-ki.com/sitemap.xml
