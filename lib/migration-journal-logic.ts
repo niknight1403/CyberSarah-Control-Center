@@ -78,7 +78,7 @@ export interface JournalEntry {
 
 export interface ReconciliationPlan {
   /** Einträge, deren Hash fehlt und die nachgetragen werden. */
-  toStamp: Array<{ tag: string; hash: string; createdAt: number }>;
+  toStamp: { tag: string; hash: string; createdAt: number }[];
   /** Bereits vorhandene Hashes. */
   alreadyApplied: string[];
   /** Einträge ohne lesbare SQL-Datei — werden nicht gestempelt, sondern gemeldet. */
