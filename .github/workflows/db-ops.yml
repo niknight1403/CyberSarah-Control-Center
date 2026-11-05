@@ -22,6 +22,7 @@ on:
           - user-set-password
           - quota-diagnose
           - migrate-pending
+          - apply-telemetry
           - publishing-columns-ensure
         default: chat-clear-preview
       email:
@@ -103,6 +104,20 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install pg --no-audit --no-fund >/dev/null 2>&1
           node publishing-live-test.mjs
+
+      - name: Telemetrie-Migration direkt anwenden (idempotent)
+        if: github.event.inputs.operation == 'apply-telemetry'
+        working-directory: scripts/db-ops
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          npm init -y >/dev/null 2>&1
+          npm install pg --no-audit --no-fund >/dev/null 2>&1
+          cd "$GITHUB_WORKSPACE"
+          FILE=drizzle/0027_billing_telemetry.sql \
+          TABLES=revenue_loop_runs,agent_executions,credit_ledger_entries \
+          node scripts/db-ops/apply-sql.mjs
 
       - name: Migrationen anwenden (nur ausstehende)
         if: github.event.inputs.operation == 'migrate-pending'
