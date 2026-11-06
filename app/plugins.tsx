@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Link } from "expo-router";
 
 import { useStudioSettings } from "@/lib/studio-settings";
+import { trpc } from "@/lib/trpc";
 import { DrawerBodyText, DrawerCard, DrawerCardTitle, DrawerScreen } from "@/components/responsive/drawer-screen";
 
 /**
@@ -19,6 +20,8 @@ export default function PluginsScreen() {
   const glass = useGlassTheme();
   const styles = useMemo(() => createStyles(glass), [glass]);
   const { settings } = useStudioSettings();
+  // Server-Wahrheit statt Handpflege: welche Integration ist wirklich bereit?
+  const integrations = trpc.integrations.list.useQuery(undefined, { retry: false, refetchInterval: 60_000 });
 
   const plugins = [
     {
@@ -66,6 +69,35 @@ export default function PluginsScreen() {
           <Text style={styles.pluginDetail} numberOfLines={2}>{plugin.detail}</Text>
         </View>
       ))}
+
+      <DrawerCard accent={`${glass.glassPalette.cyan}55`}>
+        <DrawerCardTitle>Server-Integrationen</DrawerCardTitle>
+        <DrawerBodyText>
+          {integrations.data?.summary ?? "Status wird geladen …"}
+        </DrawerBodyText>
+        <DrawerBodyText>
+          Bereit heisst: alle Pflichtvariablen sind gesetzt. Was fehlt, steht als Variablenname dabei — nie der Wert.
+        </DrawerBodyText>
+      </DrawerCard>
+
+      {(integrations.data?.statuses ?? []).map((entry) => {
+        const ready = entry.readiness === "ready";
+        const partial = entry.readiness === "partial";
+        const tone = ready ? glass.glassPalette.green : partial ? glass.glassPalette.amber : glass.glassPalette.magenta;
+        return (
+          <View key={entry.key} style={[styles.pluginCard, { borderColor: `${tone}55` }]}>
+            <View style={styles.pluginHeader}>
+              <Text style={styles.pluginTitle}>{entry.label}</Text>
+              <View style={[styles.badge, { backgroundColor: `${tone}22`, borderColor: tone }]}>
+                <Text style={[styles.badgeText, { color: tone }]}>{entry.readinessLabel}</Text>
+              </View>
+            </View>
+            <Text style={styles.pluginDetail}>
+              {entry.missingEnv.length > 0 ? `Fehlt: ${entry.missingEnv.join(", ")}` : "Alle Pflichtangaben gesetzt"}
+            </Text>
+          </View>
+        );
+      })}
 
       <Text style={styles.hint}>
         Verwaltung: <Link href="/settings" style={styles.hintLink}>Agenteneinstellungen</Link> · Neue Anschlüsse (MCP-Transporte) sind im Admin-Bereich konfiguriert.

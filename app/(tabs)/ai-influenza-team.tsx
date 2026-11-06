@@ -1,6 +1,7 @@
 import {useMemo,useState} from "react";
 import {Linking,Pressable,ScrollView,StyleSheet,Text,View} from "react-native";
 import {ScreenContainer} from "@/components/screen-container";
+import { AutonomousDraftsCard } from "@/components/glass/autonomous-drafts";
 import {GlassBackdrop} from "@/components/glass/glass-backdrop";
 import {GlassCard,GlowButton,StatusChip} from "@/components/glass/glass-primitives";
 import {NavDrawer,NavDrawerButton,useNavDrawer} from "@/components/responsive/nav-drawer";
@@ -185,6 +186,9 @@ export default function AiInfluenzaTeamScreen(){
             {priority.data&&priority.data.leads.length===0?<Text style={s.notice}>Noch keine Anfrage, die sich priorisieren ließe.</Text>:null}
             {priority.error?<Text style={s.error}>{priority.error.message}</Text>:null}
           </GlassCard>
+
+          {/* Content-Entwuerfe des Funnels: Freigabe bleibt beim Menschen. */}
+          <AutonomousDraftsCard kinds={["content"]} accent="cyan" />
 
           <GlassCard accent="magenta" style={s.card}>
             <Text style={s.sectionTitle}>Erstgespräche von der Verkaufsseite</Text>
