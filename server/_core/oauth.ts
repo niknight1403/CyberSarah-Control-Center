@@ -130,6 +130,28 @@ export function registerOAuthRoutes(app: Express) {
     }
   });
 
+  /**
+   * Anmeldelink aus der Kauf-Mail.
+   *
+   * Der Token ist eine signierte Session (kein Klartext, kein Passwort). Er wird
+   * hier einmal gegen das Konto geprueft und als Cookie gesetzt — danach steht
+   * der Kaeufer dort, wo sein Paket liegt.
+   */
+  app.get("/api/auth/magic", async (req: Request, res: Response) => {
+    const token = getQueryParam(req, "token");
+    const target = (process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || "https://app.cybersarah-ki.com").replace(/\/+$/, "");
+    const fail = (reason: string) => res.redirect(302, `${target}/login?magic=invalid&reason=${encodeURIComponent(reason)}`);
+    if (!token) return fail("token-fehlt");
+    const session = await sdk.verifySession(token);
+    if (!session?.openId) return fail("link-ungueltig");
+    const user = await getUserByOpenId(session.openId);
+    if (!user) return fail("konto-fehlt");
+    const cookieOptions = getSessionCookieOptions(req);
+    res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    console.info(`[Auth] Anmeldelink eingelöst für openId ${session.openId}`);
+    return res.redirect(302, `${target}/ai-influenza-team?checkout=success&magic=ok`);
+  });
+
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     const cookieOptions = getSessionCookieOptions(req);
     res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

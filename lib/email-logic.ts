@@ -16,7 +16,17 @@ export const EMAIL_LIMITS = {
   maxMailsPerDay: 200,
 } as const;
 
-export type EmailEventKind = "receipt" | "onboarding_welcome" | "quota_warning" | "plan_change";
+export type EmailEventKind =
+  | "receipt"
+  | "onboarding_welcome"
+  | "quota_warning"
+  | "plan_change"
+  /** Bestaetigung einer Erstgespraech-Anfrage von der Verkaufsseite. */
+  | "intro_request_confirmation"
+  /** Interne Benachrichtigung an den Betreiber, damit keine Anfrage liegen bleibt. */
+  | "admin_notification"
+  /** Nach dem Kauf: Anmeldelink, damit das Konto ohne Passwort entsteht. */
+  | "magic_link";
 
 export type EmailDispatchInput = {
   kind: EmailEventKind;

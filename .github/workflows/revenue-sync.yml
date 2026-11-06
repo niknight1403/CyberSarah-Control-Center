@@ -8,14 +8,20 @@ name: Revenue-OS Sync (Hetzner -> VM)
 # gegen die Origin-Engine. Die Render-URL (REVENUE_OS_DATABASE_URL) wird
 # bei jedem Lauf aus DATABASE_URL abgeleitet und als Secret aktualisiert,
 # damit Passwort-Rotationen automatisch nachziehen.
+# ---------------------------------------------------------------------------
+# VORUEBERGEHEND STILLGELEGT (06.11.2026)
+#
+# Befund: Der Lauf scheitert seit Tagen im Schritt "Dump von Produktion holen".
+# Ursachen, beide belegt:
+#   1. Das Ziel existiert nicht: /api/cron/revenue-os-sync antwortet live mit 404.
+#   2. Das Secret VM_SSH_HOST ist im Repository nicht gesetzt.
+# Ein 30-Minuten-Job, der dauerhaft rot ist, macht die CI als Deploy-Signal
+# unbrauchbar. Deshalb laeuft er nur noch manuell, bis der Spiegel existiert.
+# Wieder aktivieren: schedule-Block zurueckholen, VM_SSH_HOST setzen, Endpoint
+# implementieren.
+# ---------------------------------------------------------------------------
 on:
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch: {}
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/revenue-sync.yml'
 
 permissions:
   contents: read

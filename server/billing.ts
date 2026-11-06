@@ -21,8 +21,10 @@ import { readSubscriptionLifecycle } from "../lib/subscription-lifecycle-logic";
 import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
 import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
 import { provisionCheckoutEntitlement } from "./entitlements";
+import { provisionGuestAccountAfterPurchase } from "./guest-checkout-service";
 import { refundCreditsForCharge } from "./credit-ledger";
 import { findCreditPack, stripePriceIdFor } from "../lib/pricing-config";
+import { buildGuestCheckoutMetadata } from "../lib/guest-checkout-logic";
 import {buildAiInfluenzaStripeLineItem,type AiInfluenzaPackageId} from "../lib/ai-influenza-team-logic";
 import {recordAiInfluenzaInvoice,syncAiInfluenzaSubscription} from "./ai-influenza-stripe-sync";
 
@@ -403,12 +405,35 @@ export function isCheckoutBookingEvent(eventType: string): boolean {
  */
 async function bookCheckoutEvent(event: Stripe.Event): Promise<void> {
   const session = event.data.object as Stripe.Checkout.Session;
-  const userId = Number(session.client_reference_id ?? session.metadata?.cyberSarahUserId);
+
+  // Gast-Kauf zuerst: ohne Konto gaebe es fuer die Buchung keinen Empfaenger.
+  // Die Zuordnung laeuft ueber die von Stripe erhobene Adresse; danach traegt
+  // die Session die openId, und die Freischaltung findet ihr Konto.
+  let guestOpenId: string | null = null;
+  let guestUserId: number | null = null;
+  try {
+    const guest = await provisionGuestAccountAfterPurchase(session as never);
+    if (guest.handled) {
+      guestOpenId = guest.openId;
+      guestUserId = guest.userId;
+    }
+  } catch (error) {
+    console.error(
+      `[Stripe] Gast-Konto zu ${session.id ?? "ohne ID"} fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const rawUserId = Number(session.client_reference_id ?? session.metadata?.cyberSarahUserId);
+  const userId = Number.isSafeInteger(rawUserId) && rawUserId > 0 ? rawUserId : guestUserId ?? Number.NaN;
   const customerId =
     typeof session.customer === "string" ? session.customer : session.customer?.id;
   if (Number.isSafeInteger(userId) && userId > 0 && customerId) {
     await db.setStripeCustomerId(userId, customerId);
   }
+  const sessionMetadata = {
+    ...(session.metadata ?? {}),
+    ...(guestOpenId ? { userOpenId: guestOpenId } : {}),
+  } as Record<string, string | undefined>;
 
   const provision = await provisionCheckoutEntitlement({
     id: session.id,
@@ -425,7 +450,7 @@ async function bookCheckoutEvent(event: Stripe.Event): Promise<void> {
       typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null,
     userId: Number.isSafeInteger(userId) && userId > 0 ? userId : null,
     clientReferenceId: session.client_reference_id ?? null,
-    metadata: (session.metadata ?? null) as Record<string, string | undefined> | null,
+    metadata: sessionMetadata,
   });
 
   const label = `Checkout ${session.id ?? "ohne ID"} (${event.type})`;
@@ -710,6 +735,46 @@ export async function createAiInfluenzaPackageCheckoutSession(
   return {url:session.url,sessionId:session.id,packageId,orderId};
 }
 
+
+/**
+ * Checkout OHNE Login (Gast-Kauf).
+ *
+ * Unterschied zur bestehenden Funktion: kein `customer`, kein `client_reference_id`
+ * mit Nutzer-ID. Stripe legt den Kunden selbst an und erhebt die E-Mail auf der
+ * Zahlungsseite. Damit faellt die Registrierung als Huerde vor dem Kauf weg —
+ * der Grund, warum bisher kein einziger Checkout abgeschlossen wurde.
+ *
+ * Die Zuordnung passiert erst im Webhook ueber `metadata.guest` + Adresse
+ * (siehe server/guest-checkout-service.ts).
+ */
+export async function createAiInfluenzaGuestCheckoutSession(input:{
+  packageId:AiInfluenzaPackageId;
+  orderId:string;
+  email?:string|null;
+}){
+  const stripe=assertLiveStripeConfiguration();
+  const baseUrl=getAppBaseUrl();
+  const metadata=buildGuestCheckoutMetadata({
+    packageId:input.packageId,
+    orderId:input.orderId,
+    email:input.email??null,
+  });
+  const prefilledEmail=(input.email??"").trim().toLowerCase();
+  const session=await stripe.checkout.sessions.create({
+    mode:"subscription",
+    // Bewusst kein `customer`: Stripe legt ihn an und fragt die Adresse ab.
+    ...(prefilledEmail?{customer_email:prefilledEmail}:{}),
+    client_reference_id:input.orderId,
+    line_items:[buildAiInfluenzaStripeLineItem(input.packageId,process.env as Record<string,string|undefined>)],
+    success_url:`${baseUrl}/ai-influenza-danke?order=${encodeURIComponent(input.orderId)}&guest=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:`${baseUrl}/ai-influenza?checkout=cancelled`,
+    allow_promotion_codes:false,
+    subscription_data:{metadata},
+    metadata,
+  });
+  if(!session.url)throw new Error("Stripe hat keine Checkout-URL zurückgegeben.");
+  return {url:session.url,sessionId:session.id,packageId:input.packageId,orderId:input.orderId,guest:true as const};
+}
 
 /**
  * Einmal-Checkout für ein Token-Paket (`mode: "payment"`).

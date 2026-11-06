@@ -14,6 +14,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
 import { ScreenContainer } from "@/components/screen-container";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import { trpc } from "@/lib/trpc";
 import { buildTierPresentations, checkoutAvailability } from "@/lib/pricing-logic";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
@@ -83,6 +84,8 @@ export default function LandingScreen() {
           <Text style={styles.honesty}>
             Hinweis: CyberSarah verspricht keinen Umsatz und keinen Erfolg — sie hält fest, was du entschieden hast, und prüft es ehrlich nach. Upgrade jederzeit kündbar.
           </Text>
+        
+          <LegalFooter context="Startseite" />
         </ScrollView>
       </ScreenContainer>
     </GlassBackdrop>
