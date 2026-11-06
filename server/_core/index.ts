@@ -366,7 +366,9 @@ async function startServer() {
             : "Diese Adresse ist bereits abgemeldet oder nicht gespeichert. Es kommen keine weiteren Mails.",
         );
     } catch (error) {
-      res.status(500).send(`Abmeldung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+      // Details bleiben im Server-Log: die Antwort soll keine Abfrage verraten.
+      console.error("[outreach] Abmeldung fehlgeschlagen", error);
+      res.status(500).send("Abmeldung konnte nicht gespeichert werden. Bitte kurz später erneut versuchen.");
     }
   });
 

@@ -26,7 +26,9 @@ export async function optOutEmail(rawEmail: string): Promise<{ updated: number; 
     .set({
       optedOut: true,
       updatedAt: new Date(),
-      metadata: sql`coalesce(${b2bNetworkNodes.metadata}, '{}'::jsonb) || jsonb_build_object('optOutAt', ${new Date().toISOString()})`,
+      // Der Zeitstempel braucht eine feste Typangabe: ohne ::text kann
+      // Postgres den Parameter in jsonb_build_object nicht aufloesen.
+      metadata: sql`coalesce(${b2bNetworkNodes.metadata}, '{}'::jsonb) || jsonb_build_object('optOutAt', ${new Date().toISOString()}::text)`,
     })
     .where(
       or(
