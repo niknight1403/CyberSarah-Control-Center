@@ -22,6 +22,9 @@ import {
   createLiveBillingPortalSession,
 } from "./billing";
 import {adminProcedure,protectedProcedure,publicProcedure,router} from "./_core/trpc";
+import {CONVERSION_EVENT_TYPES,recordConversionEvent} from "./conversion-tracking";
+import {kpiForecast} from "./kpi-weekly-service";
+import {prioritizeIntroLeads} from "../lib/b2b-lead-priority-logic";
 import {aiInfluenzaLeadPipeline,prepareAiInfluenzaProposal,upsertAiInfluenzaLead} from "./ai-influenza-lead-service";
 import {aiInfluenzaDeliveryPlan,aiInfluenzaDeliveryStatus,aiInfluenzaOrderLaunchReadiness,generateAiInfluenzaTaskDraft} from "./ai-influenza-delivery-service";
 import {aiInfluenzaCustomerReport,aiInfluenzaProfitOverview,recordAiInfluenzaCost} from "./ai-influenza-profit-service";
@@ -109,14 +112,32 @@ export const aiInfluenzaTeamRouter=router({
     if(blockReason)throw new TRPCError({code:"PRECONDITION_FAILED",message:blockReason});
     const orderReference=`guest-checkout-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
     try{
-      return await createAiInfluenzaGuestCheckoutSession({
+      const checkout=await createAiInfluenzaGuestCheckoutSession({
         packageId:input.packageId,
         orderId:orderReference,
         email:input.email??null,
       });
+      // Gestarteter Checkout wird protokolliert, damit der Engpass messbar ist.
+      await recordConversionEvent({
+        eventType:CONVERSION_EVENT_TYPES.checkoutStarted,
+        orderKey:`checkout_started:${checkout.sessionId}`,
+        amountCents:AI_INFLUENZA_PACKAGES[input.packageId].monthlyPriceCents,
+        payload:{packageId:input.packageId, guest:true, orderReference},
+      });
+      return checkout;
     }catch(error){
       throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Gast-Checkout konnte nicht vorbereitet werden."});
     }
+  }),
+  /**
+   * Wochenauswertung der vier Kern-KPIs inkl. Prognose.
+   * Bewusst admin-only: Umsatz- und Conversion-Zahlen sind keine oeffentliche Info.
+   */
+  weeklyKpis:adminProcedure.input(z.object({weeks:z.number().int().min(1).max(52).default(8)}).optional())
+    .query(async({input})=>kpiForecast({weeks:input?.weeks??8})),
+  leadPriority:adminProcedure.query(async()=>{
+    const {requests}=await listAiInfluenzaIntroRequests(200);
+    return prioritizeIntroLeads(requests);
   }),
   adminSandboxOrder:adminProcedure.input(z.object({packageId})).mutation(async({ctx,input})=>{
     // Admin-only internal test order. No Stripe session, subscription or paid status.

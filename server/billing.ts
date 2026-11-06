@@ -22,6 +22,7 @@ import { webhookAggregateKey } from "../lib/stripe-event-idempotency-logic";
 import { claimStripeWebhookEvent, completeStripeWebhookEvent, failStripeWebhookEvent } from "./stripe-webhook-ledger";
 import { provisionCheckoutEntitlement } from "./entitlements";
 import { provisionGuestAccountAfterPurchase } from "./guest-checkout-service";
+import { CONVERSION_EVENT_TYPES, recordConversionEvent } from "./conversion-tracking";
 import { refundCreditsForCharge } from "./credit-ledger";
 import { findCreditPack, stripePriceIdFor } from "../lib/pricing-config";
 import { buildGuestCheckoutMetadata } from "../lib/guest-checkout-logic";
@@ -463,6 +464,18 @@ async function bookCheckoutEvent(event: Stripe.Event): Promise<void> {
     return;
   }
   if (provision.applied) {
+    // Abgeschlossener Checkout als Conversion-Event: Grundlage der KPI-Auswertung.
+    await recordConversionEvent({
+      eventType: CONVERSION_EVENT_TYPES.checkoutCompleted,
+      orderKey: `checkout_completed:${session.id ?? event.id ?? "unbekannt"}`,
+      amountCents: session.amount_total ?? 0,
+      payload: {
+        mode: session.mode ?? null,
+        guest: session.metadata?.guest === "1",
+        packageId: session.metadata?.packageId ?? null,
+        plan: provision.kind === "plan" ? provision.plan : null,
+      },
+    });
     console.info(
       `[Stripe] ${label}: ${provision.kind === "credits" ? `${provision.tokens} Tokens gebucht` : `Plan ${provision.plan}`} — ${provision.reason}`,
     );

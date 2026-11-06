@@ -26,7 +26,9 @@ export type EmailEventKind =
   /** Interne Benachrichtigung an den Betreiber, damit keine Anfrage liegen bleibt. */
   | "admin_notification"
   /** Nach dem Kauf: Anmeldelink, damit das Konto ohne Passwort entsteht. */
-  | "magic_link";
+  | "magic_link"
+  /** Follow-up auf eine bestehende Anfrage (kein Kaltkontakt). */
+  | "outreach";
 
 export type EmailDispatchInput = {
   kind: EmailEventKind;
@@ -38,6 +40,42 @@ export type EmailDispatchInput = {
 };
 
 export type EmailValidation = { valid: true } | { valid: false; reason: string };
+
+/**
+ * Freemail-Anbieter. Wird fuer die B2B-Priorisierung gebraucht: eine
+ * gmx-Adresse ist kein Beleg gegen einen Betrieb, aber auch kein Beleg dafuer.
+ */
+const FREE_MAIL_DOMAINS: readonly string[] = [
+  "gmail.com",
+  "googlemail.com",
+  "web.de",
+  "gmx.de",
+  "gmx.net",
+  "gmx.at",
+  "t-online.de",
+  "freenet.de",
+  "posteo.de",
+  "mailbox.org",
+  "outlook.de",
+  "outlook.com",
+  "hotmail.de",
+  "hotmail.com",
+  "live.de",
+  "live.com",
+  "yahoo.de",
+  "yahoo.com",
+  "icloud.com",
+  "me.com",
+  "aol.com",
+  "protonmail.com",
+  "proton.me",
+] as const;
+
+export function isFreeMailDomain(domain: string): boolean {
+  const normalized = domain.trim().toLowerCase().replace(/^@/, "");
+  if (!normalized) return true;
+  return FREE_MAIL_DOMAINS.includes(normalized);
+}
 
 export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
