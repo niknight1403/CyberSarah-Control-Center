@@ -21,6 +21,7 @@ import {adminProcedure,protectedProcedure,publicProcedure,router} from "./_core/
 import {aiInfluenzaLeadPipeline,prepareAiInfluenzaProposal,upsertAiInfluenzaLead} from "./ai-influenza-lead-service";
 import {aiInfluenzaDeliveryPlan,aiInfluenzaDeliveryStatus,aiInfluenzaOrderLaunchReadiness,generateAiInfluenzaTaskDraft} from "./ai-influenza-delivery-service";
 import {aiInfluenzaCustomerReport,aiInfluenzaProfitOverview,recordAiInfluenzaCost} from "./ai-influenza-profit-service";
+import {createAiInfluenzaIntroRequest,listAiInfluenzaIntroRequests,markAiInfluenzaIntroRequestHandled} from "./ai-influenza-intro-request-service";
 
 const packageId=z.enum(AI_INFLUENZA_PACKAGE_IDS);
 
@@ -30,6 +31,28 @@ export const aiInfluenzaTeamRouter=router({
     packages:Object.values(AI_INFLUENZA_PACKAGES),
     pricingNotice:"Startpreise sind Hypothesen; keine Umsatzgarantie.",
   })),
+  // Oeffentliche Erstgespraech-Anfrage: Kontaktwunsch der anfragenden Person.
+  // Kein Versand, kein Auftrag, keine Zahlung - nur ein Eintrag in der Lead-Pipeline.
+  introRequest:publicProcedure.input(z.object({
+    name:z.string().trim().min(2).max(120),
+    email:z.string().trim().email().max(254),
+    company:z.string().trim().max(220).optional(),
+    domain:z.string().trim().max(255).optional(),
+    packageId:z.enum(["starter","growth","business","elite","unsure"]).optional(),
+    goal:z.string().trim().max(1200).optional(),
+    preferredWindow:z.enum(["diese-woche","naechste-woche","flexibel"]).optional(),
+    consent:z.boolean(),
+    website:z.string().max(200).optional(),
+  })).mutation(async({input})=>{
+    try{return await createAiInfluenzaIntroRequest(input);}
+    catch(error){throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Anfrage konnte nicht gespeichert werden."});}
+  }),
+  introRequests:adminProcedure.input(z.object({limit:z.number().int().min(1).max(200).default(50)}).optional())
+    .query(({input})=>listAiInfluenzaIntroRequests(input?.limit??50)),
+  markIntroRequestHandled:adminProcedure.input(z.object({
+    requestId:z.string().trim().min(1).max(20),
+    handled:z.boolean().default(true),
+  })).mutation(({ctx,input})=>markAiInfluenzaIntroRequestHandled({...input,actorOpenId:ctx.user.openId})),
   agents:adminProcedure.query(()=>AI_INFLUENZA_AGENTS),
   adminEliteAccess:adminProcedure.query(({ctx})=>({
     packageId:"elite" as const,enabled:true as const,

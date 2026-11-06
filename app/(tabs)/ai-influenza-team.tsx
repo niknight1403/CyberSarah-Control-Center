@@ -30,12 +30,16 @@ export default function AiInfluenzaTeamScreen(){
   const leads=trpc.aiInfluenzaTeam.leadPipeline.useQuery(undefined,{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const profit=trpc.aiInfluenzaTeam.profit.useQuery({windowDays:30},{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const agents=trpc.aiInfluenzaTeam.agents.useQuery(undefined,{enabled:isAdmin,retry:false});
+  const introRequests=trpc.aiInfluenzaTeam.introRequests.useQuery({limit:20},{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const media=trpc.mediaPipeline.status.useQuery(undefined,{enabled:Boolean(me.data),retry:false});
   const checkout=trpc.aiInfluenzaTeam.checkout.useMutation({
     onSuccess:result=>{void Linking.openURL(result.url);},
   });
   const sandbox=trpc.aiInfluenzaTeam.adminSandboxOrder.useMutation({
     onSuccess:()=>{void overview.refetch();},
+  });
+  const markIntro=trpc.aiInfluenzaTeam.markIntroRequestHandled.useMutation({
+    onSuccess:()=>{void introRequests.refetch();},
   });
   const portal=trpc.aiInfluenzaTeam.portal.useMutation({
     onSuccess:result=>{void Linking.openURL(result.url);},
@@ -147,6 +151,26 @@ export default function AiInfluenzaTeamScreen(){
               <Metric label="Deckungsbeitrag" value={formatEuroCents(profit.data?profit.data.contributionCents:null)}/>
             </View>
           </>:null}
+
+          <GlassCard accent="magenta" style={s.card}>
+            <Text style={s.sectionTitle}>Erstgespräche von der Verkaufsseite</Text>
+            <Text style={s.copy}>{introRequests.data?`${introRequests.data.summary.open} offen · ${introRequests.data.summary.handled} erledigt · ${introRequests.data.summary.total} gesamt`:"Anfragen werden geladen …"}</Text>
+            {(introRequests.data?.requests??[]).slice(0,5).map(request=><View key={request.id} style={s.agent}>
+              <Text style={s.agentName}>{request.name} · {request.company}</Text>
+              <Text style={s.line}>{request.email} · Paket: {request.packageLabel} · Wunsch: {request.preferredWindowLabel}</Text>
+              {request.goal?<Text style={s.line}>{request.goal}</Text>:null}
+              <Text style={s.notice}>{request.handled?`erledigt${request.handledAt?" · "+request.handledAt.slice(0,10):""}`:"offen"} · Lead-Score {request.leadScore??"—"} ({request.leadTier??"—"})</Text>
+              {request.handled?null:<GlowButton
+                label="Als erledigt markieren"
+                accent="green"
+                variant="secondary"
+                disabled={markIntro.isPending}
+                onPress={()=>markIntro.mutate({requestId:request.id,handled:true})}
+              />}
+            </View>)}
+            {introRequests.data&&introRequests.data.requests.length===0?<Text style={s.notice}>Noch keine Anfrage über die Verkaufsseite. Ein Eintrag entsteht nur durch eine echte Anfrage.</Text>:null}
+            {introRequests.error?<Text style={s.error}>{introRequests.error.message}</Text>:null}
+          </GlassCard>
 
           {activeView.id==="agents"?<GlassCard accent="purple" style={s.card}>
             <Text style={s.sectionTitle}>AI Agent Team</Text>

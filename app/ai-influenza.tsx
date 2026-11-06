@@ -9,17 +9,32 @@
  * der App (Stripe braucht einen Kunden). Diese Beschraenkung ist gewollt und
  * wird auf der Seite auch so gesagt, statt einen Button zu zeigen, der ins
  * Leere fuehrt.
+ *
+ * Wer vor dem Kauf sprechen will, kann ein Erstgespraech anfragen. Die Anfrage
+ * ist ein Kontaktwunsch (Grundlage: Selbstauskunft), landet in der Lead-Pipeline
+ * und loest keinen automatischen Versand aus.
  */
 import { router } from "expo-router";
-import { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import { ScreenContainer } from "@/components/screen-container";
+import {
+  AI_INFLUENZA_INTRO_LIMITS,
+  AI_INFLUENZA_INTRO_PACKAGE_CHOICES,
+  AI_INFLUENZA_INTRO_PACKAGE_LABELS,
+  AI_INFLUENZA_INTRO_WINDOWS,
+  AI_INFLUENZA_INTRO_WINDOW_LABELS,
+  introRequestConfirmationText,
+  type AiInfluenzaIntroPackageChoice,
+  type AiInfluenzaIntroWindow,
+} from "@/lib/ai-influenza-intro-request-logic";
 import { AI_INFLUENZA_PACKAGES, type AiInfluenzaPackageId } from "@/lib/ai-influenza-team-logic";
 import { buildPackageLoginPath } from "@/lib/post-login-navigation-logic";
-import { glassPalette, glassSurface } from "@/lib/design/future-glass";
+import { glassDepth, glassPalette, glassRadii, glassSurface } from "@/lib/design/future-glass";
+import { trpc } from "@/lib/trpc";
 
 const PACKAGE_ORDER: readonly AiInfluenzaPackageId[] = ["starter", "growth", "business"];
 
@@ -40,6 +55,51 @@ const ABLAUF: readonly { step: string; detail: string }[] = [
 
 export default function AiInfluenzaVerkaufsseite() {
   const styles = useMemo(() => createStyles(), []);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [goal, setGoal] = useState("");
+  const [packageChoice, setPackageChoice] = useState<AiInfluenzaIntroPackageChoice>("unsure");
+  const [preferredWindow, setPreferredWindow] = useState<AiInfluenzaIntroWindow>("flexibel");
+  const [consent, setConsent] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [error, setError] = useState("");
+
+  const requestIntro = trpc.aiInfluenzaTeam.introRequest.useMutation({
+    onSuccess: (result) => {
+      setError("");
+      setConfirmation(
+        result.confirmation ??
+          introRequestConfirmationText({ preferredWindow }),
+      );
+      setGoal("");
+      setConsent(false);
+    },
+    onError: (mutationError) => {
+      setConfirmation("");
+      setError(mutationError.message || "Anfrage konnte nicht gesendet werden.");
+    },
+  });
+
+  const canSubmit =
+    name.trim().length >= AI_INFLUENZA_INTRO_LIMITS.name.min &&
+    email.includes("@") &&
+    consent &&
+    !requestIntro.isPending;
+
+  function submitIntroRequest() {
+    if (!canSubmit) return;
+    setError("");
+    requestIntro.mutate({
+      name: name.trim(),
+      email: email.trim(),
+      company: company.trim() || undefined,
+      packageId: packageChoice,
+      preferredWindow,
+      goal: goal.trim() || undefined,
+      consent,
+    });
+  }
 
   return (
     <GlassBackdrop accent="magenta">
@@ -92,6 +152,137 @@ export default function AiInfluenzaVerkaufsseite() {
             );
           })}
 
+          <GlassCard accent="cyan" style={styles.card}>
+            <Text style={styles.kicker}>ERSTGESPRAECH ANFRAGEN</Text>
+            <Text style={styles.small}>
+              Du willst vor der Paketwahl sprechen? Schreib uns hier. Die Anfrage ist ein Kontaktwunsch von dir,
+              kein Abo und keine Zahlung. Wir antworten per E-Mail zur Terminabstimmung.
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Name"
+              placeholderTextColor={glassSurface.textMuted}
+              autoCapitalize="words"
+              accessibilityLabel="Name"
+              testID="intro-name"
+            />
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="E-Mail-Adresse"
+              placeholderTextColor={glassSurface.textMuted}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              accessibilityLabel="E-Mail-Adresse"
+              testID="intro-email"
+            />
+            <TextInput
+              style={styles.input}
+              value={company}
+              onChangeText={setCompany}
+              placeholder="Unternehmen (optional)"
+              placeholderTextColor={glassSurface.textMuted}
+              autoCapitalize="words"
+              accessibilityLabel="Unternehmen"
+              testID="intro-company"
+            />
+
+            <Text style={styles.fieldLabel}>Paket, das dich interessiert</Text>
+            <View style={styles.chipRow}>
+              {AI_INFLUENZA_INTRO_PACKAGE_CHOICES.map((choice) => {
+                const active = packageChoice === choice;
+                return (
+                  <Pressable
+                    key={choice}
+                    onPress={() => setPackageChoice(choice)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={[styles.chip, active ? styles.chipActive : null]}
+                  >
+                    <Text style={[styles.chipLabel, active ? styles.chipLabelActive : null]}>
+                      {AI_INFLUENZA_INTRO_PACKAGE_LABELS[choice]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.fieldLabel}>Wann passt es dir?</Text>
+            <View style={styles.chipRow}>
+              {AI_INFLUENZA_INTRO_WINDOWS.map((window) => {
+                const active = preferredWindow === window;
+                return (
+                  <Pressable
+                    key={window}
+                    onPress={() => setPreferredWindow(window)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={[styles.chip, active ? styles.chipActive : null]}
+                  >
+                    <Text style={[styles.chipLabel, active ? styles.chipLabelActive : null]}>
+                      {AI_INFLUENZA_INTRO_WINDOW_LABELS[window]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={goal}
+              onChangeText={setGoal}
+              placeholder="Worum geht es? (optional, max. 1200 Zeichen)"
+              placeholderTextColor={glassSurface.textMuted}
+              multiline
+              numberOfLines={4}
+              maxLength={AI_INFLUENZA_INTRO_LIMITS.goal.max}
+              accessibilityLabel="Anliegen"
+              testID="intro-goal"
+            />
+
+            <Pressable
+              onPress={() => setConsent((current) => !current)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: consent }}
+              style={styles.consentRow}
+              testID="intro-consent"
+            >
+              <View style={[styles.checkbox, consent ? styles.checkboxActive : null]}>
+                {consent ? <Text style={styles.checkMark}>✓</Text> : null}
+              </View>
+              <Text style={styles.consentText}>
+                Ich bin einverstanden, dass meine Angaben zur Kontaktaufnahme gespeichert werden. Keine Weitergabe
+                an Dritte, kein automatischer Werbeversand.
+              </Text>
+            </Pressable>
+
+            {requestIntro.isPending ? (
+              <View style={styles.busyRow}>
+                <ActivityIndicator color={glassPalette.cyan} />
+              </View>
+            ) : (
+              <GlowButton
+                label="Erstgespräch anfragen"
+                accent="cyan"
+                variant="primary"
+                disabled={!canSubmit}
+                onPress={submitIntroRequest}
+                testID="intro-submit"
+              />
+            )}
+
+            {confirmation ? <Text style={styles.success}>{confirmation}</Text> : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Text style={styles.tinyNote}>
+              Pflicht sind Name, E-Mail und die Einwilligung. Ohne Einwilligung wird nichts gespeichert.
+            </Text>
+          </GlassCard>
+
           <GlassCard accent="purple" style={styles.card}>
             <Text style={styles.kicker}>WAS HIER NICHT PASSIERT</Text>
             <Text style={styles.small}>
@@ -126,5 +317,45 @@ function createStyles() {
     deliverables: { gap: 4, paddingVertical: 4 },
     deliverable: { color: glassSurface.textMuted, fontSize: 13, lineHeight: 19 },
     small: { color: glassSurface.textMuted, fontSize: 13, lineHeight: 20 },
+    input: {
+      backgroundColor: glassDepth.layer,
+      borderColor: glassSurface.border,
+      borderRadius: glassRadii.md,
+      borderWidth: 1,
+      color: glassSurface.textPrimary,
+      fontSize: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    inputMultiline: { minHeight: 88, textAlignVertical: "top" },
+    fieldLabel: { color: glassSurface.textMuted, fontSize: 12, letterSpacing: 0.6, paddingTop: 4 },
+    chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    chip: {
+      borderColor: glassSurface.border,
+      borderRadius: glassRadii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    chipActive: { borderColor: glassPalette.cyan },
+    chipLabel: { color: glassSurface.textMuted, fontSize: 12, fontWeight: "600" },
+    chipLabelActive: { color: glassSurface.textPrimary },
+    consentRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 4 },
+    checkbox: {
+      alignItems: "center",
+      borderColor: glassSurface.border,
+      borderRadius: 6,
+      borderWidth: 1,
+      height: 22,
+      justifyContent: "center",
+      width: 22,
+    },
+    checkboxActive: { borderColor: glassPalette.cyan },
+    checkMark: { color: glassSurface.textPrimary, fontSize: 13, fontWeight: "800" },
+    consentText: { color: glassSurface.textMuted, flex: 1, fontSize: 12, lineHeight: 18 },
+    busyRow: { alignItems: "center", paddingVertical: 12 },
+    success: { color: glassPalette.green, fontSize: 13, lineHeight: 19 },
+    error: { color: glassPalette.red, fontSize: 13, lineHeight: 19 },
+    tinyNote: { color: glassSurface.textMuted, fontSize: 11, lineHeight: 16 },
   });
 }
