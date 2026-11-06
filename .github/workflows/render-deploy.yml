@@ -115,6 +115,9 @@ jobs:
           TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+          # Abmeldung ist Pflicht, bevor Outreach live gehen darf: der Wert ist
+          # eine feste Adresse im eigenen Dienst, kein Geheimnis.
+          OUTREACH_UNSUBSCRIBE_BASE_URL: https://app.cybersarah-ki.com/api/outreach/unsubscribe
           HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           # Sprint 367: Publishing-Tokens (optional — leere Secrets bleiben
