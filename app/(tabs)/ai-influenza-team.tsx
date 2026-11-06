@@ -32,6 +32,8 @@ export default function AiInfluenzaTeamScreen(){
   const profit=trpc.aiInfluenzaTeam.profit.useQuery({windowDays:30},{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const agents=trpc.aiInfluenzaTeam.agents.useQuery(undefined,{enabled:isAdmin,retry:false});
   const introRequests=trpc.aiInfluenzaTeam.introRequests.useQuery({limit:20},{enabled:isAdmin,retry:false,refetchInterval:60_000});
+  const weekly=trpc.aiInfluenzaTeam.weeklyKpis.useQuery({weeks:8},{enabled:isAdmin,retry:false,refetchInterval:60_000});
+  const priority=trpc.aiInfluenzaTeam.leadPriority.useQuery(undefined,{enabled:isAdmin,retry:false,refetchInterval:60_000});
   const media=trpc.mediaPipeline.status.useQuery(undefined,{enabled:Boolean(me.data),retry:false});
   const checkout=trpc.aiInfluenzaTeam.checkout.useMutation({
     onSuccess:result=>{void Linking.openURL(result.url);},
@@ -152,6 +154,37 @@ export default function AiInfluenzaTeamScreen(){
               <Metric label="Deckungsbeitrag" value={formatEuroCents(profit.data?profit.data.contributionCents:null)}/>
             </View>
           </>:null}
+
+          <GlassCard accent="green" style={s.card}>
+            <Text style={s.sectionTitle}>Die Woche im Funnel</Text>
+            <Text style={s.copy}>{weekly.data?`Letzte ${weekly.data.report.weeks} Wochen · Stand ${weekly.data.report.generatedAt.slice(0,10)}`:"Kennzahlen werden geladen …"}</Text>
+            <View style={s.metrics}>
+              <Metric label="Checkouts gestartet" value={weekly.data?.report.totals.checkouts_started??"—"}/>
+              <Metric label="Checkouts bezahlt" value={weekly.data?.report.totals.checkouts_completed??"—"}/>
+              <Metric label="Anfragen" value={weekly.data?.report.totals.intro_requests??"—"}/>
+              <Metric label="Gespräche" value={weekly.data?.report.totals.intro_calls_held??"—"}/>
+              <Metric label="Rate Checkout" value={weekly.data?.report.rates.checkoutToPaid==null?"—":`${Math.round((weekly.data.report.rates.checkoutToPaid??0)*100)} %`}/>
+              <Metric label="Rate Anfrage" value={weekly.data?.report.rates.requestToCall==null?"—":`${Math.round((weekly.data.report.rates.requestToCall??0)*100)} %`}/>
+            </View>
+            {weekly.data?<Text style={s.notice}>
+              {`Prognose auf ${weekly.data.forecast.basis === "gemessen" ? "gemessenen Raten" : weekly.data.forecast.basis === "gemischt" ? "teils gemessenen Raten" : "Annahmen"} · Monat 1: ${formatEuroCents(weekly.data.forecast.scenarios[0]?.mrrCents??null)} · Monat 6: ${formatEuroCents(weekly.data.forecast.scenarios[2]?.mrrCents??null)}`}
+            </Text>:null}
+            {(weekly.data?.report.warnings??[]).map((warning)=><Text key={warning} style={s.notice}>{warning}</Text>)}
+            {(weekly.data?.forecast.notes??[]).slice(0,2).map((note)=><Text key={note} style={s.notice}>{note}</Text>)}
+            {weekly.error?<Text style={s.error}>{weekly.error.message}</Text>:null}
+          </GlassCard>
+
+          <GlassCard accent="cyan" style={s.card}>
+            <Text style={s.sectionTitle}>Wen zuerst anrufen</Text>
+            <Text style={s.copy}>{priority.data?`${priority.data.summary.hot} heiß · ${priority.data.summary.warm} warm · ${priority.data.summary.kalt} kalt · erwartet ${formatEuroCents(priority.data.summary.expectedMonthlyCents)}/Monat`:"Priorisierung wird geladen …"}</Text>
+            {(priority.data?.leads??[]).slice(0,3).map(lead=><View key={String(lead.id)} style={s.agent}>
+              <Text style={s.agentName}>#{lead.rank} {lead.company||lead.email||"ohne Firma"} · {lead.band} ({lead.priorityScore})</Text>
+              <Text style={s.line}>{lead.reason}</Text>
+              <Text style={s.notice}>{lead.recommendedAction}</Text>
+            </View>)}
+            {priority.data&&priority.data.leads.length===0?<Text style={s.notice}>Noch keine Anfrage, die sich priorisieren ließe.</Text>:null}
+            {priority.error?<Text style={s.error}>{priority.error.message}</Text>:null}
+          </GlassCard>
 
           <GlassCard accent="magenta" style={s.card}>
             <Text style={s.sectionTitle}>Erstgespräche von der Verkaufsseite</Text>
