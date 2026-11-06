@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 06.11.2026 — Erstgespraech-Anfrage auf der Verkaufsseite (Inbound-Kanal)
+
+- **Neuer Inbound-Kanal:** Auf `/ai-influenza` kann ohne Konto ein Erstgespraech angefragt werden (Name, E-Mail, optional Unternehmen, Paketinteresse, Wunschzeitraum, Anliegen). Pflicht sind Name, gueltige E-Mail und ausdrueckliche Einwilligung.
+- **Rechtsgrundlage `customer-requested`:** Die Anfrage ist ein Kontaktwunsch der anfragenden Person. `contactPolicy.maySend` bleibt `false`, `externalSendApproved` bleibt `false`: es geht keine Mail und keine Nachricht automatisch raus.
+- **Kein neues Datenmodell:** Die Anfrage landet als Lead in `b2b_network_nodes` (ein Knoten je Unternehmensdomain, Freemail-Adressen je Person) und als Ereignis in `revenue_jobs` (`kind = ai-influenza-intro-request`, Dedupe je Tag ohne Klartext-E-Mail im Schluessel). Keine Migration noetig.
+- **Admin-Sicht:** Karte „Erstgespraeche von der Verkaufsseite" im AI-Influenza-Tab mit offen/erledigt, Paketwunsch, Wunschzeitraum, Lead-Score und „Als erledigt markieren".
+- **Ehrliche Grenzen:** kein Kalender-Sync, keine Slot-Buchung, kein Bestaetigungsversand, kein Captcha (nur Honeypot plus bestehender Rate-Limit-Guard). Dokumentiert in `docs/2026-11-06_AI_INFLUENZA_ERSTGESPRAECH_ANFRAGE.md`.
+- **Belegt durch:** 16 neue Tests (`tests/ai-influenza-intro-request.test.ts`), Gesamtsuite 445 Dateien / 3439 Tests gruen, `tsc --noEmit` ohne Fehler, Server-Build erfolgreich.
+
 ## 02.11.2026 — v2.8.6 (APK) · Phase 7 / v2.8.0 (Release-Plan): AI Influenza Team
 
 > Versionshinweis: der Android-Build-Workflow inkrementiert die Patch-Version gegenüber
