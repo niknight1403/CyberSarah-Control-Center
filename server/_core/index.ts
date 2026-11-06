@@ -46,6 +46,8 @@ import { assertCoreSchemaOnStartup, checkCoreTables } from "../schema-health";
 import { runOutreachCycle } from "../outreach-worker-service";
 import { optOutEmail } from "../outreach-optout-service";
 import { readinessSchemaBlock } from "../../lib/schema-health-logic";
+import { checkEmailDomain } from "../email-domain-health";
+import { readinessEmailBlock } from "../../lib/email-domain-logic";
 import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
 import { restoreRouteRotationState } from "../route-rotation-agent";
@@ -394,6 +396,21 @@ async function startServer() {
     }
   });
 
+  /**
+   * Zustellbarkeit des Mailversands. Rein lesend: prueft die Absenderdomain
+   * gegen die Domainliste des Anbieters, ohne Testmail.
+   */
+  app.get("/api/email-health", async (_req, res) => {
+    const check = await checkEmailDomain();
+    res.status(check.status === "unverified" ? 503 : 200).json({
+      configured: check.configured,
+      status: check.status,
+      fromDomain: check.fromDomain,
+      domainVerified: check.domainVerified,
+      hint: check.hint,
+    });
+  });
+
   app.get("/api/schema-health", async (_req, res) => {
     const schema = await checkCoreTables();
     if (!schema) {
@@ -410,12 +427,16 @@ async function startServer() {
     // Kerntabellen ist fuer den Funnel nicht bereit, auch wenn SELECT 1 geht.
     const schema = await checkCoreTables();
     const schemaBlock = schema ? readinessSchemaBlock(schema) : { ok: null, checked: 0, missing: [], hint: "Datenbank nicht pruefbar" };
+    // Mailversand blockiert den Start nicht, muss aber sichtbar sein: eine
+    // unverifizierte Absenderdomain heisst, dass Interessenten nichts bekommen.
+    const emailCheck = await checkEmailDomain();
     const ready = database && (schema?.ok ?? true);
     res.status(ready ? 200 : 503).json({
       ok: ready,
       checks: {
         database,
         schema: schemaBlock,
+        email: readinessEmailBlock(emailCheck),
         influencerLearningEnabled: influencerLearning.enabled,
         influencerLearningRunning: influencerLearning.running,
         influencerLearningLastCompletedAt: influencerLearning.lastCompletedAt,
