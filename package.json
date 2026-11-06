@@ -36,7 +36,9 @@
     "backend:launch": "python scripts/backend_launch.py",
     "hubspot:check": "tsx scripts/hubspot-live-check.ts",
     "hubspot:write-check": "tsx scripts/hubspot-write-roundtrip.ts",
-    "hubspot:mrr-check": "tsx scripts/hubspot-mrr-check.ts"
+    "hubspot:mrr-check": "tsx scripts/hubspot-mrr-check.ts",
+    "db:audit": "tsx scripts/db-schema-audit.ts",
+    "db:migrate": "tsx scripts/db-schema-audit.ts --apply"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

@@ -8,7 +8,11 @@ describe("mobile readiness wiring regression", () => {
     const server = read("server/_core/index.ts");
     expect(server).toContain('app.get("/api/ready"');
     expect(server).toContain("const database = await checkDatabaseHealth()");
-    expect(server).toContain("res.status(database ? 200 : 503)");
+    // Bereitschaft haengt jetzt an Datenbank UND Schema: eine erreichbare
+    // Datenbank ohne Kerntabellen ist fuer den Funnel nicht bereit.
+    expect(server).toContain("const ready = database && (schema?.ok ?? true)");
+    expect(server).toContain("res.status(ready ? 200 : 503)");
+    expect(server).toContain('app.get("/api/schema-health"');
     const client = read("lib/mobile-readiness-client.ts");
     expect(client).toContain('new URL("/api/ready", parsed)');
     expect(client).not.toContain('new URL("/api/health", parsed)');

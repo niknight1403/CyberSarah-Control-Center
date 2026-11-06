@@ -2,8 +2,11 @@ import {TRPCError} from "@trpc/server";
 import {z} from "zod";
 import {
   AI_INFLUENZA_AGENTS,
+  AI_INFLUENZA_ENTRY_PACKAGE_ID,
+  AI_INFLUENZA_HIDDEN_PACKAGE_IDS,
   AI_INFLUENZA_PACKAGE_IDS,
   AI_INFLUENZA_PACKAGES,
+  aiInfluenzaBookingBlockReason,
   simulateAiInfluenzaTestJourney,
 } from "../lib/ai-influenza-team-logic";
 import {
@@ -14,10 +17,14 @@ import {
   advanceAiInfluenzaOrder,
 } from "./ai-influenza-team-service";
 import {
+  createAiInfluenzaGuestCheckoutSession,
   createAiInfluenzaPackageCheckoutSession,
   createLiveBillingPortalSession,
 } from "./billing";
 import {adminProcedure,protectedProcedure,publicProcedure,router} from "./_core/trpc";
+import {CONVERSION_EVENT_TYPES,recordConversionEvent} from "./conversion-tracking";
+import {kpiForecast} from "./kpi-weekly-service";
+import {prioritizeIntroLeads} from "../lib/b2b-lead-priority-logic";
 import {aiInfluenzaLeadPipeline,prepareAiInfluenzaProposal,upsertAiInfluenzaLead} from "./ai-influenza-lead-service";
 import {aiInfluenzaDeliveryPlan,aiInfluenzaDeliveryStatus,aiInfluenzaOrderLaunchReadiness,generateAiInfluenzaTaskDraft} from "./ai-influenza-delivery-service";
 import {aiInfluenzaCustomerReport,aiInfluenzaProfitOverview,recordAiInfluenzaCost} from "./ai-influenza-profit-service";
@@ -63,6 +70,9 @@ export const aiInfluenzaTeamRouter=router({
   overview:adminProcedure.query(()=>aiInfluenzaTeamOverview()),
   testJourney:adminProcedure.input(z.object({packageId})).query(({input})=>simulateAiInfluenzaTestJourney(input.packageId)),
   checkout:protectedProcedure.input(z.object({packageId})).mutation(async({ctx,input})=>{
+    // Sperre auch serverseitig: ein in der UI verstecktes Paket bleibt sonst per API buchbar.
+    const blockReason=aiInfluenzaBookingBlockReason(input.packageId);
+    if(blockReason)throw new TRPCError({code:"PRECONDITION_FAILED",message:blockReason});
     try{
       const customer=await ensureAiInfluenzaCustomerNode({
         openId:ctx.user.openId,
@@ -86,6 +96,48 @@ export const aiInfluenzaTeamRouter=router({
     }catch(error){
       throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Checkout konnte nicht vorbereitet werden."});
     }
+  }),
+  /**
+   * Gast-Checkout: buchbar ohne Konto.
+   *
+   * Die Order entsteht erst im Webhook, weil erst dann die von Stripe erhobene
+   * Adresse bekannt ist. Hier wird nur eine Referenz erzeugt, damit sich Session
+   * und spaeterer Auftrag zuordnen lassen.
+   */
+  guestCheckout:publicProcedure.input(z.object({
+    packageId:z.enum(AI_INFLUENZA_PACKAGE_IDS),
+    email:z.string().trim().email().max(200).optional(),
+  })).mutation(async({input})=>{
+    const blockReason=aiInfluenzaBookingBlockReason(input.packageId);
+    if(blockReason)throw new TRPCError({code:"PRECONDITION_FAILED",message:blockReason});
+    const orderReference=`guest-checkout-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    try{
+      const checkout=await createAiInfluenzaGuestCheckoutSession({
+        packageId:input.packageId,
+        orderId:orderReference,
+        email:input.email??null,
+      });
+      // Gestarteter Checkout wird protokolliert, damit der Engpass messbar ist.
+      await recordConversionEvent({
+        eventType:CONVERSION_EVENT_TYPES.checkoutStarted,
+        orderKey:`checkout_started:${checkout.sessionId}`,
+        amountCents:AI_INFLUENZA_PACKAGES[input.packageId].monthlyPriceCents,
+        payload:{packageId:input.packageId, guest:true, orderReference},
+      });
+      return checkout;
+    }catch(error){
+      throw new TRPCError({code:"PRECONDITION_FAILED",message:error instanceof Error?error.message:"Gast-Checkout konnte nicht vorbereitet werden."});
+    }
+  }),
+  /**
+   * Wochenauswertung der vier Kern-KPIs inkl. Prognose.
+   * Bewusst admin-only: Umsatz- und Conversion-Zahlen sind keine oeffentliche Info.
+   */
+  weeklyKpis:adminProcedure.input(z.object({weeks:z.number().int().min(1).max(52).default(8)}).optional())
+    .query(async({input})=>kpiForecast({weeks:input?.weeks??8})),
+  leadPriority:adminProcedure.query(async()=>{
+    const {requests}=await listAiInfluenzaIntroRequests(200);
+    return prioritizeIntroLeads(requests);
   }),
   adminSandboxOrder:adminProcedure.input(z.object({packageId})).mutation(async({ctx,input})=>{
     // Admin-only internal test order. No Stripe session, subscription or paid status.

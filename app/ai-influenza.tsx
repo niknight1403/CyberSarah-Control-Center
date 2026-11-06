@@ -5,10 +5,11 @@
  * kalte Besucher. Sie ist absichtlich nuechtern: echte Preise aus den Paketen,
  * echte Lieferbestandteile, keine Erfolgsversprechen und keine Frist-Timer.
  *
- * Zahlen kann hier niemand ohne Konto: der Kauf laeuft ueber den Checkout in
- * der App (Stripe braucht einen Kunden). Diese Beschraenkung ist gewollt und
- * wird auf der Seite auch so gesagt, statt einen Button zu zeigen, der ins
- * Leere fuehrt.
+ * Kaufen ohne Konto: der Checkout laeuft als Gast-Checkout direkt zu Stripe,
+ * die E-Mail wird dort erhoben. Vorher war hier ein Login vorgeschaltet — 17
+ * gestartete Checkouts und keine einzige Zahlung waren der Beleg, dass diese
+ * Huerde mehr kostet als sie schuetzt. Nach der Zahlung kommt der Anmeldelink
+ * per Mail, das Konto entsteht also nach dem Kauf, nicht davor.
  *
  * Wer vor dem Kauf sprechen will, kann ein Erstgespraech anfragen. Die Anfrage
  * ist ein Kontaktwunsch (Grundlage: Selbstauskunft), landet in der Lead-Pipeline
@@ -16,7 +17,7 @@
  */
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
@@ -31,12 +32,21 @@ import {
   type AiInfluenzaIntroPackageChoice,
   type AiInfluenzaIntroWindow,
 } from "@/lib/ai-influenza-intro-request-logic";
-import { AI_INFLUENZA_PACKAGES, type AiInfluenzaPackageId } from "@/lib/ai-influenza-team-logic";
+import {
+  AI_INFLUENZA_ENTRY_PACKAGE_ID,
+  AI_INFLUENZA_PACKAGES,
+  isAiInfluenzaPackageBookable,
+  type AiInfluenzaPackageId,
+} from "@/lib/ai-influenza-team-logic";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import { buildPackageLoginPath } from "@/lib/post-login-navigation-logic";
 import { glassDepth, glassPalette, glassRadii, glassSurface } from "@/lib/design/future-glass";
 import { trpc } from "@/lib/trpc";
 
-const PACKAGE_ORDER: readonly AiInfluenzaPackageId[] = ["starter", "growth", "business"];
+// Gesperrte Pakete erscheinen nicht: die Sperre wirkt in UI und Checkout.
+const PACKAGE_ORDER: readonly AiInfluenzaPackageId[] = (["starter", "growth", "business"] as const).filter(
+  (packageId) => isAiInfluenzaPackageBookable(packageId),
+);
 
 function euro(cents: number) {
   return new Intl.NumberFormat("de-DE", {
@@ -55,6 +65,29 @@ const ABLAUF: readonly { step: string; detail: string }[] = [
 
 export default function AiInfluenzaVerkaufsseite() {
   const styles = useMemo(() => createStyles(), []);
+
+  /**
+   * Gast-Kauf: kein Login, keine Registrierung. Die Adresse aus dem
+   * Erstgespraech-Formular wird vorbelegt, wenn sie schon getippt wurde —
+   * spart einen zweiten Eintrag auf der Stripe-Seite.
+   */
+  const startGuestCheckout = async (packageId: AiInfluenzaPackageId) => {
+    setCheckoutError("");
+    try {
+      const typedEmail = email.trim();
+      const result = await guestCheckout.mutateAsync({
+        packageId,
+        ...(typedEmail.includes("@") ? { email: typedEmail } : {}),
+      });
+      await Linking.openURL(result.url);
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error ? error.message : "Der Checkout konnte nicht geöffnet werden. Bitte später erneut.",
+      );
+    }
+  };
+  const [checkoutError, setCheckoutError] = useState("");
+  const guestCheckout = trpc.aiInfluenzaTeam.guestCheckout.useMutation();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
@@ -135,18 +168,19 @@ export default function AiInfluenzaVerkaufsseite() {
                   <Text style={styles.packageName}>{pkg.name}</Text>
                   <Text style={styles.price}>{euro(pkg.monthlyPriceCents)}</Text>
                 </View>
-                <Text style={styles.priceNote}>pro Monat, zzgl. USt. · monatlich kündbar</Text>
+                <Text style={styles.priceNote}>pro Monat, inkl. gesetzlicher USt. · monatlich kündbar</Text>
                 <View style={styles.deliverables}>
                   {pkg.deliverables.map((item) => (
                     <Text key={item} style={styles.deliverable}>· {item}</Text>
                   ))}
                 </View>
                 <GlowButton
-                  label="Paket wählen"
+                  label={pkg.id === AI_INFLUENZA_ENTRY_PACKAGE_ID ? `Für ${euro(pkg.monthlyPriceCents)} starten` : "Paket wählen"}
                   accent="magenta"
-                  variant={pkg.id === "growth" ? "primary" : "secondary"}
-                  // Paket bleibt erhalten: nach dem Login steht der Checkout bereit.
-                  onPress={() => router.push(buildPackageLoginPath(pkg.id) as never)}
+                  variant={pkg.id === AI_INFLUENZA_ENTRY_PACKAGE_ID ? "primary" : "secondary"}
+                  // Direkt zum Gast-Checkout: keine Registrierung vor der Zahlung.
+                  disabled={guestCheckout.isPending}
+                  onPress={() => void startGuestCheckout(pkg.id)}
                 />
               </GlassCard>
             );
@@ -291,6 +325,14 @@ export default function AiInfluenzaVerkaufsseite() {
               werden muss. Rechnungen und Kündigung findest du im Abo-Portal.
             </Text>
           </GlassCard>
+        
+          {checkoutError ? (
+            <Text style={styles.checkoutError} accessibilityRole="alert">
+              {checkoutError}
+            </Text>
+          ) : null}
+
+          <LegalFooter context="AI Influenza Team" />
         </ScrollView>
       </ScreenContainer>
     </GlassBackdrop>
@@ -305,6 +347,7 @@ function createStyles() {
     title: { color: glassSurface.textPrimary, fontSize: 30, fontWeight: "800", lineHeight: 36 },
     lead: { color: glassSurface.textMuted, fontSize: 15, lineHeight: 22 },
     card: { padding: 18, gap: 10 },
+    checkoutError: { color: glassPalette.amber, fontSize: 13, lineHeight: 19, fontWeight: "700" },
     kicker: { color: glassPalette.magenta, fontSize: 11, letterSpacing: 1.6, fontWeight: "700" },
     row: { gap: 2, paddingTop: 6 },
     stepLabel: { color: glassSurface.textPrimary, fontSize: 14, fontWeight: "700" },

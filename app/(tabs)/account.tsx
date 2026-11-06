@@ -12,6 +12,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import { trpc } from "@/lib/trpc";
 import * as Auth from "@/lib/_core/auth";
 import { accentAlpha, glassDepth, glassPalette, glassRadii, glassSpacing, glassSurface, glassType } from "@/lib/design/future-glass";
@@ -415,6 +416,8 @@ export default function AccountScreen() {
           )}
           {message ? <Text style={styles.message}>{message}</Text> : null}
         </View>
+        
+          <LegalFooter context="Konto" />
         </ScrollView>
       </ScreenContainer>
     </GlassBackdrop>

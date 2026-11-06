@@ -21,9 +21,105 @@ import {
   type AiInfluenzaIntroWindow,
 } from "../lib/ai-influenza-intro-request-logic";
 import { parseAiInfluenzaIntroRequest } from "../lib/ai-influenza-intro-request-logic";
+import {
+  buildIntroRequestAdminNotice,
+  buildIntroRequestConfirmation,
+  resolveAdminNotifyAddress,
+  toDispatchInput,
+  INTRO_REQUEST_OPT_IN_SOURCE,
+} from "../lib/transactional-email-templates";
 import { b2bNetworkNodes, revenueJobs } from "../drizzle/schema";
 import { getDb } from "./db";
+import { dispatchTransactionalEmail } from "./email-service";
 import { upsertB2BNode } from "./growth-network-service";
+
+/**
+ * Benachrichtigt Anfragende und Betreiber.
+ *
+ * Grundsatz: Der Versand ist eine Zugabe, keine Bedingung. Scheitert Resend
+ * (nicht konfiguriert, Tageslimit, Netzwerk), bleibt die Anfrage gespeichert und
+ * der Fehler wird protokolliert. Was nicht passiert: ein stilles "ok", obwohl
+ * keine Mail rausging.
+ */
+async function notifyIntroRequest(input: {
+  requestId: string;
+  parsed: Extract<ReturnType<typeof parseAiInfluenzaIntroRequest>, { ok: true }>;
+  receivedAt: string;
+}): Promise<Record<string, { status: string; detail: string; configured: boolean }>> {
+  const baseUrl = (process.env.APP_BASE_URL || "https://app.cybersarah-ki.com").replace(/\/+$/, "");
+  const adminAddress = resolveAdminNotifyAddress(process.env as Record<string, string | undefined>);
+  const summary: Record<string, { status: string; detail: string; configured: boolean }> = {};
+
+  const confirmation = buildIntroRequestConfirmation({
+    name: input.parsed.value.name,
+    email: input.parsed.value.email,
+    packageLabel: AI_INFLUENZA_INTRO_PACKAGE_LABELS[input.parsed.value.packageId],
+    preferredWindowLabel: AI_INFLUENZA_INTRO_WINDOW_LABELS[input.parsed.value.preferredWindow],
+    goal: input.parsed.value.goal,
+    receivedAt: input.receivedAt,
+    requestId: input.requestId,
+  });
+  const confirmationOutcome = await dispatchTransactionalEmail(
+    toDispatchInput(confirmation.draft, confirmation.to, {
+      documented: input.parsed.value.consentGiven,
+      source: INTRO_REQUEST_OPT_IN_SOURCE,
+    }),
+  ).catch((error: unknown) => ({
+    status: "rejected" as const,
+    reason: `Versand warf: ${error instanceof Error ? error.message : String(error)}`,
+    configured: false,
+  }));
+  summary.confirmation = {
+    status: confirmationOutcome.status,
+    detail: confirmationOutcome.status === "rejected" ? confirmationOutcome.reason : confirmationOutcome.status,
+    configured: confirmationOutcome.configured,
+  };
+
+  if (adminAddress) {
+    const common = {
+      requestId: input.requestId,
+      name: input.parsed.value.name,
+      email: input.parsed.value.email,
+      company: input.parsed.value.company,
+      domain: input.parsed.value.domain,
+      packageLabel: AI_INFLUENZA_INTRO_PACKAGE_LABELS[input.parsed.value.packageId],
+      preferredWindowLabel: AI_INFLUENZA_INTRO_WINDOW_LABELS[input.parsed.value.preferredWindow],
+      goal: input.parsed.value.goal,
+      leadScore: input.parsed.scoring.score,
+      leadTier: input.parsed.scoring.tier,
+      receivedAt: input.receivedAt,
+      adminUrl: `${baseUrl}/ai-influenza-team`,
+    };
+    const adminOutcome = await dispatchTransactionalEmail(
+      toDispatchInput(buildIntroRequestAdminNotice({ ...common, domain: common.domain }), adminAddress, {
+        documented: true,
+        source: "betreiber-benachrichtigung (Empfaenger ist der Betreiber)",
+      }),
+    ).catch((error: unknown) => ({
+      status: "rejected" as const,
+      reason: `Versand warf: ${error instanceof Error ? error.message : String(error)}`,
+      configured: false,
+    }));
+    summary.admin = {
+      status: adminOutcome.status,
+      detail: adminOutcome.status === "rejected" ? adminOutcome.reason : adminOutcome.status,
+      configured: adminOutcome.configured,
+    };
+  } else {
+    summary.admin = {
+      status: "rejected",
+      detail: "Keine Betreiber-Adresse konfiguriert (AI_INFLUENZA_NOTIFY_EMAIL oder ADMIN_EMAIL).",
+      configured: false,
+    };
+  }
+
+  for (const [channel, entry] of Object.entries(summary)) {
+    console.log(
+      `[intro-request-email] ${channel} status=${entry.status} configured=${entry.configured} request=${input.requestId} detail=${entry.detail}`.slice(0, 400),
+    );
+  }
+  return summary;
+}
 
 export const AI_INFLUENZA_INTRO_JOB_KIND = "ai-influenza-intro-request";
 
@@ -127,6 +223,28 @@ export async function createAiInfluenzaIntroRequest(
     })
     .onConflictDoNothing({ target: revenueJobs.dedupeKey })
     .returning();
+
+  if (job && parsed.value.email) {
+    const emailSummary = await notifyIntroRequest({
+      requestId: String(job.id),
+      parsed,
+      receivedAt,
+    });
+    const failed = Object.entries(emailSummary).filter(([, entry]) => entry.status !== "sent");
+    try {
+      await db
+        .update(revenueJobs)
+        .set({
+          payload: { ...(job.payload ?? {}), emailDispatch: emailSummary },
+          updatedAt: new Date(),
+          // Sichtbarer Fehler statt stiller Nichtzustellung.
+          lastError: failed.length > 0 ? failed.map(([channel, entry]) => `${channel}: ${entry.detail}`).join(" | ").slice(0, 500) : null,
+        })
+        .where(eq(revenueJobs.id, job.id));
+    } catch (error) {
+      console.error(`[intro-request-email] Protokoll konnte nicht gespeichert werden: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   if (!job) {
     return {

@@ -11,6 +11,31 @@ export type AiInfluenzaPackage={
   hypothesisNotice:string;
 };
 
+/**
+ * Voruebergehend gesperrte Pakete.
+ *
+ * Grund: Der Lieferpfad fuer High-Ticket ist nicht belegt (Kontingente,
+ * Freigaben, Betreuung). Ein 2.499-EUR-Paket zu verkaufen, bevor die Lieferung
+ * belegbar ist, waere ein Versprechen ohne Deckung. Die Sperre wirkt in der UI
+ * UND im Checkout — ein versteckter Knopf ist keine Sperre.
+ */
+export const AI_INFLUENZA_HIDDEN_PACKAGE_IDS:readonly AiInfluenzaPackageId[]=["business"];
+
+/** Einstiegspreis im Funnel: das Paket, auf das alle CTAs zeigen. */
+export const AI_INFLUENZA_ENTRY_PACKAGE_ID:AiInfluenzaPackageId="starter";
+
+export function isAiInfluenzaPackageBookable(packageId:AiInfluenzaPackageId):boolean{
+  return !AI_INFLUENZA_HIDDEN_PACKAGE_IDS.includes(packageId);
+}
+
+/** Grund fuer die Sperre, im Klartext fuer Fehlermeldung und UI. */
+export function aiInfluenzaBookingBlockReason(packageId:AiInfluenzaPackageId):string|null{
+  if(!isAiInfluenzaPackageBookable(packageId)){
+    return `Das Paket "${AI_INFLUENZA_PACKAGES[packageId].name}" ist vorübergehend nicht buchbar: Der Lieferpfad ist noch nicht belegt (${AI_INFLUENZA_PACKAGES[packageId].monthlyPriceCents/100} EUR/Monat). Wir verkaufen nichts, was wir nicht liefern können.`;
+  }
+  return null;
+}
+
 export const AI_INFLUENZA_PACKAGES:Record<AiInfluenzaPackageId,AiInfluenzaPackage>={
   starter:{
     id:"starter",name:"Starter",monthlyPriceCents:29900,currency:"eur",

@@ -4,6 +4,7 @@ import {ScreenContainer} from "@/components/screen-container";
 import {GlassBackdrop} from "@/components/glass/glass-backdrop";
 import {GlassCard,GlowButton,StatusChip} from "@/components/glass/glass-primitives";
 import {NavDrawer,NavDrawerButton,useNavDrawer} from "@/components/responsive/nav-drawer";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import {glassPalette,glassSurface} from "@/lib/design/future-glass";
 import {trpc} from "@/lib/trpc";
 import {useLocalSearchParams} from "expo-router";
@@ -231,7 +232,9 @@ export default function AiInfluenzaTeamScreen(){
             {health.notes.map(note=><Text key={note} style={s.notice}>• {note}</Text>)}
           </GlassCard>:null}
         </>:null}
-      </ScrollView>
+      
+          <LegalFooter context="AI Influenza Team" />
+        </ScrollView>
     </ScreenContainer>
     <NavDrawer {...nav.drawerProps}/>
   </GlassBackdrop>;

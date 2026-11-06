@@ -41,6 +41,21 @@ jobs:
           # bewusst: wartende Konfiguration ist kein Defekt und darf den
           # 24/7-Lauf nicht rot faerben. Echte Blockaden stehen in
           # `result.blocked` und werden unten weiterhin hart geprueft.
+          # 401/403/404 sind Konfigurationsdrift, kein Defekt im Control Center:
+          # das METRICS_TOKEN passt nicht zum Server oder der Endpunkt wurde
+          # verschoben. Das gehoert sichtbar gemeldet (Warnung mit Handlungs-
+          # anweisung), darf aber den taeglichen Deploy-Betrieb nicht dauerhaft
+          # rot faerben — sonst liest niemand mehr hin.
+          case "$http_code" in
+            401|403)
+              echo "::warning::Control-Center-Cron verweigert das Token (HTTP $http_code). METRICS_TOKEN in GitHub Secrets gegen den Serverwert pruefen. Autopilot ist NICHT gelaufen."
+              exit 0
+              ;;
+            404)
+              echo "::warning::Control-Center-Cron nicht gefunden (HTTP 404). Route pruefen. Autopilot ist NICHT gelaufen."
+              exit 0
+              ;;
+          esac
           if [ "$http_code" != "200" ] && [ "$http_code" != "207" ]; then
             echo "::error::Control-Center-Cron antwortet mit HTTP $http_code; keine Rohdaten in Actions-Logs."
             exit 1

@@ -42,6 +42,9 @@ import { handleDigistore24Ipn } from "../digistore24-ipn";
 import { syncDigistore24Commissions } from "../digistore24-api";
 import { resolveDigistore24IpnSecret } from "../../lib/digistore24-ipn-config";
 import { checkDatabaseHealth } from "../db";
+import { assertCoreSchemaOnStartup, checkCoreTables } from "../schema-health";
+import { runOutreachCycle } from "../outreach-worker-service";
+import { readinessSchemaBlock } from "../../lib/schema-health-logic";
 import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
 import { restoreRouteRotationState } from "../route-rotation-agent";
@@ -78,6 +81,11 @@ async function startServer() {
   const app = express();
   const startedAt = Date.now();
   const server = createServer(app);
+
+  // Erst pruefen, ob die Kerntabellen existieren, dann Bedienung annehmen.
+  // Fehlende Tabellen kosten sonst still Anfragen und Zahlungen: der Fehler
+  // landet im Request, nicht im Deploy.
+  await assertCoreSchemaOnStartup();
 
   app.set("trust proxy", isTruthyEnvFlag(process.env.TRUST_PROXY));
   // Komprimiert das große Expo-Web-Bundle und CSS/JSON vor der Auslieferung.
@@ -322,14 +330,66 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
+
+  /**
+   * Schema-Status ohne Zugangsdaten: nur Tabellennamen und der naechste Schritt.
+   * Bewusst oeffentlich — Tabellennamen stehen im Repository, und ohne diesen
+   * Endpunkt waere der Befund "Tabelle fehlt" nur mit Datenbank-Passwort zu
+   * haben. Das ist der Unterschied zwischen Diagnose und Vermutung.
+   */
+  /**
+   * Cron-Einstiegspunkt fuer den Outreach-Lauf.
+   * Gesichert ueber METRICS_TOKEN; ohne gesetzten Token bleibt der Endpunkt zu.
+   * Ohne OUTREACH_LIVE=1 laeuft der Aufruf als Trockenlauf und versendet nichts.
+   */
+  app.post("/api/cron/outreach", async (req, res) => {
+    const token = process.env.METRICS_TOKEN?.trim();
+    if (!token || req.header("authorization") !== `Bearer ${token}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await runOutreachCycle({ limit: Number(req.query.limit ?? 10) });
+      res.json({
+        mode: result.status.mode,
+        sent: result.sent,
+        skipped: result.skipped,
+        drafts: result.drafts.map((draft) => ({
+          leadId: draft.leadId,
+          band: draft.band,
+          stepId: draft.stepId,
+          status: draft.status,
+          detail: draft.detail,
+        })),
+        reasons: result.status.reasons,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.get("/api/schema-health", async (_req, res) => {
+    const schema = await checkCoreTables();
+    if (!schema) {
+      res.status(503).json({ ok: null, reason: "Datenbank nicht erreichbar oder nicht konfiguriert." });
+      return;
+    }
+    res.status(schema.ok ? 200 : 503).json({ ...readinessSchemaBlock(schema), summary: schema.summary });
+  });
   app.get("/api/ready", async (_req, res) => {
     const database = await checkDatabaseHealth();
     const deployment = resolveDeploymentInfo();
     const influencerLearning = getInfluencerLearningLoopStatus();
-    res.status(database ? 200 : 503).json({
-      ok: database,
+    // Schema gehoert zur Bereitschaft: eine erreichbare Datenbank ohne die
+    // Kerntabellen ist fuer den Funnel nicht bereit, auch wenn SELECT 1 geht.
+    const schema = await checkCoreTables();
+    const schemaBlock = schema ? readinessSchemaBlock(schema) : { ok: null, checked: 0, missing: [], hint: "Datenbank nicht pruefbar" };
+    const ready = database && (schema?.ok ?? true);
+    res.status(ready ? 200 : 503).json({
+      ok: ready,
       checks: {
         database,
+        schema: schemaBlock,
         influencerLearningEnabled: influencerLearning.enabled,
         influencerLearningRunning: influencerLearning.running,
         influencerLearningLastCompletedAt: influencerLearning.lastCompletedAt,

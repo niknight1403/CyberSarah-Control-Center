@@ -11,6 +11,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, GlowButton, StatusChip } from "@/components/glass/glass-primitives";
 import { ScreenContainer } from "@/components/screen-container";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 
 const NAECHSTE_SCHRITTE: readonly { title: string; detail: string }[] = [
@@ -66,6 +67,8 @@ export default function AiInfluenzaDanke() {
           </GlassCard>
 
           <GlowButton label="Zum Dashboard" accent="magenta" onPress={() => router.push("/ai-influenza-team")} />
+        
+          <LegalFooter context="AI Influenza Team" />
         </ScrollView>
       </ScreenContainer>
     </GlassBackdrop>

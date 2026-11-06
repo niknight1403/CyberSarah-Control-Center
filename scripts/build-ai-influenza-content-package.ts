@@ -34,7 +34,49 @@ import {
   type VoiceTarget,
 } from "../lib/ai-influenza-voice-logic";
 import { buildMotifPpm, paletteFor } from "../lib/ai-influenza-motif-logic";
+import {
+  canStartMediaRun,
+  initialKeyState,
+  isKeyUsable,
+  mediaKeyId,
+  observeMediaAttempt,
+  summarizeMediaKeys,
+  type MediaKeyState,
+} from "../lib/media-key-quarantine-logic";
 import { buildConcatFfmpegArgs, buildSceneFfmpegArgs } from "../lib/video-assembly-logic";
+
+/**
+ * Laufweite Quarantaene je Media-Schluessel.
+ *
+ * Ein 401 antwortet auch bei Szene 12 noch mit 401. Frueher wurde der Schluessel
+ * trotzdem fuer jede Szene erneut probiert: der Lauf wurde langsam, die
+ * Fehlerliste unlesbar und die eigentliche Lage (nur noch ein gesunder
+ * Schluessel) unsichtbar. Jetzt gilt: einmal tote Schluessel werden uebersprungen.
+ */
+const mediaStates = new Map<string, MediaKeyState>();
+
+function mediaStateFor(apiKey: string, source: string): MediaKeyState {
+  const keyId = mediaKeyId(apiKey);
+  const existing = mediaStates.get(keyId);
+  if (existing) return existing;
+  const created = initialKeyState({ apiKey, source });
+  mediaStates.set(keyId, created);
+  return created;
+}
+
+function recordMediaAttempt(
+  reference: { apiKey: string; source: string } | undefined,
+  status: number | null,
+  retryAfterSeconds?: number | null,
+): void {
+  if (!reference) return;
+  const current = mediaStateFor(reference.apiKey, reference.source);
+  mediaStates.set(current.keyId, observeMediaAttempt(current, { status, now: Date.now(), retryAfterSeconds }));
+}
+
+function isUsableNow(apiKey: string, source: string): boolean {
+  return isKeyUsable(mediaStateFor(apiKey, source), Date.now());
+}
 
 const SCRIPTS: Record<string, string> = {
   starter: [
@@ -86,9 +128,12 @@ async function fetchWithRetry(
   request: { url: string; headers: Record<string, string>; body: string },
   label: string,
   attempts = 3,
+  keyRef?: { apiKey: string; source: string },
 ): Promise<Response | null> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const response = await fetch(request.url, { method: "POST", headers: request.headers, body: request.body });
+    const retryAfterRaw = Number(response.headers.get("retry-after") ?? "");
+    recordMediaAttempt(keyRef, response.status, Number.isFinite(retryAfterRaw) ? retryAfterRaw : null);
     if (response.ok) return response;
     const retryable = shouldRetryStatus(response.status);
     const last = attempt === attempts - 1;
@@ -112,8 +157,13 @@ async function synthesizeSceneVoice(
   index: number,
 ): Promise<{ file: string; source: string; seconds: number } | null> {
   for (const target of targets) {
+    // Quarantaenierte Schluessel werden in diesem Lauf nicht erneut probiert.
+    if (!isUsableNow(target.apiKey, target.provider)) continue;
     const request = buildTtsRequest(target, text);
-    const response = await fetchWithRetry(request, `Szene ${index + 1} ${target.provider}`);
+    const response = await fetchWithRetry(request, `Szene ${index + 1} ${target.provider}`, 3, {
+      apiKey: target.apiKey,
+      source: target.provider,
+    });
     if (!response) continue;
 
     const contentType = response.headers.get("content-type") ?? "";
@@ -151,8 +201,12 @@ async function buildSceneMotif(
 ): Promise<{ file: string; source: string }> {
   const output = path.join(workDir, `scene-${index + 1}.png`);
   for (const key of keys) {
+    if (!isUsableNow(key, "gemini-image")) continue;
     try {
-      const response = await fetchWithRetry(buildMotifRequest(key, prompt), `Szene ${index + 1} Motiv`);
+      const response = await fetchWithRetry(buildMotifRequest(key, prompt), `Szene ${index + 1} Motiv`, 3, {
+        apiKey: key,
+        source: "gemini-image",
+      });
       if (!response) continue;
       const image = parseMotifImage(await response.json());
       if (!image) continue;
@@ -198,6 +252,24 @@ async function main(): Promise<void> {
   console.log(`Vertonung: ${voiceTarget ? voiceTarget.provider : "keine"} · Motive: ${imageKeys.length > 0 ? "gemini, sonst Markenmotiv" : "Markenmotiv"}`);
   if (!voiceTarget) console.log(`Hinweis: ${explainMissingVoice(process.env)}`);
 
+  // Schluessel beim Start registrieren, damit die Quarantaene ab Szene 1 greift.
+  for (const target of voiceTargets) mediaStateFor(target.apiKey, target.provider);
+  for (const key of imageKeys) mediaStateFor(key, "gemini-image");
+  const keyStates = Array.from(mediaStates.values());
+  const runGuard = canStartMediaRun(keyStates, Date.now());
+  if (!runGuard.allowed) {
+    const configured = keyStates.length > 0;
+    const message = `Media-Lage: ${runGuard.reason}`;
+    if (configured || process.env.REQUIRE_COMPLETE_PACKAGE === "1") {
+      // Schluessel sind vorhanden, aber keiner liefert: stilles Weitermachen
+      // wuerde ein Paket ohne Stimme als fertig ausliefern.
+      console.error(`FAIL: ${message}`);
+      process.exit(1);
+    }
+    console.log(`Hinweis: ${message} (Trockenlauf ohne Schluessel bleibt gruen.)`);
+  }
+  const voiceTargetsUsable = voiceTargets.filter((target) => isUsableNow(target.apiKey, target.provider));
+
   const workDir = mkdtempSync(path.join(tmpdir(), `content-${packageId}-`));
   const manifestScenes: {
     index: number;
@@ -211,7 +283,7 @@ async function main(): Promise<void> {
   // Schritt 1: Stimme und Motiv je Szene, Laenge aus der echten Sprachdauer.
   const prepared: { index: number; seconds: number; audioPath: string; imagePath: string; scene: ReelStoryboardScene; voiceSource: string; motifSource: string }[] = [];
   for (const [index, scene] of approved.scenes.entries()) {
-    const voice = await synthesizeSceneVoice(voiceTargets, scene.voiceover, workDir, index);
+    const voice = await synthesizeSceneVoice(voiceTargetsUsable, scene.voiceover, workDir, index);
     const planned = scene.endSeconds - scene.startSeconds;
     // Szenenlaenge folgt der echten Sprachdauer, damit kein Wort abgeschnitten wird.
     const seconds = voice ? Math.max(2, Math.ceil(voice.seconds + 0.3)) : planned;
@@ -328,6 +400,9 @@ async function main(): Promise<void> {
           ? "gemini-image"
           : "brand-gradient",
         scenes: manifestScenes,
+        // Schluessel-Lage im Paket: belegt, welcher Anbieter tatsaechlich trug
+        // und ob ein Schluessel waehrend des Laufs ausgefallen ist.
+        mediaKeys: summarizeMediaKeys(Array.from(mediaStates.values())),
         notes: approved.notes,
       },
       null,
@@ -350,6 +425,13 @@ async function main(): Promise<void> {
     console.error(`FAIL: ${summary}`);
     console.error(`Unvollstaendig: ${manifestScenes.length - withVoice} Szene(n) ohne Stimme. Ursache pruefen statt gruen winken.`);
     process.exit(1);
+  }
+  const keySummary = summarizeMediaKeys(Array.from(mediaStates.values()));
+  if (keySummary.quarantined > 0) {
+    console.log(
+      `Hinweis: ${keySummary.quarantined} Media-Schluessel als ungueltig gesperrt (${keySummary.invalidSources.join(", ") || "unbekannt"}). ` +
+        "Schluessel erneuern, sonst traegt der Lauf auf dem letzten gesunden Schluessel.",
+    );
   }
   console.log(`PASS: ${summary}`);
   if (!complete) console.log("Hinweis: Paket ohne vollstaendige Vertonung — lokal gebaut, nicht als fertig gemeldet.");
