@@ -147,3 +147,17 @@ describe("Outreach-Handbremse", () => {
     expect(status.dailyCap).toBeGreaterThan(0);
   });
 });
+
+describe("Abmeldung", () => {
+  it("schliesst den Live-Versand ohne Abmelde-Ziel aus", () => {
+    // Der Live-Modus verlangt genau dieses Ziel: /api/outreach/unsubscribe
+    const ohneZiel = outreachStatus({ OUTREACH_LIVE: "1" });
+    expect(ohneZiel.mode).toBe("trockenlauf");
+    const mitZiel = outreachStatus({
+      OUTREACH_LIVE: "1",
+      OUTREACH_UNSUBSCRIBE_BASE_URL: "https://app.cybersarah-ki.com/api/outreach/unsubscribe",
+    });
+    expect(mitZiel.mode).toBe("live");
+    expect(mitZiel.unsubscribeConfigured).toBe(true);
+  });
+});

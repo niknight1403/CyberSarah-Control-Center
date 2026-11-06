@@ -21,6 +21,7 @@ import { AI_INFLUENZA_OUTREACH_SEQUENCE, nextOutreachStep, renderOutreachStep } 
 import { outreachQueueFromLeads, type PrioritizedLead } from "../lib/b2b-lead-priority-logic";
 import { dispatchTransactionalEmail } from "./email-service";
 import { listAiInfluenzaIntroRequests } from "./ai-influenza-intro-request-service";
+import { readOptOutEmails } from "./outreach-optout-service";
 import { toDispatchInput } from "../lib/transactional-email-templates";
 
 export const OUTREACH_DAILY_CAP = 20;
@@ -99,11 +100,17 @@ export async function runOutreachCycle(input: { limit?: number; now?: Date } = {
   );
 
   const base = (process.env.OUTREACH_UNSUBSCRIBE_BASE_URL ?? "").trim();
+  // Abgemeldete Adressen fliegen raus, bevor irgendetwas gerendert wird.
+  const optedOut = await readOptOutEmails();
   const drafts: OutreachDraft[] = [];
   let sent = 0;
   let skipped = 0;
 
   for (const lead of queue) {
+    if (optedOut.has(String(lead.email ?? "").toLowerCase())) {
+      skipped += 1;
+      continue;
+    }
     const createdAt = lead.createdAt ? new Date(lead.createdAt) : now;
     const daysSince = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / (24 * 60 * 60 * 1000)));
     const step = nextOutreachStep(daysSince);

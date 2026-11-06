@@ -44,6 +44,7 @@ import { resolveDigistore24IpnSecret } from "../../lib/digistore24-ipn-config";
 import { checkDatabaseHealth } from "../db";
 import { assertCoreSchemaOnStartup, checkCoreTables } from "../schema-health";
 import { runOutreachCycle } from "../outreach-worker-service";
+import { optOutEmail } from "../outreach-optout-service";
 import { readinessSchemaBlock } from "../../lib/schema-health-logic";
 import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
@@ -342,6 +343,31 @@ async function startServer() {
    * Gesichert ueber METRICS_TOKEN; ohne gesetzten Token bleibt der Endpunkt zu.
    * Ohne OUTREACH_LIVE=1 laeuft der Aufruf als Trockenlauf und versendet nichts.
    */
+  /**
+   * Abmeldung aus dem Outreach. Bewusst ohne Login erreichbar: eine Huerde
+   * vor der Abmeldung ist keine Einwilligung, sondern ein Rechtsverstoss.
+   */
+  app.get("/api/outreach/unsubscribe", async (req, res) => {
+    const email = String(req.query.email ?? "").trim();
+    if (!email.includes("@")) {
+      res.status(400).send("Adresse fehlt oder ist ungueltig.");
+      return;
+    }
+    try {
+      const result = await optOutEmail(email);
+      res
+        .status(200)
+        .type("text/plain; charset=utf-8")
+        .send(
+          result.updated > 0
+            ? "Abgemeldet. Es kommen keine weiteren Mails."
+            : "Diese Adresse ist bereits abgemeldet oder nicht gespeichert. Es kommen keine weiteren Mails.",
+        );
+    } catch (error) {
+      res.status(500).send(`Abmeldung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+
   app.post("/api/cron/outreach", async (req, res) => {
     const token = process.env.METRICS_TOKEN?.trim();
     if (!token || req.header("authorization") !== `Bearer ${token}`) {
