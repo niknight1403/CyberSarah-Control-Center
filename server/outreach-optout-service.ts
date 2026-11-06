@@ -15,6 +15,23 @@ function leadNodeKey(email: string): string {
   return `ai-influenza-lead:${domain}`;
 }
 
+export async function optOutLeadNode(rawNodeKey: string): Promise<{ updated: number; nodeKey: string }> {
+  const nodeKey = rawNodeKey.trim();
+  if (!nodeKey) throw new Error("Knotenschluessel fehlt.");
+  const db = await getDb();
+  if (!db) throw new Error("Datenbank nicht verfügbar.");
+  const result = await db
+    .update(b2bNetworkNodes)
+    .set({
+      optedOut: true,
+      updatedAt: new Date(),
+      metadata: sql`coalesce(${b2bNetworkNodes.metadata}, '{}'::jsonb) || jsonb_build_object('optOutAt', ${new Date().toISOString()}::text)`,
+    })
+    .where(eq(b2bNetworkNodes.nodeKey, nodeKey))
+    .returning({ id: b2bNetworkNodes.id });
+  return { updated: result.length, nodeKey };
+}
+
 export async function optOutEmail(rawEmail: string): Promise<{ updated: number; email: string }> {
   const email = rawEmail.trim().toLowerCase();
   if (!email.includes("@")) throw new Error("Ungueltige Adresse.");

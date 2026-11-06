@@ -23,6 +23,7 @@ import { dispatchTransactionalEmail } from "./email-service";
 import { listAiInfluenzaIntroRequests } from "./ai-influenza-intro-request-service";
 import { readOptOutEmails } from "./outreach-optout-service";
 import { toDispatchInput } from "../lib/transactional-email-templates";
+import { buildUnsubscribeUrl } from "../lib/outreach-unsubscribe-link";
 
 export const OUTREACH_DAILY_CAP = 20;
 
@@ -118,7 +119,10 @@ export async function runOutreachCycle(input: { limit?: number; now?: Date } = {
       skipped += 1;
       continue;
     }
-    const unsubscribe = base ? `${base}${base.includes("?") ? "&" : "?"}email=${encodeURIComponent(String(lead.email ?? ""))}` : "";
+    const unsubscribe = buildUnsubscribeUrl(base, {
+      leadNodeKey: (lead as { leadNodeKey?: string | null }).leadNodeKey ?? null,
+      email: String(lead.email ?? ""),
+    });
     const rendered = renderOutreachStep(step, {
       vorname: firstNameFromEmail(String(lead.email ?? "")),
       firma: (lead.company ?? "").trim() || "dein Betrieb",

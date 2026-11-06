@@ -44,7 +44,7 @@ import { resolveDigistore24IpnSecret } from "../../lib/digistore24-ipn-config";
 import { checkDatabaseHealth } from "../db";
 import { assertCoreSchemaOnStartup, checkCoreTables } from "../schema-health";
 import { runOutreachCycle } from "../outreach-worker-service";
-import { optOutEmail } from "../outreach-optout-service";
+import { optOutEmail, optOutLeadNode } from "../outreach-optout-service";
 import { readinessSchemaBlock } from "../../lib/schema-health-logic";
 import { checkEmailDomain } from "../email-domain-health";
 import { readinessEmailBlock } from "../../lib/email-domain-logic";
@@ -350,13 +350,14 @@ async function startServer() {
    * vor der Abmeldung ist keine Einwilligung, sondern ein Rechtsverstoss.
    */
   app.get("/api/outreach/unsubscribe", async (req, res) => {
+    const leadNodeKey = String(req.query.lead ?? "").trim();
     const email = String(req.query.email ?? "").trim();
-    if (!email.includes("@")) {
-      res.status(400).send("Adresse fehlt oder ist ungueltig.");
+    if (!leadNodeKey && !email.includes("@")) {
+      res.status(400).send("Adresse oder Lead-Kennung fehlt.");
       return;
     }
     try {
-      const result = await optOutEmail(email);
+      const result = leadNodeKey ? await optOutLeadNode(leadNodeKey) : await optOutEmail(email);
       res
         .status(200)
         .type("text/plain; charset=utf-8")
