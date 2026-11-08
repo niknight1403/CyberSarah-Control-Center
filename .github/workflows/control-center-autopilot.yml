@@ -1,8 +1,12 @@
 name: control-center-autopilot
 
 on:
+  # Nach jedem erfolgreichen Deploy laufen lassen, egal ueber welchen Weg
+  # deployt wurde: "CyberSarah Deploy & Sync Secrets" ist der Push-Deploy auf
+  # main, "Render Deploy" der manuelle Lauf. Ohne den Push-Trigger behauptete
+  # der Katalog eine Aktualisierung, die nie stattfand.
   workflow_run:
-    workflows: ["Render Deploy"]
+    workflows: ["Render Deploy", "CyberSarah Deploy & Sync Secrets"]
     types: [completed]
   schedule:
     - cron: "17 */2 * * *"

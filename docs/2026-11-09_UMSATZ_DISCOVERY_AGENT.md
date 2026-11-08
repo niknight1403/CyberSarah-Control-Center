@@ -76,23 +76,31 @@ Schutz gegen Wildwuchs:
 
 ## Autopilot-Katalog
 
-`lib/autopilot-registry-logic.ts` beschreibt jeden Lauf mit Kadenz,
-Schreibzugriff und Absicherung — und sagt ausdruecklich, wo Automatik **nicht**
-sinnvoll ist:
+`lib/autopilot-registry-logic.ts` beschreibt jeden Lauf mit Trigger,
+Verdrahtungs-Referenz, Kadenz, Schreibzugriff und Absicherung — und sagt
+ausdruecklich, wo Automatik **nicht** sinnvoll ist. Details und Regeln:
+`docs/2026-11-09_AUTOPILOT_KATALOG.md`.
 
-| Lauf | Status | Begruendung in Kurzform |
+| Lauf | Trigger | Status |
 | --- | --- | --- |
-| Control-Center (Dachlauf) | aktiv | buendelt alle Schritte, Signale werden gemeinsam bewertet |
-| Hub-Entwuerfe | aktiv | ohne Nachschub verhungert jeder Loop |
-| Umsatz-Discovery | aktiv | sucht nur dort, wo Daten existieren |
-| Outreach-Worker | aktiv | sinnvoll nur oberhalb einer Mindestqualitaet, Trockenlauf als Default |
-| Publishing-Autopilot | aktiv | Verteilung ist der langsamste Teil des Loops |
-| Integrations-Health | empfohlen | 30-Minuten-Cron erst mit Alarmkanal, sonst Rauschen |
-| Marktplatz-DauerScan | empfohlen | wartet auf Plattform-API mit Provisionsdaten |
-| Automatische Preisoptimierung | **nicht sinnvoll** | zu wenig Daten pro Preisstufe — erst Messvolumen |
+| Control-Center (Dachlauf) | Cron `17 */2 * * *` + nach jedem Deploy | aktiv |
+| Hub-Entwuerfe | Kind des Dachlaufs | aktiv |
+| Umsatz-Discovery | Kind des Dachlaufs | aktiv |
+| Revenue-Loop | Cron `40 5 * * *` | aktiv |
+| Publishing | Server-Timer, 60 s | aktiv |
+| Outreach-Worker | Route, Freigabe noetig | aktiv |
+| Integrations-Audit | Cron `15 6 * * *` | aktiv |
+| Tech-Scanner | Cron `30 5 * * *` | aktiv |
+| Integrations-Health | Route, auf Abruf | empfohlen (Alarmkanal fehlt) |
+| Marktplatz-DauerScan | manuell | empfohlen (API-Zahlen fehlen) |
+| Automatische Preisoptimierung | manuell | **nicht sinnvoll** (zu wenig Messvolumen) |
 
-`GET` via tRPC: `autopilots.overview` (protected) liefert den Katalog plus
-`nextSensibleStep`, also den naechsten Ausbau, der sich lohnt.
+`autopilots.overview` (protected) liefert Katalog, Kinder je Dachlauf,
+`issues` aus `validateAutopilotCatalog` und `nextSensibleStep`.
+`autopilots.validate` gibt nur die Regelverstoesse zurueck.
+`tests/autopilot-catalog-wiring.test.ts` prueft jede Referenz gegen den
+echten Workflow, Cron-Ausdruck, Timer oder die Aufrufstelle im Repo — der
+Katalog kann also nicht veralten, ohne dass die Suite rot wird.
 
 ## tRPC-API `revenueDiscovery`
 
