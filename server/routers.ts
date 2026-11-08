@@ -24,6 +24,7 @@ import { keylessSearchRouter } from "./keyless-search";
 import { secretsRouter } from "./secrets-router";
 import { wixRouter } from "./wix-router";
 import { integrationsRouter } from "./integrations-router";
+import { integrationHealthRouter } from "./integration-health-router";
 import { imageGenerationRouter } from "./image-generation-router";
 import { mediaPipelineRouter } from "./media-pipeline-router";
 import { assetPacksRouter } from "./asset-packs-router";
@@ -55,6 +56,7 @@ export const appRouter = router({
   agents: agentsRouter,
   revenue: revenueRouter,
   integrations: integrationsRouter,
+  integrationHealth: integrationHealthRouter,
   imageGeneration: imageGenerationRouter,
   mediaPipeline: mediaPipelineRouter,
   assetPacks: assetPacksRouter,

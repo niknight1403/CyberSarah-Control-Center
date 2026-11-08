@@ -19,10 +19,15 @@
 
 export type ProbeSeverity = "pass" | "warn" | "skip" | "fail";
 
+/** Die drei Integrationen, die live (statt nur per ENV) geprueft werden. */
+export type LiveProbeProvider = "resend" | "tiktok" | "meta";
+
 export type ProbeResult = {
   name: string;
   severity: ProbeSeverity;
   detail: string;
+  /** Erst ab der Durchfuehrung gesetzt; die reinen Auswerter kennen ihn nicht. */
+  provider?: LiveProbeProvider;
 };
 
 /** Platzhalter, die in .env.example / Vorlagen stehen und nie echte Keys sind. */
@@ -404,4 +409,16 @@ export function summarizeProbes(results: readonly ProbeResult[], strict = false)
     failed,
     exitCode: failed > 0 || (strict && warned > 0) ? 1 : 0,
   };
+}
+
+/**
+ * Gesamturteil einer Pruefliste. "Alles uebersprungen" ist bewusst `warn`
+ * und nicht `pass`: ein Lauf ohne eine einzige echte Pruefung darf nicht
+ * wie ein gruener Haken aussehen.
+ */
+export function computeProbeOverall(results: readonly ProbeResult[]): "pass" | "warn" | "fail" {
+  if (results.some((result) => result.severity === "fail")) return "fail";
+  if (results.some((result) => result.severity === "warn")) return "warn";
+  if (results.length === 0 || results.every((result) => result.severity === "skip")) return "warn";
+  return "pass";
 }

@@ -1,0 +1,9 @@
+# Gitleaks-False-Positives (Fingerprint: commit:datei:regel:zeile).
+#
+# f43c0f3: Der DKIM-Public-Key einer Resend-Absenderdomain ist ein
+# OEFFENTLICHER DNS-Record (TXT), kein Geheimnis — Gitleaks stuft den
+# Base64-Block als `generic-api-key` ein. Der Wert wurde in der Doku
+# entfernt (siehe docs/2026-11-08_AUDIT_AUSBAU_RESEND_DNS.md), der
+# historische Commit bleibt aber im Verlauf. Kein Allowlist-Muster, damit
+# echte Keys in Markdown weiterhin anschlagen.
+f43c0f39947e6c2347145323ca5bfaac725d6086:docs/2026-11-08_AUDIT_AUSBAU_RESEND_DNS.md:generic-api-key:44

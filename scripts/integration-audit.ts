@@ -29,20 +29,8 @@ import {
   shouldSendTelegramEvent,
   type DedupeState,
 } from "../lib/telegram-notify-logic";
-import {
-  evaluateDnsAlignment,
-  evaluateMetaAppProbe,
-  evaluateMetaTokenProbe,
-  evaluateResendDomains,
-  evaluateTikTokClientProbe,
-  evaluateTikTokTokenProbe,
-  extractResendRecords,
-  isUsableCredential,
-  looksLikeResendKey,
-  type ProbeResult,
-  type ResendRecord,
-  summarizeProbes,
-} from "../lib/integration-live-probe-logic";
+import { summarizeProbes, type ProbeResult } from "../lib/integration-live-probe-logic";
+import { collectLiveProbes } from "../server/integrations/live-probe-service";
 
 const args = new Set(process.argv.slice(2));
 
@@ -134,178 +122,6 @@ async function fetchOkWithColdStartWake(
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
   return { ...last, wokeUp: false };
-}
-
-type JsonResponse = { status: number; body: unknown };
-
-/**
- * Holt JSON ohne zu werfen. Ein Netzwerkfehler darf den Audit nicht
- * abstuerzen lassen — er wird als Status 0 gemeldet und vom Auswerter
- * als Warnung behandelt.
- *
- * Wichtig: Query-Strings werden aus der Log-Zeile entfernt, weil Meta die
- * Zugangsdaten als `access_token` in der URL traegt. Keine Secrets ins Log.
- */
-async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 12_000): Promise<JsonResponse> {
-  try {
-    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-    const text = await response.text();
-    let body: unknown = text;
-    try {
-      body = JSON.parse(text);
-    } catch {
-      // Kein JSON (z. B. HTML-Fehlerseite eines Proxys) — Roh-Text behalten.
-    }
-    return { status: response.status, body };
-  } catch (error) {
-    const safeUrl = url.replace(/\?.*$/, "");
-    console.log(`INFO  Netzwerkfehler ${safeUrl} — ${error instanceof Error ? error.message : String(error)}`);
-    return { status: 0, body: null };
-  }
-}
-
-/** DNS ueber Cloudflare DoH — kein zusaetzliches Paket, funktioniert im CI. */
-async function resolveDns(name: string, type: string): Promise<string[]> {
-  const endpoint = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`;
-  const { status, body } = await fetchJson(endpoint, { headers: { accept: "application/dns-json" } }, 8_000);
-  if (status !== 200) return [];
-  const answers = (body as { Answer?: { data?: unknown }[] } | null)?.Answer;
-  if (!Array.isArray(answers)) return [];
-  return answers.flatMap((answer) => (typeof answer?.data === "string" ? [answer.data] : []));
-}
-
-async function resolveResendRecords(records: readonly ResendRecord[]): Promise<Record<string, string[]>> {
-  const liveDns: Record<string, string[]> = {};
-  for (const record of records) {
-    liveDns[`${record.type}:${record.name}`] = await resolveDns(record.name, record.type);
-  }
-  return liveDns;
-}
-
-const DEFAULT_RESEND_DOMAIN = "cybersarah-ki.com";
-const GRAPH_BASE = "https://graph.facebook.com/v21.0";
-const TIKTOK_BASE = "https://open.tiktokapis.com/v2";
-
-/**
- * Live-Pruefung der drei Integrationen, die bisher nur "gesetzt ja/nein"
- * kannten. Lesend: kein Versand, kein Posting, keine Budgetaenderung.
- */
-async function runProviderProbes(): Promise<void> {
-  // --- Resend: Absenderdomain + echte DNS-Records ---
-  const resendKey = process.env.RESEND_API_KEY;
-  const resendDomain =
-    process.env.RESEND_DOMAIN?.trim() ||
-    process.env.RESEND_FROM_DOMAIN?.trim().replace(/^.*@/, "") ||
-    DEFAULT_RESEND_DOMAIN;
-
-  if (!isUsableCredential(resendKey)) {
-    report({
-      name: "Resend-Konfiguration",
-      severity: "skip",
-      detail: "RESEND_API_KEY fehlt oder ist ein Platzhalter — Live-Pruefung uebersprungen",
-    });
-  } else {
-    if (!looksLikeResendKey(resendKey)) {
-      report({
-        name: "Resend-Key-Format",
-        severity: "warn",
-        detail: "Key beginnt nicht mit re_ — vermutlich der falsche Schluessel im Secret",
-      });
-    }
-    const auth = { authorization: `Bearer ${resendKey.trim()}` };
-    const domains = await fetchJson("https://api.resend.com/domains", { headers: auth });
-    const evaluation = evaluateResendDomains(domains.status, domains.body, resendDomain);
-    report({ name: "Resend-Absenderdomain", severity: evaluation.severity, detail: evaluation.detail });
-
-    if (evaluation.domain) {
-      const detailResponse = await fetchJson(`https://api.resend.com/domains/${encodeURIComponent(evaluation.domain.id)}`, {
-        headers: auth,
-      });
-      if (detailResponse.status === 200) {
-        const records = extractResendRecords(detailResponse.body);
-        const liveDns = await resolveResendRecords(records);
-        const alignment = evaluateDnsAlignment(records, liveDns);
-        report({ name: "Resend-DNS-Records", severity: alignment.severity, detail: alignment.detail });
-      } else {
-        report({
-          name: "Resend-DNS-Records",
-          severity: "warn",
-          detail: `Domain-Details nicht abrufbar (HTTP ${detailResponse.status}) — DNS-Abgleich uebersprungen`,
-        });
-      }
-
-      const dmarcValues = await resolveDns(`_dmarc.${evaluation.domain.name}`, "TXT");
-      const hasDmarc = dmarcValues.some((value) => value.toLowerCase().includes("v=dmarc1"));
-      report({
-        name: "DMARC-Record",
-        severity: hasDmarc ? "pass" : "warn",
-        detail: hasDmarc
-          ? "DMARC-Richtlinie veroeffentlicht"
-          : `kein TXT _dmarc.${evaluation.domain.name} — Zustellbarkeit leidet, Spam-Einstufung wahrscheinlicher`,
-      });
-    }
-  }
-
-  // --- TikTok ---
-  const tiktokKey = process.env.TIKTOK_CLIENT_KEY;
-  const tiktokSecret = process.env.TIKTOK_CLIENT_SECRET;
-  const tiktokToken = process.env.TIKTOK_ACCESS_TOKEN;
-
-  if (isUsableCredential(tiktokKey) && isUsableCredential(tiktokSecret)) {
-    const probe = await fetchJson(`${TIKTOK_BASE}/oauth/token/`, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_key: tiktokKey.trim(),
-        client_secret: tiktokSecret.trim(),
-        grant_type: "client_credentials",
-      }).toString(),
-    });
-    report(evaluateTikTokClientProbe(probe.status, probe.body));
-  } else {
-    report({
-      name: "TikTok Client-Credentials",
-      severity: "skip",
-      detail: "TIKTOK_CLIENT_KEY/SECRET fehlen oder sind Platzhalter — kein Live-Aufruf",
-    });
-  }
-
-  if (isUsableCredential(tiktokToken)) {
-    const probe = await fetchJson(`${TIKTOK_BASE}/user/info/?fields=display_name`, {
-      headers: { authorization: `Bearer ${tiktokToken.trim()}` },
-    });
-    report(evaluateTikTokTokenProbe(probe.status, probe.body));
-  } else {
-    report({
-      name: "TikTok Access-Token",
-      severity: "skip",
-      detail: "TIKTOK_ACCESS_TOKEN fehlt — lesende Profilpruefung nicht moeglich",
-    });
-  }
-
-  // --- Meta / Instagram ---
-  const metaToken = process.env.META_ACCESS_TOKEN;
-  const metaAppId = process.env.META_APP_ID;
-  const metaSecret = process.env.META_APP_SECRET;
-
-  if (isUsableCredential(metaToken)) {
-    const probe = await fetchJson(`${GRAPH_BASE}/me?fields=id,name&access_token=${encodeURIComponent(metaToken.trim())}`);
-    report(evaluateMetaTokenProbe(probe.status, probe.body));
-  } else if (isUsableCredential(metaAppId) && isUsableCredential(metaSecret)) {
-    // Ohne Nutzer-Token bleibt die App-Identitaet: Graph /{app-id} mit
-    // app_id|app_secret ist die einzige lesende Pruefung ohne Login.
-    const appToken = `${metaAppId.trim()}|${metaSecret.trim()}`;
-    const probe = await fetchJson(
-      `${GRAPH_BASE}/${encodeURIComponent(metaAppId.trim())}?access_token=${encodeURIComponent(appToken)}`,
-    );
-    report(evaluateMetaAppProbe(probe.status, probe.body));
-  } else {
-    report({
-      name: "Meta-Credentials",
-      severity: "skip",
-      detail: "META_ACCESS_TOKEN bzw. META_APP_ID/SECRET fehlen — kein Live-Aufruf",
-    });
-  }
 }
 
 async function main(): Promise<void> {
@@ -416,7 +232,13 @@ async function main(): Promise<void> {
   }
 
   // --- 6. Live-Verifikation: Resend, TikTok, Meta ---
-  await runProviderProbes();
+  // Gleiche Implementierung wie der tRPC-Router `integrationHealth` —
+  // CLI und API koennen nicht auseinanderlaufen.
+  const liveReport = await collectLiveProbes({
+    domain: process.env.RESEND_DOMAIN,
+    logger: (message) => console.log(`INFO  ${message}`),
+  });
+  for (const result of liveReport.results) report(result);
 
   // --- Zusammenfassung ---
   const failed = results.filter((result) => result.severity === "fail");

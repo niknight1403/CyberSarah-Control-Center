@@ -41,7 +41,7 @@ damit ins Leere. Die Records (Namen relativ zu `cybersarah-ki.com`, Provider
 ist Hetzner `ns1.your-server.de`):
 
 ```
-TXT    resend._domainkey   p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDc7O1j3kRp8gskPAn7iUb0UcV1uJSCuUwuUGRNeuadHno5XtqFKy6+4UjqPyET2Wm4NA9aznpJ4s2PmoQPrdRGaq1kRHVg8NcXoMfrwyM20xrSimUuQM6WTCWo/nc+dvWoH76Ex7r2lewHUi2PC0Wy8XIwErOBeA8P1uS0Aw33ywIDAQAB
+TXT    resend._domainkey   <DKIM-Public-Key aus dem Resend-Dashboard>
 MX     send                feedback-smtp.eu-west-1.amazonses.com   (Prio 10)
 TXT    send                v=spf1 include:amazonses.com ~all
 CNAME  rsend               send.forge.rmta.net
@@ -50,6 +50,12 @@ CNAME  rsend               send.forge.rmta.net
 Zusaetzlich fehlt eine DMARC-Richtlinie (`_dmarc.cybersarah-ki.com` liefert
 NXDOMAIN). Empfehlung: `v=DMARC1; p=none; rua=mailto:<admin-postfach>`
 als Einstieg, spaeter auf `quarantine`.
+
+Hinweis: Der DKIM-Wert ist ein oeffentlicher Schluessel, steht hier aber
+bewusst nicht im Klartext — Gitleaks stuft den Base64-Block als
+`generic-api-key` ein und faerbt den Secret-Scan rot. Der exakte Wert steht
+im Resend-Dashboard unter “DNS Records” (oder per
+`GET api.resend.com/domains/<id>`).
 
 Nach dem Eintragen im DNS: Domain im Resend-Dashboard erneut pruefen
 (“Verify DNS Records”), dann `npm run audit` — die beiden Resend-Pruefungen
@@ -70,3 +76,36 @@ meldet `npm run backend:health:all` hier bewusst `FAIL`.
 - Der Python-Check laeuft (noch) nicht in CI: im Repo gibt es keine
   `requirements.txt` auf Root-Ebene, der Audit-Workflow installiert nur Node.
   Aufruf daher lokal bzw. auf dem Host: `npm run backend:health:all`.
+
+## tRPC-Router `integrationHealth`
+
+Damit das Dashboard den Live-Zustand sieht, ohne das CLI zu starten, liegt
+die Durchfuehrung in `server/integrations/live-probe-service.ts`. CLI und
+Router rufen denselben Service auf — zwei Implementierungen wuerden
+irgendwann unterschiedliche Ergebnisse liefern.
+
+| Procedure | Typ | Zweck |
+| --- | --- | --- |
+| `integrationHealth.status` | `protectedProcedure`, Query | Alle Pruefungen mit Severity, Zaehlern und Gesamturteil; optional `provider`-Filter und `force` |
+| `integrationHealth.issues` | `protectedProcedure`, Query | Nur Handlungsbedarfe (`fail`/`warn`) fuer Banner |
+| `integrationHealth.refresh` | `adminProcedure`, Mutation | Verwirft den 5-Minuten-Cache und prueft neu |
+
+Bewusste Entscheidungen:
+
+- **Nicht oeffentlich.** Der bestehende `integrations.list` bleibt
+  oeffentlich (reine ENV-Namen), aber anonyme Provider-Aufrufe waeren eine
+  offene Quota-Tuer.
+- **5-Minuten-Cache** pro Prozess (`DEFAULT_PROBE_TTL_MS`). Ein
+  Dashboard-Reload erzeugt keine zusaetzlichen Resend-/Graph-Aufrufe.
+- **Kein Secret im Payload**: nur Pruefname, Severity und Klartext-Detail.
+- **„Alles uebersprungen" ist `warn`, nicht `pass`** (`computeProbeOverall`)
+  — ein Lauf ohne echte Pruefung darf nicht wie ein gruener Haken aussehen.
+
+Client-Aufruf (Beispiel):
+
+```ts
+const health = await trpc.integrationHealth.status.query();
+if (health.overall !== "pass") {
+  // health.results enthaelt die konkreten Handlungsbedarfe
+}
+```
