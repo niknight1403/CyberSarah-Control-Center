@@ -19,6 +19,7 @@ import {
   evaluateMetaAppProbe,
   evaluateMetaTokenProbe,
   evaluateResendDomains,
+  evaluateRevenueRelayProbe,
   evaluateTikTokClientProbe,
   evaluateTikTokTokenProbe,
   extractResendRecords,
@@ -322,6 +323,36 @@ export async function collectLiveProbes(options: LiveProbeOptions = {}): Promise
         "meta",
       ),
     );
+  }
+
+  // --- Revenue-Engine-Relay: die Scans im Autopilot haengen daran ---
+  const revenueBase = env.REVENUE_OS_API_BASE_URL;
+  if (!isUsableCredential(revenueBase)) {
+    results.push(
+      withProvider(
+        { name: "Revenue-Engine-Relay", severity: "skip", detail: "REVENUE_OS_API_BASE_URL fehlt — Relay nicht pruefbar" },
+        "revenue-engine",
+      ),
+    );
+  } else {
+    let healthUrl: string | null = null;
+    try {
+      const parsed = new URL(revenueBase.trim());
+      healthUrl = `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}/api/healthz`;
+    } catch {
+      healthUrl = null;
+    }
+    if (!healthUrl) {
+      results.push(
+        withProvider(
+          { name: "Revenue-Engine-Relay", severity: "fail", detail: "REVENUE_OS_API_BASE_URL ist keine gueltige URL" },
+          "revenue-engine",
+        ),
+      );
+    } else {
+      const antwort = await fetchJson(healthUrl, { method: "GET" }, fetchImpl, timeoutMs, logger);
+      results.push(evaluateRevenueRelayProbe(antwort.status, antwort.body));
+    }
   }
 
   const summary = summarizeProbes(results);

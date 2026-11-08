@@ -66,3 +66,36 @@ Keine Laufzeit-Telemetrie. Ob der letzte Lauf erfolgreich war, steht in den
 GitHub-Actions-Laeufen und im Server-Log, nicht hier. Der Katalog beschreibt
 die Verdrahtung, damit niemand aus einem gruenen Katalog auf einen gesunden
 Betrieb schliesst.
+
+## Die zwei Blockaden vom 7. November (gelöst am 09.11.)
+
+Der Dachlauf meldete seit dem 07.11.2026 in jedem Lauf `2 echte Blockade(n)`,
+und der Workflow endete deshalb mit Exit 1. Beide Meldungen stammten aus
+denselben zwei Zeilen: `HARA: …` und `Expansion: …`, also aus den beiden
+Revenue-Scan-Triggern.
+
+**Ursache, belegt statt vermutet:** Der Scan geht an
+`https://hub.cybersarah-ki.com/revenue-api/api/{hara|expansion}/scan`. Dieser
+Pfad antwortet aktuell mit `404` (nginx, `Server: nginx/1.24.0`), waehrend
+`/api/hara/scan` auf demselben Host das Control Center selbst erreicht (401
+Login). Der Relay vor der Loopback-Engine auf Port 18741 ist also nicht mehr
+verdrahtet. Beide Scans scheitern damit identisch, und der Lauf zaehlte zwei
+Blockaden, obwohl eine einzige Infrastruktur-Ursache dahinterstand.
+
+**Was geaendert wurde:**
+
+- `scan()` liefert jetzt zusätzlich die Fehlerklasse. Ein Ausfall der
+  Scan-Infrastruktur (`PRECONDITION_FAILED`, `SERVICE_UNAVAILABLE`, Timeout)
+  wird als **offener Punkt** geführt: `HARA-Live-Scan ausgesetzt: … — interne
+  Revenue-Signale laufen weiter`. Echte, unerwartete Fehler bleiben Blockaden.
+  Damit endet der Lauf nicht mehr mit Exit 1 wegen einer toten Fremdstrecke,
+  und verschwiegen wird trotzdem nichts.
+- Der Relay-Zustand ist jetzt Teil von `integrationHealth`: neuer Prüfpunkt
+  `Revenue-Engine-Relay` (200/403 = erreichbar, 404 = Pfad fehlt, 0 = weg).
+  Damit taucht genau dieser Ausfall dort auf, wo Integrationen überwacht
+  werden, statt nur als Zahl im Cron-Log.
+
+**Was offen bleibt:** Der Relay selbst ist Host-Arbeit
+(nginx-Location → 127.0.0.1:18741, Key `X-Revenue-Internal-Key`). Solange er
+fehlt, laufen HARA und Expansion nur über den internen Pfad; `integrationHealth`
+zeigt das als `fail` mit der Ursache.

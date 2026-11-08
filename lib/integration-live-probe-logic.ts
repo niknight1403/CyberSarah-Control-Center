@@ -20,7 +20,7 @@
 export type ProbeSeverity = "pass" | "warn" | "skip" | "fail";
 
 /** Die drei Integrationen, die live (statt nur per ENV) geprueft werden. */
-export type LiveProbeProvider = "resend" | "tiktok" | "meta";
+export type LiveProbeProvider = "resend" | "tiktok" | "meta" | "revenue-engine";
 
 export type ProbeResult = {
   name: string;
@@ -421,4 +421,40 @@ export function computeProbeOverall(results: readonly ProbeResult[]): "pass" | "
   if (results.some((result) => result.severity === "warn")) return "warn";
   if (results.length === 0 || results.every((result) => result.severity === "skip")) return "warn";
   return "pass";
+}
+
+/**
+ * Revenue-Engine-Relay (hub.cybersarah-ki.com/revenue-api → Loopback 18741).
+ *
+ * Die Scans im Control-Center-Autopilot haengen daran. Faellt der Relay aus,
+ * liefert nginx 404 — genau der Fall, der die beiden Scan-Schritte wochenlang
+ * unsichtbar scheitern liess. Deshalb wird der Zustand hier explizit geprueft:
+ * 200/403 = erreichbar (403 ist der Key-Schutz), 404 = Pfad fehlt, sonst weg.
+ */
+export function evaluateRevenueRelayProbe(status: number, body: unknown): ProbeResult & { provider: LiveProbeProvider } {
+  const provider: LiveProbeProvider = "revenue-engine";
+  const name = "Revenue-Engine-Relay";
+  if (status === 200 || status === 403) {
+    return {
+      provider,
+      name,
+      severity: "pass",
+      detail: status === 403 ? "Relay erreichbar, interner Key verlangt (403)" : "Relay erreichbar (200)",
+    };
+  }
+  if (status === 404) {
+    return {
+      provider,
+      name,
+      severity: "fail",
+      detail: "Relay-Pfad fehlt: /revenue-api liefert 404 — HARA- und Expansion-Scan laufen nur noch ueber den internen Pfad",
+    };
+  }
+  if (status === 0) {
+    return { provider, name, severity: "fail", detail: "Relay nicht erreichbar (Netzwerkfehler oder Timeout)" };
+  }
+  const record = asRecord(body);
+  const raw = record && typeof record.error === "string" ? record.error : "";
+  const zusatz = raw ? ` (${raw.slice(0, 80)})` : "";
+  return { provider, name, severity: status >= 500 ? "fail" : "warn", detail: `Unerwartete Antwort HTTP ${status}${zusatz}` };
 }

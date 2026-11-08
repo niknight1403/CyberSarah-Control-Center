@@ -5,6 +5,7 @@ import {
   evaluateMetaAppProbe,
   evaluateMetaTokenProbe,
   evaluateResendDomains,
+  evaluateRevenueRelayProbe,
   evaluateTikTokClientProbe,
   evaluateTikTokTokenProbe,
   extractResendRecords,
@@ -253,5 +254,26 @@ describe("Zusammenfassung", () => {
   it("bricht im Strict-Modus auch bei Warnungen ab", () => {
     expect(summarizeProbes(results, false).exitCode).toBe(0);
     expect(summarizeProbes(results, true).exitCode).toBe(1);
+  });
+});
+
+describe("Revenue-Engine-Relay", () => {
+  it("wertet 200 und 403 als erreichbar", () => {
+    expect(evaluateRevenueRelayProbe(200, null).severity).toBe("pass");
+    const geschuetzt = evaluateRevenueRelayProbe(403, { error: "Key noetig" });
+    expect(geschuetzt.severity).toBe("pass");
+    expect(geschuetzt.detail).toMatch(/403/);
+  });
+
+  it("meldet ein fehlendes Relay (404) als Fehler mit Ursache", () => {
+    const result = evaluateRevenueRelayProbe(404, "Not Found");
+    expect(result.severity).toBe("fail");
+    expect(result.detail).toMatch(/Relay-Pfad fehlt/);
+    expect(result.provider).toBe("revenue-engine");
+  });
+
+  it("behandelt Netzwerkfehler als Fehler und 5xx als Fehler", () => {
+    expect(evaluateRevenueRelayProbe(0, null).detail).toMatch(/nicht erreichbar/);
+    expect(evaluateRevenueRelayProbe(502, null).severity).toBe("fail");
   });
 });

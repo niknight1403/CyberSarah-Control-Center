@@ -109,7 +109,7 @@ describe("Live-Probe-Service", () => {
 
   it("ueberspringt alles ohne Schluessel und meldet das nicht als gruen", async () => {
     const report = await collectLiveProbes({ env: {}, fetchImpl: fakeFetch([]).impl, domain: DOMAIN });
-    expect(report.results).toHaveLength(4);
+    expect(report.results).toHaveLength(5);
     expect(report.results.every((result) => result.severity === "skip")).toBe(true);
     expect(report.overall).toBe("warn");
   });
@@ -193,7 +193,7 @@ describe("Live-Probe-Service", () => {
     expect(resend.every((result) => result.severity === "pass")).toBe(true);
     // TikTok/Meta sind ohne Schluessel skip — ein Lauf mit echten gruenen
     // Pruefungen bleibt trotzdem gruen.
-    expect(report.results.filter((result) => result.severity === "skip")).toHaveLength(3);
+    expect(report.results.filter((result) => result.severity === "skip")).toHaveLength(4);
   });
 
   it("prueft Meta per App-Credentials, wenn kein Nutzer-Token da ist", async () => {

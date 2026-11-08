@@ -124,4 +124,27 @@ describe("control center autopilot", () => {
     expect(result.blocked.join(" ")).toContain("Relay offline");
     expect(result.decision.action).toBe("HEAL");
   });
+
+  it("wertet einen toten Revenue-Relay als offenen Punkt statt als Blockade", async () => {
+    const scan = vi.fn(async () => {
+      const fehler = new Error("Revenue-Scan konnte nicht gestartet oder bestaetigt werden.") as Error & { code?: string };
+      fehler.code = "SERVICE_UNAVAILABLE";
+      throw fehler;
+    });
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts, ...growthDeps });
+
+    expect(result.blocked).toEqual([]);
+    expect(result.deferred.join(" ")).toContain("HARA-Live-Scan ausgesetzt");
+    expect(result.deferred.join(" ")).toContain("Expansion-Live-Scan ausgesetzt");
+    expect(result.deferred.join(" ")).toContain("interne Revenue-Signale laufen weiter");
+    // Der interne Revenue-Pfad laeuft trotzdem.
+    expect(revenue).toHaveBeenCalled();
+  });
+
+  it("haelt einen unerwarteten Scan-Fehler weiterhin als Blockade", async () => {
+    const scan = vi.fn(async () => { throw new Error("kaputt"); });
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts, ...growthDeps });
+    expect(result.blocked.join(" ")).toContain("HARA: kaputt");
+    expect(result.blocked.join(" ")).toContain("Expansion: kaputt");
+  });
 });

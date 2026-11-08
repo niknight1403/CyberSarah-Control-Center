@@ -63,15 +63,31 @@ export type ControlCenterAutopilotDeps = {
   discovery?: typeof runRevenueDiscovery;
 };
 
-async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
+async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan): Promise<{
+  ok: boolean;
+  detail: string;
+  /**
+   * "infrastructure" = Relay/Engine nicht erreichbar oder nicht konfiguriert.
+   * Das ist kein Datenfehler: die internen Revenue-Signale laufen trotzdem,
+   * deshalb darf ein solcher Ausfall den Lauf nicht als Blockade beenden.
+   */
+  failureKind: "none" | "infrastructure" | "unknown";
+}> {
   try {
     const result = await trigger(path);
     return {
       ok: result.accepted === true,
       detail: result.background ? "vom echten Revenue-Worker angenommen" : result.completed ? "vom echten Revenue-Worker abgeschlossen" : "angenommen",
+      failureKind: "none",
     };
   } catch (error) {
-    return { ok: false, detail: error instanceof Error ? error.message : "Scan fehlgeschlagen" };
+    const code = (error as { code?: string } | null)?.code;
+    const infrastructure = code === "PRECONDITION_FAILED" || code === "SERVICE_UNAVAILABLE";
+    return {
+      ok: false,
+      detail: error instanceof Error ? error.message : "Scan fehlgeschlagen",
+      failureKind: infrastructure ? "infrastructure" : "unknown",
+    };
   }
 }
 
@@ -140,8 +156,18 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   catch (error) { salesCatalogError = error instanceof Error ? error.message : "Katalog-Schritt fehlgeschlagen"; }
   const deferred: string[] = [];
   const blocked: string[] = [];
-  if (hara.ok) realActions.push("HARA-Live-Scan gestartet"); else blocked.push(`HARA: ${hara.detail}`);
-  if (expansion.ok) realActions.push("Expansion-Live-Scan gestartet"); else blocked.push(`Expansion: ${expansion.detail}`);
+  for (const [label, result] of [["HARA", hara], ["Expansion", expansion]] as const) {
+    if (result.ok) { realActions.push(`${label}-Live-Scan gestartet`); continue; }
+    if (result.failureKind === "infrastructure") {
+      // Die externen Scans sind Zusatzsignale; der interne Revenue-Pfad
+      // (runRevenueAutopilot) laeuft im selben Lauf weiter. Ein toter Relay
+      // wird deshalb als offener Punkt gemeldet statt den ganzen Lauf zu
+      // blockieren — verschwinden darf er aber nicht.
+      deferred.push(`${label}-Live-Scan ausgesetzt: ${result.detail} (interne Revenue-Signale laufen weiter)`);
+      continue;
+    }
+    blocked.push(`${label}: ${result.detail}`);
+  }
   if ((drafts.generated.content ?? 0) > 0) realActions.push(`${drafts.generated.content} Creator-Content-Entwürfe erzeugt`);
   if ((drafts.generated.idea ?? 0) > 0) realActions.push(`${drafts.generated.idea} Produktideen erzeugt`);
   if ((drafts.generated["revenue-loop"] ?? 0) > 0) realActions.push(`${drafts.generated["revenue-loop"]} Revenue-Loop-Entwürfe erzeugt`);
