@@ -3,7 +3,8 @@ name: Integrations-Audit
 # Sprint 196 — E2E-Pruefung aller Betriebs-Bruecken gegen das LIVE-Backend.
 # Nutzt npm run audit (scripts/integration-audit.ts): Backend-Health,
 # 429-Fallback-Simulation, Telegram-Bruecke (Konfiguration + optionaler
-# Echtversand), Tool-Proxy-Queue-Verhalten.
+# Echtversand), Tool-Proxy-Queue-Verhalten sowie Live-Verifikation von
+# Resend (Absenderdomain + DNS-Records), TikTok und Meta.
 # Secrets kommen aus den Repo-Secrets — nie im Klartext im Workflow.
 
 on:
@@ -47,6 +48,16 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           AUDIT_TARGET: ${{ secrets.AUDIT_TARGET }}
+          # Live-Verifikation (Sprint-Audit-Ausbau): gesetzt = wird geprueft,
+          # nicht gesetzt = Skip mit sichtbarem Hinweis (kein falsches Rot).
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_DOMAIN: ${{ secrets.RESEND_DOMAIN }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
         run: |
           ARGS=""
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.sendTelegramTest }}" = "true" ]; then

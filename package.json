@@ -38,7 +38,11 @@
     "hubspot:write-check": "tsx scripts/hubspot-write-roundtrip.ts",
     "hubspot:mrr-check": "tsx scripts/hubspot-mrr-check.ts",
     "db:audit": "tsx scripts/db-schema-audit.ts",
-    "db:migrate": "tsx scripts/db-schema-audit.ts --apply"
+    "db:migrate": "tsx scripts/db-schema-audit.ts --apply",
+    "backend:live": "python scripts/backend_health_check.py --live",
+    "backend:worker": "python scripts/backend_health_check.py --worker",
+    "backend:health:all": "python scripts/backend_health_check.py --all",
+    "audit:strict": "tsx scripts/integration-audit.ts --strict"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
