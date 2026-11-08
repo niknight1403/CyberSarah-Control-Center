@@ -25,6 +25,9 @@ import { secretsRouter } from "./secrets-router";
 import { wixRouter } from "./wix-router";
 import { integrationsRouter } from "./integrations-router";
 import { integrationHealthRouter } from "./integration-health-router";
+import { hubDraftsRouter } from "./hub-drafts-router";
+import { revenueDiscoveryRouter } from "./revenue-discovery-router";
+import { autopilotsRouter } from "./autopilots-router";
 import { imageGenerationRouter } from "./image-generation-router";
 import { mediaPipelineRouter } from "./media-pipeline-router";
 import { assetPacksRouter } from "./asset-packs-router";
@@ -57,6 +60,9 @@ export const appRouter = router({
   revenue: revenueRouter,
   integrations: integrationsRouter,
   integrationHealth: integrationHealthRouter,
+  hubDrafts: hubDraftsRouter,
+  revenueDiscovery: revenueDiscoveryRouter,
+  autopilots: autopilotsRouter,
   imageGeneration: imageGenerationRouter,
   mediaPipeline: mediaPipelineRouter,
   assetPacks: assetPacksRouter,

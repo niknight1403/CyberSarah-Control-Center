@@ -2,20 +2,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LiveProbeReport } from "../server/integrations/live-probe-service";
 
-const mocks = vi.hoisted(() => ({
+import { createIntegrationHealthRouter } from "../server/integration-health-router";
+import { router } from "../server/_core/trpc";
+
+const mocks = {
   getLiveProbes: vi.fn(),
   resetLiveProbeCache: vi.fn(),
-}));
+};
 
-vi.mock("../server/integrations/live-probe-service", () => ({
-  getLiveProbes: mocks.getLiveProbes,
-  resetLiveProbeCache: mocks.resetLiveProbeCache,
-  // Nur der Router steht hier auf dem Pruefstand; der Service selbst hat
-  // eigene Tests (tests/live-probe-service.test.ts).
-  collectLiveProbes: vi.fn(),
-}));
+/**
+ * Router-Instanz mit eingespeisten Abhaengigkeiten statt Modul-Mock:
+ * `isolate: false` teilt die Modul-Registry ueber Testdateien hinweg.
+ */
+function testRouter() {
+  return router({
+    integrationHealth: createIntegrationHealthRouter({
+      probes: mocks.getLiveProbes as never,
+      resetCache: mocks.resetLiveProbeCache,
+    }),
+  });
+}
 
-const { appRouter } = await import("../server/routers");
 type TrpcContext = import("../server/_core/context").TrpcContext;
 
 function report(overrides: Partial<LiveProbeReport> = {}): LiveProbeReport {
@@ -70,12 +77,12 @@ describe("integrationHealth-Router", () => {
   });
 
   it("verlangt eine Anmeldung", async () => {
-    const caller = appRouter.createCaller(context(null));
+    const caller = testRouter().createCaller(context(null));
     await expect(caller.integrationHealth.status()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("liefert Zaehler und Severities statt Rohdaten", async () => {
-    const caller = appRouter.createCaller(context("user"));
+    const caller = testRouter().createCaller(context("user"));
     const result = await caller.integrationHealth.status();
 
     expect(result.domain).toBe("cybersarah-ki.com");
@@ -91,7 +98,7 @@ describe("integrationHealth-Router", () => {
   });
 
   it("filtert nach Provider und rechnet das Urteil neu", async () => {
-    const caller = appRouter.createCaller(context("user"));
+    const caller = testRouter().createCaller(context("user"));
     const meta = await caller.integrationHealth.status({ provider: "meta" });
 
     expect(meta.results).toHaveLength(1);
@@ -100,16 +107,16 @@ describe("integrationHealth-Router", () => {
   });
 
   it("reicht force an den Service durch", async () => {
-    const caller = appRouter.createCaller(context("user"));
+    const caller = testRouter().createCaller(context("user"));
     await caller.integrationHealth.status({ force: true });
     expect(mocks.getLiveProbes).toHaveBeenCalledWith({ force: true });
   });
 
   it("erlaubt den erzwungenen Lauf nur Admins", async () => {
-    const userCaller = appRouter.createCaller(context("user"));
+    const userCaller = testRouter().createCaller(context("user"));
     await expect(userCaller.integrationHealth.refresh()).rejects.toMatchObject({ code: "FORBIDDEN" });
 
-    const adminCaller = appRouter.createCaller(context("admin"));
+    const adminCaller = testRouter().createCaller(context("admin"));
     const result = await adminCaller.integrationHealth.refresh();
     expect(mocks.resetLiveProbeCache).toHaveBeenCalledTimes(1);
     expect(mocks.getLiveProbes).toHaveBeenCalledWith({ force: true });
@@ -117,7 +124,7 @@ describe("integrationHealth-Router", () => {
   });
 
   it("liefert nur Handlungsbedarfe fuer Banner", async () => {
-    const caller = appRouter.createCaller(context("user"));
+    const caller = testRouter().createCaller(context("user"));
     const result = await caller.integrationHealth.issues();
 
     expect(result.count).toBe(3);
@@ -133,7 +140,7 @@ describe("integrationHealth-Router", () => {
         results: [{ name: "Resend-Absenderdomain", severity: "pass", detail: "verifiziert", provider: "resend" }],
       }),
     );
-    const caller = appRouter.createCaller(context("user"));
+    const caller = testRouter().createCaller(context("user"));
     const result = await caller.integrationHealth.issues();
     expect(result).toMatchObject({ count: 0, overall: "pass" });
   });

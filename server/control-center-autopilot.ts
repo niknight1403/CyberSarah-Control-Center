@@ -8,6 +8,8 @@ import { assertControlCenterAutopilotEnabled } from "../lib/control-center-opera
 import { revenueThroughputOverview } from "./revenue-throughput-service";
 import { runAiInfluenzaAutopilotStep, type AiInfluenzaAutopilotResult } from "./ai-influenza-autopilot";
 import { runSalesCatalogStep, type SalesCatalogRunResult } from "./ai-influenza-sales-catalog";
+import { runHubDraftAutopilot, type HubDraftRunResult } from "./hub-draft-autopilot";
+import { runRevenueDiscovery, type DiscoveryRunResult } from "./revenue-discovery-service";
 
 export type ControlCenterAutopilotResult = {
   ok: boolean;
@@ -36,6 +38,10 @@ export type ControlCenterAutopilotResult = {
   aiInfluenza: AiInfluenzaAutopilotResult | null;
   /** AI Influenza Team: Kataloglage auf Stripe und Digistore24. */
   salesCatalog: SalesCatalogRunResult | null;
+  /** Hub-Abdeckung: alle vier Loop-Stufen je Geschaeftsbereich bespielt. */
+  hubDrafts: HubDraftRunResult | null;
+  /** Umsatz-Discovery: neue oder integrierbare Umsatzwege als Ideen-Entwurf. */
+  revenueDiscovery: DiscoveryRunResult | null;
   realActions: string[];
   deferred: string[];
   blocked: string[];
@@ -53,6 +59,8 @@ export type ControlCenterAutopilotDeps = {
   throughput?: typeof revenueThroughputOverview;
   aiInfluenza?: typeof runAiInfluenzaAutopilotStep;
   salesCatalog?: typeof runSalesCatalogStep;
+  hubDrafts?: typeof runHubDraftAutopilot;
+  discovery?: typeof runRevenueDiscovery;
 };
 
 async function scan(path: "hara/scan" | "expansion/scan", trigger: typeof triggerRevenueScan) {
@@ -86,10 +94,20 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   const throughputRunner = deps.throughput ?? revenueThroughputOverview;
   const influenzaRunner = deps.aiInfluenza ?? runAiInfluenzaAutopilotStep;
   const catalogRunner = deps.salesCatalog ?? runSalesCatalogStep;
+  const hubDraftRunner = deps.hubDrafts ?? runHubDraftAutopilot;
+  const discoveryRunner = deps.discovery ?? runRevenueDiscovery;
 
   const [hara, expansion] = await Promise.all([scan("hara/scan", trigger), scan("expansion/scan", trigger)]);
   const revenue = await runRevenue(5);
   const drafts = await runDrafts();
+  let hubDrafts: HubDraftRunResult | null = null;
+  let hubDraftError: string | null = null;
+  try { hubDrafts = await hubDraftRunner(); }
+  catch (error) { hubDraftError = error instanceof Error ? error.message : "Hub-Entwuerfe fehlgeschlagen"; }
+  let discovery: DiscoveryRunResult | null = null;
+  let discoveryError: string | null = null;
+  try { discovery = await discoveryRunner(); }
+  catch (error) { discoveryError = error instanceof Error ? error.message : "Umsatz-Discovery fehlgeschlagen"; }
   const [learning, b2b] = await Promise.all([learnInfluencers(), getB2BOverview()]);
   const growth = {
     influencerPersonasLearned: learning.evolutions.length,
@@ -134,6 +152,19 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (growth.b2bPersonaAssignments > 0) realActions.push(`${growth.b2bPersonaAssignments} B2B-Beziehungen autonom passenden KI-Personas zugeordnet`);
   if (growth.b2bExpansionQueue > 0) realActions.push(`${growth.b2bExpansionQueue} B2B-Expansion-/Nurture-Aktionen priorisiert`);
   realActions.push(`SaaS Loop Engineering: Fokus ${growth.saasLoopFocus}, Owner-Persona ${growth.saasLoopOwnerPersona}`);
+  if (hubDraftError) blocked.push(`Hub-Entwuerfe: ${hubDraftError}`);
+  if (hubDrafts) {
+    if (hubDrafts.created > 0) realActions.push(`${hubDrafts.created} Hub-Entwuerfe erzeugt (${hubDrafts.coverage.coveragePct}% Loop-Abdeckung)`);
+    if (hubDrafts.loopDrafts.created > 0) realActions.push(`${hubDrafts.loopDrafts.created} Loop-Engineering-Entwurf/Entwuerfe je Bereich erzeugt`);
+    if (hubDrafts.skipped.length > 0) deferred.push(`Hub-Entwuerfe: ${hubDrafts.skipped.length} uebersprungen (${hubDrafts.skipped.slice(0, 2).map(item => `${item.hub}/${item.stage}: ${item.reason}`).join(" · ")})`);
+    if (hubDrafts.coverage.emptyHubs.length > 0) deferred.push(`Hub-Entwuerfe: noch ohne jede Stufe: ${hubDrafts.coverage.emptyHubs.join(", ")}`);
+  }
+  if (discoveryError) blocked.push(`Umsatz-Discovery: ${discoveryError}`);
+  if (discovery) {
+    if (discovery.created > 0) realActions.push(`${discovery.created} Umsatz-Kandidat(en) als Entwurf zur Freigabe vorgelegt (${discovery.integrate} integrierbar, ${discovery.test} zu testen)`);
+    if (discovery.created === 0 && discovery.evaluated > 0) deferred.push(`Umsatz-Discovery: ${discovery.evaluated} Kandidat(en) bewertet, keiner neu (bereits vorgelegt oder zu schwach)`);
+    if (discovery.integrate > 0) realActions.push(`Umsatz-Discovery: ${discovery.integrate} Kandidat(en) mit vollstaendigem Beleg integrierbar`);
+  }
   if (growthPulse?.generated) realActions.push(`${growthPulse.generated} datenbasierte Reichweiten-/Funnel-Entwuerfe erzeugt`);
   if (growthError) blocked.push(`Growth Pulse: ${growthError}`);
   if (throughputError) blocked.push(`Revenue Throughput: ${throughputError}`);
@@ -187,6 +218,8 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
     throughput,
     aiInfluenza,
     salesCatalog,
+    hubDrafts,
+    revenueDiscovery: discovery,
     realActions,
     deferred,
     blocked,

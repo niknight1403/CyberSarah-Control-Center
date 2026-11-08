@@ -38,7 +38,24 @@ describe("control center autopilot", () => {
   // Katalog-Schritt ebenfalls als Fake: er wuerde sonst Plaene aus der
   // Umgebung bauen und den Test von Secrets abhaengig machen.
   const salesCatalog = async () => ({ dryRun: true, plans: 0, executed: 0, skipped: 0, needsReview: 0, created: [], reused: [], blocked: [], error: null });
-  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput, aiInfluenza, salesCatalog };
+  // Hub-Entwuerfe ebenfalls gefaked: der echte Lauf braucht die Entwurfs-Queue
+  // in der Datenbank und wuerde den Test an ein laufendes Postgres binden.
+  const hubDrafts = (async () => ({
+    ok: true, dryRun: false, startedAt: "2026-11-09T08:00:00.000Z",
+    planned: 8, created: 3, duplicates: 0, skipped: [],
+    loopDrafts: { planned: 4, created: 1, duplicates: 0 },
+    jobs: [], note: "Nur pending-Entwuerfe erzeugt.",
+    coverage: { hubs: [], totalStages: 32, coveredStages: 11, coveragePct: 34, completeHubs: ["hara", "saas"], emptyHubs: [] },
+  })) as never;
+  // Discovery ebenfalls gefaked: der echte Lauf liest Katalog und Entwuerfe
+  // aus der Datenbank.
+  const discovery = (async () => ({
+    ok: true, dryRun: false, startedAt: "2026-11-09T08:00:00.000Z", periodKey: "2026-W45",
+    evaluated: 5, integrate: 1, test: 2, review: 1, skip: 1, created: 1, duplicates: 0,
+    drafts: [{ title: "Kandidat", score: 74, verdict: "integrate", dedupeKey: "discovery:x", hub: "loop" }],
+    top: [], skipped: [], note: "Ideen-Entwuerfe angelegt.",
+  })) as never;
+  const growthDeps = { learnInfluencers, b2bOverview, growth: growthPulse, throughput, aiInfluenza, salesCatalog, hubDrafts, discovery };
 
   it("orchestriert echte Scans, Revenue und Drafts in einem Lauf", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
@@ -55,6 +72,7 @@ describe("control center autopilot", () => {
     expect(result.growthPulse?.generated).toBe(1);
     expect(result.realActions.join(" ")).toContain("Reichweiten");
     expect(result.realActions.join(" ")).toContain("Influencer-Personas");
+    expect(result.realActions.join(" ")).toContain("Hub-Entwuerfe erzeugt");
     expect(result.decision.action).toBe("VERIFY");
   });
 

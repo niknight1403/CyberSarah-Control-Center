@@ -48,6 +48,10 @@ export type ContentDraftPayload = {
   disclosure?: string;
   reviewFlags?: string[];
   commerceSource?: { provider: "stripe"; productId: string; priceId: string };
+  /** Geschaeftsbereich, fuer den der Entwurf gebaut wurde (Hub-Abdeckung). */
+  hub?: string;
+  /** Stufe im Loop: attention | trust | offer | reuse. */
+  loopStage?: string;
 };
 
 export type RevenueLoopDraftPayload = {
@@ -147,8 +151,10 @@ export function validateDraftPayload(
       return [{ format, variant, content: assetContent, ...(title ? { title } : {}), ...(cta ? { cta } : {}), ...(qualityReason ? { qualityReason } : {}) }];
     }).slice(0, 30) : undefined;
     const disclosure = nonEmpty(raw.disclosure, 600) ?? undefined;
+    const hubTag = nonEmpty(raw.hub, 40) ?? undefined;
+    const loopStageTag = nonEmpty(raw.loopStage, 16) ?? undefined;
     const reviewFlags = contentEvidenceReview([topic, content, ...(assets?.map(asset => asset.content) ?? [])].join("\n"), disclosure);
-    return { valid: true, payload: { personaId, platform, topic, content, ...(assets?.length ? { assets, assetCount: assets.length } : {}), ...(disclosure ? { disclosure } : {}), ...(reviewFlags.length ? { reviewFlags } : {}) }, title: topic.slice(0, 120) };
+    return { valid: true, payload: { personaId, platform, topic, content, ...(assets?.length ? { assets, assetCount: assets.length } : {}), ...(disclosure ? { disclosure } : {}), ...(reviewFlags.length ? { reviewFlags } : {}), ...(hubTag ? { hub: hubTag } : {}), ...(loopStageTag ? { loopStage: loopStageTag } : {}) }, title: topic.slice(0, 120) };
   }
   if (kind === "revenue-loop") {
     const rawHub = nonEmpty(raw.hub, 40);

@@ -46,7 +46,17 @@ function shapeReport(report: LiveProbeReport, provider?: LiveProbeProvider) {
   };
 }
 
-export const integrationHealthRouter = router({
+export type IntegrationHealthDeps = {
+  /** Live-Pruefung; im Test durch eine feste Antwort ersetzt. */
+  probes?: (options?: { force?: boolean }) => Promise<LiveProbeReport>;
+  resetCache?: () => void;
+};
+
+export function createIntegrationHealthRouter(deps: IntegrationHealthDeps = {}) {
+  const probes = deps.probes ?? ((options?: { force?: boolean }) => getLiveProbes({ force: options?.force ?? false }));
+  const dropCache = deps.resetCache ?? resetLiveProbeCache;
+
+  return router({
   /**
    * Aktueller Live-Zustand. Nutzt den 5-Minuten-Cache, damit ein
    * Dashboard-Reload keine zusaetzlichen Provider-Aufrufe erzeugt.
@@ -61,14 +71,14 @@ export const integrationHealthRouter = router({
         .optional(),
     )
     .query(async ({ input }) => {
-      const report = await getLiveProbes({ force: input?.force ?? false });
+      const report = await probes({ force: input?.force ?? false });
       return shapeReport(report, input?.provider);
     }),
 
   /** Erzwingt einen frischen Live-Lauf (Cache wird verworfen). */
   refresh: adminProcedure.mutation(async () => {
-    resetLiveProbeCache();
-    const report = await getLiveProbes({ force: true });
+    dropCache();
+    const report = await probes({ force: true });
     return shapeReport(report);
   }),
 
@@ -77,7 +87,7 @@ export const integrationHealthRouter = router({
    * der Client die Severity-Logik nachbauen muss.
    */
   issues: protectedProcedure.query(async () => {
-    const report = await getLiveProbes();
+    const report = await probes();
     const issues = report.results.filter((result) => result.severity === "fail" || result.severity === "warn");
     return {
       checkedAt: report.checkedAt,
@@ -96,4 +106,8 @@ export const integrationHealthRouter = router({
       })),
     };
   }),
-});
+  });
+}
+
+/** Produktions-Instanz fuer den App-Router. */
+export const integrationHealthRouter = createIntegrationHealthRouter();
