@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-08T11:26:31",
-  "aktiv": "gemini",
-  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
-  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemma-4-26b-a4b-it",
+  "stand": "2026-11-08T17:11:37",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "qwen/qwen3.8-27b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "VERFUEGBAR",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
       "http_status": null,
-      "modell": "gemma-4-26b-a4b-it",
-      "detail": "gemma-4-26b-a4b-it",
+      "modell": "gemma-4-31b-it",
+      "detail": "000 gemma-4-31b-it",
       "hinweis": null
     },
     {
@@ -31,11 +31,11 @@
     },
     {
       "id": "openrouter",
-      "status": "VERFUEGBAR",
-      "http_status": null,
+      "status": "LIMIT ERREICHT",
+      "http_status": 429,
       "modell": "xingchen-agi/xing4.0-29b-a4b:free",
-      "detail": "xingchen-agi/xing4.0-29b-a4b:free",
-      "hinweis": null
+      "detail": "429 xingchen-agi/xing4.0-29b-a4b:free",
+      "hinweis": "Changer rotiert weiter"
     },
     {
       "id": "cerebras",
