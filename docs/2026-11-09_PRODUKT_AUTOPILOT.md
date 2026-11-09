@@ -9,7 +9,7 @@ und Katalogeintrag im eigenen Dashboard. Er verkauft nichts und erfindet nichts.
 |---|---|
 | Reine Logik (Auswahl, Parameter, Antworten) | `lib/product-autopilot-logic.ts` |
 | Ablauf, Netzwerk, Datenbank | `server/product-autopilot.ts` |
-| Ideenkatalog (versioniert, mit Begruendung) | `config/product-ideas.json` |
+| Ideenkatalog (versioniert, mit Begruendung) | `lib/product-ideas.ts` |
 | Endpunkte | `server/_core/index.ts` |
 | Zeitplan | `.github/workflows/product-autopilot.yml` |
 | Tests | `tests/product-autopilot.test.ts` (21) |
@@ -44,6 +44,15 @@ GET  /api/product-autopilot/status
 Fehler werden je Idee festgehalten (`status = retry`, ab dem dritten Versuch
 `failed`), ein Fehlschlag stoppt die anderen Ideen nicht.
 
+## Warum der Katalog im Build steckt
+
+Der Server laeuft als gebuendeltes `dist/index.js`. Ein relativer Pfad zu einer
+JSON-Datei war dort nicht verlaesslich vorhanden (erster Produktionslauf: "Ideenkatalog
+nicht gefunden", Status `blocked`). Der Katalog liegt deshalb als TS-Modul
+`lib/product-ideas.ts` und reist im Build mit. Fuer Sonderfaelle laesst sich per
+`PRODUCT_IDEAS_FILE` eine JSON-Datei davorlegen; der Status-Endpunkt nennt die
+benutzte Quelle (`ideasSource`).
+
 ## Grenzen, absichtlich
 
 - **Freigabe bleibt manuell.** Digistore24 gibt Produkte erst nach Freigabe im
@@ -51,7 +60,7 @@ Fehler werden je Idee festgehalten (`status = retry`, ab dem dritten Versuch
   aber nichts. Der Autopilot legt an, der Mensch gibt frei.
 - **Obergrenzen.** Hoechstens 3 Produkte je Lauf, 20 insgesamt. Ein Autopilot ohne
   Deckel produziert Muell.
-- **Ideen sind kuratiert.** `config/product-ideas.json` enthaelt Begruendung und
+- **Ideen sind kuratiert.** `lib/product-ideas.ts` enthaelt Begruendung und
   ein `approved`-Flag. Ideen ohne Freigabe (z. B. Scale) bleiben liegen, bis
   Starter und Pro Umsatz zeigen.
 - **Keine Umsatzerfindung.** Neue Produkte starten mit 0 Verkaeufen und 0 EUR.

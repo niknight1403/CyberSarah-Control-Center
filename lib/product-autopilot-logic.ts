@@ -47,7 +47,7 @@ export type PlannedProduct = {
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ALLOWED_INTERVALS: ProductInterval[] = ["1_month", "3_month", "6_month", "12_month"];
 
-/** Nimmt den Inhalt von config/product-ideas.json und behaelt nur brauchbare Ideen. */
+/** Nimmt einen Ideenkatalog (JSON-Form) und behaelt nur brauchbare Ideen. */
 export function parseProductIdeas(raw: unknown): ProductIdea[] {
   const list = Array.isArray(raw) ? raw : [];
   const seen = new Set<string>();

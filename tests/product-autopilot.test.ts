@@ -43,8 +43,9 @@ describe("Produkt-Autopilot: Ideenkatalog", () => {
     expect(parseProductIdeas([idea(), idea()])).toHaveLength(1);
   });
 
-  it("liest den echten Katalog aus config/product-ideas.json", () => {
-    const { ideas, error } = loadProductIdeas();
+  it("liest den gebuendelten Katalog", () => {
+    const { ideas, error, source } = loadProductIdeas();
+    expect(source).toBe("bundled");
     expect(error).toBeUndefined();
     expect(ideas.length).toBeGreaterThanOrEqual(2);
     expect(ideas.filter((entry) => entry.approved).length).toBeGreaterThanOrEqual(2);
