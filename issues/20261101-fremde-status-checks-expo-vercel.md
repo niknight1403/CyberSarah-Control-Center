@@ -87,3 +87,34 @@ Nicht betroffen: `Render Deploy` ist reines `workflow_dispatch` und wird vom
 Merge nicht ausgeloest; der Produktionsdeploy laeuft ueber die
 Render-Git-Integration. Produktion antwortet nach dem Merge mit HTTP 200 auf
 `/`, `/healthz` und `/api/health` (`{"ok":true}`).
+
+## Nachtrag 09.11.2026 — Workflow angelegt, Ursache bleibt bei EAS
+
+Der Commit `154e5b5` zeigt die beiden roten Checks weiter:
+
+```
+create-production-builds.yml (@niko1403/custom-ai-studio-mobile)    error
+create-production-builds.yml (@niko1403/cybersarah-control-center-)  error
+```
+
+Vollstaendige Beschreibung (REST-API, `commits/main/status`):
+
+> Failed to create workflow run. Invalid workflow definition. []: Invalid input:
+> expected object, received null.
+
+Ersteller ist GitHub App `182946` (Expo-Bot). Die beiden Kontexte nennen
+EAS-Projekte, nicht Repositories: `niko1403/custom-ai-studio-mobile` entspricht
+`appSlug` in `app.config.ts`, das zweite Projekt traegt einen alten Namen mit
+Bindestrich. Beide Repos sind mit dem vorhandenen Token nicht lesbar
+(`GET /repos/niko1403/<name>` -> 404), die fehlerhafte Definition liegt also
+nicht hier.
+
+Neu: `.github/workflows/create-production-builds.yml` existiert jetzt mit
+gueltiger, input-freier `workflow_dispatch`-Definition und baut bewusst nichts
+(Produktions-APK laeuft ueber `build-apk.yml`). Damit findet die Integration
+einen annehmbaren Workflow vor, falls sie hinein dispatchen kann.
+
+Bleibt der Fehler danach bestehen, ist die Ursache eindeutig auf der EAS-Seite:
+Die App versucht, mit ihrer gespeicherten (ungueltigen) Definition einen Lauf zu
+erzeugen. Abschalten laesst sich das nur im Expo-Konto:
+Project Settings -> GitHub -> Repository-Verbindung trennen oder neu verbinden.

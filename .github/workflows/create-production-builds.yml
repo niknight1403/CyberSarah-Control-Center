@@ -1,0 +1,42 @@
+name: create-production-builds
+
+# Wird von der Expo/EAS-GitHub-Integration aufgerufen (Status-Kontext
+# "create-production-builds.yml (@niko1403/...)"). Die Integration dispatcht
+# diesen Workflow bei jedem Push; fehlte die Datei, quittierte GitHub jeden
+# Commit mit "Failed to create workflow run. Invalid workflow definition."
+#
+# Absichtlich ohne Eingabefelder: die Integration sendet keine Inputs, und ein
+# Workflow mit Pflichtfeldern wuerde die Annahme wieder scheitern lassen.
+#
+# Dieser Workflow baut NICHTS. Produktions-APKs entstehen ueber build-apk.yml
+# (Expo-Web-Export + Capacitor + Gradle), nicht ueber EAS: das EAS-Projekt haengt
+# noch am alten Kontonamen @niko1403, ein EAS-Build wuerde dort scheitern.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: create-production-builds
+  cancel-in-progress: false
+
+jobs:
+  hinweis:
+    name: Produktions-Builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Einordnung festhalten
+        run: |
+          {
+            echo "## Produktions-Builds"
+            echo ""
+            echo "Dieser Workflow existiert, damit die EAS-Integration einen gueltigen"
+            echo "Workflow-Dispatch vorfindet. Er baut bewusst nichts."
+            echo ""
+            echo "- Produktions-APK: \`.github/workflows/build-apk.yml\` (workflow_dispatch, Gradle)"
+            echo "- Deploy der Web-App: Render (Auto-Deploy auf main)"
+            echo "- EAS-Projektstatus: noch am alten Kontonamen @niko1403 gebunden; ein echter"
+            echo "  EAS-Build wuerde dort scheitern, bis die Integration neu verbunden ist."
+          } >> "$GITHUB_STEP_SUMMARY"

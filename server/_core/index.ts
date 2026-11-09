@@ -42,6 +42,8 @@ import { handleDigistore24Ipn } from "../digistore24-ipn";
 import { syncDigistore24Commissions } from "../digistore24-api";
 import { resolveDigistore24IpnSecrets } from "../../lib/digistore24-ipn-config";
 import { runProductAutopilot, productAutopilotStatus } from "../product-autopilot";
+import { resolveXToken, xTokenDiagnostics } from "../x-token-service";
+import { retryFailedJobsControlled } from "../publishing-retry-service";
 import { checkDatabaseHealth } from "../db";
 import { assertCoreSchemaOnStartup, checkCoreTables } from "../schema-health";
 import { runOutreachCycle } from "../outreach-worker-service";
@@ -652,6 +654,59 @@ async function startServer() {
    * Produkt-Autopilot: legt faellige Produkte autonom bei Digistore24 an.
    * Auth wie bei den anderen Cron-Routen (Bearer METRICS_TOKEN).
    */
+  /** X-Token: Diagnose und erzwungener Refresh (Bearer METRICS_TOKEN). */
+  app.get("/api/x-token/status", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      res.json(await xTokenDiagnostics());
+    } catch (error) {
+      res.status(500).json({ ok: false, detail: error instanceof Error ? error.message : "Diagnose fehlgeschlagen." });
+    }
+  });
+
+  app.post("/api/cron/x-token/refresh", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const resolved = await resolveXToken({ force: true });
+      res.status(resolved.token ? 200 : 503).json({
+        ok: Boolean(resolved.token),
+        refreshed: resolved.refreshed,
+        detail: resolved.reason ?? (resolved.refreshed ? "Token erneuert." : "Token unveraendert."),
+      });
+    } catch (error) {
+      res.status(500).json({ ok: false, detail: error instanceof Error ? error.message : "Refresh fehlgeschlagen." });
+    }
+  });
+
+  /** Fehlgeschlagene Publikations-Jobs kontrolliert erneut einplanen. */
+  app.post("/api/cron/publishing-retry", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    const body = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+    const limit = Number(body.limit ?? 25);
+    try {
+      const result = await retryFailedJobsControlled({
+        limit: Number.isFinite(limit) ? limit : 25,
+        dryRun: body.dryRun === true,
+      });
+      console.info("[Publishing-Retry]", JSON.stringify({ requeued: result.requeued, skipped: result.skipped.length }));
+      res.status(result.ok ? 200 : 503).json(result);
+    } catch (error) {
+      res.status(500).json({ ok: false, detail: error instanceof Error ? error.message : "Wiederaufnahme fehlgeschlagen." });
+    }
+  });
+
   app.post("/api/cron/product-autopilot", async (req, res) => {
     const configuredToken = process.env.METRICS_TOKEN?.trim();
     if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
