@@ -1,0 +1,54 @@
+name: Digistore24-IPN E2E (signiert, Wegwerf-DB)
+
+# Manuell. Startet den echten IPN-Handler hinter HTTP gegen eine Wegwerf-
+# Postgres und prueft Signatur, Idempotenz, Aggregation und Fail-closed.
+# Kein Netzwerk zu Digistore24, kein Live-Key, keine Produktionsdaten:
+# die IPN-Passphrase wird fuer den Test zufaellig erzeugt.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ipn-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: digistore_ipn_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d digistore_ipn_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Abhaengigkeiten installieren
+        run: npm ci --no-audit --no-fund
+      - name: IPN-Kette signiert durchpruefen
+        env:
+          IPN_E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/digistore_ipn_ci
+        run: npx tsx scripts/test-digistore-ipn-e2e.ts
+      - name: Produktion-Status dokumentieren (nur Diagnose, kein Gate)
+        continue-on-error: true
+        run: |
+          echo "--- Produktionsendpunkt ---"
+          for host in app.cybersarah-ki.com api.cybersarah-ki.com; do
+            code=$(curl -s -o /tmp/body.txt -w '%{http_code}' -m 20 -X POST \
+              -H 'content-type: application/x-www-form-urlencoded' \
+              --data 'order_id=CI-IPN-PROBE&event=sale&sha_sign=invalid' \
+              "https://$host/api/v1/webhooks/digistore24" || echo "000")
+            echo "$host -> HTTP $code"
+            head -c 200 /tmp/body.txt; echo
+          done
