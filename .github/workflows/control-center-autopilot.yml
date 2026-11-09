@@ -68,6 +68,9 @@ jobs:
           deferred_count="$(jq -r '(.result.deferred // []) | length' "$body_file")"
           if [ "$blocked_count" != "0" ]; then
             echo "::error::Control-Center-Cron meldet $blocked_count echte Blockade(n); Details stehen im Server-Log."
+            # Sprint 387: Ursachen im Klartext (max. 200 Zeichen, keine Rohdaten).
+            jq -r '(.result.blocked // [])[] | "- BLOCKADE: \(.[0:200])"' "$body_file"
+            jq -r '(.result.deferred // [])[] | "- WARTET: \(.[0:200])"' "$body_file"
             exit 1
           fi
           if [ "$http_code" = "207" ] || [ "$deferred_count" != "0" ]; then
@@ -81,11 +84,6 @@ jobs:
             jq -r '"- Fokus: \(.result.growthPulse.focus)\n- Neue Entwürfe: \(.result.growthPulse.generated)\n- Externe Aktionen: \(.result.growthPulse.externalActionsExecuted)\n- Blocker: \(.result.blocked | length)\n- Wartet auf: \(.result.deferred | length)\n- Ergebnis: \(.ok)"' "$body_file"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Sprint 387: Blockade- und Warte-Texte im Job-Log sichtbar machen
-          # (Klartext-Meldungen des Servers, gekuerzt, keine Rohdaten).
-          echo "Blockaden und Wartepunkte:"
-          jq -r '(.result.blocked // [])[] | "- BLOCKADE: \(.[0:200])"' "$body_file"
-          jq -r '(.result.deferred // [])[] | "- WARTET: \(.[0:200])"' "$body_file"
           if [ "$deferred_count" = "0" ]; then
             echo "Control-Center-Autopilot einschließlich Growth Pulse vollständig bestätigt."
           else
