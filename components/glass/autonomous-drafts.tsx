@@ -113,10 +113,11 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
       }
 
       const result = await decideMutation.mutateAsync({ id: row.id, action });
+      // Another admin may have decided this row already. Refresh even when
+      // the server rejects the stale decision so the queue cannot stay stale.
+      await utils.draftEngine.queue.invalidate();
       if (!result.ok) {
         setNotice({ id: row.id, text: result.reason });
-      } else {
-        await utils.draftEngine.queue.invalidate();
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Freigabe fehlgeschlagen. Bitte erneut versuchen.";
