@@ -46,3 +46,25 @@ describe("dual sidebar logic (Sprint 200)", () => {
     expect(resolveSidebarFooter("superagent", "checking")).toEqual({ label: "ORCHESTRATOR PRÜFT…", tone: "muted" });
   });
 });
+
+describe("Fuenf-Bereiche-Navigation (Sprint 387)", () => {
+  it("zeigt mobil und Desktop dieselben fuenf Hauptbereiche", () => {
+    const areas = getSidebarItems("apps").map((item) => item.title);
+    expect(areas).toEqual([
+      "Übersicht",
+      "Wachstum & Content",
+      "Umsatz & Kunden",
+      "KI-Agent",
+      "Konto & System",
+    ]);
+  });
+
+  it("haelt alte Ziele innerhalb der Bereiche erreichbar (kein Deep-Link bricht)", () => {
+    const routes = getSidebarItems("apps").map((item) => item.route);
+    expect(routes).toContain("/dashboard");
+    expect(routes).toContain("/media-studio");
+    expect(routes).toContain("/revenue-os");
+    expect(routes).toContain("/agent");
+    expect(routes).toContain("/account");
+  });
+});

@@ -28,6 +28,8 @@ import { MetricTile } from "@/components/glass/metric-tile";
 import { ControlModuleCard } from "@/components/glass/control-module-card";
 import { HoloActivityCard } from "@/components/glass/holo-activity-card";
 import { SuperagentHeroCard } from "@/components/glass/superagent-hero-card";
+import { RevenueKpiStrip } from "@/components/glass/revenue-kpi-strip";
+import { useRevenueKpis } from "@/lib/use-revenue-kpis";
 import { DashboardErrorState, DashboardSkeleton } from "@/components/cyber/dashboard/dashboard-states";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import { chatStatusCopy, formatUptime, systemStatusCopy, workspaceStatusCopy } from "@/lib/dashboard-view-model";
@@ -65,6 +67,8 @@ export default function DashboardScreen() {
   const glass = useGlassTheme();
   const { vm, state, hasAlerts, isAdmin, retry, serverUptimeText } = useDashboardData();
   const hub = useHubStatus();
+  // Sprint 387: belegte Umsatzkennzahlen, nur fuer Administratoren.
+  const revenue = useRevenueKpis(isAdmin);
   const [showDetails, setShowDetails] = useState(false);
   const { width } = useWindowDimensions();
   const wide = Platform.OS === "web" && isWideViewport(width);
@@ -138,6 +142,15 @@ export default function DashboardScreen() {
               accent={vm.system.status === "healthy" ? "green" : "amber"}
             />
           </View>
+
+          {isAdmin ? (
+            <RevenueKpiStrip
+              snapshot={revenue.snapshot}
+              loading={revenue.loading}
+              failed={revenue.failed}
+              onRetry={revenue.refetch}
+            />
+          ) : null}
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionEyebrow}>SCHNELLZUGRIFF</Text>
