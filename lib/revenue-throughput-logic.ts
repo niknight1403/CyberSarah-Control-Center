@@ -44,10 +44,19 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
   const conversionVelocityPct=change(input.recent7Conversions,input.previous7Conversions);
 
   const blockers:string[]=[];
+  /**
+   * Sprint 388: Fehlende Konfiguration eines OPTIONALEN Zahlungskanals ist kein
+   * Defekt des Systems, sondern ein offener Konfigurationspunkt (der Betreiber
+   * muss einen Schluessel setzen). Frueher machte "Digistore24-IPN nicht
+   * konfiguriert" den gesamten 2h-Autopilot-Lauf rot, obwohl Stripe live ist und
+   * kein Fehler vorlag. Echte Ausfaelle (IPN-Fehler in Folge) bleiben Blocker.
+   */
+  const configurationGaps:string[]=[];
   if(!input.databaseReady)blockers.push("Revenue-Datenbank nicht verfügbar");
   if(!input.stripeConnected)blockers.push("Stripe-Katalog/API nicht verbunden");
   if(!input.stripeWebhookConfigured)blockers.push("Stripe-Webhook-Secret fehlt oder ist ungültig");
-  if(!input.digistoreIpnConfigured)blockers.push("Digistore24-IPN nicht konfiguriert");
+  if(!input.digistoreIpnConfigured)configurationGaps.push("Digistore24-IPN nicht konfiguriert (optionaler Kanal, Stripe bleibt live)");
+  if(!input.digistoreApiConfigured)configurationGaps.push("Digistore24-API-Key fehlt (optionaler Kanal, Polling faellt aus)");
   if(input.providerCircuitsTotal>0&&input.providerCircuitsOpen===input.providerCircuitsTotal)blockers.push("Alle LLM-Provider-Circuits offen");
   if(input.stripeWebhookConsecutiveFailures>=3)blockers.push(`Stripe-Webhook ${input.stripeWebhookConsecutiveFailures} Fehler in Folge`);
   if(input.digistoreWebhookConsecutiveFailures>=3)blockers.push(`Digistore24-IPN ${input.digistoreWebhookConsecutiveFailures} Fehler in Folge`);
@@ -56,7 +65,11 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
 
   const priorities=[
     ...blockers.map((detail,index)=>({rank:index+1,kind:"repair" as const,detail})),
-    ...(blockers.length?[]:[{rank:1,kind:"scale" as const,detail:"Kein kritischer Revenue-Blocker: bestes gemessenes B2B-/Funnel-Experiment skalieren"}]),
+    ...(!blockers.length
+      ?[{rank:1,kind:"scale" as const,detail:configurationGaps.length
+          ? `Kein Defekt: optionaler Kanal wartet auf Konfiguration (${configurationGaps.length}). Bestes gemessenes B2B-/Funnel-Experiment skalieren`
+          : "Kein kritischer Revenue-Blocker: bestes gemessenes B2B-/Funnel-Experiment skalieren"}]
+      :[]),
   ];
 
   return {
@@ -94,6 +107,7 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
       providerCircuitsTotal:input.providerCircuitsTotal,
     },
     blockers,
+    configurationGaps,
     priorities,
     status:blockers.length?"repair" as const:"scale" as const,
   };

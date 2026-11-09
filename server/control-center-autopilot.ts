@@ -225,6 +225,7 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   if (throughput) {
     if (throughput.status === "repair") blocked.push(...throughput.blockers.map(item => `Revenue: ${item}`));
     else realActions.push(`Revenue Throughput stabil · 30d Run-Rate ${throughput.revenueVelocity.monthlyRunRateEur.toLocaleString("de-DE")} EUR`);
+    for (const gap of throughput.configurationGaps ?? []) deferred.push(`Revenue: ${gap}`);
   }
   for (const item of drafts.skipped) {
     const detail = `${item.kind}: ${item.reason}`;

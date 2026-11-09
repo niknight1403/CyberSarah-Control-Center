@@ -47,7 +47,29 @@ describe("revenue throughput supervisor",()=>{
     expect(out.blockers.join(" ")).toContain("LLM-Provider");
     expect(out.blockers.join(" ")).toContain("Invoice");
     expect(out.blockers.join(" ")).toContain("Stripe-Webhook");
-    expect(out.blockers.join(" ")).toContain("Digistore24-IPN");
+    // Echte IPN-Ausfaelle bleiben Blockade ...
+    expect(out.blockers.join(" ")).toContain("Digistore24-IPN 3 Fehler in Folge");
     expect(out.priorities.every((item)=>item.kind==="repair")).toBe(true);
+  });
+
+  it("Sprint 388: fehlende Konfiguration eines optionalen Kanals blockiert nicht",()=>{
+    const out=buildRevenueThroughputSnapshot({
+      ...base,
+      digistoreIpnConfigured:false,
+      digistoreApiConfigured:false,
+    });
+    // Stripe ist live und fehlerfrei: kein Defekt, also kein Reparaturauftrag.
+    expect(out.status).toBe("scale");
+    expect(out.blockers).toEqual([]);
+    expect(out.configurationGaps.join(" ")).toContain("Digistore24-IPN nicht konfiguriert");
+    expect(out.configurationGaps.join(" ")).toContain("Digistore24-API-Key fehlt");
+    expect(out.priorities[0]?.kind).toBe("scale");
+    expect(out.priorities[0]?.detail).toContain("optionaler Kanal wartet auf Konfiguration");
+  });
+
+  it("Sprint 388: konfigurierte Kanaele melden keine Luecke",()=>{
+    const out=buildRevenueThroughputSnapshot(base);
+    expect(out.configurationGaps).toEqual([]);
+    expect(out.priorities[0]?.detail).not.toContain("optionaler Kanal");
   });
 });

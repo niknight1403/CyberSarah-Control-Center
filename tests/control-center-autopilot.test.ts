@@ -147,4 +147,20 @@ describe("control center autopilot", () => {
     expect(result.blocked.join(" ")).toContain("HARA: kaputt");
     expect(result.blocked.join(" ")).toContain("Expansion: kaputt");
   });
+
+  // Sprint 388: Ein fehlender Schluessel fuer einen OPTIONALEN Zahlungskanal ist
+  // ein Wartepunkt, kein Defekt. Vorher war der 2h-Lauf dauerhaft rot, obwohl
+  // Stripe live war und nichts kaputt ist.
+  it("meldet fehlende Konfiguration eines optionalen Kanals als Wartepunkt, nicht als Blockade", async () => {
+    const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
+    const throughputGap = vi.fn(async () => ({
+      ...(await (throughput as unknown as () => Promise<Record<string, unknown>>)()),
+      configurationGaps: ["Digistore24-IPN nicht konfiguriert (optionaler Kanal, Stripe bleibt live)"],
+    }));
+    const result = await runControlCenterAutopilot({
+      scan, revenue, drafts, ...growthDeps, throughput: throughputGap as never,
+    });
+    expect(result.blocked).toEqual([]);
+    expect(result.deferred.join(" ")).toContain("Digistore24-IPN nicht konfiguriert");
+  });
 });
