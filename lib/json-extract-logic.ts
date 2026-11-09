@@ -40,9 +40,3 @@ export function extractJsonObject(raw: string): Record<string, unknown> | null {
   }
   return null;
 }
-
-/**
- * Validiert ein generiertes SVG: entfernt Code-Fences, prueft Grundform,
- * blockiert aktive Inhalte (script/foreignObject/external href) und
- * Groessenlimits. Gibt das bereinigte SVG oder null zurueck (rein).
- */
