@@ -79,11 +79,13 @@ jobs:
           {
             echo "### CyberSarah 24/7 Growth Pulse"
             jq -r '"- Fokus: \(.result.growthPulse.focus)\n- Neue Entwürfe: \(.result.growthPulse.generated)\n- Externe Aktionen: \(.result.growthPulse.externalActionsExecuted)\n- Blocker: \(.result.blocked | length)\n- Wartet auf: \(.result.deferred | length)\n- Ergebnis: \(.ok)"' "$body_file"
-  # Sprint 387: Blockade-Texte sichtbar machen (nur Klartext-Meldungen des
-  # Servers, gekuerzt; kein Rohkoerper, keine Kennzahlen, keine Tokens).
-  jq -r '(.result.blocked // [])[] | "- BLOCKADE: \(.[0:200])"' "$body_file" | tee -a "$GITHUB_STEP_SUMMARY"
-  jq -r '(.result.deferred // [])[] | "- WARTET: \(.[0:200])"' "$body_file" | tee -a "$GITHUB_STEP_SUMMARY"
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # Sprint 387: Blockade- und Warte-Texte im Job-Log sichtbar machen
+          # (Klartext-Meldungen des Servers, gekuerzt, keine Rohdaten).
+          echo "Blockaden und Wartepunkte:"
+          jq -r '(.result.blocked // [])[] | "- BLOCKADE: \(.[0:200])"' "$body_file"
+          jq -r '(.result.deferred // [])[] | "- WARTET: \(.[0:200])"' "$body_file"
           if [ "$deferred_count" = "0" ]; then
             echo "Control-Center-Autopilot einschließlich Growth Pulse vollständig bestätigt."
           else
