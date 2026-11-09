@@ -14,6 +14,7 @@ import {
 } from "@/lib/revenue-loop-logic";
 import { loadLoops, saveLoops, type KeyValueAdapter } from "@/lib/revenue-loop-store";
 import type { RevenueLoopDraftPayload } from "@/lib/draft-engine-logic";
+import { deriveLoopFields } from "@/lib/loop-adoption-logic";
 
 /**
  * Sprint 229 — React-Kleber des Loop-Engineering-Moduls: Laden, Prompt-
@@ -145,29 +146,31 @@ export function useLoopEngineering(adapter?: KeyValueAdapter) {
     await persist(next);
   }, [state.pending, state.lastPrompt, persist]);
 
-  /** Uebernimmt einen serverseitig freigegebenen autonomen Loop als lokalen Plan-Entwurf. */
+  /**
+   * Uebernimmt eine freigegebene Umsatzmoeglichkeit als lokalen Plan-Entwurf.
+   * Sprint 350: Felder werden auf die Loop-Grenzen abgeleitet statt roh
+   * durchgereicht — vorher scheiterte die Uebernahme an `stages.join(" → ")`,
+   * sobald der Fluss laenger als 60 Zeichen war.
+   */
   const adoptAutonomousLoop = useCallback(async (payload: RevenueLoopDraftPayload): Promise<{ ok: boolean; reason: string }> => {
-    if (!payload.experiment || !payload.unit || typeof payload.targetValue !== "number") {
-      return { ok: false, reason: "Dieser ältere Entwurf enthält noch keinen vollständigen Experiment-/Zielplan. Bitte neu erzeugen." };
-    }
+    const derived = deriveLoopFields(payload);
+    if (!derived.ok) return { ok: false, reason: derived.reason };
     const loops = loopsRef.current;
-    if (loops.some((loop) => loop.name.trim().toLowerCase() === payload.name.trim().toLowerCase())) {
-      return { ok: false, reason: `Schleife "${payload.name}" ist bereits integriert.` };
+    if (loops.some((loop) => loop.name.trim().toLowerCase() === derived.fields.name.trim().toLowerCase())) {
+      return { ok: false, reason: `Schleife "${derived.fields.name}" ist bereits integriert.` };
     }
     try {
-      const loop = createLoopDraft({
-        name: payload.name,
-        flow: payload.stages.join(" → "),
-        hypothesis: payload.hypothesis,
-        experiment: payload.experiment,
-        metric: payload.metric,
-        unit: payload.unit,
-        targetValue: payload.targetValue,
-        currentValue: payload.currentValue ?? 0,
-      });
+      const loop = createLoopDraft(derived.fields);
       const next = [...loops, loop];
       loopsRef.current = next;
-      setState((prev) => ({ ...prev, loops: next, result: CONFIRMED_RESULT }));
+      const notes = derived.shortened.length > 0
+        ? [`Für die Loop-Grenzen gekürzt: ${derived.shortened.join(", ")}.`]
+        : [];
+      setState((prev) => ({
+        ...prev,
+        loops: next,
+        result: { ...CONFIRMED_RESULT, lines: [...notes, ...CONFIRMED_RESULT.lines] },
+      }));
       await persist(next);
       return { ok: true, reason: "" };
     } catch (error) {

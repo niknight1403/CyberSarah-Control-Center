@@ -5,9 +5,11 @@ import { AiCore } from "@/components/glass/ai-core";
 import { GlassBackdrop } from "@/components/glass/glass-backdrop";
 import { GlassCard, StatusChip } from "@/components/glass/glass-primitives";
 import { AutonomousDraftsCard } from "@/components/glass/autonomous-drafts";
+import { LoopOpportunitiesCard } from "@/components/glass/loop-opportunities-card";
 import { NavDrawer, NavDrawerButton, useNavDrawer } from "@/components/responsive/nav-drawer";
 import { ScreenContainer } from "@/components/screen-container";
 import { useLoopEngineering } from "@/hooks/use-loop-engineering";
+import { opportunityToLoopPayload } from "@/lib/loop-adoption-logic";
 import { evaluateLoopProgress, loopProgressPercent, loopStatusLabel, LOOP_DISCLAIMER, recommendNextStep, type LoopDraft } from "@/lib/revenue-loop-logic";
 import { glassPalette, glassSurface } from "@/lib/design/future-glass";
 
@@ -131,6 +133,10 @@ export default function LoopEngineeringScreen() {
               <Text style={styles.disclaimer}>{state.result.disclaimer}</Text>
             </GlassCard>
           )}
+
+          <LoopOpportunitiesCard
+            onAdopt={async (opportunity) => adoptAutonomousLoop(opportunityToLoopPayload(opportunity))}
+          />
 
           <AutonomousDraftsCard
             kinds={["revenue-loop"]}
