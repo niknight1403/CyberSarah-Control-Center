@@ -76,3 +76,31 @@ Alternativ: einen Hetzner-DNS-API-Token bereitstellen, dann legt der Workflow
 * Es wird kein Umsatz als erzielt gebucht, solange keine verifizierte Zahlung vorliegt.
 * Nach Schritt A + B gilt: signierter POST → `200`, unsignierter POST → `401`,
   doppeltes Event → `200 duplicate`, ohne Doppelbuchung.
+
+## 5. IPN-Test: Ergebnis (09.11.2026, 05:15 UTC)
+
+Der komplette IPN-Pfad ist jetzt automatisiert belegt — ohne Digistore24-Netzwerk,
+ohne Live-Key, ohne Produktionsdaten (`scripts/test-digistore-ipn-e2e.ts`, Workflow
+`digistore24-ipn-e2e.yml`, Lauf `42565558039`, **16 von 16 Pruefungen bestanden**):
+
+| Fall | Ergebnis |
+|---|---|
+| GET auf die Route | 404 |
+| ohne `sha_sign` / fremdes Geheimnis / kein Hex | 401, 0 Events gebucht |
+| gueltiger Verkauf 19,99 EUR, 9,99 Provision | 200 `OK recorded`, `events=1 conversions=1 revenue=999` |
+| Kaeufermail | nur gehasht, `rawPayload` ohne Klarmail |
+| identische Zustellung erneut | 200 `OK duplicate`, `events=1 revenue=999` (keine Doppelbuchung) |
+| signierte Erstattung | 200 `OK recorded`, `conversions=0 revenue=0` |
+| `order_id` fehlt / Betrag unlesbar | 400 |
+| kein Secret gesetzt | 503, keine Buchung (fail-closed) |
+
+Damit ist bewiesen: Signaturpruefung, Idempotenz, Aggregation und das ehrliche
+Verhalten ohne Secret funktionieren im echten HTTP-Pfad mit echter Datenbank.
+
+### Was der Test nicht beweist
+
+Die Produktion antwortet unveraendert `503 IPN-Secret nicht konfiguriert`. Zusaetzlich
+meldet das Deploy-Gate `D24_API=INVALID_KEY_QUARANTINED`: Digistore24 weist den
+hinterlegten API-Key zurueck. Beide Werte sind Betreiber-Zugangsdaten; ohne sie kann
+kein echter Zahlungseingang verifiziert oder verbucht werden. Ein gruener Test ist
+deshalb ausdruecklich **kein** Nachweis eines realen Umsatzes.
