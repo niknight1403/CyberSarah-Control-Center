@@ -1,5 +1,5 @@
 {
-  "stand": "2026-11-09T08:23:34",
+  "stand": "2026-11-09T18:59:39",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -25,17 +25,17 @@
       "id": "groq",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "openai/gpt-oss-120b",
-      "detail": "openai/gpt-oss-120b",
+      "modell": "qwen/qwen3.8-27b",
+      "detail": "qwen/qwen3.8-27b",
       "hinweis": null
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT",
-      "http_status": 429,
+      "status": "VERFUEGBAR",
+      "http_status": null,
       "modell": "xingchen-agi/xing4.0-29b-a4b:free",
-      "detail": "429 xingchen-agi/xing4.0-29b-a4b:free",
-      "hinweis": "Changer rotiert weiter"
+      "detail": "xingchen-agi/xing4.0-29b-a4b:free",
+      "hinweis": null
     },
     {
       "id": "cerebras",
