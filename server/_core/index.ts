@@ -40,7 +40,7 @@ import { sdk } from "./sdk";
 import { createSecurityMiddleware } from "./security";
 import { handleDigistore24Ipn } from "../digistore24-ipn";
 import { syncDigistore24Commissions } from "../digistore24-api";
-import { resolveDigistore24IpnSecret } from "../../lib/digistore24-ipn-config";
+import { resolveDigistore24IpnSecrets } from "../../lib/digistore24-ipn-config";
 import { checkDatabaseHealth } from "../db";
 import { assertCoreSchemaOnStartup, checkCoreTables } from "../schema-health";
 import { runOutreachCycle } from "../outreach-worker-service";
@@ -250,9 +250,9 @@ async function startServer() {
   // Commissionen via REST-API — geschuetzt durch die IPN-Passphrase als
   // X-Sync-Key (kein offener Trigger). Idempotent wie der IPN-Pfad.
   app.post("/api/v1/webhooks/digistore24-sync", async (req, res) => {
-    const expectedKey = resolveDigistore24IpnSecret();
+    const acceptedKeys = resolveDigistore24IpnSecrets();
     const providedKey = (req.header("x-sync-key") ?? "").trim();
-    if (!expectedKey || providedKey !== expectedKey) {
+    if (!acceptedKeys.length || !acceptedKeys.includes(providedKey)) {
       res.status(401).json({ ok: false, detail: "Ungültiger Sync-Key." });
       return;
     }

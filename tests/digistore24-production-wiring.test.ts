@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { resolveDigistore24IpnSecret } from "../lib/digistore24-ipn-config";
+import {
+  resolveDigistore24IpnSecret,
+  resolveDigistore24IpnSecrets,
+  ipnSecretFingerprint,
+} from "../lib/digistore24-ipn-config";
 
 describe("Digistore24 production wiring",()=>{
   it("prefers the canonical IPN secret",()=>{
@@ -26,5 +30,27 @@ describe("Digistore24 production wiring",()=>{
     expect(guard).toContain("INVALID_KEY_QUARANTINED");
     expect(guard).toContain("D24_PROBE_UNAVAILABLE");
     expect(guard).toContain("https://www.digistore24.com/api/call/listCommissions");
+  });
+});
+
+describe("Digistore24 IPN: Passphrasen-Rotation", () => {
+  it("liest mehrere Kandidaten aus einer kommagetrennten Liste", () => {
+    expect(resolveDigistore24IpnSecrets({ DIGISTORE24_IPN_SECRET: " a , b;c\nd " })).toEqual(["a", "b", "c", "d"]);
+  });
+  it("entfernt Duplikate und leere Eintraege", () => {
+    expect(resolveDigistore24IpnSecrets({ DIGISTORE24_IPN_SECRET: "x,,x; " })).toEqual(["x"]);
+  });
+  it("bevorzugt das kanonische Secret vor dem Alias", () => {
+    expect(resolveDigistore24IpnSecrets({ DIGISTORE24_IPN_SECRET: "neu", DIGISTORE24_IPN_PASSPHRASE: "alt" })).toEqual(["neu"]);
+  });
+  it("liefert ohne Konfiguration eine leere Liste", () => {
+    expect(resolveDigistore24IpnSecrets({})).toEqual([]);
+  });
+  it("Fingerabdruck ist stabil und verraet das Geheimnis nicht", () => {
+    const fingerprint = ipnSecretFingerprint("Passphrase-1");
+    expect(fingerprint).toHaveLength(8);
+    expect(fingerprint).toBe(ipnSecretFingerprint("Passphrase-1"));
+    expect(fingerprint).not.toBe(ipnSecretFingerprint("Passphrase-2"));
+    expect(fingerprint).not.toContain("Passphrase");
   });
 });
