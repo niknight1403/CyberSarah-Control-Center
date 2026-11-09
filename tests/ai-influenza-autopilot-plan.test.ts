@@ -9,6 +9,28 @@ function candidate(over: Partial<AiInfluenzaAutopilotCandidate> = {}): AiInfluen
 }
 
 describe("AI Influenza Autopilot-Planung", () => {
+  it("haelt echte Zahlungsschritte bis zum verifizierten Stripe-Event an", () => {
+    const result = planAiInfluenzaAutopilot({
+      orders: [candidate({ step: "payment-pending", testOnly: false })],
+    });
+    expect(result.advanced).toBe(0);
+    expect(result.waiting).toBe(1);
+    expect(result.plans[0]).toMatchObject({
+      decision: "wait",
+      from: "payment-pending",
+      to: "paid",
+      reason: expect.stringMatching(/Stripe.*Event/i),
+    });
+  });
+
+  it("erlaubt den isolierten Test-only Payment-Schritt weiterhin", () => {
+    const result = planAiInfluenzaAutopilot({
+      orders: [candidate({ step: "payment-pending", testOnly: true })],
+    });
+    expect(result.advanced).toBe(1);
+    expect(result.plans[0]).toMatchObject({ decision: "advance", to: "paid" });
+  });
+
   it("schaltet interne Schritte in Assisted ohne Freigabe weiter", () => {
     const result = planAiInfluenzaAutopilot({ orders: [candidate()] });
     expect(result.advanced).toBe(1);
