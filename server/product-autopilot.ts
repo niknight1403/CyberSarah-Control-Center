@@ -2,7 +2,7 @@
  * CyberSarah Control Center — Produkt-Autopilot (Digistore24).
  *
  * Legt Produkte selbststaendig an: Produkt, Preisplan, Katalogzeile im eigenen
- * Dashboard. Die Ideen stehen in config/product-ideas.json (versioniert, mit
+ * Dashboard. Die Ideen stehen in lib/product-ideas.ts (versioniert, mit
  * Begruendung und Freigabe-Flag). Der Autopilot erfindet keine Produkte und
  * keine Umsaetze.
  *
@@ -20,11 +20,11 @@
  */
 
 import fs from "node:fs";
-import path from "node:path";
 import axios from "axios";
 import { sql } from "drizzle-orm";
 import { affiliateProducts, revenueJobs, revenueOffers } from "../drizzle/schema";
 import { getDb } from "./db";
+import { PRODUCT_IDEAS } from "../lib/product-ideas";
 import {
   buildCreateProductParams, buildPaymentPlanParams, catalogSlug, checkoutUrl,
   intervalLabel, planNextProducts, readCreatedPaymentPlanId, readCreatedProductId,
@@ -56,30 +56,27 @@ export type AutopilotRunResult = {
   ideas: number;
 };
 
-function ideasFilePath(): string {
-  const candidates = [
-    process.env.PRODUCT_IDEAS_FILE?.trim(),
-    path.join(process.cwd(), "config", "product-ideas.json"),
-    path.resolve(__dirname, "..", "config", "product-ideas.json"),
-  ].filter((entry): entry is string => Boolean(entry));
-  for (const candidate of candidates) {
-    try { if (fs.existsSync(candidate)) return candidate; } catch { /* naechster Pfad */ }
+/**
+ * Ideenkatalog: standardmaessig der gebuendelte Katalog aus lib/product-ideas.ts.
+ * Optional laesst sich per PRODUCT_IDEAS_FILE eine JSON-Datei davorlegen (Betrieb).
+ */
+export function loadProductIdeas(): { ideas: ProductIdea[]; error?: string; source: "bundled" | "file" } {
+  const override = process.env.PRODUCT_IDEAS_FILE?.trim();
+  if (override) {
+    try {
+      if (fs.existsSync(override)) {
+        const parsed = JSON.parse(fs.readFileSync(override, "utf8"));
+        const ideas = parseProductIdeas(parsed);
+        if (ideas.length) return { ideas, source: "file" };
+        return { ideas: [], source: "file", error: "Ideen-Datei enthaelt keine gueltige Idee." };
+      }
+    } catch (error) {
+      return { ideas: [], source: "file", error: `Ideen-Datei unlesbar: ${safeErrorMessage(error)}` };
+    }
   }
-  return "";
-}
-
-/** Liest den Ideen-Katalog. Fehlt er, gibt es einen ehrlichen Fehler statt Fake-Ideen. */
-export function loadProductIdeas(): { ideas: ProductIdea[]; error?: string } {
-  const file = ideasFilePath();
-  if (!file) return { ideas: [], error: "Ideenkatalog config/product-ideas.json nicht gefunden." };
-  try {
-    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-    const ideas = parseProductIdeas(parsed);
-    if (!ideas.length) return { ideas: [], error: "Ideenkatalog enthaelt keine gueltige Idee." };
-    return { ideas };
-  } catch (error) {
-    return { ideas: [], error: `Ideenkatalog unlesbar: ${safeErrorMessage(error)}` };
-  }
+  const ideas = parseProductIdeas(PRODUCT_IDEAS);
+  if (!ideas.length) return { ideas: [], source: "bundled", error: "Gebundelter Ideenkatalog ist leer." };
+  return { ideas, source: "bundled" };
 }
 
 async function d24Call(fn: string, params: Record<string, string>): Promise<Record<string, unknown>> {
@@ -315,7 +312,7 @@ export async function runProductAutopilot(options: AutopilotRunOptions = {}): Pr
 
 /** Statusbericht fuer Dashboard und Betrieb. */
 export async function productAutopilotStatus(): Promise<Record<string, unknown>> {
-  const { ideas, error } = loadProductIdeas();
+  const { ideas, error, source } = loadProductIdeas();
   const rows = await existingRows();
   const db = await getDb();
   const lastRun = db
@@ -328,6 +325,7 @@ export async function productAutopilotStatus(): Promise<Record<string, unknown>>
   return {
     ok: !error,
     detail: error,
+    ideasSource: source,
     apiKeyConfigured: Boolean(process.env.DIGISTORE24_API_KEY?.trim()),
     ideasTotal: ideas.length,
     ideasApproved: ideas.filter((idea) => idea.approved).length,
