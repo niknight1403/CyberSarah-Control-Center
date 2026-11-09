@@ -59,6 +59,16 @@ export function planAiInfluenzaAutopilot(args: {
       });
       continue;
     }
+    // A real order must wait for verified Stripe evidence before entering "paid".
+    // This mirrors the service guard and avoids repeatedly attempting an invalid transition.
+    if (next === "paid" && !order.testOnly) {
+      waiting += 1;
+      plans.push({
+        decision: "wait", jobId: order.jobId, orderId: order.orderId, from: order.step, to: next,
+        reason: "Echte Zahlung wartet auf ein verifiziertes Stripe-Zahlungs-/Subscription-Event.",
+      });
+      continue;
+    }
     if (advanced >= maxAdvances) {
       waiting += 1;
       plans.push({
