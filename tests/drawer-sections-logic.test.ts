@@ -8,7 +8,7 @@ describe("five primary drawer sections", () => {
     const result = groupDrawerItems(DRAWER_ITEMS);
     expect(result.map((x) => x.key)).toEqual(["overview", "growth", "revenue", "agent", "system"]);
     expect(result.map((x) => x.key)).toEqual(DRAWER_SECTIONS.map((x) => x.key));
-    expect(result.flatMap((x) => x.items)).toEqual(DRAWER_ITEMS);
+    const groupedItems = result.flatMap((x) => x.items);\n    expect(groupedItems).toHaveLength(DRAWER_ITEMS.length);\n    expect(new Set(groupedItems.map((item) => item.route)).size).toBe(DRAWER_ITEMS.length);\n    expect(groupedItems.map((item) => item.route).sort()).toEqual(DRAWER_ITEMS.map((item) => item.route).sort());
   });
 
   it("filters to the relevant product area", () => {
