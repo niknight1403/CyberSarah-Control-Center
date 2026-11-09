@@ -13,8 +13,21 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { getMonetizationAccount, resolvePlanForUser } from "./monetization";
 import { PLAN_LIMITS } from "../lib/monetization-logic";
 import { fetchRevenueOsSnapshot } from "./revenue-os";
+import { loadRevenueKpis } from "./revenue-kpi-service";
 
 export const revenueRouter = router({
+  /**
+   * Sprint 387 — Command-Dashboard-Kennzahlen (nur Admins).
+   * Stripe-Abos und eigene Buchungen, jede Quelle unabhaengig und ehrlich:
+   * fehlt eine Quelle, bleibt die Kennzahl leer statt geschaetzt zu werden.
+   */
+  kpis: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") {
+      return { status: "forbidden" as const };
+    }
+    return { status: "ok" as const, snapshot: await loadRevenueKpis() };
+  }),
+
   getMetrics: protectedProcedure.query(async ({ ctx }) => {
     const isAdmin = ctx.user.role === "admin";
     const [state, plan] = await Promise.all([

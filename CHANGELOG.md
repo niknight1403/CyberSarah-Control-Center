@@ -4,6 +4,16 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 09.11.2026 — Belegte Umsatzkennzahlen im Command Dashboard + Fuenf-Bereiche-Navigation
+
+- **Dashboard zeigt Umsatz:** neue Kacheln fuer Umsatz der letzten 30 Tage, MRR, ARR und aktive Abo-Kunden, ausschliesslich fuer Administratoren (`revenue.kpis`, serverseitig rollengeprueft).
+- **Keine Schaetzung:** MRR nur aus Abos mit bekanntem Preis; Abos ohne Preis werden gezaehlt und als Luecke benannt, `past_due` wird separat ausgewiesen und nicht in den MRR gerechnet. Ohne Buchungen steht „—" statt 0.
+- **Quellen sichtbar:** jede Kennzahl traegt ihre Herkunft (Stripe / eigene Buchungen / keine Quelle) plus Klartext-Grund in der Fusszeile.
+- **Navigation vereinheitlicht:** die Desktop-Sidebar fuehrt jetzt dieselben fuenf Bereiche wie die mobile Tab-Bar (Uebersicht · Wachstum & Content · Umsatz & Kunden · KI-Agent · Konto & System). Alte Routen bleiben erreichbar.
+- **Autopilot-Diagnose:** der Workflow `control-center-autopilot` schreibt Blockade- und Warte-Texte in die Step-Summary, damit ein roter Lauf seine Ursache selbst nennt.
+- **Belegt durch:** 29 neue/erweiterte Tests (`tests/revenue-kpi-logic.test.ts`, `tests/revenue-kpi-service.test.ts`, `tests/dual-sidebar-logic.test.ts`), `tsc --noEmit` ohne Fehler, Server-Build erfolgreich. Audit-Bericht: `docs/2026-11-09_SPRINT_1_REPOSITORY_AUDIT.md`, Sprint-Doku: `docs/2026-11-09_SPRINT_387_COMMAND_DASHBOARD_KENNZAHLEN.md`.
+- **Ehrliche Grenze:** es ist weiterhin kein echter Kundenumsatz verbucht; die Kennzahlen bleiben deshalb produktiv leer, bis eine belegte Zahlung existiert.
+
 ## 06.11.2026 — Erstgespraech-Anfrage auf der Verkaufsseite (Inbound-Kanal)
 
 - **Neuer Inbound-Kanal:** Auf `/ai-influenza` kann ohne Konto ein Erstgespraech angefragt werden (Name, E-Mail, optional Unternehmen, Paketinteresse, Wunschzeitraum, Anliegen). Pflicht sind Name, gueltige E-Mail und ausdrueckliche Einwilligung.

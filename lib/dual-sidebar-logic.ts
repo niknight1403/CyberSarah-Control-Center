@@ -20,11 +20,21 @@ export type NavigationItem = {
   icon: IconSymbolName;
 };
 
+/**
+ * Sprint 387 — Desktop-Navigation auf dieselbe Fuenf-Bereiche-Struktur wie
+ * die mobile Tab-Bar gebracht (Master-Prompt §4):
+ *   Uebersicht · Wachstum & Content · Umsatz & Kunden · KI-Agent · Konto & System
+ *
+ * Die frueheren Eintraege "Revenue OS" und "Business & Analytics" zeigten auf
+ * dasselbe Zielgebiet und sind jetzt unter "Umsatz & Kunden" gebuendelt; die
+ * Routen selbst bleiben unveraendert erreichbar (kein Deep-Link bricht).
+ */
 export const APPS_ITEMS: NavigationItem[] = [
   { route: "/dashboard", title: "Übersicht", icon: "house.fill" },
-  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill" },
-  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill" },
-  { route: "/account", title: "Konto", icon: "person.crop.circle" },
+  { route: "/media-studio", title: "Wachstum & Content", icon: "video.fill" },
+  { route: "/revenue-os", title: "Umsatz & Kunden", icon: "chart.bar.fill" },
+  { route: "/agent", title: "KI-Agent", icon: "sparkles" },
+  { route: "/account", title: "Konto & System", icon: "person.crop.circle" },
 ];
 
 export const SUPERAGENT_ITEMS: NavigationItem[] = [
