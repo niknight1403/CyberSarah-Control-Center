@@ -1,0 +1,84 @@
+name: product-autopilot
+
+# Produkt-Autopilot: legt faellige Produkte autonom bei Digistore24 an
+# (Produkt + Preisplan) und traegt sie in den eigenen Katalog ein.
+# Ein Lauf pro Tag; die Tageslauf-Sperre liegt zusaetzlich in der App
+# (revenue_jobs.dedupe_key), damit parallele Trigger nichts doppeln.
+# Wichtig: Digistore24 gibt Produkte erst nach manueller Freigabe im Konto
+# frei — der Autopilot legt an, verkauft aber nicht.
+on:
+  workflow_dispatch:
+    inputs:
+      maxProducts:
+        description: "Hoechstens so viele Produkte in diesem Lauf (1-3)"
+        default: "1"
+      dryRun:
+        description: "Trockenlauf (nur planen, nichts anlegen)"
+        type: boolean
+        default: false
+      force:
+        description: "Tageslauf-Sperre umgehen"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "15 7 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-autopilot
+  cancel-in-progress: false
+
+jobs:
+  autopilot:
+    name: Produkt-Lauf
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Lauf ausloesen und Ergebnis pruefen
+        env:
+          BASE_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          TOKEN: ${{ secrets.METRICS_TOKEN }}
+          MAX_PRODUCTS: ${{ inputs.maxProducts || '1' }}
+          DRY_RUN: ${{ inputs.dryRun && 'true' || 'false' }}
+          FORCE: ${{ inputs.force && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          test -n "$BASE_URL"
+          test -n "$TOKEN"
+          case "$BASE_URL" in https://*) ;; *) echo "::error::RENDER_PUBLIC_URL muss HTTPS sein"; exit 1;; esac
+          body_file="$(mktemp)"
+          summary_file="$(mktemp)"
+          trap 'rm -f "$body_file" "$summary_file"' EXIT
+          payload="$(printf '{"maxProducts":%s,"dryRun":%s,"force":%s}' "$MAX_PRODUCTS" "$DRY_RUN" "$FORCE")"
+          http_code="$(curl --silent --show-error --max-time 120 \
+            --output "$body_file" --write-out '%{http_code}' \
+            --request POST --header "Authorization: Bearer $TOKEN" \
+            --header "Content-Type: application/json" --data "$payload" \
+            "${BASE_URL%/}/api/cron/product-autopilot")"
+          echo "HTTP $http_code"
+          node -e '
+            const fs = require("fs");
+            const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const lines = [];
+            const push = (label, value) => lines.push(`- ${label}: ${value}`);
+            push("Modus", body.mode ?? "unbekannt");
+            push("Ideen im Katalog", body.ideas ?? 0);
+            for (const item of body.created ?? []) {
+              lines.push(`- Angelegt: ${item.slug} -> Produkt ${item.productId}, Plan ${item.paymentPlanId} (${item.checkoutUrl})`);
+            }
+            for (const item of body.failed ?? []) lines.push(`- Fehlgeschlagen: ${item.slug}: ${item.error}`);
+            const skipped = body.skipped ?? [];
+            if (skipped.length) push("Uebersprungen", skipped.map(s => `${s.slug} (${s.reason})`).join(", "));
+            if (body.detail) push("Hinweis", body.detail);
+            lines.push("");
+            lines.push("Produkte bleiben bis zur Freigabe im Digistore24-Konto auf Status awaiting_approval.");
+            fs.writeFileSync(process.argv[2], lines.join("\n") + "\n");
+          ' "$body_file" "$summary_file"
+          cat "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+          cat "$summary_file"
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Produkt-Autopilot lieferte HTTP $http_code."
+            exit 1
+          fi
