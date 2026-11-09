@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 09.11.2026 — Digistore24-IPN: Deploy-Kette repariert, Autopilot gruen
+
+- **Echte Ursache gefunden:** `render-deploy.yml` setzte die Digistore24-Variablen nur im Gate-Schritt, nie im Deploy-Schritt. `buildServiceEnv()` konnte das IPN-Secret deshalb nie an Render geben - der Endpunkt antwortete dauerhaft 503, unabhaengig vom Secret-Store.
+- **Behoben:** App- und Domain-Deploy setzen jetzt `DIGISTORE24_API_KEY`, `DIGISTORE24_IPN_SECRET`, `DIGISTORE24_IPN_PASSPHRASE`, `DIGISTORE24_AFFILIATE_ID`. Deploy `42562297072` gruen, Produktion `252ab00`, `/api/health` 200.
+- **Digistore24-API-Key produktiv aktiv:** der Autopilot-Lauf 04:40 UTC ist **gruen** (Exit 0, 8 Wartepunkte, keine Blockade) statt rot.
+- **Custom Domain registriert:** `api.cybersarah-ki.com` ist in Render angelegt (`unverified`), wartet nur noch auf den DNS-CNAME.
+- **Neuer Workflow** `dns-subdomain.yml` legt den CNAME in der Hetzner-Zone an, sobald ein DNS-Token vorliegt (der vorhandene Token ist ein Cloud-Token).
+- **Offen, mit Betreiber-Zugang verbunden:** IPN-Passphrase als GitHub-Secret `DIGISTORE24_IPN_SECRET` eintragen und DNS-CNAME `api` setzen. Details: `docs/2026-11-09_DIGISTORE24_IPN_AKTIVIERUNG.md`.
+
 ## 09.11.2026 — Autopilot: optionale Kanal-Konfiguration blockiert nicht mehr + Wettbewerbsanalyse
 
 - **Ursache der roten Autopilot-Laeufe gefunden:** der 2h-Lauf meldete ``1 echte Blockade(n)`` — ``Revenue: Digistore24-IPN nicht konfiguriert``. Stripe ist live und fehlerfrei; ein fehlender Schluessel fuer einen *optionalen* zweiten Zahlungskanal ist aber kein Defekt.
