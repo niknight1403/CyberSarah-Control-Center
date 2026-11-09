@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 09.11.2026 — Autopilot: optionale Kanal-Konfiguration blockiert nicht mehr + Wettbewerbsanalyse
+
+- **Ursache der roten Autopilot-Laeufe gefunden:** der 2h-Lauf meldete ``1 echte Blockade(n)`` — ``Revenue: Digistore24-IPN nicht konfiguriert``. Stripe ist live und fehlerfrei; ein fehlender Schluessel fuer einen *optionalen* zweiten Zahlungskanal ist aber kein Defekt.
+- **Neue Trennung:** ``configurationGaps`` (Wartepunkt, Betreiber muss Schluessel setzen) vs. ``blockers`` (echter Defekt). Digistore24-IPN/API-Konfiguration wandert nach ``configurationGaps`` und erscheint im Autopilot als Wartepunkt; echte IPN-Ausfaelle (>=3 Fehler in Folge) bleiben Blockade.
+- **Diagnose im Workflow:** Blockade- und Warte-Texte stehen jetzt im Job-Log, damit ein roter Lauf seine Ursache selbst nennt (vorher nur im Server-Log).
+- **Wettbewerbsanalyse** als Entscheidungsgrundlage: `docs/2026-11-09_SPRINT_4_WETTBEWERBSANALYSE.md` mit belegten Preisen (Buffer, Metricool, SocialBee, Later, Hootsuite, Sprout Social, HubSpot, GoHighLevel, Klaviyo, Mailchimp, OpusClip, Make, Zapier, Stripe Billing, Canva) und klarer Produktentscheidung (kein Canva-/Mailer-/Hootsuite-Klon).
+- **Offene Luecke, ausdruecklich benannt:** fuer deutsche Content-Retainer fehlt eine belegte Preisverteilung; die Paketpreise bleiben Start-Hypothesen, bis 3-5 echte Vergleichsangebote vorliegen.
+- **Belegt durch:** 4 Tests in `tests/revenue-throughput-logic.test.ts`, 8 in `tests/control-center-autopilot.test.ts`, `tsc --noEmit` ohne Fehler.
+
 ## 09.11.2026 — Belegte Umsatzkennzahlen im Command Dashboard + Fuenf-Bereiche-Navigation
 
 - **Dashboard zeigt Umsatz:** neue Kacheln fuer Umsatz der letzten 30 Tage, MRR, ARR und aktive Abo-Kunden, ausschliesslich fuer Administratoren (`revenue.kpis`, serverseitig rollengeprueft).
