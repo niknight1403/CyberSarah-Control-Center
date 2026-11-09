@@ -91,34 +91,35 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
 
   const decide = async (row: DraftRow, action: "approve" | "reject") => {
     setNotice(null);
-    if (action === "approve") {
-      if (row.kind === "idea" && onAdoptIdea) {
-        const payload = row.payload as IdeaDraftPayload;
-        setBusyId(row.id);
-        const adoption = await onAdoptIdea({ title: row.title, note: payload.note, rationale: payload.rationale });
-        if (!adoption.ok) {
-          setBusyId(null);
-          setNotice({ id: row.id, text: adoption.reason });
-          return;
-        }
-      }
-      if (row.kind === "revenue-loop" && onAdoptRevenueLoop) {
-        setBusyId(row.id);
-        const adoption = await onAdoptRevenueLoop(row.payload as RevenueLoopDraftPayload);
-        if (!adoption.ok) {
-          setBusyId(null);
-          setNotice({ id: row.id, text: adoption.reason });
-          return;
-        }
-      }
-    }
     setBusyId(row.id);
     try {
+      // Keep the complete approval flow inside this try/finally. Adoption can
+      // fail before the server mutation (for example when local persistence
+      // rejects); that must never leave the row's button permanently busy.
+      if (action === "approve" && row.kind === "idea" && onAdoptIdea) {
+        const payload = row.payload as IdeaDraftPayload;
+        const adoption = await onAdoptIdea({ title: row.title, note: payload.note, rationale: payload.rationale });
+        if (!adoption.ok) {
+          setNotice({ id: row.id, text: adoption.reason || "Idee konnte nicht in die Inbox übernommen werden." });
+          return;
+        }
+      }
+      if (action === "approve" && row.kind === "revenue-loop" && onAdoptRevenueLoop) {
+        const adoption = await onAdoptRevenueLoop(row.payload as RevenueLoopDraftPayload);
+        if (!adoption.ok) {
+          setNotice({ id: row.id, text: adoption.reason || "Revenue-Loop konnte nicht übernommen werden." });
+          return;
+        }
+      }
+
       const result = await decideMutation.mutateAsync({ id: row.id, action });
-      if (!result.ok) setNotice({ id: row.id, text: result.reason });
-      await utils.draftEngine.queue.invalidate();
+      if (!result.ok) {
+        setNotice({ id: row.id, text: result.reason });
+      } else {
+        await utils.draftEngine.queue.invalidate();
+      }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Entscheidung fehlgeschlagen.";
+      const message = error instanceof Error ? error.message : "Freigabe fehlgeschlagen. Bitte erneut versuchen.";
       setNotice({ id: row.id, text: message });
     } finally {
       setBusyId(null);
