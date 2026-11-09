@@ -1,5 +1,13 @@
 # Digistore24-IPN: Aktivierungsstand und die zwei verbleibenden Betreiber-Schritte
 
+**Kanonische IPN-URL (verbindlich):** `https://app.cybersarah-ki.com/api/v1/webhooks/digistore24`
+— diese Domain ist Render-Primaerdomain, liefert `200` auf `/api/health` und ist von aussen erreichbar.
+Die Subdomain `api.cybersarah-ki.com` ist nur eine optionale Kurzform und wird fuer den Betrieb **nicht**
+gebraucht; der DNS-Eintrag ist entbehrlich.
+
+Unveraendert offen: `DIGISTORE24_IPN_SECRET` fehlt in der Render-Umgebung, und Digistore24 weist den
+hinterlegten API-Key zurueck (`D24_API=INVALID_KEY_QUARANTINED`). Beides sind Betreiber-Zugangsdaten.
+
 **Stand:** 09.11.2026, 04:45 UTC · **Produktionsstand:** `252ab00` · **Status:** Kette repariert, Freischaltung an zwei Zugangsdaten gebunden
 
 ## 1. Ausgangslage
