@@ -10,10 +10,17 @@ describe("mobile drawer sections", () => {
     expect(result.flatMap((x) => x.items)).toEqual(DRAWER_ITEMS);
   });
 
+  it("bildet die fuenf Produktbereiche in fester Reihenfolge ab", () => {
+    expect(DRAWER_SECTIONS.map((section) => section.title)).toEqual([
+      "ÜBERSICHT", "WACHSTUM & CONTENT", "UMSATZ & KUNDEN", "KI-AGENT", "KONTO & SYSTEM",
+    ]);
+    expect(DRAWER_SECTIONS).toHaveLength(5);
+  });
+
   it("zeigt bei Suche nur Gruppen mit Treffern", () => {
     const result = groupDrawerItems(filterDrawerItems("media"));
     expect(result).toHaveLength(1);
-    expect(result[0].key).toBe("studio");
+    expect(result[0].key).toBe("growth");
     expect(result[0].items[0].route).toBe("/media-studio");
   });
 

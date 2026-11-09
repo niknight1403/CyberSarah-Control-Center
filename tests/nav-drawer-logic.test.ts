@@ -5,20 +5,20 @@ describe("mobile drawer navigation", () => {
   it("macht die Kernbereiche und bisher versteckten Entwicklungswerkzeuge erreichbar", () => {
     const routes = DRAWER_ITEMS.map((item) => item.route);
     expect(routes).toEqual([
-      "/dashboard", "/chat", "/superagent",
-      "/revenue-os", "/business", "/focus", "/ideas", "/decisions",
-      "/media-studio",
-      "/agent", "/", "/preview", "/quality", "/cyber-terminal",
-      "/account",
+      "/dashboard", "/cyber-dashboard",
+      "/media-studio", "/ai-influenza-team",
+      "/revenue-os", "/business", "/micro-trading",
+      "/chat", "/superagent", "/agent", "/loop-engineering", "/focus", "/ideas", "/decisions",
+      "/", "/preview", "/quality", "/cyber-terminal", "/account",
     ]);
     expect(new Set(routes).size).toBe(routes.length);
     expect(routes).not.toContain("/designer");
   });
 
   it("weist jedem Menuepunkt eine gueltige Gruppe zu", () => {
-    const groups = new Set(["start", "revenue", "studio", "development", "system"]);
+    const groups = new Set(["overview", "growth", "revenue", "agent", "system"]);
     expect(DRAWER_ITEMS.every((item) => groups.has(item.group))).toBe(true);
-    expect(DRAWER_ITEMS[0].group).toBe("start");
+    expect(DRAWER_ITEMS[0].group).toBe("overview");
     expect(DRAWER_ITEMS.at(-1)?.group).toBe("system");
   });
 
@@ -28,13 +28,15 @@ describe("mobile drawer navigation", () => {
     expect(resolveActiveDrawerItem("/chat/session-1")?.title).toBe("KI-Chat");
     expect(resolveActiveDrawerItem("/media-studio")?.title).toBe("Media Studio");
     expect(resolveActiveDrawerItem("/quality/build")?.route).toBe("/quality");
+    expect(resolveActiveDrawerItem("/ai-influenza-team")?.group).toBe("growth");
+    expect(resolveActiveDrawerItem("/loop-engineering")?.group).toBe("agent");
   });
 
   it("behandelt Root nur als exakten Treffer und laesst unbekannte Routen in Ruhe", () => {
     expect(resolveActiveDrawerItem("")?.route).toBe("/");
     expect(resolveActiveDrawerItem("/")?.route).toBe("/");
     expect(resolveActiveDrawerItem("/plugins")).toBeNull();
-    expect(resolveActiveDrawerItem("/micro-trading")).toBeNull();
+    expect(resolveActiveDrawerItem("/micro-trading")?.group).toBe("revenue");
     expect(resolveActiveDrawerItem("/not-found")).toBeNull();
   });
 });

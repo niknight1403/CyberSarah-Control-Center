@@ -1,14 +1,15 @@
 /**
  * Nav-Drawer-Logik (rein, testbar) — Sprint 132.
  *
- * Modell für das seitliche Menü im Base44-Stil (Chat, Workflows, Plugins,
- * Meetings, Dateien, Gedächtnis, Daten, Agenteneinstellungen). Getrennt von
- * lib/viewport-logic.ts (Desktop-Sidebar), weil der Drawer bewusst mehr
- * Einträge zeigt als die kompakte Bottom-Tab-Leiste.
+ * Einheitliches Fünf-Bereiche-Modell für den Navigations-Drawer.
+ * Bestehende Expo-Routen bleiben eigenständige Ziele; dieses Modell ordnet
+ * sie nur nach Produktaufgabe und ändert keine Deep Links oder Berechtigungen.
  */
 
 export type DrawerRoute =
   | "/dashboard"
+  | "/cyber-dashboard"
+  | "/ai-influenza-team"
   | "/business"
   | "/media-studio"
   | "/account"
@@ -52,26 +53,29 @@ export type DrawerItem = {
     | "chart.bar.fill";
   badge?: string;
   keywords?: readonly string[];
-  group: "start" | "revenue" | "studio" | "development" | "system";
+  group: "overview" | "growth" | "revenue" | "agent" | "system";
 };
 
-/** Reihenfolge deckungsgleich mit dem Base44-Vorbild (Chat oben, Settings unten). */
-/** Operatives Menü: Revenue zuerst, Admin- und Utility-Routen bleiben direkt erreichbar. */
+/** Fünf Produktbereiche; alle bestehenden Kernziele bleiben direkt erreichbar. */
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
-  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill", group: "start", keywords: ["status","gesundheit","betrieb","startseite"] },
-  { route: "/chat", title: "KI-Chat", icon: "message.fill", group: "start", keywords: ["ki","assistent","prompt","fragen"] },
-  { route: "/superagent", title: "Superagent & Workflows", icon: "wand.and.stars", group: "start", keywords: ["autopilot","orchestrierung","workflow"] },
-  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", group: "revenue", keywords: ["umsatz","geld","stripe","monetarisierung"] },
-  { route: "/business", title: "Business & Analytics", icon: "chart.bar.fill", group: "revenue", keywords: ["analyse","kunden","statistik"] },
-  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "revenue", keywords: ["prioritaeten","aufgaben"] },
-  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "revenue", keywords: ["ideen","entwurf"] },
-  { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "revenue", keywords: ["entscheidung","protokoll"] },
-  { route: "/media-studio", title: "Media Studio", icon: "video.fill", group: "studio", keywords: ["videos","reels","content","film"] },
-  { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "development", keywords: ["programmierung","automation","entwicklung"] },
-  { route: "/", title: "Workspace", icon: "folder.fill", group: "development", keywords: ["dateien","repository","github","code"] },
-  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill", group: "development", keywords: ["vorschau","website","testen"] },
-  { route: "/quality", title: "Qualität & Builds", icon: "chart.bar.fill", group: "development", keywords: ["apk","android","build","tests","release"] },
-  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right", group: "development", keywords: ["logs","diagnose","terminal"] },
+  { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill", group: "overview", keywords: ["status","gesundheit","betrieb","startseite"] },
+  { route: "/cyber-dashboard", title: "Cyber Dashboard", icon: "sparkles", group: "overview", keywords: ["kennzahlen","cockpit","status"] },
+  { route: "/media-studio", title: "Media Studio", icon: "video.fill", group: "growth", keywords: ["videos","reels","content","film","kampagnen"] },
+  { route: "/ai-influenza-team", title: "AI Influenza Team", icon: "sparkles", group: "growth", keywords: ["content","social media","marketing","creator"] },
+  { route: "/revenue-os", title: "Revenue OS", icon: "chart.bar.fill", group: "revenue", keywords: ["umsatz","geld","stripe","monetarisierung","abonnements"] },
+  { route: "/business", title: "Business & Kunden", icon: "tablecells.fill", group: "revenue", keywords: ["analyse","kunden","crm","leads","statistik"] },
+  { route: "/micro-trading", title: "Micro Trading", icon: "chart.bar.fill", group: "revenue", keywords: ["handel","portfolio"] },
+  { route: "/chat", title: "KI-Chat", icon: "message.fill", group: "agent", keywords: ["ki","assistent","prompt","fragen"] },
+  { route: "/superagent", title: "Superagent & Workflows", icon: "wand.and.stars", group: "agent", keywords: ["autopilot","orchestrierung","workflow"] },
+  { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "agent", keywords: ["programmierung","automation","entwicklung"] },
+  { route: "/loop-engineering", title: "Loop Engineering", icon: "wand.and.stars", group: "agent", keywords: ["loops","selbstoptimierung","automation"] },
+  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "agent", keywords: ["prioritaeten","aufgaben"] },
+  { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "agent", keywords: ["ideen","entwurf"] },
+  { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "agent", keywords: ["entscheidung","protokoll"] },
+  { route: "/", title: "Workspace", icon: "folder.fill", group: "system", keywords: ["dateien","repository","github","code"] },
+  { route: "/preview", title: "Vorschau", icon: "play.rectangle.fill", group: "system", keywords: ["vorschau","website","testen"] },
+  { route: "/quality", title: "Qualität & Builds", icon: "chart.bar.fill", group: "system", keywords: ["apk","android","build","tests","release"] },
+  { route: "/cyber-terminal", title: "Terminal", icon: "chevron.left.forwardslash.chevron.right", group: "system", keywords: ["logs","diagnose","terminal"] },
   { route: "/account", title: "Konto & Einstellungen", icon: "gearshape.fill", group: "system", keywords: ["profil","einstellungen","konto"] },
 ] as const;
 
