@@ -26,7 +26,7 @@ import { sql } from "drizzle-orm";
 import { affiliateProducts, revenueJobs, revenueOffers } from "../drizzle/schema";
 import { getDb } from "./db";
 import {
-  buildCreateProductParams, buildPaymentPlanParams, checkoutUrl,
+  buildCreateProductParams, buildPaymentPlanParams, catalogSlug, checkoutUrl,
   intervalLabel, planNextProducts, readCreatedPaymentPlanId, readCreatedProductId,
   safeErrorMessage, summarizeRun, MAX_PRODUCTS_PER_RUN, MAX_AUTOPILOT_PRODUCTS_TOTAL,
   parseProductIdeas, type ProductIdea,
@@ -200,7 +200,7 @@ async function persistProduct(idea: ProductIdea, productId: string, planId: stri
     });
   }
   await db.insert(affiliateProducts).values({
-    slug: `ds24-${productId}`,
+    slug: catalogSlug(productId),
     title: idea.name,
     url,
     platform: "digistore24",
