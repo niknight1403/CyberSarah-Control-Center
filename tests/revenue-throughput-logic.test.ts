@@ -14,6 +14,26 @@ const base={
 };
 
 describe("revenue throughput supervisor",()=>{
+  it("does not block Stripe revenue when the optional Digistore24 integration is unused",()=>{
+    const out=buildRevenueThroughputSnapshot({
+      ...base,
+      digistoreApiConfigured:false,
+      digistoreIpnConfigured:false,
+    });
+    expect(out.status).toBe("scale");
+    expect(out.blockers).not.toContain("Digistore24-IPN nicht konfiguriert");
+  });
+
+  it("requires the Digistore24 IPN when its API integration is enabled",()=>{
+    const out=buildRevenueThroughputSnapshot({
+      ...base,
+      digistoreApiConfigured:true,
+      digistoreIpnConfigured:false,
+    });
+    expect(out.status).toBe("repair");
+    expect(out.blockers).toContain("Digistore24-IPN nicht konfiguriert");
+  });
+
   it("computes measured revenue velocity without inventing MRR projection",()=>{
     const out=buildRevenueThroughputSnapshot(base);
     expect(out.revenueVelocity.recent7RevenueEur).toBe(700);

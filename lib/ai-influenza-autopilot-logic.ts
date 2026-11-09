@@ -9,6 +9,7 @@
  */
 import {
   canAdvanceAiInfluenzaStep,
+  maySetPaidWithoutStripe,
   nextAiInfluenzaStep,
   type AiInfluenzaMode,
   type AiInfluenzaWorkflowStep,
@@ -56,6 +57,14 @@ export function planAiInfluenzaAutopilot(args: {
       plans.push({
         decision: "final", jobId: order.jobId, orderId: order.orderId, from: order.step,
         reason: "Auftrag steht im letzten Workflow-Schritt.",
+      });
+      continue;
+    }
+    if (!maySetPaidWithoutStripe(order.testOnly, next)) {
+      waiting += 1;
+      plans.push({
+        decision: "wait", jobId: order.jobId, orderId: order.orderId, from: order.step, to: next,
+        reason: "Echte Zahlung wartet auf ein verifiziertes Stripe-Zahlungs-/Subscription-Event.",
       });
       continue;
     }
