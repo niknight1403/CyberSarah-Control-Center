@@ -4,10 +4,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   buildIdeaResult,
   createIdeaItem,
+  deriveIdeaFromDraft,
   findIdeaByTitle,
   hasInboxCapacity,
+  IDEA_LIMITS,
   parseIdeaPrompt,
   validateIdeaItem,
+  type IdeaDraftInput,
   type IdeaItem,
   type IdeaResult,
   type IdeaStatus,
@@ -157,19 +160,24 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
   }, [state.pending, persist]);
 
   /**
-   * Sprint 346 — Autonome Ideen-Vorschlaege: legt eine freigegebene Idee
-   * direkt in die Inbox (Klick auf "Uebernehmen" = die Freigabe). Ehrlich:
-   * bei voller Inbox wird nichts ueberschrieben, sondern abgelehnt.
+   * Sprint 346/349 — Autonome Ideen-Vorschlaege: legt eine freigegebene Idee
+   * direkt in die Inbox (Klick auf "Freigeben" = die Freigabe). Ehrlich:
+   * bei voller Inbox wird nichts ueberschrieben, sondern abgelehnt; Titel und
+   * Notiz werden auf die Inbox-Limits gekuerzt statt roh durchgereicht.
    */
-  const adoptIdea = useCallback(async (title: string, note: string, source: string): Promise<{ ok: boolean; reason: string }> => {
+  const adoptIdeaDraft = useCallback(async (input: IdeaDraftInput): Promise<{ ok: boolean; reason: string }> => {
     const items = itemsRef.current;
     if (!hasInboxCapacity(items)) {
-      return { ok: false, reason: "Inbox voll — erst Ideen verarbeiten." };
+      return { ok: false, reason: `Inbox voll (${IDEA_LIMITS.maxInboxOpen} offene Ideen) — erst triagieren, dann freigeben.` };
     }
-    if (!validateIdeaItem({ title, note, source }).valid) {
-      return { ok: false, reason: "Vorschlag unvollstaendig." };
+    const derived = deriveIdeaFromDraft(input);
+    if (!derived.valid) return { ok: false, reason: derived.reason };
+    const existing = items.find((item) => item.status !== "dropped" && item.title.toLowerCase() === derived.title.toLowerCase());
+    if (existing) {
+      // Erneutes Freigeben nach einem Fehlschlag darf keine zweite Kopie anlegen.
+      return { ok: true, reason: `"${existing.title}" liegt bereits in der Inbox.` };
     }
-    const next = [...items, createIdeaItem({ title, note, source })];
+    const next = [...items, createIdeaItem({ title: derived.title, note: derived.note, source: "autonom" })];
     itemsRef.current = next;
     setState((prev) => ({ ...prev, items: next }));
     await persist(next);
@@ -180,5 +188,5 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
     setState((prev) => ({ ...prev, pending: null }));
   }, []);
 
-  return { state, runPrompt, approvePending, dismissPending, adoptIdea };
+  return { state, runPrompt, approvePending, dismissPending, adoptIdeaDraft };
 }

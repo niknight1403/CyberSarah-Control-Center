@@ -30,7 +30,7 @@ type DraftsCardProps = {
   kinds: readonly DraftKind[];
   accent?: "cyan" | "green" | "purple" | "blue";
   /** Nur fuer kind "idea": legt die freigegebene Idee in die Inbox. */
-  onAdoptIdea?: (payload: IdeaDraftPayload) => Promise<{ ok: boolean; reason: string }>;
+  onAdoptIdea?: (payload: IdeaDraftPayload & { title: string }) => Promise<{ ok: boolean; reason: string }>;
   /** Fuer Revenue-Loops: Freigabe integriert den Plan in Loop Engineering. */
   onAdoptRevenueLoop?: (payload: RevenueLoopDraftPayload) => Promise<{ ok: boolean; reason: string }>;
   /** Optional: Revenue-Loop-Entwuerfe auf konkrete Revenue-Hubs begrenzen. */
@@ -59,7 +59,8 @@ function describePayload(row: DraftRow): string {
 export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, onAdoptRevenueLoop, revenueHubs, autoGenerate = true }: DraftsCardProps) {
   const styles = useMemo(() => createStyles(), []);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  /** Fehlermeldung gehoert zur Zeile, die sie ausgeloest hat — sonst bleibt sie unsichtbar. */
+  const [notice, setNotice] = useState<{ id: number; text: string } | null>(null);
 
   const meQuery = trpc.auth.me.useQuery(undefined, { staleTime: 60_000 });
   const isAdmin = meQuery.data?.role === "admin";
@@ -94,10 +95,10 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
       if (row.kind === "idea" && onAdoptIdea) {
         const payload = row.payload as IdeaDraftPayload;
         setBusyId(row.id);
-        const adoption = await onAdoptIdea({ note: payload.note, rationale: payload.rationale });
+        const adoption = await onAdoptIdea({ title: row.title, note: payload.note, rationale: payload.rationale });
         if (!adoption.ok) {
           setBusyId(null);
-          setNotice(adoption.reason);
+          setNotice({ id: row.id, text: adoption.reason });
           return;
         }
       }
@@ -106,7 +107,7 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
         const adoption = await onAdoptRevenueLoop(row.payload as RevenueLoopDraftPayload);
         if (!adoption.ok) {
           setBusyId(null);
-          setNotice(adoption.reason);
+          setNotice({ id: row.id, text: adoption.reason });
           return;
         }
       }
@@ -114,10 +115,11 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
     setBusyId(row.id);
     try {
       const result = await decideMutation.mutateAsync({ id: row.id, action });
-      if (!result.ok) setNotice(result.reason);
+      if (!result.ok) setNotice({ id: row.id, text: result.reason });
       await utils.draftEngine.queue.invalidate();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Entscheidung fehlgeschlagen.");
+      const message = error instanceof Error ? error.message : "Entscheidung fehlgeschlagen.";
+      setNotice({ id: row.id, text: message });
     } finally {
       setBusyId(null);
     }
@@ -164,7 +166,7 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
               <Text style={styles.hint}>{draftApprovalHint(row.kind)}</Text>
             </View>
             <Text style={styles.payload}>{describePayload(row)}</Text>
-            {notice && busyId === row.id ? <Text style={styles.errorNote}>{notice}</Text> : null}
+            {notice?.id === row.id ? <Text style={styles.errorNote}>{notice.text}</Text> : null}
             <View style={styles.buttonRow}>
               <Pressable
                 accessibilityLabel={`Entwurf ${row.id} freigeben`}

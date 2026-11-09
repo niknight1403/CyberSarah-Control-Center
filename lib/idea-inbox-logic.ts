@@ -91,6 +91,53 @@ export function createIdeaItem(input: Partial<IdeaItem>, now = Date.now): IdeaIt
   };
 }
 
+/* ============ Ideen-Freigabe aus autonomen Entwuerfen (Sprint 349) ============ */
+
+/**
+ * Ein autonomer Ideen-Entwurf liefert nur Notiz und Begruendung — keinen
+ * Titel, und beide Felder duerfen laenger sein als die Inbox erlaubt.
+ * Fruehere Fassung reichte die Notiz roh als Titel durch; sobald sie ueber
+ * IDEA_LIMITS.title.max lag (oder Notiz + Begruendung ueber das Notiz-Limit),
+ * scheiterte die Freigabe still. Hier wird ehrlich abgeleitet statt
+ * durchgereicht: Titel aus dem ersten Satz, alles hart auf die Limits gekuerzt.
+ */
+export type IdeaDraftInput = { title?: string; note: string; rationale?: string };
+export type IdeaFromDraft = { valid: true; title: string; note: string } | { valid: false; reason: string };
+
+/** Kuerzt hart auf das Limit und bleibt lesbar: Wortgrenze + Auslassungszeichen. */
+function clampToLimit(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const hard = text.slice(0, max - 1);
+  const soft = hard.replace(/\s+\S*$/, "");
+  const base = soft.length >= Math.floor(max / 2) ? soft : hard;
+  return `${base.trimEnd()}\u2026`;
+}
+
+/** Erster Satz (oder erste Zeile) — der Kern einer Idee, nicht ihr ganzer Aufsatz. */
+function firstSentence(text: string): string {
+  const line = (text.split(/\r?\n/)[0] ?? "").trim();
+  if (line.length === 0) return "";
+  const sentence = line.match(/^.+?[.!?](?=\s|$)/);
+  return (sentence ? sentence[0] : line).trim();
+}
+
+/**
+ * Leitet aus einem Entwurf eine gueltige Inbox-Idee ab. Quelle bleibt
+ * "autonom" — der Entwurf ist Herkunft, nicht der Mensch.
+ */
+export function deriveIdeaFromDraft(input: IdeaDraftInput): IdeaFromDraft {
+  const note = (input.note ?? "").trim();
+  if (note.length === 0) return { valid: false, reason: "Der Entwurf enthaelt keine Idee (leere Notiz)." };
+  const explicitTitle = (input.title ?? "").trim();
+  const title = clampToLimit(firstSentence(explicitTitle.length > 0 ? explicitTitle : note), IDEA_LIMITS.title.max);
+  if (title.length < IDEA_LIMITS.title.min) {
+    return { valid: false, reason: `Der Entwurf liefert keinen brauchbaren Titel (min. ${IDEA_LIMITS.title.min} Zeichen).` };
+  }
+  const rationale = (input.rationale ?? "").trim();
+  const merged = [note, rationale.length > 0 ? `Warum: ${rationale}` : ""].filter((part) => part.length > 0).join("\n\n");
+  return { valid: true, title, note: clampToLimit(merged, IDEA_LIMITS.note.max) };
+}
+
 /* ==================== Ideen-Reifung (Sprint 243) ==================== */
 
 export type IdeaAge = "fresh" | "aging" | "withering";

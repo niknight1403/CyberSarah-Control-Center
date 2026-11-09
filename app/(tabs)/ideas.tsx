@@ -34,7 +34,7 @@ const PROMPT_HINTS = [
  */
 export default function IdeasScreen() {
   const drawer = useNavDrawer();
-  const { state, runPrompt, approvePending, dismissPending, adoptIdea } = useIdeaInbox();
+  const { state, runPrompt, approvePending, dismissPending, adoptIdeaDraft } = useIdeaInbox();
   const [prompt, setPrompt] = useState("");
   const styles = useMemo(() => createStyles(), []);
   const [snapshotAt] = useState(() => Date.now());
@@ -172,10 +172,7 @@ export default function IdeasScreen() {
           <AutonomousDraftsCard
             kinds={["idea"]}
             accent="purple"
-            onAdoptIdea={async (payload) => {
-              const result = await adoptIdea(payload.note, `${payload.note} — ${payload.rationale}`, "autonom");
-              return result;
-            }}
+            onAdoptIdea={async (payload) => adoptIdeaDraft(payload)}
           />
 
           <Text style={styles.disclaimer}>{IDEA_DISCLAIMER}</Text>
