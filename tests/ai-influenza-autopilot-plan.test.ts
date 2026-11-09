@@ -25,6 +25,26 @@ describe("AI Influenza Autopilot-Planung", () => {
     expect(plan.decision === "wait" ? plan.reason : "").toMatch(/Freigabe/i);
   });
 
+  it("haelt echte Zahlungsuebergaenge bis zum verifizierten Stripe-Event an", () => {
+    const result = planAiInfluenzaAutopilot({
+      orders: [candidate({ step: "payment-pending", testOnly: false })],
+    });
+    expect(result.advanced).toBe(0);
+    expect(result.waiting).toBe(1);
+    expect(result.plans[0]).toMatchObject({
+      decision: "wait", from: "payment-pending", to: "paid",
+      reason: expect.stringMatching(/Stripe.*Event/i),
+    });
+  });
+
+  it("erlaubt den isolierten Test-only Payment-Schritt weiterhin", () => {
+    const result = planAiInfluenzaAutopilot({
+      orders: [candidate({ step: "payment-pending", testOnly: true })],
+    });
+    expect(result.advanced).toBe(1);
+    expect(result.plans[0]).toMatchObject({ decision: "advance", to: "paid" });
+  });
+
   it("schaltet im Manual-Modus nichts weiter", () => {
     const result = planAiInfluenzaAutopilot({ orders: [candidate({ mode: "manual" })] });
     expect(result.advanced).toBe(0);

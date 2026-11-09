@@ -16,6 +16,10 @@ describe("approved content production contract", () => {
     expect(publishing).toContain("approved-draft:");
     expect(readFileSync("server/draft-engine-router.ts", "utf8")).toContain("enqueueApprovedContentDraft");
     expect(readFileSync("server/channel-autopilot.ts", "utf8")).toContain("reconcileApprovedContentDrafts");
+    const reconciler = readFileSync("server/channel-autopilot.ts", "utf8");
+    expect(reconciler).toContain('supported.has(platform)');
+    expect(reconciler).toContain('content.length<10');
+    expect(reconciler).toContain('Legacy approved rows may predate the current publishing contract');
   });
 });
 describe("zero-cost media safety contract", () => {

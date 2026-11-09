@@ -68,9 +68,23 @@ export async function reconcileApprovedContentDrafts(limit=50){
     .orderBy(desc(draftQueue.decidedAt)).limit(Math.min(Math.max(limit,1),200));
   let inserted=0,reused=0,invalid=0;
   for(const row of rows){
-    const p=row.payload as {personaId?:unknown;platform?:unknown;topic?:unknown;content?:unknown};
-    if(!row.decidedBy||![p.personaId,p.platform,p.topic,p.content].every(v=>typeof v==="string")){invalid++;continue;}
-    const result=await enqueueApprovedContentDraft(row.decidedBy,{id:row.id,personaId:String(p.personaId),platform:String(p.platform),topic:String(p.topic),content:String(p.content)});
+    const p=row.payload&&typeof row.payload==="object"
+      ? row.payload as {personaId?:unknown;platform?:unknown;topic?:unknown;content?:unknown}
+      : {};
+    const personaId=typeof p.personaId==="string"?p.personaId.trim():"";
+    const platform=typeof p.platform==="string"?p.platform.trim().toLowerCase().replace("youtube/shorts","tiktok"):"";
+    const topic=typeof p.topic==="string"?p.topic.trim():"";
+    const content=typeof p.content==="string"?p.content.trim():"";
+    const supported=new Set(["instagram","tiktok","linkedin","x","threads","bluesky"]);
+    // Legacy approved rows may predate the current publishing contract.
+    // Quarantine them from this reconciliation pass without changing their
+    // human approval state or repeatedly throwing from the 15-minute loop.
+    if(!row.decidedBy?.trim()||!Number.isSafeInteger(row.id)||row.id<1||
+      !personaId||!supported.has(platform)||!topic||content.length<10){
+      invalid++;
+      continue;
+    }
+    const result=await enqueueApprovedContentDraft(row.decidedBy,{id:row.id,personaId,platform,topic,content});
     result.inserted?inserted++:reused++;
   }
   return {scanned:rows.length,inserted,reused,invalid};
