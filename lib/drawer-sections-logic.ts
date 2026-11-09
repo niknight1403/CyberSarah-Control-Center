@@ -4,11 +4,11 @@ export const DRAWER_SECTIONS: readonly {
   key: DrawerItem["group"];
   title: string;
 }[] = [
-  { key: "start", title: "SCHNELLSTART" },
-  { key: "revenue", title: "GESCHÄFT & UMSATZ" },
-  { key: "studio", title: "CONTENT STUDIO" },
-  { key: "development", title: "ENTWICKLUNG" },
-  { key: "system", title: "SYSTEM" },
+  { key: "overview", title: "ÜBERSICHT" },
+  { key: "growth", title: "WACHSTUM & CONTENT" },
+  { key: "revenue", title: "UMSATZ & KUNDEN" },
+  { key: "agent", title: "KI-AGENT" },
+  { key: "system", title: "KONTO & SYSTEM" },
 ] as const;
 
 export type VisibleDrawerSection = {
