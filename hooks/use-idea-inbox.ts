@@ -88,12 +88,14 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
     return () => { active = false; };
   }, [storage]);
 
-  const persist = useCallback(async (items: IdeaItem[]) => {
+  const persist = useCallback(async (items: IdeaItem[]): Promise<boolean> => {
     try {
       await saveIdeaItems(storage(), items);
       setState((prev) => ({ ...prev, saveError: null }));
+      return true;
     } catch (error) {
       setState((prev) => ({ ...prev, saveError: error instanceof Error ? error.message : "Speichern fehlgeschlagen" }));
+      return false;
     }
   }, [storage]);
 
@@ -149,6 +151,7 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
     const next = pending.kind === "add"
       ? [...items, createIdeaItem({ title: pending.title, note: pending.note, source: pending.source })]
       : items.map((item) => (item.id === pending.ideaId ? { ...item, status: pending.status, updatedAt: Date.now() } : item));
+    const previous = items;
     itemsRef.current = next;
     setState((prev) => ({
       ...prev,
@@ -156,7 +159,16 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
       pending: null,
       result: { headline: "Änderung übernommen", lines: ["Die bestätigte Änderung wurde gespeichert — ehrlich geführt, nichts erfunden."], disclaimer: prev.result?.disclaimer ?? "" },
     }));
-    await persist(next);
+    const saved = await persist(next);
+    if (!saved) {
+      itemsRef.current = previous;
+      setState((prev) => ({
+        ...prev,
+        items: previous,
+        pending,
+        result: { headline: "Speichern fehlgeschlagen", lines: ["Die Änderung wurde nicht übernommen. Bitte Speicherzugriff prüfen und erneut bestätigen."], disclaimer: prev.result?.disclaimer ?? "" },
+      }));
+    }
   }, [state.pending, persist]);
 
   /**
@@ -180,7 +192,12 @@ export function useIdeaInbox(adapter?: IdeaKeyValueAdapter) {
     const next = [...items, createIdeaItem({ title: derived.title, note: derived.note, source: "autonom" })];
     itemsRef.current = next;
     setState((prev) => ({ ...prev, items: next }));
-    await persist(next);
+    const saved = await persist(next);
+    if (!saved) {
+      itemsRef.current = items;
+      setState((prev) => ({ ...prev, items }));
+      return { ok: false, reason: "Idee konnte lokal nicht gespeichert werden. Bitte Speicherzugriff prüfen und erneut freigeben." };
+    }
     return { ok: true, reason: "" };
   }, [persist]);
 
