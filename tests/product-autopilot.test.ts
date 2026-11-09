@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import {
-  autopilotProductStatus, buildCreateProductParams, buildPaymentPlanParams, checkoutUrl,
+  autopilotProductStatus, buildCreateProductParams, catalogSlug, buildPaymentPlanParams, checkoutUrl,
   euroAmount, intervalLabel, parseProductIdeas, planNextProducts, productNameKey,
   readCreatedPaymentPlanId, readCreatedProductId, safeErrorMessage, summarizeRun,
   type ProductIdea,
@@ -128,6 +128,12 @@ describe("Produkt-Autopilot: Parameter fuer Digistore24", () => {
 });
 
 describe("Produkt-Autopilot: Antworten und Fehler", () => {
+  it("nutzt denselben Katalog-Slug wie der IPN-Pfad", () => {
+    // Der IPN-Handler normalisiert product_id zum Slug; 762354 bleibt 762354.
+    expect(catalogSlug(762354)).toBe("762354");
+    expect(catalogSlug(" 762354 ")).toBe("762354");
+  });
+
   it("liest Produkt- und Plan-IDs", () => {
     expect(readCreatedProductId({ data: { product_id: 762354 } })).toBe("762354");
     expect(readCreatedProductId({ data: { product_id: "762355" } })).toBe("762355");

@@ -139,6 +139,15 @@ export function intervalLabel(idea: ProductIdea): string {
   }
 }
 
+/**
+ * Katalog-Slug im eigenen Dashboard. Muss dem Slug entsprechen, den der
+ * IPN-Pfad bildet (normalisierte product_id), sonst legt der erste Verkauf
+ * eine zweite Zeile an und der Umsatz landet nicht auf dem Produkt.
+ */
+export function catalogSlug(productId: string | number): string {
+  return String(productId).trim();
+}
+
 export function checkoutUrl(productId: string | number): string {
   return `https://www.checkout-ds24.com/product/${String(productId).trim()}`;
 }
