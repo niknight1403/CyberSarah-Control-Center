@@ -47,7 +47,7 @@ export function buildRevenueThroughputSnapshot(input:RevenueThroughputInput){
   if(!input.databaseReady)blockers.push("Revenue-Datenbank nicht verfügbar");
   if(!input.stripeConnected)blockers.push("Stripe-Katalog/API nicht verbunden");
   if(!input.stripeWebhookConfigured)blockers.push("Stripe-Webhook-Secret fehlt oder ist ungültig");
-  if(!input.digistoreIpnConfigured)blockers.push("Digistore24-IPN nicht konfiguriert");
+  if(input.digistoreApiConfigured&&!input.digistoreIpnConfigured)blockers.push("Digistore24-IPN nicht konfiguriert");
   if(input.providerCircuitsTotal>0&&input.providerCircuitsOpen===input.providerCircuitsTotal)blockers.push("Alle LLM-Provider-Circuits offen");
   if(input.stripeWebhookConsecutiveFailures>=3)blockers.push(`Stripe-Webhook ${input.stripeWebhookConsecutiveFailures} Fehler in Folge`);
   if(input.digistoreWebhookConsecutiveFailures>=3)blockers.push(`Digistore24-IPN ${input.digistoreWebhookConsecutiveFailures} Fehler in Folge`);
