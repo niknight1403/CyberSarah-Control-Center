@@ -118,3 +118,29 @@ Bleibt der Fehler danach bestehen, ist die Ursache eindeutig auf der EAS-Seite:
 Die App versucht, mit ihrer gespeicherten (ungueltigen) Definition einen Lauf zu
 erzeugen. Abschalten laesst sich das nur im Expo-Konto:
 Project Settings -> GitHub -> Repository-Verbindung trennen oder neu verbinden.
+
+### Zweiter Befund 09.11.2026, 07:20 — Workflow vorhanden, Status bleibt rot
+
+Mit `34f1579` liegt `.github/workflows/create-production-builds.yml` auf `main`
+und ist gueltig (input-freier `workflow_dispatch`, im Repo geprueft). Die beiden
+Status-Kontexte bleiben trotzdem auf `error`, Wortlaut unveraendert:
+
+```
+create-production-builds.yml (@niko1403/custom-ai-studio-mobile)     error
+create-production-builds.yml (@niko1403/cybersarah-control-center-)  error
+```
+
+Damit ist ausgeschlossen, dass die fehlende Datei die Ursache ist: Die App
+scheitert an ihrer EIGENEN gespeicherten Definition ("Invalid input: expected
+object, received null") und zeigt weiterhin auf den alten Kontonamen
+`niko1403` (2025 in `niknight1403` umbenannt; `GET /users/niko1403` -> 404).
+
+Abschalten laesst sich das nur ausserhalb des Repos, in zwei Wegen:
+
+1. Expo-Konto: Projekt -> Settings -> GitHub -> Repository-Verbindung trennen
+   (oder neu verbinden, damit der aktuelle Kontoname hinterlegt ist).
+2. GitHub: Settings -> Applications -> Expo -> Configure -> Zugriff auf dieses
+   Repository entfernen. Danach postet die App keine Status-Checks mehr.
+
+Die interne CI ist davon unabhaengig gruen (`validate`, `Gitleaks`, `deploy`,
+`mirror`, `PostgreSQL Publishing Multi-Worker Gate`, `Echter Autopilot-Lauf`).
