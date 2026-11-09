@@ -7,8 +7,11 @@ export const MOBILE_HEADER_ROUTES: Readonly<Record<string, MobileHeader>> = {
   "/chat": { title: "Chat", subtitle: "KI-Dialog & Agentensteuerung" },
   "/superagent": { title: "Superagent", subtitle: "Autonome Orchestrierung" },
   "/business": { title: "Business", subtitle: "Revenue, Trading & Operations" },
+  "/micro-trading": { title: "Micro Trading", subtitle: "Markt & Handelsübersicht" },
   "/revenue-os": { title: "Revenue OS", subtitle: "Wachstum & Monetarisierung" },
   "/media-studio": { title: "Media Studio", subtitle: "Content & Kampagnen" },
+  "/ai-influenza-team": { title: "AI Influenza Team", subtitle: "Creator, Personas & Kampagnen" },
+  "/cyber-dashboard": { title: "Cyber Dashboard", subtitle: "Systemstatus & Sicherheit" },
   "/account": { title: "Konto", subtitle: "Profil, Plan & Einstellungen" },
   "/agent": { title: "Entwicklung", subtitle: "Agenten, Builds & Automatisierung" },
   "/preview": { title: "Vorschau", subtitle: "App-Erlebnis prüfen" },
@@ -27,7 +30,7 @@ export function resolveMobileHeader(pathname: string): MobileHeader {
   const path = pathname === "" ? "/" : pathname.replace(/\/+$/, "") || "/";
   if (MOBILE_HEADER_ROUTES[path]) return MOBILE_HEADER_ROUTES[path];
   const parent = Object.keys(MOBILE_HEADER_ROUTES)
-    .filter((route) => route !== "/" && path.startsWith(`${route}/`))
+    .filter((route) => route !== "/" && path.startsWith(route + "/"))
     .sort((a, b) => b.length - a.length)[0];
   return parent ? MOBILE_HEADER_ROUTES[parent] : FALLBACK_HEADER;
 }
