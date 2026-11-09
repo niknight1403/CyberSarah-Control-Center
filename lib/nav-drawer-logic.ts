@@ -1,10 +1,9 @@
 /**
  * Nav-Drawer-Logik (rein, testbar) — Sprint 132.
  *
- * Modell für das seitliche Menü im Base44-Stil (Chat, Workflows, Plugins,
- * Meetings, Dateien, Gedächtnis, Daten, Agenteneinstellungen). Getrennt von
- * lib/viewport-logic.ts (Desktop-Sidebar), weil der Drawer bewusst mehr
- * Einträge zeigt als die kompakte Bottom-Tab-Leiste.
+ * Einheitliches Fünf-Bereiche-Modell für den Navigations-Drawer.
+ * Bestehende Expo-Routen bleiben eigenständige Ziele; dieses Modell ordnet
+ * sie nur nach Produktaufgabe und ändert keine Deep Links oder Berechtigungen.
  */
 
 export type DrawerRoute =
@@ -57,8 +56,7 @@ export type DrawerItem = {
   group: "overview" | "growth" | "revenue" | "agent" | "system";
 };
 
-/** Reihenfolge deckungsgleich mit dem Base44-Vorbild (Chat oben, Settings unten). */
-/** Operatives Menü: Revenue zuerst, Admin- und Utility-Routen bleiben direkt erreichbar. */
+/** Fünf Produktbereiche; alle bestehenden Kernziele bleiben direkt erreichbar. */
 export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/dashboard", title: "Übersicht", icon: "chart.bar.fill", group: "overview", keywords: ["status","gesundheit","betrieb","startseite"] },
   { route: "/cyber-dashboard", title: "Cyber Dashboard", icon: "sparkles", group: "overview", keywords: ["kennzahlen","cockpit","status"] },
