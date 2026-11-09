@@ -26,7 +26,7 @@ import { registerRenderProxy } from "./renderProxy";
 import { appRouter } from "../routers";
 import { getDb } from "../db";
 import { funnelCampaigns } from "../../drizzle/schema";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { renderLandingHtml, type LandingFunnelPayload } from "../../lib/digistore24-launch-logic";
 import { createContext } from "./context";
 import {
@@ -41,6 +41,7 @@ import { createSecurityMiddleware } from "./security";
 import { handleDigistore24Ipn } from "../digistore24-ipn";
 import { syncDigistore24Commissions } from "../digistore24-api";
 import { resolveDigistore24IpnSecrets } from "../../lib/digistore24-ipn-config";
+import { conversionEvents } from "../../drizzle/schema";
 import { runProductAutopilot, productAutopilotStatus } from "../product-autopilot";
 import { resolveXToken, xTokenDiagnostics } from "../x-token-service";
 import { retryFailedJobsControlled } from "../publishing-retry-service";
@@ -654,6 +655,57 @@ async function startServer() {
    * Produkt-Autopilot: legt faellige Produkte autonom bei Digistore24 an.
    * Auth wie bei den anderen Cron-Routen (Bearer METRICS_TOKEN).
    */
+  /**
+   * IPN-Eingang nachweisen: letzte Digistore24-Ereignisse, ohne Kaeuferdaten.
+   * Damit ist ein echtes Testereignis von Digistore24 in Sekunden pruefbar,
+   * statt es aus dem Dashboard zu erraten.
+   */
+  app.get("/api/digistore24/ipn-status", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(503).json({ ok: false, detail: "Datenbank nicht verfuegbar." });
+      return;
+    }
+    const rows = await db
+      .select({
+        orderKey: conversionEvents.orderKey,
+        eventType: conversionEvents.eventType,
+        amountCents: conversionEvents.amountCents,
+        commissionCents: conversionEvents.commissionCents,
+        currency: conversionEvents.currency,
+        productSlug: conversionEvents.productSlug,
+        occurredAt: conversionEvents.occurredAt,
+        id: conversionEvents.id,
+      })
+      .from(conversionEvents)
+      .orderBy(desc(conversionEvents.id))
+      .limit(5);
+    const secretsConfigured = (process.env.DIGISTORE24_IPN_SECRET ?? process.env.DIGISTORE24_PASSPHRASE ?? "")
+      .split(",").map((entry) => entry.trim()).filter(Boolean).length;
+    res.json({
+      ok: true,
+      secretsConfigured,
+      events: rows.map((row) => ({
+        orderKey: row.orderKey,
+        eventType: row.eventType,
+        amountCents: row.amountCents,
+        commissionCents: row.commissionCents,
+        currency: row.currency,
+        productSlug: row.productSlug,
+        occurredAt: row.occurredAt,
+        receivedAt: row.occurredAt,
+      })),
+      detail: rows.length
+        ? "IPN-Ereignisse vorhanden."
+        : "Noch kein IPN verbucht — Digistore24 hat entweder nichts gesendet oder die IPN-URL ist im Konto nicht gesetzt.",
+    });
+  });
+
   /** X-Token: Diagnose und erzwungener Refresh (Bearer METRICS_TOKEN). */
   app.get("/api/x-token/status", async (req, res) => {
     const configuredToken = process.env.METRICS_TOKEN?.trim();

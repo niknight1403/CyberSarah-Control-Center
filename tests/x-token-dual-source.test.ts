@@ -83,7 +83,18 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-const envBackup = { ...process.env };
+// Nur die eigenen Schluessel sichern und zuruecksetzen. Ein Austausch des
+// gesamten process.env-Objekts wuerde vi.stubEnv in anderen Testdateien
+// unterlaufen (dort blieben Stubs stehen und Preis-Tests kippten).
+const TOUCHED_ENV = ["X_CLIENT_ID", "X_CLIENT_SECRET", "X_REFRESH_TOKEN", "X_OAUTH_TOKEN_URL", "X_PUBLISH_TOKEN"] as const;
+const envBackup = new Map<string, string | undefined>(TOUCHED_ENV.map((key) => [key, process.env[key]]));
+
+const restoreEnv = () => {
+  for (const [key, value] of envBackup) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+};
 
 beforeEach(() => {
   acceptedTokens = [];
@@ -96,8 +107,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env = { ...envBackup };
+  restoreEnv();
   setXTokenStoreForTests(null);
+  resetXTokenRefreshStateForTests();
 });
 
 describe("X-Token-Erneuerung: Kandidaten", () => {
