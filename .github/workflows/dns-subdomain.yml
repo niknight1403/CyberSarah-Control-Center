@@ -1,0 +1,95 @@
+name: DNS Subdomain anlegen (api.cybersarah-ki.com)
+
+# Sprint 389: api.cybersarah-ki.com fehlte in der Zone cybersarah-ki.com
+# (DNS laeuft bei Hetzner, ns1.your-server.de). Dieser Workflow legt die
+# CNAME-Weiterleitung auf den Render-Service an bzw. aktualisiert sie.
+#
+# Sicherheit:
+# - Nur manuell ausloesbar (workflow_dispatch), nur im eigenen Repo.
+# - HETZNER_API_TOKEN ist ein GitHub-Secret und wird nie ausgegeben.
+# - Es wird ausschliesslich EIN CNAME-Datensatz im uebergebenen Zone-Namen
+#   angelegt/aktualisiert; keine Loeschungen, keine anderen Zonen.
+# - Die Ausgabe nennt nur Record-Typ, Name, Ziel und HTTP-Status.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zone:
+        description: 'Zone (ohne Punkt am Ende)'
+        required: false
+        default: 'cybersarah-ki.com'
+      record_name:
+        description: 'Subdomain (ohne Zone)'
+        required: false
+        default: 'api'
+      target:
+        description: 'Ziel-Hostname (CNAME)'
+        required: false
+        default: 'cybersarah-control-center-hmlc.onrender.com'
+
+jobs:
+  dns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CNAME anlegen oder aktualisieren
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          ZONE: ${{ inputs.zone }}
+          RECORD_NAME: ${{ inputs.record_name }}
+          RECORD_TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HETZNER_API_TOKEN:-}" ]; then
+            echo "::error::HETZNER_API_TOKEN fehlt im Repository."
+            exit 1
+          fi
+          api="https://dns.hetzner.com/api/v1"
+
+          zones=$(curl -sS -m 30 -H "Auth-API-Token: $HETZNER_API_TOKEN" "$api/zones")
+          code=$(printf '%s' "$zones" | jq -r '.error.code // "ok"')
+          if [ "$code" != "ok" ]; then
+            echo "::warning::Hetzner-DNS-API verweigert den Zugriff (Token ist vermutlich ein Cloud-Token, kein DNS-Token)."
+            printf '%s' "$zones" | jq -r '.error.message // "unbekannt"' | head -3
+            exit 2
+          fi
+
+          zone_id=$(printf '%s' "$zones" | jq -r --arg z "$ZONE" '.zones[] | select(.name==$z) | .id' | head -1)
+          if [ -z "$zone_id" ]; then
+            echo "::error::Zone $ZONE nicht in diesem Hetzner-Konto gefunden."
+            exit 1
+          fi
+
+          existing=$(curl -sS -m 30 -H "Auth-API-Token: $HETZNER_API_TOKEN" "$api/records?zone_id=$zone_id")
+          record_id=$(printf '%s' "$existing" | jq -r --arg n "$RECORD_NAME" '[.records[] | select(.name==$n and .type=="CNAME")] | first | .id // ""')
+
+          if [ -n "$record_id" ]; then
+            echo "CNAME $RECORD_NAME existiert (id $record_id) — wird auf Ziel gesetzt."
+            body=$(jq -n --arg v "$RECORD_TARGET" --arg n "$RECORD_NAME" --arg z "$zone_id" \
+              '{value:$v,name:$n,type:"CNAME",zone_id:$z,ttl:300}')
+            status=$(curl -sS -m 30 -o /tmp/resp.json -w '%{http_code}' -X PUT \
+              -H "Auth-API-Token: $HETZNER_API_TOKEN" -H 'Content-Type: application/json' \
+              -d "$body" "$api/records/$record_id")
+          else
+            echo "CNAME $RECORD_NAME fehlt — wird angelegt."
+            body=$(jq -n --arg v "$RECORD_TARGET" --arg n "$RECORD_NAME" --arg z "$zone_id" \
+              '{value:$v,name:$n,type:"CNAME",zone_id:$z,ttl:300}')
+            status=$(curl -sS -m 30 -o /tmp/resp.json -w '%{http_code}' -X POST \
+              -H "Auth-API-Token: $HETZNER_API_TOKEN" -H 'Content-Type: application/json' \
+              -d "$body" "$api/records")
+          fi
+
+          echo "HTTP-Status der Aenderung: $status"
+          if [ "$status" != "200" ] && [ "$status" != "201" ]; then
+            jq -r '.error.message // .message // "unbekannter Fehler"' /tmp/resp.json | head -3
+            exit 1
+          fi
+          jq -r '"Ergebnis: \(.record.type) \(.record.name) -> \(.record.value) (TTL \(.record.ttl))"' /tmp/resp.json
+
+      - name: Aufloesung pruefen
+        run: |
+          for i in $(seq 1 20); do
+            out=$(getent hosts "${{ inputs.record_name }}.${{ inputs.zone }}" || true)
+            if [ -n "$out" ]; then echo "aufgeloest: $out"; exit 0; fi
+            sleep 15
+          done
+          echo "::warning::Record ist angelegt, aber nach 5 Minuten noch nicht oeffentlich sichtbar. DNS-Propagierung abwarten."
