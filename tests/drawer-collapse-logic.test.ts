@@ -7,14 +7,14 @@ describe("mobile drawer collapse", () => {
     const next = toggleDrawerSection(initial, "system");
     expect(next).toEqual({ revenue: true, system: true });
     expect(initial).toEqual({ revenue: true });
-    expect(toggleDrawerSection(next, "development")).toEqual({ revenue: true, system: false });
+    expect(toggleDrawerSection(next, "system")).toEqual({ revenue: true, system: false });
   });
 
   it("expands collapsed groups during search without overwriting preferences", () => {
-    const state = { development: true };
-    expect(isDrawerSectionCollapsed(state, "development", "")).toBe(true);
-    expect(isDrawerSectionCollapsed(state, "development", "apk")).toBe(false);
-    expect(isDrawerSectionCollapsed(state, "development", "  ")).toBe(true);
+    const state = { system: true };
+    expect(isDrawerSectionCollapsed(state, "system", "")).toBe(true);
+    expect(isDrawerSectionCollapsed(state, "system", "apk")).toBe(false);
+    expect(isDrawerSectionCollapsed(state, "system", "  ")).toBe(true);
     expect(state.system).toBe(true);
   });
 
