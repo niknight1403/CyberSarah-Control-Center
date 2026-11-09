@@ -4,10 +4,10 @@ import { isDrawerSectionCollapsed, toggleDrawerSection } from "@/lib/drawer-coll
 describe("mobile drawer collapse", () => {
   it("toggles a single group and keeps previous state immutable", () => {
     const initial = { revenue: true };
-    const next = toggleDrawerSection(initial, "development");
-    expect(next).toEqual({ revenue: true, development: true });
+    const next = toggleDrawerSection(initial, "system");
+    expect(next).toEqual({ revenue: true, system: true });
     expect(initial).toEqual({ revenue: true });
-    expect(toggleDrawerSection(next, "development")).toEqual({ revenue: true, development: false });
+    expect(toggleDrawerSection(next, "development")).toEqual({ revenue: true, system: false });
   });
 
   it("expands collapsed groups during search without overwriting preferences", () => {
@@ -15,10 +15,10 @@ describe("mobile drawer collapse", () => {
     expect(isDrawerSectionCollapsed(state, "development", "")).toBe(true);
     expect(isDrawerSectionCollapsed(state, "development", "apk")).toBe(false);
     expect(isDrawerSectionCollapsed(state, "development", "  ")).toBe(true);
-    expect(state.development).toBe(true);
+    expect(state.system).toBe(true);
   });
 
   it("leaves unconfigured groups expanded", () => {
-    expect(isDrawerSectionCollapsed({}, "studio", "")).toBe(false);
+    expect(isDrawerSectionCollapsed({}, "growth", "")).toBe(false);
   });
 });
