@@ -37,7 +37,7 @@ export const DRAWER_ITEMS: readonly DrawerItem[] = [
   { route: "/superagent", title: "Superagent & Workflows", icon: "wand.and.stars", group: "agent", keywords: ["autopilot", "orchestrierung", "workflow"] },
   { route: "/agent", title: "Agenten & Automatisierung", icon: "wand.and.stars", group: "agent", keywords: ["programmierung", "automation", "entwicklung"] },
   { route: "/loop-engineering", title: "Loop Engineering", icon: "gearshape.fill", group: "agent", keywords: ["loops", "verbesserung", "autonomie"] },
-  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "agent", keywords: ["prioritäten", "aufgaben"] },
+  { route: "/focus", title: "Fokus & Rückblick", icon: "hourglass", group: "agent", keywords: ["prioritäten", "prioritaeten", "aufgaben"] },
   { route: "/ideas", title: "Ideen-Inbox", icon: "sparkles", group: "agent", keywords: ["ideen", "entwurf"] },
   { route: "/decisions", title: "Entscheidungen", icon: "tablecells.fill", group: "agent", keywords: ["entscheidung", "protokoll", "freigaben"] },
   { route: "/", title: "Workspace", icon: "folder.fill", group: "system", keywords: ["dateien", "repository", "github", "code"] },
