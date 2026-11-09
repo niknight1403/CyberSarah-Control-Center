@@ -80,7 +80,11 @@ async function main(): Promise<void> {
 
   const send = async (body: string, contentType = "application/x-www-form-urlencoded") => {
     const response = await fetch(base, { method: "POST", headers: { "content-type": contentType }, body });
-    return { status: response.status, text: (await response.text()).trim() };
+    return {
+      status: response.status,
+      text: (await response.text()).trim(),
+      fingerprint: response.headers.get("x-ipn-secret-fingerprint") ?? "",
+    };
   };
 
   const counts = async () => {
@@ -174,6 +178,26 @@ async function main(): Promise<void> {
     record("fehlendes Secret -> 503", noSecret.status === 503, `HTTP ${noSecret.status}`);
     const after = await counts();
     record("keine Buchung ohne Secret", after.events === before.events, `${after.events} Event(s)`);
+
+    console.log("\n[8] Passphrasen-Rotation");
+    const SECOND = "zweite_passphrase_nach_wechsel";
+    process.env.DIGISTORE24_IPN_SECRET = `${PASSPHRASE},${SECOND}`;
+    const rotated = { ...sale, order_id: "E2E-ORDER-ROTATION" };
+    const rotatedResponse = await send(urlencode({ ...rotated, sha_sign: sign(rotated, SECOND) }));
+    record(
+      "zweiter Kandidat wird akzeptiert",
+      rotatedResponse.status === 200 && rotatedResponse.text === "OK recorded",
+      `HTTP ${rotatedResponse.status} "${rotatedResponse.text}"`,
+    );
+    const expectedFingerprint = (await import("../lib/digistore24-ipn-config")).ipnSecretFingerprint(SECOND);
+    record(
+      "Antwort nennt den passenden Fingerabdruck",
+      rotatedResponse.fingerprint === expectedFingerprint,
+      `header=${rotatedResponse.fingerprint || "leer"} erwartet=${expectedFingerprint}`,
+    );
+    const unknown = { ...sale, order_id: "E2E-ORDER-UNKNOWN" };
+    const unknownResponse = await send(urlencode({ ...unknown, sha_sign: sign(unknown, "nicht_konfigurierte_passphrase") }));
+    record("unbekannter dritter Kandidat -> 401", unknownResponse.status === 401, `HTTP ${unknownResponse.status}`);
 
     console.log(`\nErgebnis: ${checks.length} Pruefungen, ${checks.filter((c) => c.ok).length} bestanden, 0 fehlgeschlagen.`);
     console.log("Hinweis: Dies belegt den Code-Pfad. Ob die Produktion bucht, haengt allein vom gesetzten IPN-Secret in Render ab.");

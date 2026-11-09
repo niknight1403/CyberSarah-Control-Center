@@ -20,7 +20,7 @@ import type { Request, Response } from "express";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { affiliateProducts, conversionEvents } from "../drizzle/schema";
-import { resolveDigistore24IpnSecret } from "../lib/digistore24-ipn-config";
+import { resolveDigistore24IpnSecrets, ipnSecretFingerprint } from "../lib/digistore24-ipn-config";
 import {markRevenueWebhookFailure,markRevenueWebhookSuccess} from "./revenue-webhook-runtime";
 import {
   commissionCents, hashedBuyerEmail, ledgerOrderKey,
@@ -40,8 +40,8 @@ export function buildIpnSignature(fields: Record<string, string>, passphrase: st
 }
 
 export async function handleDigistore24Ipn(req: Request, res: Response): Promise<void> {
-  const passphrase = resolveDigistore24IpnSecret();
-  if (!passphrase) {
+  const passphrases = resolveDigistore24IpnSecrets();
+  if (!passphrases.length) {
     markRevenueWebhookFailure("digistore24","configuration");
     res.status(503).json({ ok: false, detail: "IPN-Secret nicht konfiguriert (DIGISTORE24_IPN_SECRET / DIGISTORE24_IPN_PASSPHRASE)." });
     return;
@@ -51,11 +51,21 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
   for (const [k, v] of Object.entries(source)) {
     if (v !== null && v !== undefined) fields[k] = String(v);
   }
-  const expected = buildIpnSignature(fields, passphrase);
+  // Mehrere Passphrasen-Kandidaten sind erlaubt (Rotation). Geprueft wird
+  // timing-safe gegen jeden Kandidaten; ohne Treffer bleibt es bei 401.
   const received = fields.sha_sign ?? "";
-  const valid = validSha512Hex(received) &&
-    crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received, "hex"));
-  if (!valid) {
+  const receivedBuffer = validSha512Hex(received) ? Buffer.from(received, "hex") : null;
+  let matchedFingerprint: string | undefined;
+  if (receivedBuffer) {
+    for (const candidate of passphrases) {
+      const expected = buildIpnSignature(fields, candidate);
+      if (crypto.timingSafeEqual(Buffer.from(expected, "hex"), receivedBuffer)) {
+        matchedFingerprint = ipnSecretFingerprint(candidate);
+        break;
+      }
+    }
+  }
+  if (!matchedFingerprint) {
     markRevenueWebhookFailure("digistore24","signature_invalid");
     res.status(401).json({ ok: false, detail: "Ungültige Signatur." });
     return;
@@ -116,6 +126,9 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
       return "recorded" as const;
     });
     markRevenueWebhookSuccess("digistore24",eventType);
+    // Welche Passphrase gegriffen hat, ist fuer den Betrieb wichtig (Rotation
+    // abschliessen) und verraet nichts: nur ein 8-stelliger Hash.
+    res.setHeader("x-ipn-secret-fingerprint", matchedFingerprint);
     res.status(200).type("text/plain").send(status === "duplicate" ? "OK duplicate" : "OK recorded");
   } catch {
     markRevenueWebhookFailure("digistore24","database",eventType);
