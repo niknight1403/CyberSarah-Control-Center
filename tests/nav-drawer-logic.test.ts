@@ -36,7 +36,7 @@ describe("mobile drawer navigation", () => {
     expect(resolveActiveDrawerItem("")?.route).toBe("/");
     expect(resolveActiveDrawerItem("/")?.route).toBe("/");
     expect(resolveActiveDrawerItem("/plugins")).toBeNull();
-    expect(resolveActiveDrawerItem("/micro-trading")).toBeNull();
+    expect(resolveActiveDrawerItem("/micro-trading")?.group).toBe("revenue");
     expect(resolveActiveDrawerItem("/not-found")).toBeNull();
   });
 });
