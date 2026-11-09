@@ -112,3 +112,38 @@ meldet das Deploy-Gate `D24_API=INVALID_KEY_QUARANTINED`: Digistore24 weist den
 hinterlegten API-Key zurueck. Beide Werte sind Betreiber-Zugangsdaten; ohne sie kann
 kein echter Zahlungseingang verifiziert oder verbucht werden. Ein gruener Test ist
 deshalb ausdruecklich **kein** Nachweis eines realen Umsatzes.
+
+## 6. Live-Nachweis (09.11.2026, 05:40 UTC) — IPN ist scharf
+
+Die Credentials liegen jetzt in der Render-Umgebung (per Render-API gesetzt, ohne
+Klartext im Repository): `DIGISTORE24_API_KEY` mit dem gueltigen Schluessel und
+`DIGISTORE24_IPN_SECRET` mit drei Passphrasen-Kandidaten, kommagetrennt. Produktion
+laeuft auf `4a4bc82`, `/api/health` 200.
+
+Ergebnis der Tests gegen `https://app.cybersarah-ki.com/api/v1/webhooks/digistore24`:
+
+| Test | Ergebnis |
+|---|---|
+| POST ohne Signatur | `401` Ungueltige Signatur (vorher `503`) |
+| signierter Verkauf `IPN-LIVE-TEST-20261109` | `200 OK recorded`, Fingerabdruck `7e9971d7` |
+| identische Doppelzustellung | `200 OK duplicate` |
+| signierte Erstattung derselben Bestellung | `200 OK recorded` — Netto wieder 0 EUR, 0 Conversions |
+| Signaturprobe Kandidat 2 und 3 | `400 order_id fehlt` statt `401` — Signatur also akzeptiert |
+| `digistore24-sync` mit Sync-Key | `200 ok:true`, Digistore24-API antwortet |
+
+Netto hat der Test nichts verfaelscht: der Verkauf wurde durch die passende
+Erstattung ausgeglichen, es bleiben zwei klar markierte Audit-Zeilen.
+
+## 7. Passphrasen-Rotation (PR #278)
+
+Welche der drei Passphrasen Digistore24 wirklich signiert, laesst sich ueber die API
+nicht auslesen. Deshalb akzeptiert der Endpunkt jetzt eine Liste
+(`DIGISTORE24_IPN_SECRET` getrennt durch Komma, Semikolon oder Zeilenumbruch) und
+nennt in der 200-Antwort den 8-stelligen SHA256-Fingerabdruck der passenden
+Passphrase im Header `x-ipn-secret-fingerprint`. Sobald ein echter IPN eintrifft,
+laesst sich damit der richtige Kandidat bestimmen und die anderen entfernen.
+
+## 8. Was weiterhin fehlt: Umsatz
+
+Das Digistore24-Konto ist leer (`listProducts` -> `[]`). Ohne Produkt kann kein
+IPN eintreffen; die Kette ist betriebsbereit, aber es gibt noch nichts zu verkaufen.
