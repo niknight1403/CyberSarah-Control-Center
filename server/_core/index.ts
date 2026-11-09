@@ -41,6 +41,7 @@ import { createSecurityMiddleware } from "./security";
 import { handleDigistore24Ipn } from "../digistore24-ipn";
 import { syncDigistore24Commissions } from "../digistore24-api";
 import { resolveDigistore24IpnSecrets } from "../../lib/digistore24-ipn-config";
+import { runProductAutopilot, productAutopilotStatus } from "../product-autopilot";
 import { checkDatabaseHealth } from "../db";
 import { assertCoreSchemaOnStartup, checkCoreTables } from "../schema-health";
 import { runOutreachCycle } from "../outreach-worker-service";
@@ -646,6 +647,46 @@ async function startServer() {
       return false;
     }
   };
+
+  /**
+   * Produkt-Autopilot: legt faellige Produkte autonom bei Digistore24 an.
+   * Auth wie bei den anderen Cron-Routen (Bearer METRICS_TOKEN).
+   */
+  app.post("/api/cron/product-autopilot", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    const body = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+    const maxProducts = Number(body.maxProducts ?? 1);
+    try {
+      const result = await runProductAutopilot({
+        maxProducts: Number.isFinite(maxProducts) ? maxProducts : 1,
+        dryRun: body.dryRun === true,
+        force: body.force === true,
+      });
+      console.info("[Produkt-Autopilot] Lauf:", JSON.stringify({
+        mode: result.mode, created: result.created.length, failed: result.failed.length, detail: result.detail ?? null,
+      }));
+      res.status(result.ok ? 200 : 503).json(result);
+    } catch (error) {
+      res.status(500).json({ ok: false, detail: error instanceof Error ? error.message : "Autopilot-Fehler." });
+    }
+  });
+
+  app.get("/api/product-autopilot/status", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      res.json(await productAutopilotStatus());
+    } catch (error) {
+      res.status(500).json({ ok: false, detail: error instanceof Error ? error.message : "Status nicht lesbar." });
+    }
+  });
 
   app.get("/api/runtime/status", async (req, res) => {
     if (!(await requireRuntimeUser(req, res))) return;
