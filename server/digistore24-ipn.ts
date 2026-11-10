@@ -28,6 +28,18 @@ import {
   netConversionDelta, type D24EventKind,
 } from "../lib/digistore24-ledger-logic";
 
+// Deterministic test seam: `isolate:false` can preserve module/mock state across
+// files, so the handler's DB access is injected explicitly in tests instead of
+// relying on vi.mock ordering (same pattern as memory-consolidation).
+let digistore24IpnGetDb: typeof getDb = getDb;
+
+export function setDigistore24IpnDbForTests(override: typeof getDb | null): void {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error("Digistore24-IPN-Test-Hook ist nur im Test-Modus verfuegbar.");
+  }
+  digistore24IpnGetDb = override ?? getDb;
+}
+
 function sha512(text: string): string {
   return crypto.createHash("sha512").update(text, "utf8").digest("hex");
 }
@@ -92,7 +104,7 @@ export async function handleDigistore24Ipn(req: Request, res: Response): Promise
   const day = occurredAt.toISOString().slice(0,10);
   let db: Awaited<ReturnType<typeof getDb>>;
   try {
-    db = await getDb();
+    db = await digistore24IpnGetDb();
   } catch {
     markRevenueWebhookFailure("digistore24","database",eventType);
     res.status(503).json({ ok: false, detail: "Datenbank nicht verfügbar." });
