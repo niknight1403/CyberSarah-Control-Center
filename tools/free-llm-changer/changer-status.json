@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-09T18:59:39",
-  "aktiv": "gemini",
-  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
-  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemma-4-26b-a4b-it",
+  "stand": "2026-11-10T01:58:23",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "openai/gpt-oss-120b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "VERFUEGBAR",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
       "http_status": null,
-      "modell": "gemma-4-26b-a4b-it",
-      "detail": "gemma-4-26b-a4b-it",
+      "modell": "gemma-4-31b-it",
+      "detail": "000 gemma-4-31b-it",
       "hinweis": null
     },
     {
@@ -25,17 +25,17 @@
       "id": "groq",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "qwen/qwen3.8-27b",
-      "detail": "qwen/qwen3.8-27b",
+      "modell": "openai/gpt-oss-120b",
+      "detail": "openai/gpt-oss-120b",
       "hinweis": null
     },
     {
       "id": "openrouter",
-      "status": "VERFUEGBAR",
-      "http_status": null,
-      "modell": "xingchen-agi/xing4.0-29b-a4b:free",
-      "detail": "xingchen-agi/xing4.0-29b-a4b:free",
-      "hinweis": null
+      "status": "LIMIT ERREICHT",
+      "http_status": 429,
+      "modell": "recursive/flint-v1.0:free",
+      "detail": "429 recursive/flint-v1.0:free",
+      "hinweis": "Changer rotiert weiter"
     },
     {
       "id": "cerebras",
