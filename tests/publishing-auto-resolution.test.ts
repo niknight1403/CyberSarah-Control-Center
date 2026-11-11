@@ -8,6 +8,7 @@ import {
   normalizeForMatch,
   resolveVerificationText,
   summarizeEscalationReasons,
+  isPermanentCredentialFailure,
   summarizeUncertainResolutions,
   type PublishingVerification,
 } from "../lib/publishing-auto-resolution-logic";
@@ -286,5 +287,17 @@ describe("Sprint 11: Eskalationsgruende", () => {
     // Klartext bleibt sichtbar (gekuerzt), damit die Zahl handlungsfaehig ist.
     expect(grouped.details).toHaveLength(3);
     expect(grouped.details[0]).toContain("X-Refresh fehlgeschlagen");
+  });
+});
+
+describe("Sprint 11.3: kaputter Zugang statt Einzelbefund", () => {
+  it("erkennt abgelehnte Tokens als Zugangsproblem", () => {
+    expect(isPermanentCredentialFailure("X lehnt den Token ab (HTTP 401): env: X-Refresh fehlgeschlagen (400): invalid_request Value passed for the token was invalid.")).toBe(true);
+    expect(isPermanentCredentialFailure("invalid_grant")).toBe(true);
+  });
+
+  it("haelt Netzwerk- und Providerstoerungen davon getrennt", () => {
+    expect(isPermanentCredentialFailure("Plattformabfrage fehlgeschlagen: HTTP 503")).toBe(false);
+    expect(isPermanentCredentialFailure("Quelle api.x.com, 20 Beitraege geprueft, kein Treffer.")).toBe(false);
   });
 });

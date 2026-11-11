@@ -4,6 +4,13 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 11.11.2026 — Sprint 11.3: toter X-Zugang wird zum Handlungsbedarf, nicht zu 19 Meldungen
+
+- **Befund (bewiesen):** `Grund: ... X lehnt den Token ab (HTTP 401): env: X-Refresh fehlgeschlagen (400): invalid_request Value passed for the token was invalid.` Der gespeicherte X-Refresh-Token ist tot; jede Leseabfrage scheitert, unabhaengig vom Code.
+- **Verhalten neu:** der Aufloesungslauf loest den X-Token vorab auf. Scheitert das an einem ungueltigen Zugang, werden X-Vorgaenge in diesem Lauf uebersprungen und nicht erneut beim Menschen gemeldet; das Ergebnis nennt stattdessen `Zugang blockiert: x=<n>` und `Blocker: <grund>`.
+- **Wichtig:** das ist keine stille Ausnahme. Die Vorgaenge bleiben offen und erscheinen weiter in der Warteschlange — nur ohne 19-fache Wiederholung derselben Ursache.
+- `isPermanentCredentialFailure` trennt Zugangsfehler (401/`invalid_grant`/`invalid_request`) von Netz- und Providerstoerungen (503 usw.). 2 neue Tests, 4.201 Tests gruen.
+
 ## 11.11.2026 — Sprint 11.2: X-Pruefung nutzt den Token-Service
 
 - **Befund aus dem Messlauf:** 19 von 19 Vorgaengen beim Menschen, alle auf X, Klartext `Plattformabfrage fehlgeschlagen: HTTP 401`.
