@@ -730,3 +730,53 @@ export const creditLedgerEntries = pgTable("credit_ledger_entries", {
 ]);
 
 export type CreditLedgerEntryRow = typeof creditLedgerEntries.$inferSelect;
+
+/**
+ * Sprint 194 (Master-Prompt Phase 2) — Multi-MCP-Server-Registry.
+ *
+ * Bisher steuerte genau eine Umgebungsvariable (MCP_SERVER_URL) den einen
+ * Remote-MCP-Server. Diese Tabelle haelt beliebig viele Server mit eigenem
+ * Berechtigungsprofil, Kostenprofil, Health-Zustand und Tool-Cache.
+ *
+ * Bewusst KEINE Secrets in der Tabelle: `credentialEnvVar` nennt nur den
+ * NAMEN der Umgebungsvariable, deren Wert der Server beim Aufruf als
+ * Bearer-Token einsetzt. Der Wert selbst bleibt ausserhalb der Datenbank.
+ */
+export const mcpServers = pgTable("mcp_servers", {
+  id: serial("id").primaryKey(),
+  /** Stabiler Slug (auch Routing-Schluessel fuer "server::tool"). */
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  baseUrl: text("base_url").notNull(),
+  transport: varchar("transport", { length: 24 }).notNull().default("streamable-http"),
+  /** Verliehene Berechtigungen (read/network/write/shell/filesystem). */
+  permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
+  /** Name der ENV-Variable mit dem Bearer-Token — nie der Wert. */
+  credentialEnvVar: varchar("credential_env_var", { length: 80 }),
+  /** free | metered | unknown — Kostenprofil fuer Budget-Entscheidungen. */
+  costProfile: varchar("cost_profile", { length: 16 }).notNull().default("unknown"),
+  enabled: boolean("enabled").notNull().default(true),
+  notes: text("notes"),
+  /** Letzter Health-Zustand (unchecked/healthy/degraded/stale/unreachable/disabled). */
+  healthStatus: varchar("health_status", { length: 16 }).notNull().default("unchecked"),
+  healthScore: integer("health_score"),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  lastOkAt: timestamp("last_ok_at", { withTimezone: true }),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  lastError: varchar("last_error", { length: 300 }),
+  /** Server-Selbstauskunft aus initialize (Name/Version). */
+  serverName: varchar("server_name", { length: 120 }),
+  serverVersion: varchar("server_version", { length: 60 }),
+  /** Zuletzt entdeckte Tool-Deskriptoren (Cache, keine Live-Wahrheit). */
+  tools: jsonb("tools").$type<Array<Record<string, unknown>>>().notNull().default([]),
+  toolsDiscoveredAt: timestamp("tools_discovered_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("mcp_servers_key_idx").on(table.serverKey),
+  index("mcp_servers_enabled_idx").on(table.enabled, table.healthStatus),
+]);
+
+export type McpServerRow = typeof mcpServers.$inferSelect;
+export type InsertMcpServerRow = typeof mcpServers.$inferInsert;

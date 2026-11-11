@@ -4,6 +4,16 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 11.11.2026 — Sprint 1+2: Repository-Audit und Multi-MCP-Server-Registry
+
+- **Audit (Sprint 1):** vollstaendige Capability-Matrix gegen den Code (51 tRPC-Router, 34 Tabellen, 30 Migrationen, 66 Workflows, 476 Testdateien / 3.863 Tests). Ergebnis: fast alle Master-Prompt-Faehigkeiten haben bereits eine Basis; echte Luecken sind Multi-MCP-Verwaltung, zentraler Autopilot-Manager, Agent Factory, Plugin-Manifeste und Discovery-Autopilot. Bericht: `docs/2026-11-11_SPRINT_1_REPOSITORY_AUDIT.md`.
+- **Multi-MCP statt einer ENV-Variable:** neue Tabelle `mcp_servers` (Migration `0029`) mit eigenem Berechtigungsprofil, Kostenprofil, Betriebsschalter, Health-Zustand und Discovery-Cache je Server. Zugangsdaten bleiben ENV-Referenzen (`credential_env_var`), nie Werte.
+- **Sicherheit zuerst:** neue Server erhalten nur `read` + `network`; `write`/`shell`/`filesystem` ausschliesslich mit `allowSensitivePermissions`. Endpunkte muessen HTTPS sein, ohne Zugangsdaten/Query und ohne private Adressen.
+- **Nachweisbarer Health-Zustand:** `mcp.servers.probe` fuehrt `initialize -> tools/list` aus, misst Latenz, speichert Health-Score, Tool-Cache und Fehlergrund (redigiert: Bearer-, `sk-`, `ghp_`-, JWT- und Query-Secrets). Drei Fehlschläge in Folge = nicht erreichbar.
+- **Routing und Aufruf:** `mcp.servers.callTool` routet `server::tool`, prueft Server-Rechte vor dem Netzwerk und nutzt den Sitzungs-Cache je Server-Key. Beide Netzwerkpfade laufen durch die bestehende Tool-Proxy-Queue.
+- **Ehrliche Grenzen:** SSE-Transport ist registrierbar, aber nicht angebunden (klare Meldung statt Simulation); kein UI in diesem Sprint; kein echter Fremd-Server produktiv geprueft.
+- **Belegt durch:** 56 neue Tests (`tests/mcp-server-registry-logic.test.ts`, `tests/mcp-server-service.test.ts`), `tsc --noEmit` sauber, `npm run build` erfolgreich, Gesamtsuite 476 Dateien / 3.863 Tests gruen. Doku: `docs/2026-11-11_SPRINT_2_MCP_MULTI_SERVER.md`.
+
 ## 09.11.2026 — Digistore24-IPN: Deploy-Kette repariert, Autopilot gruen
 
 - **Echte Ursache gefunden:** `render-deploy.yml` setzte die Digistore24-Variablen nur im Gate-Schritt, nie im Deploy-Schritt. `buildServiceEnv()` konnte das IPN-Secret deshalb nie an Render geben - der Endpunkt antwortete dauerhaft 503, unabhaengig vom Secret-Store.

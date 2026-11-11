@@ -21,8 +21,6 @@ import { z } from "zod";
 import {
   DEFAULT_DISCOVERED_TOOL_PERMISSIONS,
   runMcpDiscovery,
-  type JsonRpcNotification,
-  type JsonRpcRequest,
 } from "../lib/mcp-client-logic";
 import {
   buildTransportEndpoints,
@@ -31,11 +29,11 @@ import {
 } from "../lib/mcp-transport-logic";
 import { assertToolAllowed } from "../lib/mcp-registry-logic";
 import { createMcpSessionStore, runMcpToolCall } from "../lib/mcp-session-logic";
+import { createStreamableHttpSend } from "./mcp-channel";
+import { drizzleMcpServerStore } from "./mcp-server-store";
+import { createMcpServerService } from "./mcp-server-service";
 import { getToolProxyQueue } from "./_core/tool-proxy-queue";
 import { adminProcedure, router } from "./_core/trpc";
-
-/** Request-Timeout fuer MCP-Gespraeche (Sandbox-Ports wuerden haengen). */
-const MCP_REQUEST_TIMEOUT_MS = 10_000;
 
 /** Berechtigungen, die Remote-Tools im Betrieb verliehen werden (ENV-Override). */
 function grantedToolPermissions() {
@@ -47,54 +45,8 @@ function grantedToolPermissions() {
   return parsed.length > 0 ? parsed : (["read", "network"] as const);
 }
 
-type StreamableHttpSend = (request: JsonRpcRequest | JsonRpcNotification) => Promise<unknown>;
-
 /** Prozesslokaler Sitzungs-Cache (Sprint 136): je Server-URL eine Sitzung. */
 const mcpSessionStore = createMcpSessionStore();
-
-/**
- * Baut den Kanal fuer Streamable HTTP: POST mit JSON-RPC-Body, Accept fuer
- * JSON und Event-Stream, Session-Header wird uebernommen (Startwert optional,
- * Sprint 136), SSE-Antworten werden auf data:-Zeilen reduziert. fetch-Fehler
- * tragen den HTTP-Status, damit abgelaufene Sitzungen (404) erkannt werden.
- */
-function createStreamableHttpSend(rpcUrl: string, initialSessionId: string | null = null) {
-  let sessionId: string | null = initialSessionId;
-  const send: StreamableHttpSend = async (request) => {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    };
-    if (sessionId) headers["mcp-session-id"] = sessionId;
-    const response = await fetch(rpcUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(request),
-      signal: AbortSignal.timeout(MCP_REQUEST_TIMEOUT_MS),
-    });
-    const newSession = response.headers.get("mcp-session-id");
-    if (newSession) sessionId = newSession;
-    if (!response.ok) {
-      throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
-    }
-    // Notifications beantwortet der Server mit 202 ohne Body.
-    if (response.status === 202) return undefined;
-    const contentType = response.headers.get("content-type") ?? "";
-    const body = await response.text();
-    if (contentType.includes("text/event-stream")) {
-      const dataLines = body
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trim())
-        .filter((line) => line.length > 0);
-      if (dataLines.length === 0) return undefined;
-      return JSON.parse(dataLines[dataLines.length - 1]);
-    }
-    if (!body) return undefined;
-    return JSON.parse(body);
-  };
-  return { send, getSessionId: () => sessionId };
-}
 
 /** Liest MCP_SERVER_URL und validiert die Streamable-HTTP-Endpunkte. */
 function resolveConfiguredEndpoint():
@@ -110,6 +62,31 @@ function resolveConfiguredEndpoint():
   const rpcUrl = negotiation.kind === "streamable-http" ? endpoints.endpoints.rpc : endpoints.endpoints.messages;
   return { ok: true, baseUrl, rpcUrl };
 }
+
+
+/** Service-Instanz je Aufruf: Store ist zustandslos, der Sitzungs-Cache lebt im Service. */
+let multiServerService: ReturnType<typeof createMcpServerService> | null = null;
+function getServerService() {
+  if (!multiServerService) {
+    multiServerService = createMcpServerService({ store: drizzleMcpServerStore });
+  }
+  return multiServerService;
+}
+
+/** Eingabe-Schema der Multi-Server-Verwaltung (Fachvalidierung liegt in der lib). */
+const serverDraftSchema = z.object({
+  key: z.string().min(2).max(64),
+  name: z.string().min(1).max(120),
+  baseUrl: z.string().min(8).max(500),
+  transport: z.enum(["streamable-http", "sse"]).optional(),
+  permissions: z.array(z.enum(["read", "write", "network", "shell", "filesystem"])).optional(),
+  credentialEnvVar: z.string().max(80).nullable().optional(),
+  costProfile: z.enum(["free", "metered", "unknown"]).optional(),
+  enabled: z.boolean().optional(),
+  notes: z.string().max(500).nullable().optional(),
+  /** Nur mit dieser ausdruecklichen Freigabe werden write/shell/filesystem vergeben. */
+  allowSensitivePermissions: z.boolean().optional(),
+});
 
 export const mcpRouter = router({
   /** Verfuegbare Transporte (statisch, rein) + konfigurierte Endpunkte. */
@@ -231,7 +208,52 @@ export const mcpRouter = router({
         store: mcpSessionStore,
         nowMs: () => Date.now(),
         clientVersion: process.env.APP_VERSION ?? "0.0.0",
-        openSession: (sessionId) => createStreamableHttpSend(endpoint.rpcUrl, sessionId),
+        openSession: (sessionId) => createStreamableHttpSend(endpoint.rpcUrl, { initialSessionId: sessionId }),
       }));
     }),
+  /**
+   * Master-Prompt Phase 2 — Multi-MCP-Server-Registry.
+   *
+   * Jeder Server traegt eigenes Berechtigungsprofil, Kostenprofil und einen
+   * nachweisbaren Health-Zustand. Neue Server erhalten nie automatisch
+   * weitreichende Rechte (Standard read+network, sensible Rechte nur mit
+   * allowSensitivePermissions). Zugangsdaten bleiben ENV-Referenzen.
+   */
+  servers: router({
+    list: adminProcedure.query(async () => getServerService().listServers()),
+
+    register: adminProcedure
+      .input(serverDraftSchema)
+      .mutation(async ({ input }) => getServerService().registerServer(input)),
+
+    setEnabled: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64), enabled: z.boolean() }))
+      .mutation(async ({ input }) => getServerService().setEnabled(input.serverKey, input.enabled)),
+
+    remove: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64) }))
+      .mutation(async ({ input }) => getServerService().removeServer(input.serverKey)),
+
+    /** Healthcheck + Tool-Discovery; Ergebnis wird persistiert (Health-Score). */
+    probe: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64) }))
+      .mutation(async ({ input }) =>
+        getToolProxyQueue().enqueue(() => getServerService().probeServer(input.serverKey)),
+      ),
+
+    /** Tool-Aufruf ueber die Server-Id — Berechtigungs-Gate vor dem Netzwerk. */
+    callTool: adminProcedure
+      .input(
+        z.object({
+          serverKey: z.string().min(2).max(64),
+          toolName: z.string().min(1).max(120),
+          args: z.record(z.string(), z.unknown()).default({}),
+        }),
+      )
+      .mutation(async ({ input }) =>
+        getToolProxyQueue().enqueue(() =>
+          getServerService().callTool(input.serverKey, { toolName: input.toolName, args: input.args }),
+        ),
+      ),
+  }),
 });
