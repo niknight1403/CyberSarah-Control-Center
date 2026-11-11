@@ -4,6 +4,14 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 11.11.2026 — Sprint 11.4: "unklar" trennt Entscheidung von kaputtem Zugang
+
+- **Problem in der Oberflaeche:** die Betriebsuebersicht zeigte `Unklar 19`. Der Zaehler vermischte zwei Dinge mit verschiedenen naechsten Schritten — Vorgaenge, die eine menschliche Entscheidung brauchen, und Vorgaenge, deren Plattformzugang unbrauchbar ist.
+- **Neu:** `summarizeUncertainBlockers` wertet die gespeicherten Fehlertexte der unklaren Vorgaenge aus und trennt Zugangsblocker (HTTP 401, `invalid_grant`, `invalid_request`) von echter Unklarheit. Ergebnis: `credentialsBlocked` je Plattform, ein Satz Handlungsanweisung je Plattform und eine Note wie "19 von 19 unklaren Vorgaengen sind durch einen unbrauchbaren Zugang blockiert, nicht durch fehlende Informationen".
+- **UI:** die Karte "Publishing – Betriebsübersicht" zeigt bei Bedarf den Block "Unklare Vorgänge: Zugang prüfen" mit Handlungsanweisung und dem maskierten letzten Grund. Kein erfundener Zustand: Grundlage sind ausschliesslich gespeicherte Fehlertexte des eigenen Kontos.
+- **Ehrlich zur Datenlage:** neue Laeufe schreiben fuer blockierte Vorgaenge keinen weiteren Fehlertext, deshalb erklaert die Karte den Unterschied zwischen altem Befund und neuem Verhalten.
+- 3 neue Tests, 4.204 Tests gruen.
+
 ## 11.11.2026 — Sprint 11.3: toter X-Zugang wird zum Handlungsbedarf, nicht zu 19 Meldungen
 
 - **Befund (bewiesen):** `Grund: ... X lehnt den Token ab (HTTP 401): env: X-Refresh fehlgeschlagen (400): invalid_request Value passed for the token was invalid.` Der gespeicherte X-Refresh-Token ist tot; jede Leseabfrage scheitert, unabhaengig vom Code.

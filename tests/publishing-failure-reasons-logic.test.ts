@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyPublishingFailure,
   groupPublishingFailures,
+  summarizeUncertainBlockers,
   type PublishingFailureJob,
 } from "../lib/publishing-failure-reasons-logic";
 
@@ -88,5 +89,37 @@ describe("Sprint 44 – Publikationsfehler nach Ursache und Provider", () => {
   it("liefert fuer leere Eingabe einen leeren, ehrlichen Bericht", () => {
     const report = groupPublishingFailures([]);
     expect(report).toMatchObject({ totalFailedJobs: 0, withErrorText: 0, withoutErrorText: 0, byPlatform: [], byCause: [] });
+  });
+});
+
+describe("Sprint 11.4: unklare Vorgaenge nach Ursache trennen", () => {
+  const row = (platform: string, status: string, lastError: string | null): PublishingFailureJob =>
+    ({ platform, status, attempts: 1, lastError });
+
+  it("zaehlt Zugangsblocker getrennt und erklaert den Schritt", () => {
+    const summary = summarizeUncertainBlockers([
+      row("x", "versand_ungeklaert", "Automatische Pruefung ohne Ergebnis: Plattformpruefung nicht moeglich: X lehnt den Token ab (HTTP 401): invalid_request Value passed for the token was invalid."),
+      row("x", "versand_ungeklaert", "Automatische Pruefung ohne Ergebnis: Plattformpruefung nicht moeglich: X lehnt den Token ab (HTTP 401)"),
+      row("bluesky", "versand_ungeklaert", "Automatische Pruefung ohne Ergebnis: Quelle bsky.app, 20 Beitraege geprueft, kein Treffer."),
+    ]);
+    expect(summary.uncertain).toBe(3);
+    expect(summary.credentialsBlocked).toEqual([
+      { platform: "x", jobs: 2, detail: expect.stringContaining("HTTP 401") },
+    ]);
+    expect(summary.guidance[0]).toContain("X: 2 unklare Vorgaenge");
+    expect(summary.note).toContain("2 von 3");
+  });
+
+  it("behauptet keinen Zugangsblocker ohne gespeicherten Fehlertext", () => {
+    const summary = summarizeUncertainBlockers([
+      row("instagram", "versand_ungeklaert", null),
+      row("threads", "versand_ungeklaert", ""),
+    ]);
+    expect(summary.credentialsBlocked).toEqual([]);
+    expect(summary.note).toBe("Alle unklaren Vorgaenge brauchen eine menschliche Entscheidung.");
+  });
+
+  it("meldet leere Eingabe ohne Alarm", () => {
+    expect(summarizeUncertainBlockers([])).toMatchObject({ uncertain: 0, credentialsBlocked: [], guidance: [] });
   });
 });
