@@ -122,6 +122,14 @@ export type DraftEngineRunResult = {
   plan: DraftRunPlan[];
   generated: Partial<Record<DraftKind, number>>;
   skipped: { kind: DraftKind; reason: string }[];
+  /**
+   * true, wenn das Zeitbudget vor dem Plan-Ende erreicht wurde. Der Lauf
+   * liefert dann einen ehrlichen Teilbericht statt minutenlang zu haengen —
+   * die fehlenden Entwuerfe kommen beim naechsten Lauf (Cron).
+   */
+  truncated?: boolean;
+  /** Verbrauchte Laufzeit in Millisekunden (Diagnose, nie geraten). */
+  elapsedMs?: number;
 };
 
 function isRetryableProviderLimit(reason: string): boolean {
@@ -133,7 +141,18 @@ export type DraftEngineDeps = {
   llm?: (messages: Message[]) => Promise<string>;
   /** Injectierbare Zeit (Tests); produktiv Date.now(). */
   now?: () => number;
+  /**
+   * Zeitbudget des Laufs. Standard 90 s: der Cron-Lauf darf laenger arbeiten,
+   * ein interaktiver "Jetzt erzeugen"-Klick bekommt ein kleineres Budget.
+   */
+  budgetMs?: number;
 };
+
+/** Standard-Zeitbudget eines Engine-Laufs (Cron). */
+export const DRAFT_ENGINE_DEFAULT_BUDGET_MS = 90_000;
+
+/** Zeitbudget fuer den interaktiven "Jetzt erzeugen"-Klick in der App. */
+export const DRAFT_ENGINE_RUN_NOW_BUDGET_MS = 25_000;
 
 type PendingDraftCoverage = {
   counts: Record<DraftKind, number>;
@@ -283,10 +302,14 @@ async function generateIdeaDraft(llm: (messages: Message[]) => Promise<string>, 
  * Fehler landen als skipped-Eintraege im Bericht.
  */
 export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftEngineRunResult> {
-  const nowMs = (deps.now ?? Date.now)();
+  const clock = deps.now ?? Date.now;
+  const nowMs = clock();
+  const startedAtMs = clock();
+  const budgetMs = deps.budgetMs ?? DRAFT_ENGINE_DEFAULT_BUDGET_MS;
+  const deadlineMs = startedAtMs + Math.max(budgetMs, 1);
   const llm = deps.llm ?? defaultDraftLlm;
 
-  const result: DraftEngineRunResult = { plan: [], generated: {}, skipped: [] };
+  const result: DraftEngineRunResult = { plan: [], generated: {}, skipped: [], truncated: false };
   let coverage: PendingDraftCoverage | null = null;
   try {
     coverage = await pendingDraftCoverage();
@@ -312,6 +335,14 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
       ? Math.min(entry.slots, missingRevenueHubs.length)
       : Math.min(entry.slots, perRunLimit);
     for (let slot = 0; slot < slots; slot++) {
+      if (clock() >= deadlineMs) {
+        result.truncated = true;
+        result.skipped.push({
+          kind: entry.kind,
+          reason: `Zeitbudget von ${Math.round(budgetMs / 1000)} s erreicht — Rest folgt im naechsten Lauf.`,
+        });
+        break;
+      }
       try {
         const outcome =
           entry.kind === "content"
@@ -338,7 +369,9 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
     }
     if (okCount > 0) result.generated[entry.kind] = okCount;
     if (providerDeferred) break;
+    if (result.truncated) break;
   }
+  result.elapsedMs = Math.max(0, clock() - startedAtMs);
   return result;
 }
 

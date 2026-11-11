@@ -61,6 +61,8 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
   const [busyId, setBusyId] = useState<number | null>(null);
   /** Fehlermeldung gehoert zur Zeile, die sie ausgeloest hat — sonst bleibt sie unsichtbar. */
   const [notice, setNotice] = useState<{ id: number; text: string } | null>(null);
+  /** Bericht des Engine-Laufs: was entstanden ist und was (noch) fehlt. */
+  const [runReport, setRunReport] = useState<string>("");
 
   const meQuery = trpc.auth.me.useQuery(undefined, { staleTime: 60_000 });
   const isAdmin = meQuery.data?.role === "admin";
@@ -80,7 +82,8 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
     if (meQuery.data?.role !== "admin" || rows.length > 0) return;
     autoStarted.current = true;
     runMutation.mutate(undefined, {
-      onSuccess: async () => {
+      onSuccess: async (data) => {
+        setRunReport(describeRun(data?.result));
         await utils.draftEngine.queue.invalidate();
       },
       onError: () => {
@@ -140,20 +143,21 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
       ) : queueQuery.isLoading || runMutation.isPending ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator color={glassPalette[accent]} />
-          <Text style={styles.emptyNote}>{runMutation.isPending ? "Autonome Engine erzeugt fehlende Entwürfe …" : "Entwürfe werden geladen …"}</Text>
+          <Text style={styles.emptyNote}>{runMutation.isPending ? "Autonome Engine erzeugt fehlende Entwürfe … (Zeitbudget 25 s, danach ehrlicher Teilbericht)" : "Entwürfe werden geladen …"}</Text>
         </View>
       ) : queueQuery.isError ? (
         <Text style={styles.errorNote}>Freigabe-Queue nicht erreichbar: {queueQuery.error.message}</Text>
       ) : rows.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyNote}>Keine offenen Entwürfe für diesen Bereich.</Text>
+          {runReport ? <Text style={styles.errorNote}>{runReport}</Text> : null}
           {runMutation.error ? <Text style={styles.errorNote}>Automatischer Lauf fehlgeschlagen: {runMutation.error.message}</Text> : null}
           {meQuery.data?.role === "admin" ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Fehlende Entwürfe jetzt erzeugen"
               disabled={runMutation.isPending}
-              onPress={() => runMutation.mutate(undefined, { onSuccess: async () => { await utils.draftEngine.queue.invalidate(); } })}
+              onPress={() => runMutation.mutate(undefined, { onSuccess: async (data) => { setRunReport(describeRun(data?.result)); await utils.draftEngine.queue.invalidate(); } })}
               style={styles.generateButton}
             >
               <Text style={styles.generateText}>Entwürfe jetzt erzeugen</Text>
@@ -192,6 +196,30 @@ export function AutonomousDraftsCard({ kinds, accent = "purple", onAdoptIdea, on
       )}
     </GlassCard>
   );
+}
+
+/**
+ * Ehrlicher Laufbericht: die Engine erzeugt nur echte Entwürfe. Fehlt eine
+ * LLM-Route oder greift das Zeitbudget, steht das hier im Klartext — statt
+ * eines endlosen Ladezeichens.
+ */
+function describeRun(result?: {
+  generated?: Record<string, number>;
+  skipped?: { kind: string; reason: string }[];
+  truncated?: boolean;
+  elapsedMs?: number;
+}): string {
+  if (!result) return "";
+  const generated = Object.entries(result.generated ?? {}).filter(([, count]) => count > 0);
+  const parts: string[] = [];
+  parts.push(generated.length
+    ? `Neu erzeugt: ${generated.map(([kind, count]) => `${count}× ${kind}`).join(", ")}.`
+    : "Kein neuer Entwurf erzeugt.");
+  const firstReason = result.skipped?.find((entry) => entry.reason)?.reason;
+  if (firstReason) parts.push(`Grund: ${firstReason}`);
+  if (result.truncated) parts.push("Zeitbudget erreicht — der Rest folgt im nächsten Lauf.");
+  if (typeof result.elapsedMs === "number") parts.push(`Dauer ${Math.round(result.elapsedMs / 1000)} s.`);
+  return parts.join(" ");
 }
 
 function createStyles() {

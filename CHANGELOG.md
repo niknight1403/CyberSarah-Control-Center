@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 11.11.2026 — Sprint 11: Autonome Abschluesse statt Endlos-Wartezustaende
+
+- **Ungeklaerte Veroeffentlichungen loesen sich selbst auf:** `lib/publishing-auto-resolution-logic.ts` entscheidet aus einer echten, rein lesenden Plattformpruefung — gefunden wird bestaetigt, nicht gefunden wird nach 72 Stunden ohne Neuversand geschlossen, nicht pruefbar bleibt beim Menschen. Ohne Nachweis wird nie geschlossen.
+- **Schreibgeschuetzte Pruefung:** `server/publishing-auto-resolution.ts` liest Bluesky (oeffentlich), X, Threads, Instagram und LinkedIn; TikTok hat keinen Lesepfad und wird ehrlich als solcher gemeldet. Jeder HTTP-Fehler ergibt `unverifiable`, nie `not_found`.
+- **Sendetext wird festgehalten:** der Publishing-Service speichert den tatsaechlich gesendeten Text vor dem Versand, damit ein Abgleich eindeutig statt Raetselraten ist.
+- **Draft-Engine mit Zeitbudget:** 90 s im Cron, 25 s interaktiv; der Lauf liefert `truncated` und `elapsedMs` und benennt offene Arbeit im Bericht statt minutenlang zu laden.
+- **Betrieb:** neuer Cron-Endpunkt `/api/cron/publishing-resolution` und stuendlicher Workflow `publishing-resolution.yml`; Admin-Karte nennt jetzt die fehlenden Bedingungen am grauen Bestaetigungsknopf, die Entwurfskarte zeigt einen ehrlichen Laufbericht.
+- **Nachweise:** 23 neue Tests (`publishing-auto-resolution`, `draft-engine-budget`), `tsc` sauber. Doku: `docs/2026-11-11_SPRINT_11_AUTONOME_AUFLOESUNG.md`.
+
 ## 11.11.2026 — Release v4.3.0: Autonomes MCP-Governance-System (Sprints 1-10)
 
 - **Version 4.3.0** (`package.json`, `package-lock.json`, `app.config.ts`) — naechste Minor nach dem letzten Release v4.2.1; buendelt zehn Sprints zur MCP-Governance. Die `package.json` stand seit v4.2.1 faelschlich auf 3.1.1, das ist damit korrigiert.

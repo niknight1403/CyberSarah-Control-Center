@@ -88,7 +88,11 @@ export function PublishingReviewAdminCard({isAdmin}:{isAdmin:boolean}) {
     <Text style={[styles.title,{color:glassSurface.textPrimary}]}>Versandprüfung</Text>
     <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>
       Eine fehlende Plattform-Antwort bedeutet nicht automatisch einen Fehler beim Posten.
-      Bitte zuerst direkt auf der Plattform prüfen. Ein Neuversand ist hier ausgeschlossen.
+      Die automatische Prüfung vergleicht den gesendeten Text stündlich mit dem
+      Plattformkonto: gefundene Beiträge bestätigt sie selbst, nicht gefundene
+      schließt sie nach 72 Stunden ohne Neuversand. Nur wenn eine Plattform
+      technisch nicht lesbar ist, entscheidet weiterhin ein Mensch.
+      Ein Neuversand ist hier ausgeschlossen.
     </Text>
 
     <View style={styles.metrics}>
@@ -229,6 +233,21 @@ export function PublishingReviewAdminCard({isAdmin}:{isAdmin:boolean}) {
               Plattformstatus selbst geprüft; Entscheidung ohne Neuversand bestätigen
             </Text>
           </Pressable>
+          {(() => {
+            // Ein grauer Knopf ohne Begruendung wirkt wie ein Defekt. Die
+            // fehlende Bedingung wird deshalb im Klartext genannt.
+            const missing: string[] = [];
+            if (evidence.trim().length < 16) missing.push("Prüfgrundlage mit mindestens 16 Zeichen");
+            if (decision === "confirmed_published" && !validManualReviewReceipt(externalId)) {
+              missing.push("echte Plattform-Beitrags-ID (keine URL)");
+            }
+            if (!acknowledged) missing.push("bestätigte Häkchen-Zeile");
+            return missing.length
+              ? <Text style={[styles.meta,{color:glassSurface.textMuted}]}>
+                  Noch offen: {missing.join(" · ")}
+                </Text>
+              : null;
+          })()}
           <View style={styles.actions}>
             <Pressable accessibilityRole="button" accessibilityLabel="Prüfung abbrechen"
               onPress={reset} style={[styles.button,{borderColor:glassSurface.border}]}>
