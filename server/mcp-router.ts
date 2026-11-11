@@ -39,6 +39,8 @@ import { drizzleCredentialStore } from "./mcp-credential-store";
 import { createMcpSupervisorService } from "./mcp-supervisor-service";
 import { createMcpAgentService } from "./mcp-agent-service";
 import { drizzleAgentStore } from "./mcp-agent-store";
+import { createMcpTeamService } from "./mcp-team-service";
+import { drizzleTeamPlanStore } from "./mcp-team-store";
 import { drizzleCircuitStore } from "./mcp-supervisor-store";
 import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
@@ -80,6 +82,15 @@ let governanceService: ReturnType<typeof createMcpGovernanceService> | null = nu
 let credentialService: ReturnType<typeof createMcpCredentialService> | null = null;
 let supervisorService: ReturnType<typeof createMcpSupervisorService> | null = null;
 let agentService: ReturnType<typeof createMcpAgentService> | null = null;
+
+let teamService: ReturnType<typeof createMcpTeamService> | null = null;
+
+function getTeamService() {
+  if (!teamService) {
+    teamService = createMcpTeamService({ agents: drizzleAgentStore, plans: drizzleTeamPlanStore });
+  }
+  return teamService;
+}
 
 function getAgentService() {
   if (!agentService) {
@@ -549,5 +560,52 @@ export const mcpRouter = router({
     remove: adminProcedure
       .input(z.object({ agentKey: z.string().min(2).max(48) }))
       .mutation(async ({ input }) => getAgentService().remove(input.agentKey)),
+  }),
+  /**
+   * Sprint 7 — Team-Orchestrierung.
+   *
+   * `preview` plant ohne zu speichern, `plan` speichert eine Momentaufnahme.
+   * Ausgefuehrt wird hier nichts: Aufgaben ohne passenden Agenten bleiben offen.
+   */
+  team: router({
+    agents: adminProcedure.query(async () => {
+      const agents = await getTeamService().activeAgents();
+      return agents.map((agent) => ({
+        agentKey: agent.agentKey,
+        name: agent.name,
+        role: agent.role,
+        tools: agent.grants.length,
+        maxRiskLevel: agent.security.maxRiskLevel,
+        budgetCentsPerRun: agent.security.budgetCentsPerRun,
+      }));
+    }),
+
+    preview: adminProcedure
+      .input(
+        z.object({
+          objective: z.string().min(12).max(4000),
+          budgetCents: z.number().int().min(1).max(100000),
+          maxTasks: z.number().int().min(1).max(12).optional(),
+        }),
+      )
+      .mutation(async ({ input }) => getTeamService().preview(input)),
+
+    plan: adminProcedure
+      .input(
+        z.object({
+          objective: z.string().min(12).max(4000),
+          budgetCents: z.number().int().min(1).max(100000),
+          maxTasks: z.number().int().min(1).max(12).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => getTeamService().plan({ ...input, actor: ctx.user?.openId ?? null })),
+
+    list: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(100).optional() }).optional())
+      .query(async ({ input }) => getTeamService().list(input?.limit)),
+
+    get: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input }) => getTeamService().get(input.id)),
   }),
 });
