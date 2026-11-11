@@ -8,7 +8,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "./db";
 import { publishingJobs } from "../drizzle/schema";
-import { groupPublishingFailures } from "../lib/publishing-failure-reasons-logic";
+import { groupPublishingFailures, summarizeUncertainBlockers } from "../lib/publishing-failure-reasons-logic";
 import {publishingOpsOverviewDb} from "./publishing-ops";
 import {getPublishingModeOverview} from "./publishing-service";
 import {isAutopilotEnabled} from "../lib/publishing-queue-logic";
@@ -44,6 +44,8 @@ export const publishingRouter = router({
       autopilotConfigured:isAutopilotEnabled(process.env.PUBLISHING_AUTOPILOT),
       modes:getPublishingModeOverview(),
       failureReasons: groupPublishingFailures(recentFailed),
+      // Sprint 11.4 — "unklar" trennt jetzt Entscheidung von kaputtem Zugang.
+      uncertainBlockers: summarizeUncertainBlockers(recentFailed),
     };
   }),
 

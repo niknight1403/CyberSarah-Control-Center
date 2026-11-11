@@ -9,6 +9,7 @@
  * - Retry-Faehigkeit ist eine Empfehlung, keine Zusage. Versand-unklar bleibt
  *   immer manuell zu pruefen.
  */
+import { isPermanentCredentialFailure } from "./publishing-auto-resolution-logic";
 
 export type PublishingFailureCause =
   | "auth"
@@ -175,4 +176,56 @@ export function groupPublishingFailures(jobs: readonly PublishingFailureJob[]): 
     byCause,
     note,
   };
+}
+
+/**
+ * Sprint 11.4 - "Unklar" ist nicht immer dasselbe.
+ *
+ * Ein Vorgang kann unklar sein, weil der Beitrag wirklich nicht auffindbar ist,
+ * oder weil der Zugang zur Plattform selbst unbrauchbar ist (abgelehnter
+ * Token). Beides landet im gleichen Zaehler und verlangt unterschiedliche
+ * Schritte: der eine eine menschliche Entscheidung, der andere eine neue
+ * Autorisierung. Ohne diese Trennung steht in der Oberflaeche "19 unklar" und
+ * niemand weiss, was zu tun ist.
+ */
+export interface UncertainCredentialBlocker {
+  platform: string;
+  jobs: number;
+  detail: string | null;
+}
+
+export interface UncertainBlockerSummary {
+  uncertain: number;
+  credentialsBlocked: UncertainCredentialBlocker[];
+  guidance: string[];
+  note: string;
+}
+
+export function summarizeUncertainBlockers(jobs: readonly PublishingFailureJob[]): UncertainBlockerSummary {
+  const uncertain = jobs.filter(job => job.status === "versand_ungeklaert");
+  const map = new Map<string, { jobs: number; detail: string | null }>();
+  for (const job of uncertain) {
+    const text = job.lastError ?? "";
+    if (!text.trim() || !isPermanentCredentialFailure(text)) continue;
+    const platform = job.platform || "unbekannt";
+    const entry = map.get(platform) ?? { jobs: 0, detail: null };
+    entry.jobs += 1;
+    if (!entry.detail) entry.detail = maskForDisplay(text);
+    map.set(platform, entry);
+  }
+  const credentialsBlocked = [...map.entries()]
+    .map(([platform, entry]) => ({ platform, jobs: entry.jobs, detail: entry.detail }))
+    .sort((a, b) => b.jobs - a.jobs || a.platform.localeCompare(b.platform));
+
+  const blockedJobs = credentialsBlocked.reduce((sum, entry) => sum + entry.jobs, 0);
+  const guidance = credentialsBlocked.map(entry =>
+    `${entry.platform.toUpperCase()}: ${entry.jobs} unklare Vorgaenge warten auf einen gueltigen Zugang, nicht auf eine Entscheidung. Zugang neu autorisieren, dann prueft der naechste Lauf erneut.`,
+  );
+  const note = uncertain.length === 0
+    ? "Keine unklaren Vorgaenge im betrachteten Zeitraum."
+    : blockedJobs === 0
+      ? "Alle unklaren Vorgaenge brauchen eine menschliche Entscheidung."
+      : `${blockedJobs} von ${uncertain.length} unklaren Vorgaengen sind durch einen unbrauchbaren Zugang blockiert, nicht durch fehlende Informationen.`;
+
+  return { uncertain: uncertain.length, credentialsBlocked, guidance, note };
 }

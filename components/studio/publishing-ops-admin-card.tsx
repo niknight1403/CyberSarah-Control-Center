@@ -55,6 +55,19 @@ export function PublishingOpsAdminCard({isAdmin}:{isAdmin:boolean}){
           <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>{m.name}</Text>
         </View>)}
       </View>
+      {stats.uncertainBlockers.credentialsBlocked.length>0?<View style={[styles.blocker,{borderColor:glassPalette.amber}]}>
+        <Text style={[styles.title,{color:glassPalette.amber}]}>Unklare Vorgänge: Zugang prüfen</Text>
+        {stats.uncertainBlockers.guidance.map(line=><Text key={line} style={[styles.hint,{color:glassSurface.textSecondary}]}>
+          {line}
+        </Text>)}
+        {stats.uncertainBlockers.credentialsBlocked.map(entry=>entry.detail?<Text key={entry.platform}
+          style={[styles.hint,{color:glassSurface.textSecondary}]} numberOfLines={3}>
+          Letzter gespeicherter Grund ({entry.platform.toUpperCase()}): {entry.detail}
+        </Text>:null)}
+        <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>
+          {stats.uncertainBlockers.note} Neue Läufe zählen blockierte Vorgänge getrennt und schreiben keinen weiteren Fehlertext.
+        </Text>
+      </View>:null}
       <Text style={[styles.title,{color:glassSurface.textPrimary}]}>Plattform-Bereitschaft</Text>
       {Object.entries(stats.modes).map(([platform,info])=><View key={platform} style={styles.modeRow}>
         <Text style={[styles.modeLabel,{color:glassSurface.textPrimary}]}>{platform.toUpperCase()}</Text>
@@ -79,6 +92,7 @@ const styles=StyleSheet.create({
   grid:{flexDirection:"row",flexWrap:"wrap",gap:8},
   metric:{minWidth:90,flexGrow:1,borderWidth:1,borderRadius:10,padding:10,gap:3},
   number:{fontSize:19,fontWeight:"800"},
+  blocker:{borderWidth:1,borderRadius:12,padding:10,gap:6},
   modeRow:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",gap:10},
   modeLabel:{fontSize:11,fontWeight:"700"},
   modeStatus:{fontSize:11,fontWeight:"800"},
