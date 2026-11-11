@@ -4,6 +4,16 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 11.11.2026 — Release v3.2.0: Autonomes MCP-Governance-System (Sprints 1-10)
+
+- **Version 3.2.0** (`package.json`, `package-lock.json`, `app.config.ts`) — das Release buendelt zehn Sprints zur MCP-Governance.
+- **Registry, Vault, Supervisor:** Multi-Server-Verwaltung mit Health-Score, AES-256-GCM-Zugangsdaten und Circuit Breaker.
+- **Governance und Agenten:** semantische Tool-Suche, Risikoklassen, Policy-Gate, Argument-Sanitizing, Agenten als pruefbare Spezifikation.
+- **Ausfuehrung:** Team-Orchestrierung, Run-Engine mit harten Limits, Execution Bridge mit Audit ohne Argumentwerte, Freigabe-Workflow mit Vier-Augen-Prinzip und Ablauf.
+- **Sicherheit im Standard:** Live-Aufrufe nur mit `MCP_LIVE_EXECUTION=1`; ohne Executor bleibt `refusingExecutor` aktiv, es wird kein Erfolg vorgetaeuscht.
+- **Nachweise:** `tsc` sauber, Build gruen, 493 Dateien / 4.168 Tests gruen, ESLint 0 Fehler. Release-Notizen: `docs/releases/v3.2.0.md`.
+- **Offene Punkte:** kein Ende-zu-Ende-Lauf gegen einen echten Fremd-MCP-Server, kein Cron fuer den Freigabe-Ablauf, keine UI fuer Registry/Laeufe/Freigaben.
+
 ## 11.11.2026 — Sprint 1+2: Repository-Audit und Multi-MCP-Server-Registry
 
 - **Audit (Sprint 1):** vollstaendige Capability-Matrix gegen den Code (51 tRPC-Router, 34 Tabellen, 30 Migrationen, 66 Workflows, 476 Testdateien / 3.863 Tests). Ergebnis: fast alle Master-Prompt-Faehigkeiten haben bereits eine Basis; echte Luecken sind Multi-MCP-Verwaltung, zentraler Autopilot-Manager, Agent Factory, Plugin-Manifeste und Discovery-Autopilot. Bericht: `docs/2026-11-11_SPRINT_1_REPOSITORY_AUDIT.md`.
