@@ -146,7 +146,7 @@ export type StepOutcome = {
   code?: string;
 };
 
-export type TaskExecutor = (input: { task: TeamTask; agentKey: string; attempt: number }) => Promise<StepOutcome>;
+export type TaskExecutor = (input: { task: TeamTask; agentKey: string; attempt: number; runId?: number }) => Promise<StepOutcome>;
 
 export type ApplyStepInput = {
   taskId: string;

@@ -38,6 +38,8 @@ export type TeamTask = {
   dependsOn: string[];
   /** Stichwoerter, an denen die Eignung gemessen wurde. */
   matches: string[];
+  /** Konkrete Argumente; fehlende Pflichtfelder verhindern den Aufruf. */
+  args?: Record<string, unknown>;
   estimatedSteps: number;
   estimatedCostCents: number;
   riskLevel: RiskLevel;

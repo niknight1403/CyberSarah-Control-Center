@@ -43,6 +43,8 @@ import { createMcpTeamService } from "./mcp-team-service";
 import { drizzleTeamPlanStore } from "./mcp-team-store";
 import { createMcpRunService } from "./mcp-run-service";
 import { drizzleRunStore } from "./mcp-run-store";
+import { createMcpExecutionBridge } from "./mcp-execution-bridge-service";
+import { drizzleAuditStore } from "./mcp-execution-audit-store";
 import { drizzleCircuitStore } from "./mcp-supervisor-store";
 import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
@@ -89,9 +91,36 @@ let teamService: ReturnType<typeof createMcpTeamService> | null = null;
 
 let runService: ReturnType<typeof createMcpRunService> | null = null;
 
+let executionBridge: ReturnType<typeof createMcpExecutionBridge> | null = null;
+
+/**
+ * Werkzeug-Bridge: Policy, Credentials, Supervisor und Transport bleiben im
+ * Server-Service. Die Bridge waehlt nur das Werkzeug und auditiert.
+ */
+function getExecutionBridge() {
+  if (!executionBridge) {
+    executionBridge = createMcpExecutionBridge({
+      agents: drizzleAgentStore,
+      servers: drizzleMcpServerStore,
+      audit: drizzleAuditStore,
+      callTool: (serverKey, input) => getServerService().callTool(serverKey, input),
+    });
+  }
+  return executionBridge;
+}
+
+/** Live-Aufrufe nur mit ausdruecklicher Freigabe per Umgebungsvariable. */
+function liveExecutionEnabled(): boolean {
+  return process.env.MCP_LIVE_EXECUTION === "1";
+}
+
 function getRunService() {
   if (!runService) {
-    runService = createMcpRunService({ plans: drizzleTeamPlanStore, runs: drizzleRunStore });
+    runService = createMcpRunService({
+      plans: drizzleTeamPlanStore,
+      runs: drizzleRunStore,
+      ...(liveExecutionEnabled() ? { execute: getExecutionBridge().executor } : {}),
+    });
   }
   return runService;
 }
@@ -674,5 +703,47 @@ export const mcpRouter = router({
     get: adminProcedure
       .input(z.object({ runId: z.number().int().positive() }))
       .query(async ({ input }) => getRunService().get(input.runId)),
+  }),
+  /**
+   * Sprint 9 — Execution Bridge.
+   *
+   * `resolve` zeigt ohne Aufruf, welches Werkzeug gewaehlt wuerde, wie die
+   * Policy entscheidet und welche Pflichtfelder fehlen. `audit` liest das
+   * Protokoll (Schluessel und Hash, niemals Werte).
+   */
+  execution: router({
+    resolve: adminProcedure
+      .input(
+        z.object({
+          agentKey: z.string().min(2).max(48),
+          taskId: z.string().min(1).max(64).optional(),
+          goal: z.string().min(3).max(400),
+          args: z.record(z.string(), z.unknown()).optional(),
+        }),
+      )
+      .mutation(async ({ input }) =>
+        getExecutionBridge().resolve({
+          agentKey: input.agentKey,
+          task: {
+            id: input.taskId ?? "preview",
+            title: input.goal.slice(0, 80),
+            goal: input.goal,
+            assignee: input.agentKey,
+            dependsOn: [],
+            matches: [],
+            estimatedSteps: 1,
+            estimatedCostCents: 0,
+            riskLevel: "low",
+            requiresApproval: false,
+            ...(input.args ? { args: input.args } : {}),
+          },
+        }),
+      ),
+
+    enabled: adminProcedure.query(async () => ({ liveExecution: liveExecutionEnabled() })),
+
+    audit: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).optional(), runId: z.number().int().positive().optional() }).optional())
+      .query(async ({ input }) => drizzleAuditStore.list(input?.limit, input?.runId)),
   }),
 });
