@@ -34,6 +34,9 @@ import { drizzleMcpServerStore } from "./mcp-server-store";
 import { createMcpServerService, type GovernanceGate } from "./mcp-server-service";
 import { createMcpGovernanceService } from "./mcp-governance-service";
 import { drizzleApprovalStore, drizzleToolGovernanceStore } from "./mcp-governance-store";
+import { createMcpCredentialService } from "./mcp-credential-service";
+import { drizzleCredentialStore } from "./mcp-credential-store";
+import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
 import { getToolProxyQueue } from "./_core/tool-proxy-queue";
 import { adminProcedure, router } from "./_core/trpc";
@@ -70,6 +73,44 @@ function resolveConfiguredEndpoint():
 /** Service-Instanz je Aufruf: Store ist zustandslos, der Sitzungs-Cache lebt im Service. */
 let multiServerService: ReturnType<typeof createMcpServerService> | null = null;
 let governanceService: ReturnType<typeof createMcpGovernanceService> | null = null;
+let credentialService: ReturnType<typeof createMcpCredentialService> | null = null;
+
+/**
+ * Schluessel fuer die Vault-Verschluesselung: identisch zur Secret-Ablage
+ * (Sprint 167), damit es nur einen Crypto-Pfad gibt. Fehlt das Secret, wird
+ * ehrlich geworfen statt mit einem Default zu verschluesseln.
+ */
+function credentialEncryptionSecret(): string {
+  const secret = (process.env.PROVIDER_KEY_ENCRYPTION_SECRET ?? process.env.JWT_SECRET ?? "").trim();
+  if (!secret) {
+    throw new Error(
+      "Kein Server-Secret fuer die Vault-Verschluesselung verfuegbar. Setze JWT_SECRET oder PROVIDER_KEY_ENCRYPTION_SECRET.",
+    );
+  }
+  return secret;
+}
+
+function getCredentialService() {
+  if (!credentialService) {
+    credentialService = createMcpCredentialService({
+      store: drizzleCredentialStore,
+      encrypt: (plaintext) => encryptSecret(plaintext, credentialEncryptionSecret()),
+      decrypt: (payload) => decryptSecret(payload, credentialEncryptionSecret()),
+      requestToken: async ({ url, headers, body }) => {
+        const response = await fetch(url, { method: "POST", headers, body, redirect: "error" });
+        const text = await response.text();
+        let payload: unknown = null;
+        try {
+          payload = text ? JSON.parse(text) : null;
+        } catch {
+          payload = { error: "Antwort ist kein JSON" };
+        }
+        return { status: response.status, payload };
+      },
+    });
+  }
+  return credentialService;
+}
 
 /**
  * Governance-Service mit der Registry als Serverquelle. Der Modus je Server
@@ -104,6 +145,7 @@ function getServerService() {
     multiServerService = createMcpServerService({
       store: drizzleMcpServerStore,
       governance: getGovernanceService() as GovernanceGate,
+      resolveCredential: (input) => getCredentialService().resolve(input),
     });
   }
   return multiServerService;
@@ -373,5 +415,50 @@ export const mcpRouter = router({
       ),
 
     expire: adminProcedure.mutation(async () => ({ expired: await getGovernanceService().expireStaleApprovals() })),
+  }),
+  /**
+   * Sprint 4 — Credential Vault.
+   *
+   * Werte werden ausschliesslich verschluesselt gespeichert und nur maskiert
+   * zurueckgegeben. Die Aufloesung (Vault vor ENV) passiert im Aufrufpfad,
+   * nicht im UI.
+   */
+  credentials: router({
+    list: adminProcedure.query(async () => getCredentialService().list()),
+
+    setBearer: adminProcedure
+      .input(
+        z.object({
+          serverKey: z.string().min(2).max(64),
+          kind: z.enum(["bearer", "api_key"]).default("bearer"),
+          secret: z.string().min(8).max(8192),
+        }),
+      )
+      .mutation(async ({ ctx, input }) =>
+        getCredentialService().setStatic({
+          serverKey: input.serverKey,
+          kind: input.kind,
+          secret: input.secret,
+          actor: ctx.user?.openId ?? null,
+        }),
+      ),
+
+    setOAuth: adminProcedure
+      .input(
+        z.object({
+          serverKey: z.string().min(2).max(64),
+          tokenUrl: z.string().url().max(500),
+          clientId: z.string().min(1).max(200),
+          clientSecret: z.string().min(8).max(8192),
+          scopes: z.array(z.string().min(1).max(120)).max(20).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) =>
+        getCredentialService().setOAuthClient({ ...input, actor: ctx.user?.openId ?? null }),
+      ),
+
+    remove: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64) }))
+      .mutation(async ({ input }) => getCredentialService().remove(input.serverKey)),
   }),
 });
