@@ -77,7 +77,7 @@ export function resolveVerificationText(input: {
 export function summarizeEscalationReasons(decisions: { action: string; platform: string; reason: string }[]): {
   byPlatform: Record<string, number>;
   byReason: Record<string, number>;
-  /** Bis zu drei verschiedene Klartexte (gekuerzt) — warum genau? */
+  /** Bis zu vier verschiedene Klartexte (gekuerzt) — warum genau? */
   details: string[];
 } {
   const byPlatform: Record<string, number> = {};
@@ -88,7 +88,7 @@ export function summarizeEscalationReasons(decisions: { action: string; platform
     byPlatform[decision.platform] = (byPlatform[decision.platform] ?? 0) + 1;
     const key = escalationCategory(decision.reason);
     byReason[key] = (byReason[key] ?? 0) + 1;
-    if (details.size < 3) details.add(decision.reason.replace(/\s+/g, " ").trim().slice(0, 140));
+    if (details.size < 4) details.add(decision.reason.replace(/\s+/g, " ").trim().slice(0, 260));
   }
   return { byPlatform, byReason, details: [...details] };
 }
