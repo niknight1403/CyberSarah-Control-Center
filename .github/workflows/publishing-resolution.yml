@@ -1,0 +1,77 @@
+name: publishing-resolution
+
+# Sprint 11 — Autonome Aufloesung ungeklaerter Veroeffentlichungen.
+#
+# Der Lauf prueft (nur lesend) auf der jeweiligen Plattform, ob ein als
+# "versand_ungeklaert" markierter Beitrag existiert, und schliesst den
+# Vorgang nachweisbar ab:
+#   - Beitrag gefunden  -> Job wird bestaetigt (externe ID uebernommen)
+#   - kein Fund + Frist -> Job wird ohne Neuversand geschlossen
+#   - nicht pruefbar    -> bleibt sichtbar beim Menschen (kein Raten)
+# Es wird dabei NIE gesendet und NIE erneut gepostet.
+
+on:
+  schedule:
+    # Stuendlich zur Minute 23: kurz nach dem 2-Stunden-Autopilot-Takt,
+    # damit frische "ungeklaert"-Faelle sofort eine erste Pruefung bekommen.
+    - cron: "23 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publishing-resolution
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Ungeklaerte Veroeffentlichungen pruefen
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Aufloesungslauf ausfuehren
+        env:
+          BASE_URL: ${{ secrets.RENDER_PUBLIC_URL }}
+          TOKEN: ${{ secrets.METRICS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASE_URL:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "::warning::RENDER_PUBLIC_URL oder METRICS_TOKEN fehlt — Aufloesungslauf uebersprungen."
+            exit 0
+          fi
+          case "$BASE_URL" in https://*) ;; *) echo "::error::RENDER_PUBLIC_URL muss HTTPS sein"; exit 1;; esac
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+          http_code="$(curl --silent --show-error --max-time 240 \
+            --output "$body_file" --write-out '%{http_code}' --request POST \
+            --header "Authorization: Bearer $TOKEN" \
+            "${BASE_URL%/}/api/cron/publishing-resolution")"
+          # Keine Rohantwort ausgeben: sie enthaelt Job- und Persona-Daten.
+          case "$http_code" in
+            200)
+              python3 - "$body_file" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          summary=data.get("result",{}).get("summary",{})
+          print(f"Aufloesung: geprueft={data.get('result',{}).get('checked',0)} "
+                f"bestaetigt={summary.get('confirm',0)} geschlossen={summary.get('close',0)} "
+                f"wartend={summary.get('wait',0)} beim Menschen={summary.get('escalate',0)}")
+          errors=data.get("result",{}).get("errors",[])
+          for entry in errors[:5]:
+              print(f"::warning::Aufloesung: {entry}")
+          PY
+              ;;
+            401|403)
+              echo "::warning::Aufloesung verweigert das Token (HTTP $http_code). METRICS_TOKEN gegen den Serverwert pruefen."
+              exit 0
+              ;;
+            404)
+              echo "::warning::Endpunkt /api/cron/publishing-resolution nicht gefunden (HTTP 404). Route pruefen."
+              exit 0
+              ;;
+            *)
+              echo "::error::Aufloesungslauf fehlgeschlagen (HTTP $http_code)."
+              exit 1
+              ;;
+          esac

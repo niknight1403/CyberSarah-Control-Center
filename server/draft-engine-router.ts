@@ -5,7 +5,7 @@
  */
 import { z } from "zod";
 
-import { decideDraft, listDraftQueue, runDraftEngine } from "./draft-engine";
+import { DRAFT_ENGINE_RUN_NOW_BUDGET_MS, decideDraft, listDraftQueue, runDraftEngine } from "./draft-engine";
 import { buildDraftQueueView, type DraftRow } from "../lib/draft-engine-logic";
 import { adminProcedure, router } from "./_core/trpc";
 import { enqueueApprovedContentDraft } from "./publishing-service";
@@ -52,9 +52,15 @@ export const draftEngineRouter = router({
       return { ok: true as const, row: serializeRow(row), processing };
     }),
 
-  /** Admin-Trigger: Engine sofort ausfuehren (sonst taeglicher Cron). */
+  /**
+   * Admin-Trigger: Engine sofort ausfuehren (sonst Cron).
+   * Bewusst mit kleinem Zeitbudget: der Aufruf sitzt in der Oberflaeche und
+   * muss antworten. Bleibt Arbeit offen, sagt der Bericht das ehrlich
+   * (`truncated`) statt den Knopf minutenlang drehen zu lassen.
+   */
   runNow: adminProcedure.mutation(async () => {
-    const result = await runDraftEngine();
-    return { ok: true as const, result };
+    const startedAt = Date.now();
+    const result = await runDraftEngine({ budgetMs: DRAFT_ENGINE_RUN_NOW_BUDGET_MS });
+    return { ok: true as const, result, durationMs: Date.now() - startedAt };
   }),
 });

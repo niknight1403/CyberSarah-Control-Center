@@ -674,6 +674,18 @@ export async function processDueJobsForUser(userOpenId: string, now = new Date()
       const content = await generateJobContent(job);
       if (resolution.mode !== "live") throw new Error(resolution.reason);
 
+      // Sprint 11: den tatsaechlich gesendeten Text am Job festhalten, BEVOR
+      // der Versand beginnt. Nur so kann eine spaetere, rein lesende
+      // Plattformpruefung den Beitrag eindeutig zuordnen (kein Raten).
+      if (!job.contentOverride?.trim()) {
+        await db.update(publishingJobs).set({ contentOverride: content.slice(0, 4000) })
+          .where(and(
+            eq(publishingJobs.id, job.id),
+            eq(publishingJobs.userOpenId, userOpenId),
+            eq(publishingJobs.status, "in_bearbeitung"),
+          ));
+      }
+
       // Arm on the database BEFORE provider side effects. If the provider
       // accepted a post but the acknowledgement is lost, never replay.
       const armed = await armPublishingDispatch(db, job.id, userOpenId);

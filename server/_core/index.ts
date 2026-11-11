@@ -56,6 +56,7 @@ import { restoreRouterState } from "../model-router";
 // Sprint 196 — Autonomer Route-Rotations-Agent (Gratis-Kette, Admin-Vollzugriff).
 import { restoreRouteRotationState } from "../route-rotation-agent";
 import { runDraftEngine } from "../draft-engine";
+import { resolveUncertainPublishing } from "../publishing-auto-resolution";
 import { runRevenueAutopilot } from "../revenue-autopilot";
 import { runControlCenterAutopilot } from "../control-center-autopilot";
 import { redactAutopilotLog } from "../../lib/autopilot-log-safety";
@@ -528,6 +529,26 @@ async function startServer() {
       res.json({ ok: true, result, timestamp: Date.now() });
     } catch (error) {
       console.error("[Draft-Engine] Lauf fehlgeschlagen:", error);
+      res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
+    }
+  });
+
+  // Sprint 11 — Autonome Aufloesung ungeklaerter Veroeffentlichungen:
+  // prueft (nur lesend) auf der Plattform, ob der Beitrag existiert, und
+  // schliesst den Vorgang nachweisbar ab. Ohne Nachweis bleibt er beim
+  // Menschen. Es wird nie gesendet und nie erneut gepostet.
+  app.post("/api/cron/publishing-resolution", async (req, res) => {
+    const configuredToken = process.env.METRICS_TOKEN?.trim();
+    if (!configuredToken || req.header("authorization") !== `Bearer ${configuredToken}`) {
+      res.status(401).json({ error: "Nicht autorisiert." });
+      return;
+    }
+    try {
+      const result = await resolveUncertainPublishing();
+      console.info("[Publishing-Resolution] Lauf abgeschlossen:", JSON.stringify(result.summary));
+      res.json({ ok: true, result, timestamp: Date.now() });
+    } catch (error) {
+      console.error("[Publishing-Resolution] Lauf fehlgeschlagen:", error);
       res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "unbekannter Fehler" });
     }
   });
