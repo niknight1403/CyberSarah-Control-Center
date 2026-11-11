@@ -45,6 +45,8 @@ import { createMcpRunService } from "./mcp-run-service";
 import { drizzleRunStore } from "./mcp-run-store";
 import { createMcpExecutionBridge } from "./mcp-execution-bridge-service";
 import { drizzleAuditStore } from "./mcp-execution-audit-store";
+import { createMcpApprovalService as createMcpToolApprovalService } from "./mcp-approval-service";
+import { drizzleApprovalStore as drizzleToolApprovalStore } from "./mcp-approval-store";
 import { drizzleCircuitStore } from "./mcp-supervisor-store";
 import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
@@ -91,6 +93,15 @@ let teamService: ReturnType<typeof createMcpTeamService> | null = null;
 
 let runService: ReturnType<typeof createMcpRunService> | null = null;
 
+let toolApprovalService: ReturnType<typeof createMcpToolApprovalService> | null = null;
+
+function getToolApprovalService() {
+  if (!toolApprovalService) {
+    toolApprovalService = createMcpToolApprovalService({ store: drizzleToolApprovalStore });
+  }
+  return toolApprovalService;
+}
+
 let executionBridge: ReturnType<typeof createMcpExecutionBridge> | null = null;
 
 /**
@@ -103,6 +114,10 @@ function getExecutionBridge() {
       agents: drizzleAgentStore,
       servers: drizzleMcpServerStore,
       audit: drizzleAuditStore,
+      approvals: {
+        findUsable: (target) => getToolApprovalService().findUsable(target),
+        consume: (id) => getToolApprovalService().consume(id),
+      },
       callTool: (serverKey, input) => getServerService().callTool(serverKey, input),
     });
   }
@@ -745,5 +760,59 @@ export const mcpRouter = router({
     audit: adminProcedure
       .input(z.object({ limit: z.number().int().min(1).max(200).optional(), runId: z.number().int().positive().optional() }).optional())
       .query(async ({ input }) => drizzleAuditStore.list(input?.limit, input?.runId)),
+  }),
+  /**
+   * Sprint 10 — Freigabe-Workflow.
+   *
+   * Kritische und hohe Risiken brauchen zwei unabhaengige Stimmen, die eigene
+   * Anfrage darf niemand freigeben, und eine Freigabe deckt genau einen Aufruf
+   * (Lauf, Aufgabe, Werkzeug, Argument-Hash) bis zum Ablauf.
+   */
+  toolApprovals: router({
+    request: adminProcedure
+      .input(
+        z.object({
+          runId: z.number().int().positive(),
+          taskId: z.string().min(1).max(64),
+          agentKey: z.string().min(2).max(48),
+          serverKey: z.string().min(2).max(64),
+          toolName: z.string().min(1).max(120),
+          riskLevel: z.enum(["low", "medium", "high", "critical"]),
+          reasons: z.array(z.string().min(1).max(200)).max(8).default([]),
+          argsHash: z.string().min(8).max(64),
+          requestedBy: z.string().min(1).max(120),
+          ttlMs: z.number().int().min(60_000).max(7 * 24 * 60 * 60 * 1000).optional(),
+        }),
+      )
+      .mutation(async ({ input }) => getToolApprovalService().request(input)),
+
+    decide: adminProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          approver: z.string().min(1).max(120),
+          decision: z.enum(["approve", "reject"]),
+          note: z.string().max(300).optional(),
+        }),
+      )
+      .mutation(async ({ input }) => getToolApprovalService().decide(input)),
+
+    list: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).optional(), status: z.enum(["pending", "approved", "rejected", "expired", "consumed"]).optional() }).optional())
+      .query(async ({ input }) => getToolApprovalService().list(input?.limit, input?.status)),
+
+    get: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input }) => getToolApprovalService().get(input.id)),
+
+    byRun: adminProcedure
+      .input(z.object({ runId: z.number().int().positive() }))
+      .query(async ({ input }) => getToolApprovalService().listByRun(input.runId)),
+
+    queue: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).optional() }).optional())
+      .query(async ({ input }) => getToolApprovalService().queue(input?.limit)),
+
+    sweep: adminProcedure.mutation(async () => getToolApprovalService().sweep()),
   }),
 });

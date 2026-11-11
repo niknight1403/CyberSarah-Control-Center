@@ -68,6 +68,7 @@ function build(options: {
   callTool?: CallToolFn;
   auditThrows?: boolean;
   timeoutMs?: number;
+  approvals?: { findUsable(target: { runId: number; taskId: string; serverKey: string; toolName: string; argsHash: string }): Promise<{ id: number } | null>; consume(id: number): Promise<unknown> };
 } = {}) {
   const storedAgents = options.agents ?? [agent({ agentKey: "research-scout" })];
   const audits: AuditEntry[] = [];
@@ -94,6 +95,7 @@ function build(options: {
     servers: { list: async () => SERVERS as never },
     audit,
     callTool,
+    ...(options.approvals ? { approvals: options.approvals } : {}),
     now: () => 1_000,
     timeoutMs: options.timeoutMs ?? 50,
   });
@@ -234,5 +236,73 @@ describe("Vorschau", () => {
     const { bridge } = build();
     const preview = await bridge.resolve({ task: task(), agentKey: "gibtsnicht" });
     expect(preview.ok).toBe(false);
+  });
+});
+
+describe("Freigabe oeffnet den Aufruf (Sprint 10)", () => {
+  const riskyAgent = agent({
+    agentKey: "research-scout",
+    grants: [{ serverKey: "stripe", toolName: "charge_invoice", riskLevel: "critical", purpose: "x" }],
+  });
+
+  it("fuehrt aus, wenn eine gueltige Freigabe fuer genau diesen Aufruf vorliegt", async () => {
+    const consumed: number[] = [];
+    const approvals = {
+      findUsable: async () => ({ id: 42 }),
+      consume: async (id: number) => {
+        consumed.push(id);
+        return null;
+      },
+    };
+    const { bridge, calls, audits } = build({ agents: [riskyAgent], approvals });
+    const result = await bridge.executor({
+      task: task({ goal: "charge invoice customer", title: "Zahlung", args: {} }),
+      agentKey: "research-scout",
+      attempt: 1,
+      runId: 7,
+    });
+    expect(result.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].toolName).toBe("charge_invoice");
+    expect(consumed).toEqual([42]);
+    expect(audits[0].note).toContain("Freigabe #42");
+  });
+
+  it("verbraucht eine Freigabe auch bei fehlgeschlagenem Aufruf", async () => {
+    const consumed: number[] = [];
+    const approvals = {
+      findUsable: async () => ({ id: 9 }),
+      consume: async (id: number) => {
+        consumed.push(id);
+        return null;
+      },
+    };
+    const { bridge } = build({
+      agents: [riskyAgent],
+      approvals,
+      callTool: async () => ({ ok: false, reason: "Timeout nach 30s" }),
+    });
+    const result = await bridge.executor({
+      task: task({ goal: "charge invoice customer", title: "Zahlung", args: {} }),
+      agentKey: "research-scout",
+      attempt: 1,
+      runId: 7,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.retryable).toBe(true);
+    expect(consumed).toEqual([9]);
+  });
+
+  it("verweigert ohne passende Freigabe weiterhin", async () => {
+    const approvals = { findUsable: async () => null, consume: async () => null };
+    const { bridge, calls } = build({ agents: [riskyAgent], approvals });
+    const result = await bridge.executor({
+      task: task({ goal: "charge invoice customer", title: "Zahlung", args: {} }),
+      agentKey: "research-scout",
+      attempt: 1,
+      runId: 7,
+    });
+    expect(result.code).toBe("approval_required");
+    expect(calls).toHaveLength(0);
   });
 });

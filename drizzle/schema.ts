@@ -1007,3 +1007,35 @@ export const mcpExecutionAudit = pgTable("mcp_execution_audit", {
 
 export type McpExecutionAuditRow = typeof mcpExecutionAudit.$inferSelect;
 export type InsertMcpExecutionAuditRow = typeof mcpExecutionAudit.$inferInsert;
+
+/**
+ * Sprint 10 — Freigabe-Workflow: eine Freigabe deckt genau einen Aufruf und
+ * laeuft ab; Stimmen bleiben nachvollziehbar (Vier-Augen-Prinzip).
+ */
+export const mcpApprovalRequests = pgTable("mcp_approval_requests", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull(),
+  taskId: varchar("task_id", { length: 64 }).notNull(),
+  agentKey: varchar("agent_key", { length: 48 }).notNull(),
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  toolName: varchar("tool_name", { length: 120 }).notNull(),
+  riskLevel: varchar("risk_level", { length: 16 }).notNull(),
+  reasons: jsonb("reasons").notNull().default([]),
+  argsHash: varchar("args_hash", { length: 64 }).notNull(),
+  requiredApprovals: integer("required_approvals").notNull().default(1),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  requestedBy: varchar("requested_by", { length: 120 }).notNull(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  votes: jsonb("votes").notNull().default([]),
+  note: text("note").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("mcp_approval_requests_run_idx").on(table.runId),
+  index("mcp_approval_requests_status_idx").on(table.status),
+  index("mcp_approval_requests_expires_idx").on(table.expiresAt),
+]);
+
+export type McpApprovalRequestRow = typeof mcpApprovalRequests.$inferSelect;
+export type InsertMcpApprovalRequestRow = typeof mcpApprovalRequests.$inferInsert;
