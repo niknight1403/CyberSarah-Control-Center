@@ -978,3 +978,32 @@ export const mcpTeamRuns = pgTable("mcp_team_runs", {
 
 export type McpTeamRunRow = typeof mcpTeamRuns.$inferSelect;
 export type InsertMcpTeamRunRow = typeof mcpTeamRuns.$inferInsert;
+
+/**
+ * Sprint 9 — Audit jedes Werkzeugaufrufs: Schluessel/Typen und Hash der
+ * Argumente, niemals Werte.
+ */
+export const mcpExecutionAudit = pgTable("mcp_execution_audit", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id"),
+  taskId: varchar("task_id", { length: 64 }).notNull(),
+  agentKey: varchar("agent_key", { length: 48 }).notNull(),
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  toolName: varchar("tool_name", { length: 120 }).notNull(),
+  decision: varchar("decision", { length: 24 }).notNull(),
+  riskLevel: varchar("risk_level", { length: 16 }).notNull(),
+  argKeys: jsonb("arg_keys").notNull().default({}),
+  argsHash: varchar("args_hash", { length: 64 }).notNull(),
+  costCents: integer("cost_cents").notNull().default(0),
+  durationMs: integer("duration_ms").notNull().default(0),
+  note: text("note").notNull().default(""),
+  attempt: integer("attempt").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("mcp_execution_audit_run_idx").on(table.runId),
+  index("mcp_execution_audit_created_idx").on(table.createdAt),
+  index("mcp_execution_audit_agent_idx").on(table.agentKey),
+]);
+
+export type McpExecutionAuditRow = typeof mcpExecutionAudit.$inferSelect;
+export type InsertMcpExecutionAuditRow = typeof mcpExecutionAudit.$inferInsert;

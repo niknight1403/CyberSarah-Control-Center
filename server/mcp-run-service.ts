@@ -139,7 +139,7 @@ export function createMcpRunService(deps: RunServiceDeps): RunService {
       const startedAt = now();
       let outcome;
       try {
-        outcome = await execute({ task, agentKey, attempt });
+        outcome = await execute({ task, agentKey, attempt, runId });
       } catch (error) {
         outcome = {
           ok: false,
@@ -151,9 +151,11 @@ export function createMcpRunService(deps: RunServiceDeps): RunService {
       }
       const durationMs = outcome.durationMs > 0 ? outcome.durationMs : now() - startedAt;
 
+      // Freigabebedarf ist kein Fehlschlag: der Lauf haelt an und wartet.
+      const needsApproval = !outcome.ok && outcome.code === "approval_required";
       let nextState = applyStep(state, {
         taskId: task.id,
-        outcome: outcome.ok ? "success" : outcome.retryable ? "failed" : "failed",
+        outcome: outcome.ok ? "success" : needsApproval ? "approval_required" : "failed",
         costCents: outcome.costCents,
         durationMs,
         note: outcome.note ?? (outcome.code ?? ""),
@@ -161,7 +163,7 @@ export function createMcpRunService(deps: RunServiceDeps): RunService {
       });
 
       // Nicht wiederholbare Fehler beenden den Lauf sofort, statt still zu wiederholen.
-      if (!outcome.ok && !outcome.retryable) {
+      if (!outcome.ok && !outcome.retryable && !needsApproval) {
         nextState = {
           ...nextState,
           tasks: { ...nextState.tasks, [task.id]: { ...nextState.tasks[task.id], status: "failed" } },
