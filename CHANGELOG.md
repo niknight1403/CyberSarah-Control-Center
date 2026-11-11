@@ -4,6 +4,13 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 11.11.2026 — Sprint 11.2: X-Pruefung nutzt den Token-Service
+
+- **Befund aus dem Messlauf:** 19 von 19 Vorgaengen beim Menschen, alle auf X, Klartext `Plattformabfrage fehlgeschlagen: HTTP 401`.
+- **Ursache:** die Verifikation las den statischen Env-Token (`X_PUBLISH_TOKEN`), waehrend der Autopilot den rotierenden DB-Token ueber `resolveXToken` nutzt. Nach der ersten Rotation war der Env-Wert abgelaufen — jede Pruefung musste scheitern.
+- **Fix:** `verifyPublishingOnPlatform` loest den X-Token ueber `resolveXToken` auf (DB bevorzugt) und frischt bei HTTP 401 genau einmal zwangsweise auf, dann ehrlich `unverifiable` mit Grund.
+- **Nachweise:** 3 neue Tests, 4.199 Tests gruen, `tsc` und ESLint sauber.
+
 ## 11.11.2026 — Sprint 11.1: Aufloesung greift auch bei Altjobs
 
 - **Befund aus dem Produktionslauf:** 19 Vorgaenge geprueft, 19 beim Menschen. Ursache: Jobs vor Sprint 11 haben keinen gespeicherten Sendetext, die Pruefung verweigerte deshalb den Abgleich — ehrlich, aber nutzlos.
