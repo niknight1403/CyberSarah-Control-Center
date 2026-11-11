@@ -13,6 +13,7 @@ import {
   DEFAULT_CALL_COST_CENTS,
   buildAuditEntry,
   checkArguments,
+  hashArguments,
   classifyCallResult,
   gateCall,
   requiredArguments,
@@ -37,8 +38,15 @@ export type CallToolFn = (
   input: { toolName: string; args: Record<string, unknown> },
 ) => Promise<CallResultLike>;
 
+/** Freigabe-Pruefung vor dem Aufruf (Sprint 10). */
+export type ApprovalGate = {
+  findUsable(target: { runId: number; taskId: string; serverKey: string; toolName: string; argsHash: string }): Promise<{ id: number } | null>;
+  consume(id: number): Promise<unknown>;
+};
+
 export type BridgeDeps = {
   agents: { findByKey(agentKey: string): Promise<StoredAgent | null> };
+  approvals?: ApprovalGate;
   servers: Pick<McpServerStore, "list">;
   audit: McpAuditStore;
   callTool: CallToolFn;
@@ -222,14 +230,35 @@ export function createMcpExecutionBridge(deps: BridgeDeps): ExecutionBridge {
       await audit({ ...base, decision: "blocked", costCents: 0, durationMs: 0, note: reason });
       return { ok: false, costCents: 0, durationMs: 0, retryable: false, code: "policy_blocked", note: reason };
     }
-    if (gate.decision === "approval_required") {
-      const reason = `Freigabe erforderlich (${gate.riskLevel}): ${gate.reasons.join("; ")}`;
-      await audit({ ...base, decision: "approval_required", costCents: 0, durationMs: 0, note: reason });
-      return { ok: false, costCents: 0, durationMs: 0, retryable: false, code: "approval_required", note: reason };
-    }
     if (!argsCheck.ok) {
       await audit({ ...base, decision: "blocked", costCents: 0, durationMs: 0, note: argsCheck.reason });
       return { ok: false, costCents: 0, durationMs: 0, retryable: false, code: "missing_arguments", note: argsCheck.reason };
+    }
+
+    // Freigabepflicht: nur eine gueltige, noch nicht verbrauchte Freigabe fuer
+    // GENAU diesen Aufruf (Lauf, Aufgabe, Werkzeug, Argument-Hash) oeffnet die Tuer.
+    let approvalNote = "";
+    let approvalId: number | null = null;
+    if (gate.decision === "approval_required") {
+      const argsHash = hashArguments(argsCheck.args);
+      const usable =
+        deps.approvals && typeof runId === "number"
+          ? await deps.approvals.findUsable({
+              runId,
+              taskId: task.id,
+              serverKey: entry.serverKey,
+              toolName: entry.tool.name,
+              argsHash,
+            })
+          : null;
+
+      if (!usable) {
+        const reason = `Freigabe erforderlich (${gate.riskLevel}): ${gate.reasons.join("; ")}`;
+        await audit({ ...base, decision: "approval_required", costCents: 0, durationMs: 0, note: reason });
+        return { ok: false, costCents: 0, durationMs: 0, retryable: false, code: "approval_required", note: reason };
+      }
+      approvalId = usable.id;
+      approvalNote = ` Freigabe #${usable.id} genutzt.`;
     }
 
     const startedAt = now();
@@ -260,14 +289,19 @@ export function createMcpExecutionBridge(deps: BridgeDeps): ExecutionBridge {
               : "failed",
       costCents,
       durationMs,
-      note: classification.reason,
+      note: `${classification.reason}${approvalNote}`,
     });
+
+    // Eine Freigabe gilt fuer genau einen Aufruf — auch bei Fehlschlag.
+    if (approvalId !== null && deps.approvals) {
+      await deps.approvals.consume(approvalId);
+    }
 
     return {
       ok: classification.kind === "success",
       costCents,
       durationMs,
-      note: classification.reason,
+      note: `${classification.reason}${approvalNote}`,
       retryable: classification.retryable,
       code: classification.kind,
     };

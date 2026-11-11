@@ -260,6 +260,13 @@
       "when": 1794307000000,
       "tag": "0036_mcp_execution_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794308000000,
+      "tag": "0037_mcp_approval_requests",
+      "breakpoints": true
     }
   ]
 }
