@@ -6,6 +6,7 @@ import {
   decideUncertainResolution,
   matchPostByText,
   normalizeForMatch,
+  resolveVerificationText,
   summarizeUncertainResolutions,
   type PublishingVerification,
 } from "../lib/publishing-auto-resolution-logic";
@@ -194,5 +195,26 @@ describe("Sprint 11: schreibgeschuetzte Plattformpruefung", () => {
     });
     expect(verification.outcome).toBe("unverifiable");
     if (verification.outcome === "unverifiable") expect(verification.detail).toContain("Lesezugriff");
+  });
+});
+
+describe("Sprint 11: Textgrundlage fuer den Abgleich", () => {
+  it("nimmt den gespeicherten Sendetext, wenn vorhanden", () => {
+    const resolved = resolveVerificationText({ contentOverride: "Der gesendete Text steht hier.", draftContent: "Entwurf" });
+    expect(resolved.source).toBe("override");
+    expect(resolved.text).toBe("Der gesendete Text steht hier.");
+  });
+
+  it("faellt bei Altjobs auf den freigegebenen Quell-Entwurf zurueck", () => {
+    // Regression: Jobs vor Sprint 11 haben keinen content_override. Ohne
+    // diesen Rueckfall blieben sie dauerhaft "beim Menschen".
+    const resolved = resolveVerificationText({ contentOverride: null, draftContent: "Freigegebener Entwurf fuer X." });
+    expect(resolved.source).toBe("draft");
+    expect(resolved.text).toBe("Freigegebener Entwurf fuer X.");
+  });
+
+  it("rät nicht, wenn beide Texte fehlen oder zu kurz sind", () => {
+    expect(resolveVerificationText({ contentOverride: "  ", draftContent: "kurz" }))
+      .toEqual({ text: "", source: "none" });
   });
 });
