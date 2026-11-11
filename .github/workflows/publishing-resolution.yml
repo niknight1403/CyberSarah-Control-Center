@@ -57,6 +57,13 @@ jobs:
           print(f"Aufloesung: geprueft={data.get('result',{}).get('checked',0)} "
                 f"bestaetigt={summary.get('confirm',0)} geschlossen={summary.get('close',0)} "
                 f"wartend={summary.get('wait',0)} beim Menschen={summary.get('escalate',0)}")
+          esc=data.get("result",{}).get("escalation",{}) or {}
+          by_platform=esc.get("byPlatform",{}) or {}
+          by_reason=esc.get("byReason",{}) or {}
+          if by_platform:
+              print("  Plattformen beim Menschen: " + ", ".join(f"{k}={v}" for k,v in sorted(by_platform.items())))
+          if by_reason:
+              print("  Gruende: " + ", ".join(f"{k}={v}" for k,v in sorted(by_reason.items())))
           errors=data.get("result",{}).get("errors",[])
           for entry in errors[:5]:
               print(f"::warning::Aufloesung: {entry}")

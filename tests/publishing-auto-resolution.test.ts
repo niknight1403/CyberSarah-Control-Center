@@ -7,6 +7,7 @@ import {
   matchPostByText,
   normalizeForMatch,
   resolveVerificationText,
+  summarizeEscalationReasons,
   summarizeUncertainResolutions,
   type PublishingVerification,
 } from "../lib/publishing-auto-resolution-logic";
@@ -216,5 +217,18 @@ describe("Sprint 11: Textgrundlage fuer den Abgleich", () => {
   it("rät nicht, wenn beide Texte fehlen oder zu kurz sind", () => {
     expect(resolveVerificationText({ contentOverride: "  ", draftContent: "kurz" }))
       .toEqual({ text: "", source: "none" });
+  });
+});
+
+describe("Sprint 11: Eskalationsgruende", () => {
+  it("gruppiert nach Plattform und Kategorie, ohne Inhalte", () => {
+    const grouped = summarizeEscalationReasons([
+      { action: "escalate", platform: "x", reason: "Plattformpruefung nicht moeglich: X-Refresh fehlgeschlagen" },
+      { action: "escalate", platform: "x", reason: "Plattformpruefung nicht moeglich: kein Token" },
+      { action: "escalate", platform: "linkedin", reason: "Keine Plattformpruefung vorhanden (5 Tage offen) — Mensch muss pruefen." },
+      { action: "confirm", platform: "bluesky", reason: "egal" },
+    ]);
+    expect(grouped.byPlatform).toEqual({ x: 2, linkedin: 1 });
+    expect(grouped.byReason).toEqual({ pruefung_nicht_moeglich: 2, keine_pruefung: 1 });
   });
 });

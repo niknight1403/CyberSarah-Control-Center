@@ -69,6 +69,34 @@ export function resolveVerificationText(input: {
   return { text: "", source: "none" };
 }
 
+/**
+ * Gruppiert, WARUM Vorgaenge beim Menschen landen — ohne Inhalte, nur
+ * Kategorien. Das macht einen Lauf mit 19 Eskalationen lesbar, ohne dass
+ * jemand die Datenbank aufmachen muss.
+ */
+export function summarizeEscalationReasons(decisions: { action: string; platform: string; reason: string }[]): {
+  byPlatform: Record<string, number>;
+  byReason: Record<string, number>;
+} {
+  const byPlatform: Record<string, number> = {};
+  const byReason: Record<string, number> = {};
+  for (const decision of decisions) {
+    if (decision.action !== "escalate") continue;
+    byPlatform[decision.platform] = (byPlatform[decision.platform] ?? 0) + 1;
+    const key = escalationCategory(decision.reason);
+    byReason[key] = (byReason[key] ?? 0) + 1;
+  }
+  return { byPlatform, byReason };
+}
+
+function escalationCategory(reason: string): string {
+  if (/keine Plattformpruefung/i.test(reason)) return "keine_pruefung";
+  if (/nicht moeglich/i.test(reason)) return "pruefung_nicht_moeglich";
+  if (/Beitrags-ID/i.test(reason)) return "fund_ohne_id";
+  if (/aelter als/i.test(reason)) return "nachweis_abgelaufen";
+  return "sonstiges";
+}
+
 export type UncertainResolutionInput = {
   jobId: number;
   platform: string;

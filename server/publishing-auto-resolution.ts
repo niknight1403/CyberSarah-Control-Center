@@ -16,6 +16,7 @@ import {
   decideUncertainResolution,
   matchPostByText,
   resolveVerificationText,
+  summarizeEscalationReasons,
   summarizeUncertainResolutions,
   type PlatformPost,
   type PublishingVerification,
@@ -198,6 +199,8 @@ export async function verifyPublishingOnPlatform(
 export type AutoResolutionRunResult = {
   checked: number;
   summary: UncertainResolutionSummary;
+  /** Warum es beim Menschen landet — Kategorien, keine Inhalte. */
+  escalation: { byPlatform: Record<string, number>; byReason: Record<string, number> };
   decisions: UncertainResolutionDecision[];
   errors: string[];
 };
@@ -215,6 +218,7 @@ export async function resolveUncertainPublishing(options: {
   const result: AutoResolutionRunResult = {
     checked: 0,
     summary: { confirm: 0, close: 0, wait: 0, escalate: 0, total: 0 },
+    escalation: { byPlatform: {}, byReason: {} },
     decisions: [],
     errors: [],
   };
@@ -289,6 +293,7 @@ export async function resolveUncertainPublishing(options: {
   }
 
   result.summary = summarizeUncertainResolutions(result.decisions);
+  result.escalation = summarizeEscalationReasons(result.decisions);
   return result;
 }
 
