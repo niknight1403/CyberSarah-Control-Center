@@ -74,6 +74,19 @@ export function resolveVerificationText(input: {
  * Kategorien. Das macht einen Lauf mit 19 Eskalationen lesbar, ohne dass
  * jemand die Datenbank aufmachen muss.
  */
+/**
+ * Erkennt Fehlschlaege, die kein Messergebnis sind, sondern ein kaputter
+ * Zugang: ein abgelehnter oder abgelaufener Token, ein ungueltiger
+ * Refresh-Token. Solche Faelle duerfen nicht als "Pruefung fehlgeschlagen"
+ * je Vorgang gemeldet werden — sie sind EIN Handlungsbedarf am Zugang.
+ * Grundlage: X antwortet mit HTTP 401 bzw. `invalid_request`/`invalid_grant`
+ * ("Value passed for the token was invalid"), wenn der Refresh-Token tot ist.
+ */
+export function isPermanentCredentialFailure(detail: string): boolean {
+  const text = String(detail || "");
+  return /HTTP 401|invalid_grant|invalid_request|Value passed for the token|re-auth|Zugang erneuern/i.test(text);
+}
+
 export function summarizeEscalationReasons(decisions: { action: string; platform: string; reason: string }[]): {
   byPlatform: Record<string, number>;
   byReason: Record<string, number>;

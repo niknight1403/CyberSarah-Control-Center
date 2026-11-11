@@ -14,6 +14,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { draftQueue, publishingJobs, publishingReviewEvents } from "../drizzle/schema";
 import {
   decideUncertainResolution,
+  isPermanentCredentialFailure,
   matchPostByText,
   resolveVerificationText,
   summarizeEscalationReasons,
@@ -232,6 +233,12 @@ export type AutoResolutionRunResult = {
   summary: UncertainResolutionSummary;
   /** Warum es beim Menschen landet — Kategorien, keine Inhalte. */
   escalation: { byPlatform: Record<string, number>; byReason: Record<string, number>; details: string[] };
+  /**
+   * Je Plattform uebersprungen, weil der Zugang selbst unbrauchbar ist.
+   * Diese Vorgaenge bleiben offen, ohne beim Menschen zu landen: 19 gleiche
+   * Meldungen helfen niemandem, ein "X-Zugang erneuern" schon.
+   */
+  blocked: { byPlatform: Record<string, number>; details: string[] };
   decisions: UncertainResolutionDecision[];
   errors: string[];
 };
@@ -245,11 +252,14 @@ export async function resolveUncertainPublishing(options: {
   verify?: typeof verifyPublishingOnPlatform;
   limit?: number;
   db?: PublishingDb;
+  /** Nur fuer Tests: X-Token-Aufloesung ersetzen. */
+  resolveX?: (options: { force?: boolean }) => Promise<{ token?: string | null; reason?: string }>;
 } = {}): Promise<AutoResolutionRunResult> {
   const result: AutoResolutionRunResult = {
     checked: 0,
     summary: { confirm: 0, close: 0, wait: 0, escalate: 0, total: 0 },
     escalation: { byPlatform: {}, byReason: {}, details: [] },
+    blocked: { byPlatform: {}, details: [] },
     decisions: [],
     errors: [],
   };
@@ -276,7 +286,30 @@ export async function resolveUncertainPublishing(options: {
     .orderBy(asc(publishingJobs.updatedAt), asc(publishingJobs.id))
     .limit(limit);
 
+  // Vorflug: Ist der X-Zugang ueberhaupt nutzbar? Ein toter Refresh-Token
+  // laesst jede einzelne Pruefung mit 401 scheitern — dann ist das kein
+  // Ergebnis ueber 19 Vorgaenge, sondern ein Handlungsbedarf am Zugang.
+  const blockedPlatforms = new Map<string, string>();
+  if (!options.verify) {
+    const resolveX = options.resolveX ?? resolveXToken;
+    try {
+      const x = await resolveX({});
+      if (!x?.token && x?.reason && isPermanentCredentialFailure(x.reason)) blockedPlatforms.set("x", x.reason);
+    } catch (error) {
+      const detail = detailOf(error);
+      if (isPermanentCredentialFailure(detail)) blockedPlatforms.set("x", detail);
+    }
+    for (const [platform, reason] of blockedPlatforms) {
+      result.blocked.details.push(`${platform}: ${reason.replace(/\s+/g, " ").trim().slice(0, 220)}`);
+    }
+  }
+
   for (const job of jobs) {
+    const blocker = blockedPlatforms.get(String(job.platform || "").toLowerCase());
+    if (blocker) {
+      result.blocked.byPlatform[job.platform] = (result.blocked.byPlatform[job.platform] ?? 0) + 1;
+      continue;
+    }
     result.checked += 1;
     try {
       // Aeltere Jobs haben keinen Sendetext am Job (Sprint 11 kam spaeter).
