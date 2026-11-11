@@ -7,7 +7,7 @@ Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 ## 11.11.2026 — Sprint 11.3: toter X-Zugang wird zum Handlungsbedarf, nicht zu 19 Meldungen
 
 - **Befund (bewiesen):** `Grund: ... X lehnt den Token ab (HTTP 401): env: X-Refresh fehlgeschlagen (400): invalid_request Value passed for the token was invalid.` Der gespeicherte X-Refresh-Token ist tot; jede Leseabfrage scheitert, unabhaengig vom Code.
-- **Verhalten neu:** der Aufloesungslauf loest den X-Token vorab auf. Scheitert das an einem ungueltigen Zugang, werden X-Vorgaenge in diesem Lauf uebersprungen und nicht erneut beim Menschen gemeldet; das Ergebnis nennt stattdessen `Zugang blockiert: x=<n>` und `Blocker: <grund>`.
+- **Verhalten neu:** der Aufloesungslauf erkennt den abgelehnten Token an der ersten Pruefung (`HTTP 401` / `invalid_grant`), ueberspringt danach alle weiteren Vorgaenge dieser Plattform und meldet `Zugang blockiert: x=<n>` plus `Blocker: <grund>`. Ein Vorflug ueber den Token-Service half nicht, weil `resolveXToken` den abgelaufenen Env-Bootstrap weiterhin als Token zurueckgibt.
 - **Wichtig:** das ist keine stille Ausnahme. Die Vorgaenge bleiben offen und erscheinen weiter in der Warteschlange — nur ohne 19-fache Wiederholung derselben Ursache.
 - `isPermanentCredentialFailure` trennt Zugangsfehler (401/`invalid_grant`/`invalid_request`) von Netz- und Providerstoerungen (503 usw.). 2 neue Tests, 4.201 Tests gruen.
 

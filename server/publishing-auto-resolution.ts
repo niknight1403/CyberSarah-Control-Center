@@ -252,8 +252,6 @@ export async function resolveUncertainPublishing(options: {
   verify?: typeof verifyPublishingOnPlatform;
   limit?: number;
   db?: PublishingDb;
-  /** Nur fuer Tests: X-Token-Aufloesung ersetzen. */
-  resolveX?: (options: { force?: boolean }) => Promise<{ token?: string | null; reason?: string }>;
 } = {}): Promise<AutoResolutionRunResult> {
   const result: AutoResolutionRunResult = {
     checked: 0,
@@ -286,27 +284,15 @@ export async function resolveUncertainPublishing(options: {
     .orderBy(asc(publishingJobs.updatedAt), asc(publishingJobs.id))
     .limit(limit);
 
-  // Vorflug: Ist der X-Zugang ueberhaupt nutzbar? Ein toter Refresh-Token
-  // laesst jede einzelne Pruefung mit 401 scheitern — dann ist das kein
-  // Ergebnis ueber 19 Vorgaenge, sondern ein Handlungsbedarf am Zugang.
+  // Zugangsblocker statt 19 Einzelbefunde: sobald EINE Pruefung beweist, dass
+  // der Token abgelehnt wird (HTTP 401 / invalid_grant), ist jede weitere
+  // Abfrage derselben Plattform sinnlos. Dann wird gezaehlt und uebersprungen,
+  // ohne die Vorgaenge anzutasten — sie bleiben offen, nur ohne Rauschen.
   const blockedPlatforms = new Map<string, string>();
-  if (!options.verify) {
-    const resolveX = options.resolveX ?? resolveXToken;
-    try {
-      const x = await resolveX({});
-      if (!x?.token && x?.reason && isPermanentCredentialFailure(x.reason)) blockedPlatforms.set("x", x.reason);
-    } catch (error) {
-      const detail = detailOf(error);
-      if (isPermanentCredentialFailure(detail)) blockedPlatforms.set("x", detail);
-    }
-    for (const [platform, reason] of blockedPlatforms) {
-      result.blocked.details.push(`${platform}: ${reason.replace(/\s+/g, " ").trim().slice(0, 220)}`);
-    }
-  }
 
   for (const job of jobs) {
-    const blocker = blockedPlatforms.get(String(job.platform || "").toLowerCase());
-    if (blocker) {
+    const platformKey = String(job.platform || "").toLowerCase();
+    if (blockedPlatforms.has(platformKey)) {
       result.blocked.byPlatform[job.platform] = (result.blocked.byPlatform[job.platform] ?? 0) + 1;
       continue;
     }
@@ -326,6 +312,16 @@ export async function resolveUncertainPublishing(options: {
           ));
       }
       const verification = await verify({ platform: job.platform, contentOverride: resolved.text || null });
+      if (verification.outcome === "unverifiable" && isPermanentCredentialFailure(verification.detail ?? "")) {
+        // Beweis erbracht: der Zugang ist unbrauchbar, nicht die Pruefung.
+        // Kein Statuswechsel, kein lastError, keine Eskalation fuer diesen Vorgang.
+        if (!blockedPlatforms.has(platformKey)) {
+          blockedPlatforms.set(platformKey, verification.detail ?? "");
+          result.blocked.details.push(`${job.platform}: ${String(verification.detail ?? "").replace(/\s+/g, " ").trim().slice(0, 220)}`);
+        }
+        result.blocked.byPlatform[job.platform] = (result.blocked.byPlatform[job.platform] ?? 0) + 1;
+        continue;
+      }
       const decision = decideUncertainResolution({
         jobId: job.id,
         platform: job.platform,
