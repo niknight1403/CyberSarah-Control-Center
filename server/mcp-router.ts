@@ -37,6 +37,8 @@ import { drizzleApprovalStore, drizzleToolGovernanceStore } from "./mcp-governan
 import { createMcpCredentialService } from "./mcp-credential-service";
 import { drizzleCredentialStore } from "./mcp-credential-store";
 import { createMcpSupervisorService } from "./mcp-supervisor-service";
+import { createMcpAgentService } from "./mcp-agent-service";
+import { drizzleAgentStore } from "./mcp-agent-store";
 import { drizzleCircuitStore } from "./mcp-supervisor-store";
 import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
@@ -77,6 +79,14 @@ let multiServerService: ReturnType<typeof createMcpServerService> | null = null;
 let governanceService: ReturnType<typeof createMcpGovernanceService> | null = null;
 let credentialService: ReturnType<typeof createMcpCredentialService> | null = null;
 let supervisorService: ReturnType<typeof createMcpSupervisorService> | null = null;
+let agentService: ReturnType<typeof createMcpAgentService> | null = null;
+
+function getAgentService() {
+  if (!agentService) {
+    agentService = createMcpAgentService({ store: drizzleAgentStore, servers: drizzleMcpServerStore });
+  }
+  return agentService;
+}
 
 function getSupervisorService() {
   if (!supervisorService) {
@@ -484,5 +494,60 @@ export const mcpRouter = router({
         await getSupervisorService().reset(input.serverKey, input.toolName ?? null);
         return { ok: true };
       }),
+  }),
+  /**
+   * Sprint 6 — Agent Factory.
+   *
+   * `dryRun` plant und validiert ohne zu speichern; `create` speichert nur
+   * freigabefaehige Entwuerfe und startet immer als "draft".
+   */
+  agents: router({
+    catalog: adminProcedure.query(async () => {
+      const profiles = await getAgentService().catalog();
+      return profiles.map((profile) => ({
+        serverKey: profile.serverKey,
+        toolName: profile.name,
+        capabilities: profile.capabilities,
+        description: profile.description.slice(0, 160),
+      }));
+    }),
+
+    list: adminProcedure.query(async () => getAgentService().list()),
+
+    get: adminProcedure
+      .input(z.object({ agentKey: z.string().min(2).max(48) }))
+      .query(async ({ input }) => getAgentService().get(input.agentKey)),
+
+    dryRun: adminProcedure
+      .input(
+        z.object({
+          name: z.string().min(2).max(80),
+          brief: z.string().min(12).max(4000),
+          allowCritical: z.boolean().optional(),
+          maxGrants: z.number().int().min(1).max(12).optional(),
+        }),
+      )
+      .mutation(async ({ input }) => getAgentService().dryRun(input)),
+
+    create: adminProcedure
+      .input(
+        z.object({
+          name: z.string().min(2).max(80),
+          brief: z.string().min(12).max(4000),
+          allowCritical: z.boolean().optional(),
+          maxGrants: z.number().int().min(1).max(12).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) =>
+        getAgentService().create({ ...input, actor: ctx.user?.openId ?? null }),
+      ),
+
+    setStatus: adminProcedure
+      .input(z.object({ agentKey: z.string().min(2).max(48), status: z.enum(["draft", "active", "paused"]) }))
+      .mutation(async ({ input }) => getAgentService().setStatus(input.agentKey, input.status)),
+
+    remove: adminProcedure
+      .input(z.object({ agentKey: z.string().min(2).max(48) }))
+      .mutation(async ({ input }) => getAgentService().remove(input.agentKey)),
   }),
 });

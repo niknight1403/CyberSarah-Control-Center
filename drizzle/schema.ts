@@ -883,3 +883,48 @@ export const mcpCircuits = pgTable("mcp_circuits", {
 
 export type McpCircuitRow = typeof mcpCircuits.$inferSelect;
 export type InsertMcpCircuitRow = typeof mcpCircuits.$inferInsert;
+
+/**
+ * Sprint 6 — Agent Factory: pruefbare Agentenspezifikation. Werkzeuge werden
+ * separat in mcpAgentGrants vergeben, damit Rechte ohne Prompt-Aenderung
+ * entzogen werden koennen.
+ */
+export const mcpAgentSpecs = pgTable("mcp_agent_specs", {
+  id: serial("id").primaryKey(),
+  agentKey: varchar("agent_key", { length: 48 }).notNull(),
+  name: varchar("name", { length: 80 }).notNull(),
+  role: varchar("role", { length: 24 }).notNull(),
+  purpose: text("purpose").notNull(),
+  systemPrompt: text("system_prompt").notNull(),
+  security: jsonb("security").notNull(),
+  acceptanceTests: jsonb("acceptance_tests").notNull().default([]),
+  qualityCriteria: jsonb("quality_criteria").notNull().default([]),
+  monitoring: jsonb("monitoring").notNull().default([]),
+  warnings: jsonb("warnings").notNull().default([]),
+  version: integer("version").notNull().default(1),
+  status: varchar("status", { length: 16 }).notNull().default("draft"),
+  createdBy: varchar("created_by", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("mcp_agent_specs_key_idx").on(table.agentKey),
+  index("mcp_agent_specs_status_idx").on(table.status),
+]);
+
+export const mcpAgentGrants = pgTable("mcp_agent_grants", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id")
+    .notNull()
+    .references(() => mcpAgentSpecs.id, { onDelete: "cascade" }),
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  toolName: varchar("tool_name", { length: 120 }).notNull(),
+  riskLevel: varchar("risk_level", { length: 16 }).notNull(),
+  purpose: varchar("purpose", { length: 200 }).notNull().default(""),
+}, (table) => [
+  uniqueIndex("mcp_agent_grants_unique_idx").on(table.agentId, table.serverKey, table.toolName),
+  index("mcp_agent_grants_agent_idx").on(table.agentId),
+]);
+
+export type McpAgentSpecRow = typeof mcpAgentSpecs.$inferSelect;
+export type InsertMcpAgentSpecRow = typeof mcpAgentSpecs.$inferInsert;
+export type McpAgentGrantRow = typeof mcpAgentGrants.$inferSelect;
