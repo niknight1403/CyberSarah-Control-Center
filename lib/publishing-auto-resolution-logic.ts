@@ -77,16 +77,20 @@ export function resolveVerificationText(input: {
 export function summarizeEscalationReasons(decisions: { action: string; platform: string; reason: string }[]): {
   byPlatform: Record<string, number>;
   byReason: Record<string, number>;
+  /** Bis zu drei verschiedene Klartexte (gekuerzt) — warum genau? */
+  details: string[];
 } {
   const byPlatform: Record<string, number> = {};
   const byReason: Record<string, number> = {};
+  const details = new Set<string>();
   for (const decision of decisions) {
     if (decision.action !== "escalate") continue;
     byPlatform[decision.platform] = (byPlatform[decision.platform] ?? 0) + 1;
     const key = escalationCategory(decision.reason);
     byReason[key] = (byReason[key] ?? 0) + 1;
+    if (details.size < 3) details.add(decision.reason.replace(/\s+/g, " ").trim().slice(0, 140));
   }
-  return { byPlatform, byReason };
+  return { byPlatform, byReason, details: [...details] };
 }
 
 function escalationCategory(reason: string): string {

@@ -200,7 +200,7 @@ export type AutoResolutionRunResult = {
   checked: number;
   summary: UncertainResolutionSummary;
   /** Warum es beim Menschen landet — Kategorien, keine Inhalte. */
-  escalation: { byPlatform: Record<string, number>; byReason: Record<string, number> };
+  escalation: { byPlatform: Record<string, number>; byReason: Record<string, number>; details: string[] };
   decisions: UncertainResolutionDecision[];
   errors: string[];
 };
@@ -218,7 +218,7 @@ export async function resolveUncertainPublishing(options: {
   const result: AutoResolutionRunResult = {
     checked: 0,
     summary: { confirm: 0, close: 0, wait: 0, escalate: 0, total: 0 },
-    escalation: { byPlatform: {}, byReason: {} },
+    escalation: { byPlatform: {}, byReason: {}, details: [] },
     decisions: [],
     errors: [],
   };
