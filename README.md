@@ -2,7 +2,7 @@
 
 **CyberSarah Control Center** ist die zentrale Plattform hinter CyberSarah: eine Produktiv-App (Web + Android) mit eigenem Node-Server, Multi-Provider-KI-Integration und einem autonomen Master-Agenten. Betrieben wird sie produktiv auf Render (Custom Domain: `app.cybersarah-ki.com`) mit Neon-Postgres als Datenbank.
 
-> Aktueller Stand: **v3.2.0** (Sprints 1-10: autonomes MCP-Governance-System). Details im [CHANGELOG.md](CHANGELOG.md) und in den [Release-Notizen](docs/releases/v3.2.0.md), geplante Schritte in [NEXT_STEPS.md](NEXT_STEPS.md).
+> Aktueller Stand: **v4.3.0** (Sprints 1-10: autonomes MCP-Governance-System). Details im [CHANGELOG.md](CHANGELOG.md) und in den [Release-Notizen](docs/releases/v4.3.0.md), geplante Schritte in [NEXT_STEPS.md](NEXT_STEPS.md).
 
 ## Überblick
 
