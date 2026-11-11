@@ -21,6 +21,7 @@ const VAULT_TOKEN = ["vault", "token", "123"].join("-");
 const ENV_TOKEN = ["env", "token", "123"].join("-");
 const SHORT_TOKEN = ["token", "12345678"].join("-");
 const ROTATION_SECRET = ["geheim", "123456"].join("-");
+const TOO_SHORT_SECRET = ["ku", "rz"].join("");
 
 /** Test-"Verschluesselung": markiert statt zu verschluesseln, aber nie Klartext. */
 const encrypt = (plaintext: string) => `enc(${Buffer.from(plaintext, "utf8").toString("base64")})`;
@@ -105,7 +106,7 @@ describe("Statische Geheimnisse", () => {
 
   it("weist zu kurze Werte ab", async () => {
     const { service, rows } = build();
-    const result = await service.setStatic({ serverKey: "srv", kind: "api_key", secret: "kurz" });
+    const result = await service.setStatic({ serverKey: "srv", kind: "api_key", secret: TOO_SHORT_SECRET });
     expect(result.ok).toBe(false);
     expect(rows.size).toBe(0);
   });
@@ -128,7 +129,7 @@ describe("OAuth2-Client", () => {
       (await service.setOAuthClient({ serverKey: "srv", tokenUrl: "http://x.test/t", clientId: "a", clientSecret: "12345678" })).ok,
     ).toBe(false);
     expect(
-      (await service.setOAuthClient({ serverKey: "srv", tokenUrl: "https://x.test/t", clientId: "a", clientSecret: "kurz" })).ok,
+      (await service.setOAuthClient({ serverKey: "srv", tokenUrl: "https://x.test/t", clientId: "a", clientSecret: TOO_SHORT_SECRET })).ok,
     ).toBe(false);
     expect(rows.size).toBe(0);
   });
