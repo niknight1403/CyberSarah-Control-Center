@@ -4,14 +4,14 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
-## 11.11.2026 — Release v3.2.0: Autonomes MCP-Governance-System (Sprints 1-10)
+## 11.11.2026 — Release v4.3.0: Autonomes MCP-Governance-System (Sprints 1-10)
 
-- **Version 3.2.0** (`package.json`, `package-lock.json`, `app.config.ts`) — das Release buendelt zehn Sprints zur MCP-Governance.
+- **Version 4.3.0** (`package.json`, `package-lock.json`, `app.config.ts`) — naechste Minor nach dem letzten Release v4.2.1; buendelt zehn Sprints zur MCP-Governance. Die `package.json` stand seit v4.2.1 faelschlich auf 3.1.1, das ist damit korrigiert.
 - **Registry, Vault, Supervisor:** Multi-Server-Verwaltung mit Health-Score, AES-256-GCM-Zugangsdaten und Circuit Breaker.
 - **Governance und Agenten:** semantische Tool-Suche, Risikoklassen, Policy-Gate, Argument-Sanitizing, Agenten als pruefbare Spezifikation.
 - **Ausfuehrung:** Team-Orchestrierung, Run-Engine mit harten Limits, Execution Bridge mit Audit ohne Argumentwerte, Freigabe-Workflow mit Vier-Augen-Prinzip und Ablauf.
 - **Sicherheit im Standard:** Live-Aufrufe nur mit `MCP_LIVE_EXECUTION=1`; ohne Executor bleibt `refusingExecutor` aktiv, es wird kein Erfolg vorgetaeuscht.
-- **Nachweise:** `tsc` sauber, Build gruen, 493 Dateien / 4.168 Tests gruen, ESLint 0 Fehler. Release-Notizen: `docs/releases/v3.2.0.md`.
+- **Nachweise:** `tsc` sauber, Build gruen, 493 Dateien / 4.168 Tests gruen, ESLint 0 Fehler. Release-Notizen: `docs/releases/v4.3.0.md`.
 - **Offene Punkte:** kein Ende-zu-Ende-Lauf gegen einen echten Fremd-MCP-Server, kein Cron fuer den Freigabe-Ablauf, keine UI fuer Registry/Laeufe/Freigaben.
 
 ## 11.11.2026 — Sprint 1+2: Repository-Audit und Multi-MCP-Server-Registry
