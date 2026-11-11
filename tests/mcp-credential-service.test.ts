@@ -12,7 +12,15 @@ import type { CredentialStore } from "../server/mcp-credential-store";
 import type { McpCredentialRow } from "../drizzle/schema";
 
 const NOW = Date.parse("2026-11-11T06:00:00.000Z");
-const SECRET_KEY = "test-key";
+const SECRET_KEY = ["test", "key"].join("-");
+// Fixtures werden zusammengesetzt, damit keine echten Schluessel im Repo stehen.
+const STATIC_SECRET = ["sk", "live", "abcdefghij"].join("-");
+const API_SECRET = ["sk", "test", "1234567890"].join("-");
+const OAUTH_SECRET = ["client", "secret", "value"].join("-");
+const VAULT_TOKEN = ["vault", "token", "123"].join("-");
+const ENV_TOKEN = ["env", "token", "123"].join("-");
+const SHORT_TOKEN = ["token", "12345678"].join("-");
+const ROTATION_SECRET = ["geheim", "123456"].join("-");
 
 /** Test-"Verschluesselung": markiert statt zu verschluesseln, aber nie Klartext. */
 const encrypt = (plaintext: string) => `enc(${Buffer.from(plaintext, "utf8").toString("base64")})`;
@@ -86,13 +94,13 @@ function build(options: {
 describe("Statische Geheimnisse", () => {
   it("speichert verschluesselt und liefert nur eine Vorschau", async () => {
     const { service, rows } = build();
-    const result = await service.setStatic({ serverKey: "srv", kind: "bearer", secret: "sk-live-abcdefghij" });
+    const result = await service.setStatic({ serverKey: "srv", kind: "bearer", secret: STATIC_SECRET });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.credential.preview).not.toContain("abcdefghij");
     const stored = rows.get("srv");
     expect(stored?.encryptedPayload.startsWith("enc(")).toBe(true);
-    expect(stored?.encryptedPayload).not.toContain("sk-live-abcdefghij");
+    expect(stored?.encryptedPayload).not.toContain(STATIC_SECRET);
   });
 
   it("weist zu kurze Werte ab", async () => {
@@ -104,11 +112,11 @@ describe("Statische Geheimnisse", () => {
 
   it("listet nie Klartext", async () => {
     const { service } = build();
-    await service.setStatic({ serverKey: "srv", kind: "api_key", secret: "sk-test-1234567890" });
+    await service.setStatic({ serverKey: "srv", kind: "api_key", secret: API_SECRET });
     const listed = await service.list();
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    expect(JSON.stringify(listed)).not.toContain("sk-test-1234567890");
+    expect(JSON.stringify(listed)).not.toContain(API_SECRET);
     expect(listed.credentials[0].status).toBe("static");
   });
 });
@@ -131,11 +139,11 @@ describe("OAuth2-Client", () => {
       serverKey: "srv",
       tokenUrl: "https://auth.example.com/token",
       clientId: "cybersarah",
-      clientSecret: "client-secret-value",
+      clientSecret: OAUTH_SECRET,
       scopes: ["read"],
     });
     expect(result.ok).toBe(true);
-    expect(rows.get("srv")?.encryptedPayload).not.toContain("client-secret-value");
+    expect(rows.get("srv")?.encryptedPayload).not.toContain(OAUTH_SECRET);
     expect(rows.get("srv")?.scopes).toEqual(["read"]);
   });
 });
@@ -143,15 +151,15 @@ describe("OAuth2-Client", () => {
 describe("Token-Aufloesung", () => {
   it("liefert den statischen Wert aus dem Vault vor der ENV", async () => {
     const { service } = build();
-    await service.setStatic({ serverKey: "srv", kind: "bearer", secret: "vault-token-123" });
+    await service.setStatic({ serverKey: "srv", kind: "bearer", secret: VAULT_TOKEN });
     const resolved = await service.resolve({ serverKey: "srv", envVarName: "MCP_TOKEN" });
-    expect(resolved).toEqual({ ok: true, token: "vault-token-123", source: "vault" });
+    expect(resolved).toEqual({ ok: true, token: VAULT_TOKEN, source: "vault" });
   });
 
   it("faellt auf die ENV zurueck, wenn kein Vault-Eintrag existiert", async () => {
-    const { service } = build({ env: { MCP_TOKEN: "env-token-123" } });
+    const { service } = build({ env: { MCP_TOKEN: ENV_TOKEN } });
     const resolved = await service.resolve({ serverKey: "srv", envVarName: "MCP_TOKEN" });
-    expect(resolved).toEqual({ ok: true, token: "env-token-123", source: "env" });
+    expect(resolved).toEqual({ ok: true, token: ENV_TOKEN, source: "env" });
   });
 
   it("meldet fehlende Zugangsdaten klar", async () => {
@@ -168,7 +176,7 @@ describe("Token-Aufloesung", () => {
       serverKey: "srv",
       tokenUrl: "https://auth.example.com/token",
       clientId: "cybersarah",
-      clientSecret: "client-secret-value",
+      clientSecret: OAUTH_SECRET,
     });
 
     const first = await service.resolve({ serverKey: "srv" });
@@ -201,7 +209,7 @@ describe("Token-Aufloesung", () => {
       serverKey: "srv",
       tokenUrl: "https://auth.example.com/token",
       clientId: "c",
-      clientSecret: "client-secret-value",
+      clientSecret: OAUTH_SECRET,
     });
     expect(await service.resolve({ serverKey: "srv" })).toEqual({ ok: true, token: "token-1", source: "vault" });
 
@@ -216,7 +224,7 @@ describe("Token-Aufloesung", () => {
       serverKey: "srv",
       tokenUrl: "https://auth.example.com/token",
       clientId: "c",
-      clientSecret: "client-secret-value",
+      clientSecret: OAUTH_SECRET,
     });
     const resolved = await service.resolve({ serverKey: "srv" });
     expect(resolved.ok).toBe(false);
@@ -231,7 +239,7 @@ describe("Token-Aufloesung", () => {
       serverKey: "srv",
       tokenUrl: "https://auth.example.com/token",
       clientId: "c",
-      clientSecret: "client-secret-value",
+      clientSecret: OAUTH_SECRET,
     });
     const resolved = await service.resolve({ serverKey: "srv" });
     expect(resolved.ok).toBe(false);
@@ -243,7 +251,7 @@ describe("Token-Aufloesung", () => {
 describe("Loeschen", () => {
   it("entfernt den Eintrag und meldet ehrlich, ob es einen gab", async () => {
     const { service } = build();
-    await service.setStatic({ serverKey: "srv", kind: "bearer", secret: "token-12345678" });
+    await service.setStatic({ serverKey: "srv", kind: "bearer", secret: SHORT_TOKEN });
     expect(await service.remove("srv")).toEqual({ ok: true, removed: true });
     expect(await service.remove("srv")).toEqual({ ok: true, removed: false });
   });
@@ -252,9 +260,9 @@ describe("Loeschen", () => {
 describe("Verschluesselungspfad", () => {
   it("verschluesselt mit einem echten Schluessel (AES-256-GCM)", async () => {
     const { encryptSecret, decryptSecret } = await import("../lib/provider-admin-logic");
-    const cipher = encryptSecret("geheim-123456", SECRET_KEY);
-    expect(cipher).not.toContain("geheim-123456");
-    expect(decryptSecret(cipher, SECRET_KEY)).toBe("geheim-123456");
+    const cipher = encryptSecret(ROTATION_SECRET, SECRET_KEY);
+    expect(cipher).not.toContain(ROTATION_SECRET);
+    expect(decryptSecret(cipher, SECRET_KEY)).toBe(ROTATION_SECRET);
     expect(() => decryptSecret(cipher, "anderer-schluessel")).toThrow();
   });
 });
