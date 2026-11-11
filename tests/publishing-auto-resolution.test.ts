@@ -177,6 +177,59 @@ describe("Sprint 11: schreibgeschuetzte Plattformpruefung", () => {
     if (verification.outcome === "unverifiable") expect(verification.detail).toContain("503");
   });
 
+  it("loest den X-Token ueber den Token-Service auf statt aus der Env", async () => {
+    // Regression: der statische Env-Token ist nach einer Rotation abgelaufen
+    // und liefert HTTP 401 — jeder Vorgang landete beim Menschen (19/19).
+    const job = { platform: "x", contentOverride: SENT_TEXT };
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      calls.push(String(url));
+      if (String(url).includes("/users/me")) return { ok: true, json: async () => ({ data: { id: "42" } }) };
+      return { ok: true, json: async () => ({ data: [{ id: "1899234567890", text: SENT_TEXT, created_at: "2026-11-11T08:00:00Z" }] }) };
+    }) as unknown as typeof fetch;
+    const verification = await verifyPublishingOnPlatform(job, {
+      fetch: fetchImpl,
+      credentials: {},
+      xToken: async () => ({ token: "db-token" }),
+      now: () => NOW,
+    });
+    expect(verification.outcome).toBe("found");
+    expect(calls.some((url) => url.includes("/users/42/tweets"))).toBe(true);
+  });
+
+  it("frischt bei HTTP 401 genau einmal zwangsweise auf und wiederholt", async () => {
+    const job = { platform: "x", contentOverride: SENT_TEXT };
+    const tokenRequests: Array<{ force?: boolean }> = [];
+    let attempt = 0;
+    const fetchImpl = (async (url: string) => {
+      attempt += 1;
+      if (attempt === 1) return { ok: false, status: 401, json: async () => ({}) };
+      if (String(url).includes("/users/me")) return { ok: true, json: async () => ({ data: { id: "42" } }) };
+      return { ok: true, json: async () => ({ data: [{ id: "1899234567890", text: SENT_TEXT, created_at: "2026-11-11T08:00:00Z" }] }) };
+    }) as unknown as typeof fetch;
+    const verification = await verifyPublishingOnPlatform(job, {
+      fetch: fetchImpl,
+      credentials: { x: { token: "alt" } },
+      xToken: async (options) => { tokenRequests.push(options); return { token: "neu" }; },
+      now: () => NOW,
+    });
+    expect(tokenRequests).toEqual([{ force: true }]);
+    expect(verification.outcome).toBe("found");
+  });
+
+  it("bleibt ehrlich beim Menschen, wenn auch der frische Token abgelehnt wird", async () => {
+    const job = { platform: "x", contentOverride: SENT_TEXT };
+    const fetchImpl = (async () => ({ ok: false, status: 401, json: async () => ({}) })) as unknown as typeof fetch;
+    const verification = await verifyPublishingOnPlatform(job, {
+      fetch: fetchImpl,
+      credentials: {},
+      xToken: async () => ({ token: null, reason: "invalid_grant" }),
+      now: () => NOW,
+    });
+    expect(verification.outcome).toBe("unverifiable");
+    if (verification.outcome === "unverifiable") expect(verification.detail).toContain("invalid_grant");
+  });
+
   it("prueft nicht ohne gespeicherten Sendetext", async () => {
     const verification = await verifyPublishingOnPlatform({ platform: "x", contentOverride: null }, { now: () => NOW });
     expect(verification.outcome).toBe("unverifiable");

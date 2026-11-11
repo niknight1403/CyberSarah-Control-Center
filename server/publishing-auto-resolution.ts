@@ -24,6 +24,7 @@ import {
   type UncertainResolutionSummary,
 } from "../lib/publishing-auto-resolution-logic";
 import { readPlatformCredentialsFromEnv } from "./publishing-service";
+import { resolveXToken } from "./x-token-service";
 import type { PlatformCredentials } from "../lib/publishing-queue-logic";
 import { getDb } from "./db";
 
@@ -43,6 +44,12 @@ export type VerificationDeps = {
   fetch?: VerificationFetch;
   credentials?: PlatformCredentials;
   now?: () => number;
+  /**
+   * Loest den aktuellen X-Access-Token auf (DB-Satz bevorzugt, Env nur
+   * Bootstrap) — inklusive Auffrischung. Der statische Env-Token allein ist
+   * nach einer Rotation abgelaufen und liefert garantierte 401er.
+   */
+  xToken?: (options: { force?: boolean }) => Promise<{ token?: string | null; reason?: string }>;
 };
 
 function detailOf(error: unknown): string {
@@ -119,19 +126,43 @@ export async function verifyPublishingOnPlatform(
     }
 
     if (platform === "x") {
-      if (!cred?.token) return unverifiable("Kein X-Token (Env X_PUBLISH_TOKEN) verfuegbar.");
+      // Der X-Token rotiert bei jedem Refresh; der Env-Wert ist nur Bootstrap.
+      // Deshalb ueber den Token-Service aufloesen, nicht aus der Env lesen —
+      // ein abgelaufener Env-Token erzeugt sonst dauerhaft 401er und jeder
+      // Vorgang landet beim Menschen, ohne dass eine Pruefung je stattfand.
+      const resolve = deps.xToken ?? resolveXToken;
+      let token = cred?.token ?? null;
+      if (!token) {
+        const resolved = await resolve({});
+        token = resolved?.token ?? null;
+        if (!token) return unverifiable(`Kein X-Access-Token: ${resolved?.reason ?? "unbekannt"}`);
+      }
       const base = (process.env.X_API_BASE_URL ?? "https://api.x.com/2").replace(/\/+$/, "");
-      const auth = { authorization: `Bearer ${cred.token}` };
-      const me = await json(`${base}/users/me`, auth);
-      const userId = String((me.data as { id?: unknown } | undefined)?.id ?? "");
-      if (!userId) return unverifiable("X lieferte keine Konto-ID zu diesem Token.");
-      const tweets = await json(`${base}/users/${encodeURIComponent(userId)}/tweets?max_results=20&tweet.fields=created_at`, auth);
-      const rows = Array.isArray(tweets.data) ? tweets.data : [];
-      const posts = rows.flatMap((row) => {
-        const tweet = row as { id?: unknown; text?: unknown; created_at?: unknown };
-        return postList({ externalId: tweet.id, text: tweet.text, createdAtMs: timeOf(tweet.created_at) });
-      });
-      return decide(posts, "api.x.com");
+      const readPosts = async (accessToken: string) => {
+        const auth = { authorization: `Bearer ${accessToken}` };
+        const me = await json(`${base}/users/me`, auth);
+        const userId = String((me.data as { id?: unknown } | undefined)?.id ?? "");
+        if (!userId) throw new Error("X lieferte keine Konto-ID zu diesem Token.");
+        const tweets = await json(`${base}/users/${encodeURIComponent(userId)}/tweets?max_results=20&tweet.fields=created_at`, auth);
+        const rows = Array.isArray(tweets.data) ? tweets.data : [];
+        return rows.flatMap((row) => {
+          const tweet = row as { id?: unknown; text?: unknown; created_at?: unknown };
+          return postList({ externalId: tweet.id, text: tweet.text, createdAtMs: timeOf(tweet.created_at) });
+        });
+      };
+      try {
+        return decide(await readPosts(token), "api.x.com");
+      } catch (error) {
+        // 401 ist kein Netzwerkfehler, sondern ein abgelaufener Token: genau
+        // einmal zwangsauffrischen und wiederholen, dann ehrlich aufgeben.
+        if (!/HTTP 401/.test(detailOf(error))) throw error;
+        const refreshed = await resolve({ force: true });
+        const fresh = refreshed?.token ?? null;
+        if (!fresh || fresh === token) {
+          return unverifiable(`X lehnt den Token ab (HTTP 401): ${refreshed?.reason ?? "Auffrischung ohne Ergebnis"}`);
+        }
+        return decide(await readPosts(fresh), "api.x.com");
+      }
     }
 
     if (platform === "threads") {
