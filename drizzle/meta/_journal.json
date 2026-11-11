@@ -232,6 +232,13 @@
       "when": 1794303000000,
       "tag": "0032_mcp_circuits",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794304000000,
+      "tag": "0033_mcp_agents",
+      "breakpoints": true
     }
   ]
 }
