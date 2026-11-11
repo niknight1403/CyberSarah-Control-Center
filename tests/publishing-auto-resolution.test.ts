@@ -230,5 +230,8 @@ describe("Sprint 11: Eskalationsgruende", () => {
     ]);
     expect(grouped.byPlatform).toEqual({ x: 2, linkedin: 1 });
     expect(grouped.byReason).toEqual({ pruefung_nicht_moeglich: 2, keine_pruefung: 1 });
+    // Klartext bleibt sichtbar (gekuerzt), damit die Zahl handlungsfaehig ist.
+    expect(grouped.details).toHaveLength(3);
+    expect(grouped.details[0]).toContain("X-Refresh fehlgeschlagen");
   });
 });

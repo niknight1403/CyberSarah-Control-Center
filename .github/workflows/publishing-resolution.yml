@@ -64,6 +64,8 @@ jobs:
               print("  Plattformen beim Menschen: " + ", ".join(f"{k}={v}" for k,v in sorted(by_platform.items())))
           if by_reason:
               print("  Gruende: " + ", ".join(f"{k}={v}" for k,v in sorted(by_reason.items())))
+          for detail in (esc.get("details") or [])[:3]:
+              print(f"  Grund: {detail}")
           errors=data.get("result",{}).get("errors",[])
           for entry in errors[:5]:
               print(f"::warning::Aufloesung: {entry}")
