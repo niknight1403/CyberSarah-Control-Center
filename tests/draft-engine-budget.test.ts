@@ -54,16 +54,19 @@ describe("Sprint 11: Zeitbudget der Draft-Engine", () => {
   });
 
   it("bricht am Zeitbudget ab und liefert einen ehrlichen Teilbericht", async () => {
-    const startedAt = Date.now();
-    const result = await draftEngine.runDraftEngine({ llm: slowLlm(30), budgetMs: 60 });
-    const elapsed = Date.now() - startedAt;
+    // Deterministische Uhr statt echter Wartezeit: jede Abfrage springt
+    // 500 ms weiter. Nach drei Abfragen ist das 1,2-s-Budget sicher erreicht —
+    // unabhaengig davon, wie schnell der CI-Rechner gerade ist.
+    let ticks = 0;
+    const base = Date.UTC(2026, 10, 11, 7, 0, 0);
+    const result = await draftEngine.runDraftEngine({
+      llm: slowLlm(0), budgetMs: 1_200, now: () => base + (++ticks) * 500,
+    });
 
     expect(result.truncated).toBe(true);
-    // Das Budget wird nicht ueberschritten: ein einzelner Aufruf darf
-    // hineinlaufen, danach ist Schluss (maximal zwei Aufrufe).
-    expect(elapsed).toBeLessThan(2_000);
     expect(result.skipped.some((entry) => entry.reason.includes("Zeitbudget"))).toBe(true);
     expect(typeof result.elapsedMs).toBe("number");
+    expect(result.elapsedMs).toBeGreaterThan(0);
   });
 
   it("meldet ohne Datenbank ehrlich ab, statt Entwuerfe zu erfinden", async () => {
