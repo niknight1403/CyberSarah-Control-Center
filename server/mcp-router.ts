@@ -41,6 +41,8 @@ import { createMcpAgentService } from "./mcp-agent-service";
 import { drizzleAgentStore } from "./mcp-agent-store";
 import { createMcpTeamService } from "./mcp-team-service";
 import { drizzleTeamPlanStore } from "./mcp-team-store";
+import { createMcpRunService } from "./mcp-run-service";
+import { drizzleRunStore } from "./mcp-run-store";
 import { drizzleCircuitStore } from "./mcp-supervisor-store";
 import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
@@ -84,6 +86,15 @@ let supervisorService: ReturnType<typeof createMcpSupervisorService> | null = nu
 let agentService: ReturnType<typeof createMcpAgentService> | null = null;
 
 let teamService: ReturnType<typeof createMcpTeamService> | null = null;
+
+let runService: ReturnType<typeof createMcpRunService> | null = null;
+
+function getRunService() {
+  if (!runService) {
+    runService = createMcpRunService({ plans: drizzleTeamPlanStore, runs: drizzleRunStore });
+  }
+  return runService;
+}
 
 function getTeamService() {
   if (!teamService) {
@@ -607,5 +618,61 @@ export const mcpRouter = router({
     get: adminProcedure
       .input(z.object({ id: z.number().int().positive() }))
       .query(async ({ input }) => getTeamService().get(input.id)),
+  }),
+  /**
+   * Sprint 8 — Run-Engine.
+   *
+   * `start` legt einen Lauf an, `step` fuehrt genau einen Schritt aus,
+   * `advance` mehrere bis zur naechsten Pause/Abbruch. Ohne verdrahteten
+   * Werkzeug-Executor schlaegt jeder Schritt ehrlich mit
+   * `execution_disabled` fehl — es wird kein Erfolg vorgetaeuscht.
+   */
+  runs: router({
+    start: adminProcedure
+      .input(
+        z.object({
+          planId: z.number().int().positive(),
+          budgetCents: z.number().int().min(1).max(100000).optional(),
+          maxSteps: z.number().int().min(1).max(200).optional(),
+          maxDurationMs: z.number().int().min(1000).max(3_600_000).optional(),
+          maxAttemptsPerTask: z.number().int().min(1).max(5).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) =>
+        getRunService().start({
+          planId: input.planId,
+          budgetCents: input.budgetCents,
+          actor: ctx.user?.openId ?? null,
+          limits: {
+            ...(input.maxSteps ? { maxSteps: input.maxSteps } : {}),
+            ...(input.maxDurationMs ? { maxDurationMs: input.maxDurationMs } : {}),
+            ...(input.maxAttemptsPerTask ? { maxAttemptsPerTask: input.maxAttemptsPerTask } : {}),
+          },
+        }),
+      ),
+
+    step: adminProcedure
+      .input(z.object({ runId: z.number().int().positive() }))
+      .mutation(async ({ input }) => getRunService().step(input.runId)),
+
+    advance: adminProcedure
+      .input(z.object({ runId: z.number().int().positive(), maxIterations: z.number().int().min(1).max(50).optional() }))
+      .mutation(async ({ input }) => getRunService().advance(input.runId, input.maxIterations)),
+
+    approve: adminProcedure
+      .input(z.object({ runId: z.number().int().positive(), taskId: z.string().min(1).max(64) }))
+      .mutation(async ({ input }) => getRunService().approve(input.runId, input.taskId)),
+
+    abort: adminProcedure
+      .input(z.object({ runId: z.number().int().positive(), reason: z.string().min(3).max(300) }))
+      .mutation(async ({ input }) => getRunService().abort(input.runId, input.reason)),
+
+    list: adminProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(100).optional() }).optional())
+      .query(async ({ input }) => getRunService().list(input?.limit)),
+
+    get: adminProcedure
+      .input(z.object({ runId: z.number().int().positive() }))
+      .query(async ({ input }) => getRunService().get(input.runId)),
   }),
 });

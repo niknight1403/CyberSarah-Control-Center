@@ -369,7 +369,7 @@ export type RunLimits = {
  */
 export function evaluateRunLimits(input: RunLimitsInput): RunLimits {
   const reasons: string[] = [];
-  if (!Number.isFinite(input.spentCents) || input.spentCents > input.budgetCents) {
+  if (!Number.isFinite(input.spentCents) || input.spentCents >= input.budgetCents) {
     reasons.push(`Budget erschoepft: ${Math.max(0, input.spentCents)} von ${input.budgetCents} Cent verbraucht.`);
   }
   if (!Number.isFinite(input.stepsUsed) || input.stepsUsed >= input.maxSteps) {
