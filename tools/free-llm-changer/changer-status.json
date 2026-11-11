@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-11T02:07:22",
-  "aktiv": "groq",
-  "aktiv_name": "Groq Free Tier",
-  "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-20b",
+  "stand": "2026-11-11T09:42:16",
+  "aktiv": "gemini",
+  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
+  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
+  "modell": "gemini-flash-latest",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "gemma-4-31b-it",
-      "detail": "000 gemma-4-31b-it",
+      "modell": "gemini-flash-latest",
+      "detail": "gemini-flash-latest",
       "hinweis": null
     },
     {
@@ -25,16 +25,16 @@
       "id": "groq",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "openai/gpt-oss-20b",
-      "detail": "openai/gpt-oss-20b",
+      "modell": "openai/gpt-oss-120b",
+      "detail": "openai/gpt-oss-120b",
       "hinweis": null
     },
     {
       "id": "openrouter",
       "status": "LIMIT ERREICHT",
       "http_status": 429,
-      "modell": "recursive/flint-v1.0:free",
-      "detail": "429 recursive/flint-v1.0:free",
+      "modell": "liquid/lfm-3-1.7b:free",
+      "detail": "429 liquid/lfm-3-1.7b:free",
       "hinweis": "Changer rotiert weiter"
     },
     {
