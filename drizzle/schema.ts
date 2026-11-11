@@ -951,3 +951,30 @@ export const mcpTeamPlans = pgTable("mcp_team_plans", {
 
 export type McpTeamPlanRow = typeof mcpTeamPlans.$inferSelect;
 export type InsertMcpTeamPlanRow = typeof mcpTeamPlans.$inferInsert;
+
+/**
+ * Sprint 8 — Run-Engine: persistierter Laufzustand (Schritte, Kosten, Abbruch).
+ */
+export const mcpTeamRuns = pgTable("mcp_team_runs", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id")
+    .notNull()
+    .references(() => mcpTeamPlans.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  state: jsonb("state").notNull(),
+  spentCents: integer("spent_cents").notNull().default(0),
+  stepsUsed: integer("steps_used").notNull().default(0),
+  abortReason: text("abort_reason"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  createdBy: varchar("created_by", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("mcp_team_runs_plan_idx").on(table.planId),
+  index("mcp_team_runs_status_idx").on(table.status),
+  index("mcp_team_runs_created_idx").on(table.createdAt),
+]);
+
+export type McpTeamRunRow = typeof mcpTeamRuns.$inferSelect;
+export type InsertMcpTeamRunRow = typeof mcpTeamRuns.$inferInsert;
