@@ -31,7 +31,10 @@ import { assertToolAllowed } from "../lib/mcp-registry-logic";
 import { createMcpSessionStore, runMcpToolCall } from "../lib/mcp-session-logic";
 import { createStreamableHttpSend } from "./mcp-channel";
 import { drizzleMcpServerStore } from "./mcp-server-store";
-import { createMcpServerService } from "./mcp-server-service";
+import { createMcpServerService, type GovernanceGate } from "./mcp-server-service";
+import { createMcpGovernanceService } from "./mcp-governance-service";
+import { drizzleApprovalStore, drizzleToolGovernanceStore } from "./mcp-governance-store";
+import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
 import { getToolProxyQueue } from "./_core/tool-proxy-queue";
 import { adminProcedure, router } from "./_core/trpc";
 
@@ -66,9 +69,42 @@ function resolveConfiguredEndpoint():
 
 /** Service-Instanz je Aufruf: Store ist zustandslos, der Sitzungs-Cache lebt im Service. */
 let multiServerService: ReturnType<typeof createMcpServerService> | null = null;
+let governanceService: ReturnType<typeof createMcpGovernanceService> | null = null;
+
+/**
+ * Governance-Service mit der Registry als Serverquelle. Der Modus je Server
+ * kommt aus `mcp_servers.governance_mode` (Default: assisted).
+ */
+function getGovernanceService() {
+  if (!governanceService) {
+    governanceService = createMcpGovernanceService({
+      toolStore: drizzleToolGovernanceStore,
+      approvalStore: drizzleApprovalStore,
+      loadServers: async () => {
+        const rows = await drizzleMcpServerStore.list();
+        return rows.map((row) => ({
+          serverKey: row.serverKey,
+          tools: (row.tools ?? []).map((tool) => ({
+            name: String(tool.name ?? ""),
+            description: typeof tool.description === "string" ? tool.description : "",
+            inputSchema: tool.inputSchema,
+          })),
+          permissions: row.permissions ?? [],
+          governanceMode: (row.governanceMode ?? "assisted") as GovernanceMode,
+          enabled: row.enabled,
+        }));
+      },
+    });
+  }
+  return governanceService;
+}
+
 function getServerService() {
   if (!multiServerService) {
-    multiServerService = createMcpServerService({ store: drizzleMcpServerStore });
+    multiServerService = createMcpServerService({
+      store: drizzleMcpServerStore,
+      governance: getGovernanceService() as GovernanceGate,
+    });
   }
   return multiServerService;
 }
@@ -230,6 +266,11 @@ export const mcpRouter = router({
       .input(z.object({ serverKey: z.string().min(2).max(64), enabled: z.boolean() }))
       .mutation(async ({ input }) => getServerService().setEnabled(input.serverKey, input.enabled)),
 
+    /** Freigabemodus: manual | assisted | autonomous. */
+    setGovernanceMode: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64), mode: z.enum(["manual", "assisted", "autonomous"]) }))
+      .mutation(async ({ input }) => getServerService().setGovernanceMode(input.serverKey, input.mode)),
+
     remove: adminProcedure
       .input(z.object({ serverKey: z.string().min(2).max(64) }))
       .mutation(async ({ input }) => getServerService().removeServer(input.serverKey)),
@@ -255,5 +296,82 @@ export const mcpRouter = router({
           getServerService().callTool(input.serverKey, { toolName: input.toolName, args: input.args }),
         ),
       ),
+  }),
+  /**
+   * Sprint 3 — Governance-Gateway.
+   *
+   * Fähigkeitsprofile und Risikostufen entstehen aus `tools/list`, nicht aus
+   * einer gepflegten Liste. Entscheidungen sind nachvollziehbar (Gründe) und
+   * an die Schema-Signatur gebunden: ändert der Server ein Tool, muss neu
+   * entschieden werden.
+   */
+  governance: router({
+    list: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64).optional() }).optional())
+      .query(async ({ input }) => getGovernanceService().listGovernance(input?.serverKey)),
+
+    index: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64) }))
+      .mutation(async ({ input }) => getGovernanceService().indexServerTools(input.serverKey)),
+
+    /** Semantische Werkzeugsuche über alle aktiven Server. */
+    search: adminProcedure
+      .input(
+        z.object({
+          query: z.string().min(2).max(200),
+          limit: z.number().int().min(1).max(50).optional(),
+          capability: z.enum(CAPABILITY_TAGS as unknown as [string, ...string[]]).optional(),
+          serverKey: z.string().min(2).max(64).optional(),
+        }),
+      )
+      .query(async ({ input }) =>
+        getGovernanceService().search(input.query, {
+          limit: input.limit,
+          capability: input.capability as (typeof CAPABILITY_TAGS)[number] | undefined,
+          serverKey: input.serverKey,
+        }),
+      ),
+
+    /** Trockenlauf des Gates: legt bei Bedarf eine Freigabeanfrage an. */
+    evaluate: adminProcedure
+      .input(
+        z.object({
+          serverKey: z.string().min(2).max(64),
+          toolName: z.string().min(1).max(120),
+          args: z.record(z.string(), z.unknown()).default({}),
+        }),
+      )
+      .mutation(async ({ ctx, input }) =>
+        getGovernanceService().evaluateCall({
+          serverKey: input.serverKey,
+          toolName: input.toolName,
+          args: input.args,
+          requestedBy: ctx.user?.openId ?? null,
+        }),
+      ),
+  }),
+
+  /** Freigaben (Human-in-the-Loop) für kritische Werkzeuge. */
+  approvals: router({
+    list: adminProcedure
+      .input(z.object({ status: z.enum(["pending", "approved", "rejected", "expired"]).optional() }).optional())
+      .query(async ({ input }) => getGovernanceService().listApprovals(input?.status)),
+
+    decide: adminProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          decision: z.enum(["approved", "rejected"]),
+        }),
+      )
+      .mutation(async ({ ctx, input }) =>
+        getGovernanceService().decideApproval({
+          id: input.id,
+          decision: input.decision,
+          decidedBy: ctx.user?.openId ?? "admin",
+        }),
+      ),
+
+    expire: adminProcedure.mutation(async () => ({ expired: await getGovernanceService().expireStaleApprovals() })),
   }),
 });

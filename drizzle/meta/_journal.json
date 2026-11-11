@@ -211,6 +211,13 @@
       "when": 1794300000000,
       "tag": "0029_mcp_multi_server",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794301000000,
+      "tag": "0030_mcp_governance",
+      "breakpoints": true
     }
   ]
 }
