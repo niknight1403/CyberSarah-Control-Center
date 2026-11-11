@@ -756,6 +756,8 @@ export const mcpServers = pgTable("mcp_servers", {
   /** free | metered | unknown — Kostenprofil fuer Budget-Entscheidungen. */
   costProfile: varchar("cost_profile", { length: 16 }).notNull().default("unknown"),
   enabled: boolean("enabled").notNull().default(true),
+  /** manual | assisted | autonomous — Freigabemodus fuer Werkzeugaufrufe. */
+  governanceMode: varchar("governance_mode", { length: 16 }).notNull().default("assisted"),
   notes: text("notes"),
   /** Letzter Health-Zustand (unchecked/healthy/degraded/stale/unreachable/disabled). */
   healthStatus: varchar("health_status", { length: 16 }).notNull().default("unchecked"),
@@ -780,3 +782,54 @@ export const mcpServers = pgTable("mcp_servers", {
 
 export type McpServerRow = typeof mcpServers.$inferSelect;
 export type InsertMcpServerRow = typeof mcpServers.$inferInsert;
+
+/**
+ * Sprint 3 — Governance je Werkzeug: Fähigkeitsprofil, Risikostufe und
+ * Entscheidung werden aus dem Deskriptor abgeleitet und mit dem Fingerprint
+ * des Schemas gespeichert. Ändert der Server das Schema, ist die alte
+ * Freigabe damit nicht mehr gültig (Signatur weicht ab).
+ */
+export const mcpToolGovernance = pgTable("mcp_tool_governance", {
+  id: serial("id").primaryKey(),
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  toolName: varchar("tool_name", { length: 120 }).notNull(),
+  capabilities: jsonb("capabilities").$type<string[]>().notNull().default([]),
+  primaryCapability: varchar("primary_capability", { length: 32 }).notNull().default("other"),
+  riskLevel: varchar("risk_level", { length: 16 }).notNull().default("low"),
+  decision: varchar("decision", { length: 24 }).notNull().default("approval_required"),
+  reasons: jsonb("reasons").$type<string[]>().notNull().default([]),
+  signature: varchar("signature", { length: 64 }).notNull().default(""),
+  reviewedBy: varchar("reviewed_by", { length: 255 }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("mcp_tool_governance_key_idx").on(table.serverKey, table.toolName),
+  index("mcp_tool_governance_risk_idx").on(table.riskLevel, table.decision),
+]);
+
+export type McpToolGovernanceRow = typeof mcpToolGovernance.$inferSelect;
+export type InsertMcpToolGovernanceRow = typeof mcpToolGovernance.$inferInsert;
+
+/** Sprint 3 — Freigabeanfragen (Human-in-the-Loop) fuer kritische Werkzeuge. */
+export const mcpApprovals = pgTable("mcp_approvals", {
+  id: serial("id").primaryKey(),
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  toolName: varchar("tool_name", { length: 120 }).notNull(),
+  riskLevel: varchar("risk_level", { length: 16 }).notNull().default("high"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  reason: varchar("reason", { length: 500 }),
+  argsPreview: jsonb("args_preview").$type<Record<string, unknown>>().notNull().default({}),
+  requestedBy: varchar("requested_by", { length: 255 }),
+  decidedBy: varchar("decided_by", { length: 255 }),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("mcp_approvals_status_idx").on(table.status, table.createdAt),
+  index("mcp_approvals_tool_idx").on(table.serverKey, table.toolName),
+]);
+
+export type McpApprovalRow = typeof mcpApprovals.$inferSelect;
+export type InsertMcpApprovalRow = typeof mcpApprovals.$inferInsert;

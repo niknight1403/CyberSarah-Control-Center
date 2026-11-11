@@ -32,6 +32,7 @@ function row(overrides: Partial<McpServerRow> = {}): McpServerRow {
     credentialEnvVar: null,
     costProfile: "free",
     enabled: true,
+    governanceMode: "assisted",
     notes: null,
     healthStatus: "unchecked",
     healthScore: null,
@@ -85,6 +86,13 @@ function createFakeStore(seed: McpServerRow[] = []) {
       const existing = rows.get(key);
       if (!existing) return null;
       const saved = { ...existing, enabled };
+      rows.set(key, saved);
+      return saved;
+    },
+    async setGovernanceMode(key, mode) {
+      const existing = rows.get(key);
+      if (!existing) return null;
+      const saved = { ...existing, governanceMode: mode } as McpServerRow;
       rows.set(key, saved);
       return saved;
     },
@@ -268,6 +276,7 @@ describe("Registry-Übersicht", () => {
       findByKey: async () => null,
       upsert: async () => row(),
       setEnabled: async () => null,
+      setGovernanceMode: async () => null,
       remove: async () => false,
       recordProbe: async () => null,
     };

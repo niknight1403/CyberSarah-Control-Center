@@ -49,6 +49,31 @@ export type McpServerServiceDeps = {
   /** Sitzungs-Cache je Server (Standard: prozesslokal, je Server eine Map). */
   sessionStoreFor?: (serverKey: string) => McpSessionStore;
   clientVersion?: string;
+  /**
+   * Governance-Gateway (Sprint 3). Fehlt es, verhaelt sich der Service wie
+   * bisher — die Registry bleibt nutzbar, ohne Governance zu erzwingen.
+   */
+  governance?: GovernanceGate;
+};
+
+/**
+ * Minimale Sicht des Services auf das Governance-Gateway. Bewusst strukturell
+ * typisiert, damit Registry und Governance nicht zirkulaer importieren.
+ */
+export type GovernanceGate = {
+  evaluateCall(input: {
+    serverKey: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    requestedBy?: string | null;
+  }): Promise<{
+    decision: "allow" | "approval_required" | "block";
+    riskLevel: string;
+    reasons: string[];
+    approvalId: number | null;
+    args: Record<string, unknown> | null;
+  }>;
+  indexServerTools(serverKey: string): Promise<{ ok: boolean }>;
 };
 
 export type RegisterResult =
@@ -72,7 +97,14 @@ export type ProbeResult =
 
 export type CallToolResult =
   | { ok: true; text: string; serverKey: string; toolName: string; warning: string | null }
-  | { ok: false; reason: string };
+  | {
+      ok: false;
+      reason: string;
+      /** Nur gesetzt, wenn eine menschliche Freigabe den Aufruf blockiert. */
+      approvalRequired?: { approvalId: number; riskLevel: string; reasons: string[] };
+    };
+
+export type SetModeResult = { ok: true; server: McpServerSnapshot } | { ok: false; reason: string };
 
 export type ListResult =
   | { ok: true; servers: McpServerSnapshot[]; summary: McpRegistrySummary; conflicts: string[] }
@@ -249,6 +281,17 @@ export function createMcpServerService(deps: McpServerServiceDeps) {
         toolsDiscoveredAt: checkedAt,
       });
 
+      // Governance-Index nach jedem erfolgreichen Handshake erneuern: neue
+      // Tools werden bewertet, verschwundene Einträge entfernt.
+      if (deps.governance) {
+        try {
+          await deps.governance.indexServerTools(key);
+        } catch {
+          // Index-Fehler dürfen den Healthcheck nicht als fehlgeschlagen melden;
+          // der Zustand bleibt "healthy", der Index wird beim nächsten Lauf erneuert.
+        }
+      }
+
       return {
         ok: true,
         latencyMs,
@@ -286,6 +329,18 @@ export function createMcpServerService(deps: McpServerServiceDeps) {
     } catch {
       return null;
     }
+  }
+
+  /** Freigabemodus je Server (manual | assisted | autonomous). */
+  async function setGovernanceMode(serverKey: string, mode: string): Promise<SetModeResult> {
+    const allowed = ["manual", "assisted", "autonomous"];
+    if (!allowed.includes(mode)) {
+      return { ok: false, reason: `Unbekannter Governance-Modus: ${mode}` };
+    }
+    const key = normalizeServerKey(serverKey);
+    const updated = await deps.store.setGovernanceMode(key, mode);
+    if (!updated) return { ok: false, reason: `Unbekannter MCP-Server: ${key}` };
+    return { ok: true, server: snapshot(updated) };
   }
 
   /** Tool-Aufruf ueber die Server-Id — Berechtigungs-Gate vor dem Netzwerk. */
@@ -337,10 +392,36 @@ export function createMcpServerService(deps: McpServerServiceDeps) {
       return { ok: false, reason: `Zugangsdaten fehlen: ENV ${row.credentialEnvVar} ist nicht gesetzt.` };
     }
 
+    // Governance-Gate: Argumente, Least Privilege und Freigabestatus werden
+    // VOR dem Netzwerkaufruf geprüft. Ohne Gate bleibt das alte Verhalten.
+    let callArgs = input.args;
+    if (deps.governance) {
+      const evaluation = await deps.governance.evaluateCall({
+        serverKey: key,
+        toolName: input.toolName,
+        args: input.args,
+      });
+      if (evaluation.decision === "block") {
+        return { ok: false, reason: `Governance: ${evaluation.reasons.join("; ")}` };
+      }
+      if (evaluation.decision === "approval_required") {
+        return {
+          ok: false,
+          reason: `Freigabe erforderlich (${evaluation.riskLevel}): ${evaluation.reasons.join("; ")}`,
+          approvalRequired: {
+            approvalId: evaluation.approvalId ?? 0,
+            riskLevel: evaluation.riskLevel,
+            reasons: evaluation.reasons,
+          },
+        };
+      }
+      if (evaluation.args) callArgs = evaluation.args;
+    }
+
     try {
       const outcome = await runMcpToolCall({
         toolName: input.toolName,
-        args: input.args,
+        args: callArgs,
         // Cache-Schluessel ist der Server-Key (nicht die URL), damit zwei
         // Server mit gleicher URL keine Sitzung teilen.
         serverUrl: key,
@@ -357,7 +438,7 @@ export function createMcpServerService(deps: McpServerServiceDeps) {
     }
   }
 
-  return { listServers, registerServer, setEnabled, removeServer, probeServer, callTool };
+  return { listServers, registerServer, setEnabled, setGovernanceMode, removeServer, probeServer, callTool };
 }
 
 export type McpServerService = ReturnType<typeof createMcpServerService>;

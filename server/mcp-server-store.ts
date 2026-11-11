@@ -31,6 +31,7 @@ export type McpServerStore = {
   findByKey(serverKey: string): Promise<McpServerRow | null>;
   upsert(server: McpServerNormalized): Promise<McpServerRow>;
   setEnabled(serverKey: string, enabled: boolean): Promise<McpServerRow | null>;
+  setGovernanceMode(serverKey: string, mode: string): Promise<McpServerRow | null>;
   remove(serverKey: string): Promise<boolean>;
   recordProbe(serverKey: string, patch: McpServerProbePatch): Promise<McpServerRow | null>;
 };
@@ -93,6 +94,16 @@ export const drizzleMcpServerStore: McpServerStore = {
     const [row] = await db
       .update(mcpServers)
       .set({ enabled, updatedAt: new Date() })
+      .where(eq(mcpServers.serverKey, serverKey))
+      .returning();
+    return row ?? null;
+  },
+
+  async setGovernanceMode(serverKey, mode) {
+    const db = await requireDb();
+    const [row] = await db
+      .update(mcpServers)
+      .set({ governanceMode: mode, updatedAt: new Date() })
       .where(eq(mcpServers.serverKey, serverKey))
       .returning();
     return row ?? null;
