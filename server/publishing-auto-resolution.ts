@@ -11,10 +11,11 @@
  */
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 
-import { publishingJobs, publishingReviewEvents } from "../drizzle/schema";
+import { draftQueue, publishingJobs, publishingReviewEvents } from "../drizzle/schema";
 import {
   decideUncertainResolution,
   matchPostByText,
+  resolveVerificationText,
   summarizeUncertainResolutions,
   type PlatformPost,
   type PublishingVerification,
@@ -232,6 +233,7 @@ export async function resolveUncertainPublishing(options: {
       userOpenId: publishingJobs.userOpenId,
       platform: publishingJobs.platform,
       contentOverride: publishingJobs.contentOverride,
+      sourceDraftId: publishingJobs.sourceDraftId,
       updatedAt: publishingJobs.updatedAt,
     })
     .from(publishingJobs)
@@ -242,7 +244,20 @@ export async function resolveUncertainPublishing(options: {
   for (const job of jobs) {
     result.checked += 1;
     try {
-      const verification = await verify({ platform: job.platform, contentOverride: job.contentOverride });
+      // Aeltere Jobs haben keinen Sendetext am Job (Sprint 11 kam spaeter).
+      // Der freigegebene Quell-Entwurf ist dann die belastbare Grundlage —
+      // fehlt auch der, wird nicht geraten (verify meldet "unverifiable").
+      const resolved = await resolveJobText(db, job);
+      if (resolved.source === "draft") {
+        // Einmal nachtragen, damit spaetere Laeufe ohne Zusatzabfrage auskommen.
+        await db.update(publishingJobs).set({ contentOverride: resolved.text.slice(0, 4000) })
+          .where(and(
+            eq(publishingJobs.id, job.id),
+            eq(publishingJobs.userOpenId, job.userOpenId),
+            eq(publishingJobs.status, "versand_ungeklaert"),
+          ));
+      }
+      const verification = await verify({ platform: job.platform, contentOverride: resolved.text || null });
       const decision = decideUncertainResolution({
         jobId: job.id,
         platform: job.platform,
@@ -275,6 +290,29 @@ export async function resolveUncertainPublishing(options: {
 
   result.summary = summarizeUncertainResolutions(result.decisions);
   return result;
+}
+
+/**
+ * Textgrundlage eines ungeklaerten Jobs: gespeicherter Sendetext, sonst der
+ * freigegebene Quell-Entwurf. Reine Lesepfade, keine Schaetzung.
+ */
+async function resolveJobText(
+  db: PublishingDb,
+  job: { contentOverride: string | null; sourceDraftId: number | null },
+): Promise<{ text: string; source: "override" | "draft" | "none" }> {
+  if (job.contentOverride?.trim().length) {
+    return resolveVerificationText({ contentOverride: job.contentOverride });
+  }
+  if (!job.sourceDraftId) return resolveVerificationText({ contentOverride: null });
+
+  const [draft] = await db
+    .select({ kind: draftQueue.kind, payload: draftQueue.payload })
+    .from(draftQueue)
+    .where(eq(draftQueue.id, job.sourceDraftId))
+    .limit(1);
+  const payload = draft?.payload as { content?: unknown } | null | undefined;
+  const draftContent = draft?.kind === "content" && typeof payload?.content === "string" ? payload.content : null;
+  return resolveVerificationText({ contentOverride: job.contentOverride, draftContent });
 }
 
 async function applyVerifiedResolution(

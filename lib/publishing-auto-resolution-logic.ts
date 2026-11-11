@@ -50,6 +50,25 @@ export type UncertainResolutionDecision = {
   externalId: string | null;
 };
 
+/**
+ * Ermittelt den Text, gegen den eine Plattformpruefung abgleichen darf.
+ *
+ * Aeltere Jobs (vor Sprint 11) haben keinen gespeicherten Sendetext am Job.
+ * Dann ist der freigegebene Quell-Entwurf die einzige belastbare Grundlage —
+ * er ist der Text, der gesendet werden SOLLTE. Fehlt auch der, wird nicht
+ * geraten: `source: "none"` fuehrt ehrlich zum Menschen.
+ */
+export function resolveVerificationText(input: {
+  contentOverride?: string | null;
+  draftContent?: string | null;
+}): { text: string; source: "override" | "draft" | "none" } {
+  const override = (input.contentOverride ?? "").trim();
+  if (override.length >= 10) return { text: override, source: "override" };
+  const draft = (input.draftContent ?? "").trim();
+  if (draft.length >= 10) return { text: draft, source: "draft" };
+  return { text: "", source: "none" };
+}
+
 export type UncertainResolutionInput = {
   jobId: number;
   platform: string;

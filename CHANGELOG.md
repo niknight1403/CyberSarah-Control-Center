@@ -4,6 +4,13 @@ Alle nennenswerten Aenderungen am CyberSarah Control Center werden hier
 dokumentiert. Releases folgen der Versionierung MAJOR.MINOR.PATCH;
 Sprint-Abschnitte darunter liefern die Detailtiefe je Iteration.
 
+## 11.11.2026 — Sprint 11.1: Aufloesung greift auch bei Altjobs
+
+- **Befund aus dem Produktionslauf:** 19 Vorgaenge geprueft, 19 beim Menschen. Ursache: Jobs vor Sprint 11 haben keinen gespeicherten Sendetext, die Pruefung verweigerte deshalb den Abgleich — ehrlich, aber nutzlos.
+- **Quell-Entwurf als Textgrundlage:** `resolveVerificationText` nimmt den gespeicherten Sendetext, sonst den freigegebenen Quell-Entwurf (`source_draft_id`). Fehlt beides, bleibt es beim Menschen. Der gefundene Text wird einmalig am Job nachgetragen.
+- **Zweiter Befund, behoben:** die Mindestwartezeit verglich das Alter der Pruefung statt des Versands und hielt damit jeden Vorgang ewig in `wait` (PR #300).
+- **Nachweise:** 4 neue Tests, 4.195 Tests gruen, `tsc` und ESLint sauber.
+
 ## 11.11.2026 — Sprint 11: Autonome Abschluesse statt Endlos-Wartezustaende
 
 - **Ungeklaerte Veroeffentlichungen loesen sich selbst auf:** `lib/publishing-auto-resolution-logic.ts` entscheidet aus einer echten, rein lesenden Plattformpruefung — gefunden wird bestaetigt, nicht gefunden wird nach 72 Stunden ohne Neuversand geschlossen, nicht pruefbar bleibt beim Menschen. Ohne Nachweis wird nie geschlossen.
