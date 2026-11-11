@@ -88,11 +88,15 @@ export function decideUncertainResolution(input: UncertainResolutionInput): Unce
     };
   }
 
-  const verificationAgeMinutes = hoursBetween(input.verification.checkedAtMs, input.nowMs) * 60;
-  if (verificationAgeMinutes < minVerificationMinutes) {
+  // Mindestwartezeit bezieht sich auf den VERSAND, nicht auf die Pruefung:
+  // direkt nach dem Absenden ist ein "nicht gefunden" bedeutungslos, weil der
+  // Provider Zeit braucht. Eine frische Pruefung eines alten Vorgangs ist
+  // dagegen genau das, was wir wollen.
+  const openMinutes = openHours * 60;
+  if (openMinutes < minVerificationMinutes) {
     return {
       ...base, action: "wait", evidence: null,
-      reason: "Pruefung liegt unter der Mindestwartezeit — Provider braucht Zeit, bis der Beitrag sichtbar ist.",
+      reason: `Beitrag ist seit ${formatAge(openHours)} raus — Provider braucht Zeit, bis er sichtbar ist.`,
     };
   }
   if (input.verification.checkedAtMs < input.updatedAtMs) {
