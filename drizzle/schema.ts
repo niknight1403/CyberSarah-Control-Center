@@ -928,3 +928,26 @@ export const mcpAgentGrants = pgTable("mcp_agent_grants", {
 export type McpAgentSpecRow = typeof mcpAgentSpecs.$inferSelect;
 export type InsertMcpAgentSpecRow = typeof mcpAgentSpecs.$inferInsert;
 export type McpAgentGrantRow = typeof mcpAgentGrants.$inferSelect;
+
+/**
+ * Sprint 7 — Team-Orchestrierung: Momentaufnahme eines Plans (Aufgaben,
+ * Zuweisungen, Reihenfolge, Kosten, Budgetaufteilung).
+ */
+export const mcpTeamPlans = pgTable("mcp_team_plans", {
+  id: serial("id").primaryKey(),
+  objective: text("objective").notNull(),
+  plan: jsonb("plan").notNull(),
+  allocations: jsonb("allocations").notNull().default({}),
+  budgetCents: integer("budget_cents").notNull(),
+  taskCount: integer("task_count").notNull().default(0),
+  openCount: integer("open_count").notNull().default(0),
+  status: varchar("status", { length: 16 }).notNull().default("planned"),
+  createdBy: varchar("created_by", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("mcp_team_plans_status_idx").on(table.status),
+  index("mcp_team_plans_created_idx").on(table.createdAt),
+]);
+
+export type McpTeamPlanRow = typeof mcpTeamPlans.$inferSelect;
+export type InsertMcpTeamPlanRow = typeof mcpTeamPlans.$inferInsert;
