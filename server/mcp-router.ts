@@ -36,6 +36,8 @@ import { createMcpGovernanceService } from "./mcp-governance-service";
 import { drizzleApprovalStore, drizzleToolGovernanceStore } from "./mcp-governance-store";
 import { createMcpCredentialService } from "./mcp-credential-service";
 import { drizzleCredentialStore } from "./mcp-credential-store";
+import { createMcpSupervisorService } from "./mcp-supervisor-service";
+import { drizzleCircuitStore } from "./mcp-supervisor-store";
 import { decryptSecret, encryptSecret } from "../lib/provider-admin-logic";
 import { CAPABILITY_TAGS, type GovernanceMode } from "../lib/mcp-governance-logic";
 import { getToolProxyQueue } from "./_core/tool-proxy-queue";
@@ -74,6 +76,14 @@ function resolveConfiguredEndpoint():
 let multiServerService: ReturnType<typeof createMcpServerService> | null = null;
 let governanceService: ReturnType<typeof createMcpGovernanceService> | null = null;
 let credentialService: ReturnType<typeof createMcpCredentialService> | null = null;
+let supervisorService: ReturnType<typeof createMcpSupervisorService> | null = null;
+
+function getSupervisorService() {
+  if (!supervisorService) {
+    supervisorService = createMcpSupervisorService({ store: drizzleCircuitStore });
+  }
+  return supervisorService;
+}
 
 /**
  * Schluessel fuer die Vault-Verschluesselung: identisch zur Secret-Ablage
@@ -146,6 +156,7 @@ function getServerService() {
       store: drizzleMcpServerStore,
       governance: getGovernanceService() as GovernanceGate,
       resolveCredential: (input) => getCredentialService().resolve(input),
+      supervisor: getSupervisorService(),
     });
   }
   return multiServerService;
@@ -460,5 +471,18 @@ export const mcpRouter = router({
     remove: adminProcedure
       .input(z.object({ serverKey: z.string().min(2).max(64) }))
       .mutation(async ({ input }) => getCredentialService().remove(input.serverKey)),
+  }),
+  /** Sprint 5 — Circuit Breaker: Zustand anzeigen und zuruecksetzen. */
+  supervisor: router({
+    status: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64).optional() }).optional())
+      .query(async ({ input }) => getSupervisorService().status(input?.serverKey)),
+
+    reset: adminProcedure
+      .input(z.object({ serverKey: z.string().min(2).max(64), toolName: z.string().min(1).max(120).optional() }))
+      .mutation(async ({ input }) => {
+        await getSupervisorService().reset(input.serverKey, input.toolName ?? null);
+        return { ok: true };
+      }),
   }),
 });

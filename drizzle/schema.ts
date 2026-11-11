@@ -860,3 +860,26 @@ export const mcpCredentials = pgTable("mcp_credentials", {
 
 export type McpCredentialRow = typeof mcpCredentials.$inferSelect;
 export type InsertMcpCredentialRow = typeof mcpCredentials.$inferInsert;
+
+/**
+ * Sprint 5 — Circuit-Breaker-Zustand je Server/Werkzeug. Wird vom Supervisor
+ * geschrieben und gelesen; ein Verlust ist unkritisch (Kreis startet geschlossen).
+ */
+export const mcpCircuits = pgTable("mcp_circuits", {
+  id: serial("id").primaryKey(),
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  toolName: varchar("tool_name", { length: 120 }),
+  state: varchar("state", { length: 16 }).notNull().default("closed"),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  openUntil: timestamp("open_until", { withTimezone: true }),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  halfOpenAttempts: integer("half_open_attempts").notNull().default(0),
+  lastFailureKind: varchar("last_failure_kind", { length: 24 }),
+  lastError: varchar("last_error", { length: 300 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("mcp_circuits_key_idx").on(table.serverKey, table.toolName),
+]);
+
+export type McpCircuitRow = typeof mcpCircuits.$inferSelect;
+export type InsertMcpCircuitRow = typeof mcpCircuits.$inferInsert;

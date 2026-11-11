@@ -61,6 +61,22 @@ export type McpServerServiceDeps = {
   resolveCredential?: (input: { serverKey: string; envVarName?: string | null }) => Promise<
     { ok: true; token: string; source: "vault" | "env" } | { ok: false; reason: string }
   >;
+  /** Connection Supervisor (Sprint 5): Circuit Breaker vor dem Netzwerk. */
+  supervisor?: SupervisorGate;
+};
+
+export type SupervisorGate = {
+  gate(serverKey: string, toolName?: string | null): Promise<{
+    allowed: boolean;
+    state: string;
+    reason: string;
+    retryAfterMs: number;
+  }>;
+  record(
+    serverKey: string,
+    toolName: string | null,
+    outcome: { ok: boolean; status?: number | null; message?: string | null; timedOut?: boolean },
+  ): Promise<void>;
 };
 
 /**
@@ -109,6 +125,8 @@ export type CallToolResult =
       reason: string;
       /** Nur gesetzt, wenn eine menschliche Freigabe den Aufruf blockiert. */
       approvalRequired?: { approvalId: number; riskLevel: string; reasons: string[] };
+      /** Nur gesetzt, wenn der Circuit Breaker den Aufruf zurueckhaelt. */
+      retryAfterMs?: number;
     };
 
 export type SetModeResult = { ok: true; server: McpServerSnapshot } | { ok: false; reason: string };
@@ -434,6 +452,17 @@ export function createMcpServerService(deps: McpServerServiceDeps) {
       if (evaluation.args) callArgs = evaluation.args;
     }
 
+    if (deps.supervisor) {
+      const gate = await deps.supervisor.gate(key, input.toolName);
+      if (!gate.allowed) {
+        return {
+          ok: false,
+          reason: `Supervisor: ${gate.reason}`,
+          retryAfterMs: gate.retryAfterMs,
+        };
+      }
+    }
+
     try {
       const outcome = await runMcpToolCall({
         toolName: input.toolName,
@@ -447,9 +476,14 @@ export function createMcpServerService(deps: McpServerServiceDeps) {
         openSession: (sessionId) =>
           openChannel({ rpcUrl: rpc.rpcUrl, credentialToken: token, initialSessionId: sessionId }),
       });
-      if (!outcome.ok) return { ok: false, reason: redactMcpError(outcome.reason) };
+      if (!outcome.ok) {
+        await deps.supervisor?.record(key, input.toolName, { ok: false, message: outcome.reason });
+        return { ok: false, reason: redactMcpError(outcome.reason) };
+      }
+      await deps.supervisor?.record(key, input.toolName, { ok: true });
       return { ok: true, text: outcome.text, serverKey: key, toolName: input.toolName, warning: route.warning };
     } catch (error) {
+      await deps.supervisor?.record(key, input.toolName, { ok: false, message: errorMessage(error) });
       return { ok: false, reason: redactMcpError(errorMessage(error)) };
     }
   }

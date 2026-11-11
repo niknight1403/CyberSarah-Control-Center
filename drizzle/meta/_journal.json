@@ -225,6 +225,13 @@
       "when": 1794302000000,
       "tag": "0031_mcp_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794303000000,
+      "tag": "0032_mcp_circuits",
+      "breakpoints": true
     }
   ]
 }
