@@ -23,6 +23,22 @@ export interface CreditGuardOptions {
   free?: boolean;
 }
 
+/**
+ * Test-Seam (Repo-Konvention `setXForTests` statt `vi.mock`): unter
+ * `isolate: false` teilen sich Testdateien den Modul-Cache, ein Modul-Mock auf
+ * `./credit-ledger` wuerde also in andere Suiten lecken. Der Waechter bekommt
+ * seine I/O-Abhaengigkeiten deshalb explizit — produktiv unveraendert.
+ */
+export interface CreditGuardDeps {
+  readBalance: (openId: string) => Promise<number | null>;
+  creditPacks: () => ReadonlyArray<{ id: string; label: string; tokens: number; priceEur: number }>;
+}
+
+const defaultDeps: CreditGuardDeps = {
+  readBalance: (openId) => getUserTotalCredits(openId),
+  creditPacks: () => creditPacksForCheckout(),
+};
+
 function checkoutUrlFor(req: Request): string {
   const base = (process.env.APP_BASE_URL ?? `${req.protocol}://${req.get("host") ?? "localhost"}`).replace(/\/$/, "");
   return `${base}/api/billing/stripe/checkout`;
@@ -32,7 +48,7 @@ function checkoutUrlFor(req: Request): string {
  * Erzeugt die Middleware für eine Route. `requiredTokens` darf klein bleiben
  * (z. B. 1): der Zweck ist, ein leeres Konto sofort und höflich abzuweisen.
  */
-export function requireCredits(options: CreditGuardOptions) {
+export function requireCredits(options: CreditGuardOptions, deps: CreditGuardDeps = defaultDeps) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (options.free) {
       next();
@@ -52,7 +68,7 @@ export function requireCredits(options: CreditGuardOptions) {
       return;
     }
 
-    const balance = await getUserTotalCredits(openId);
+    const balance = await deps.readBalance(openId);
     const decision = canAfford(balance, options.requiredTokens);
     if (decision.allowed) {
       res.locals.creditBalanceTokens = balance;
@@ -70,7 +86,7 @@ export function requireCredits(options: CreditGuardOptions) {
         requiredTokens: options.requiredTokens,
         remainingTokens: balance,
         checkoutUrl: checkoutUrlFor(req),
-        creditPacks: creditPacksForCheckout(),
+        creditPacks: deps.creditPacks(),
         upgradePlan: options.upgradePlan ?? "pro",
       }),
     );
