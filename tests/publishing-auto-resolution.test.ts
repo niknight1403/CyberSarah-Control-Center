@@ -83,7 +83,18 @@ describe("Sprint 11: autonome Aufloesung ungeklaerter Veroeffentlichungen", () =
       verification: verifyAt("found", NOW - 60_000), nowMs: NOW,
     });
     expect(decision.action).toBe("wait");
-    expect(decision.reason).toContain("Mindestwartezeit");
+    expect(decision.reason).toContain("Provider braucht Zeit");
+  });
+
+  it("entscheidet auch bei frischer Pruefung — die Wartezeit gilt dem Versand", () => {
+    // Regression: vorher wurde die Frische der PRUEFUNG als Wartezeit
+    // gelesen. Damit blieb jeder Vorgang ewig "wartend", weil eine gerade
+    // erstellte Pruefung immer juenger als 10 Minuten ist.
+    const decision = decideUncertainResolution({
+      jobId: 16, platform: "x", updatedAtMs: NOW - 4 * 24 * HOUR,
+      verification: { outcome: "not_found", detail: "10 Beitraege geprueft", checkedAtMs: NOW }, nowMs: NOW,
+    });
+    expect(decision.action).toBe("close");
   });
 
   it("lehnt einen Fund ohne verwertbare Beitrags-ID ab", () => {
