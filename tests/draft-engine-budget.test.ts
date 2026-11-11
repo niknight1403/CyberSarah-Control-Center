@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * Sprint 11: Die Draft-Engine darf die Oberflaeche nie minutenlang haengen
@@ -28,11 +28,9 @@ const fakeDb: DbLike = {
   insert: () => ({ values: async () => ({}) }),
 };
 
-let currentDb: DbLike | null = fakeDb;
-
-vi.mock("../server/db", () => ({
-  getDb: async () => currentDb,
-}));
+const engineDb = fakeDb as unknown as Parameters<typeof draftEngine.runDraftEngine>[0] extends infer T
+  ? T extends { db?: infer D } ? D : never
+  : never;
 
 const draftEngine = await import("../server/draft-engine");
 
@@ -49,9 +47,9 @@ const slowLlm = (delayMs: number) => async () => {
 };
 
 describe("Sprint 11: Zeitbudget der Draft-Engine", () => {
-  beforeEach(() => {
-    currentDb = fakeDb;
-  });
+  // Kein Modul-Mocking: die Engine bekommt ihre DB explizit. Das laeuft
+  // lokal und in der CI identisch, ohne echten Postgres.
+  const db = () => (fakeDb as unknown as NonNullable<Parameters<typeof draftEngine.runDraftEngine>[0]>["db"]);
 
   it("bricht am Zeitbudget ab und liefert einen ehrlichen Teilbericht", async () => {
     // Deterministische Uhr statt echter Wartezeit: jede Abfrage springt
@@ -60,7 +58,7 @@ describe("Sprint 11: Zeitbudget der Draft-Engine", () => {
     let ticks = 0;
     const base = Date.UTC(2026, 10, 11, 7, 0, 0);
     const result = await draftEngine.runDraftEngine({
-      llm: slowLlm(0), budgetMs: 1_200, now: () => base + (++ticks) * 500,
+      llm: slowLlm(0), budgetMs: 1_200, now: () => base + (++ticks) * 500, db: db(),
     });
 
     expect(result.truncated).toBe(true);
@@ -70,8 +68,7 @@ describe("Sprint 11: Zeitbudget der Draft-Engine", () => {
   });
 
   it("meldet ohne Datenbank ehrlich ab, statt Entwuerfe zu erfinden", async () => {
-    currentDb = null;
-    const result = await draftEngine.runDraftEngine({ llm: slowLlm(1), budgetMs: 5_000 });
+    const result = await draftEngine.runDraftEngine({ llm: slowLlm(1), budgetMs: 5_000, db: null });
     expect(result.generated).toEqual({});
     expect(result.truncated).toBe(false);
     expect(result.skipped.some((entry) => entry.reason.includes("Datenbank nicht konfiguriert"))).toBe(true);
@@ -87,7 +84,7 @@ describe("Sprint 11: Zeitbudget der Draft-Engine", () => {
     const failing = async () => {
       throw new Error("LLM HTTP 429 rate limit");
     };
-    const result = await draftEngine.runDraftEngine({ llm: failing, budgetMs: 5_000 });
+    const result = await draftEngine.runDraftEngine({ llm: failing, budgetMs: 5_000, db: db() });
     expect(result.truncated).toBe(false);
     expect(result.skipped.length).toBeGreaterThan(0);
     expect(result.skipped[0]!.reason).toContain("429");

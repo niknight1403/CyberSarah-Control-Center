@@ -136,9 +136,17 @@ function isRetryableProviderLimit(reason: string): boolean {
   return /\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(reason);
 }
 
+/** Datenbank-Handle der Engine (injizierbar, damit Tests ohne Postgres laufen). */
+export type DraftEngineDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
 export type DraftEngineDeps = {
   /** LLM-Aufruf — im Test injizierbar, produktiv invokeLLM. */
   llm?: (messages: Message[]) => Promise<string>;
+  /**
+   * Datenbank-Handle. Produktiv leer (die Engine holt sich ihre Verbindung),
+   * im Test injizierbar — ohne Modul-Mocking und ohne echten Postgres.
+   */
+  db?: DraftEngineDb | null;
   /** Injectierbare Zeit (Tests); produktiv Date.now(). */
   now?: () => number;
   /**
@@ -160,8 +168,8 @@ type PendingDraftCoverage = {
 };
 
 /** Offene Entwuerfe plus Revenue-Hub-Abdeckung. Legacy-Loops zaehlen zu "loop". */
-async function pendingDraftCoverage(): Promise<PendingDraftCoverage | null> {
-  const db = await getDb();
+async function pendingDraftCoverage(injected?: DraftEngineDb | null): Promise<PendingDraftCoverage | null> {
+  const db = injected ?? await getDb();
   if (!db) return null;
   const rows = await db
     .select({ kind: draftQueue.kind, payload: draftQueue.payload })
@@ -183,6 +191,10 @@ export async function countPendingDraftsByKind(): Promise<Record<DraftKind, numb
   return (await pendingDraftCoverage())?.counts ?? null;
 }
 
+function engineDb(injected?: DraftEngineDb | null): Promise<DraftEngineDb | null> {
+  return injected !== undefined ? Promise.resolve(injected) : getDb();
+}
+
 function contentSignature(value: unknown): string {
   if (!value || typeof value !== "object") return "";
   const payload = value as { topic?: unknown; content?: unknown };
@@ -190,24 +202,27 @@ function contentSignature(value: unknown): string {
     .toLowerCase().normalize("NFKD").replace(/[^a-z0-9äöüß]+/gi, " ").trim().slice(0, 1200);
 }
 
-async function contentWasAlreadySuggested(payload: unknown): Promise<boolean> {
+async function contentWasAlreadySuggested(payload: unknown, injected?: DraftEngineDb | null): Promise<boolean> {
   const signature = contentSignature(payload);
   if (!signature) return false;
-  const db = await getDb(); if (!db) return false;
+  const db = await engineDb(injected); if (!db) return false;
   const history = await db.select({payload:draftQueue.payload}).from(draftQueue)
     .where(eq(draftQueue.kind,"content")).orderBy(desc(draftQueue.createdAt)).limit(250);
   return history.some(row => contentSignature(row.payload) === signature);
 }
 
-export async function insertPendingDraft(kind: DraftKind, title: string, payload: DraftPayloadByKind[DraftKind], createdBy: string): Promise<void> {
-  const db = await getDb();
+export async function insertPendingDraft(
+  kind: DraftKind, title: string, payload: DraftPayloadByKind[DraftKind], createdBy: string,
+  injected?: DraftEngineDb | null,
+): Promise<void> {
+  const db = await engineDb(injected);
   if (!db) throw new Error("Datenbank nicht verfuegbar — Entwurf nicht speicherbar.");
   const row: InsertDraftQueueRow = { kind, title, payload, status: "pending", createdBy };
   await db.insert(draftQueue).values(row);
 }
 
-async function contentCatalogBrief(): Promise<string> {
-  const db=await getDb(); if(!db) return "";
+async function contentCatalogBrief(injected?: DraftEngineDb | null): Promise<string> {
+  const db=await engineDb(injected); if(!db) return "";
   const [offers,affiliates]=await Promise.all([
     db.select({name:revenueOffers.name,kind:revenueOffers.kind}).from(revenueOffers).where(eq(revenueOffers.status,"active")).limit(5),
     db.select({title:affiliateProducts.title,score:affiliateProducts.score}).from(affiliateProducts).orderBy(desc(affiliateProducts.score)).limit(5),
@@ -216,13 +231,13 @@ async function contentCatalogBrief(): Promise<string> {
   return items.length ? `Aktueller Produktkatalog (nur passend und wahrheitsgemäß verwenden): ${items.join("; ")}` : "";
 }
 
-async function generateContentDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number): Promise<{ ok: true } | { ok: false; reason: string }> {
+async function generateContentDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number, db?: DraftEngineDb | null): Promise<{ ok: true } | { ok: false; reason: string }> {
   const persona = INFLUENCER_PERSONAS[slotOffset % INFLUENCER_PERSONAS.length];
   const platformRound = Math.floor(slotOffset / INFLUENCER_PERSONAS.length);
   const platform = CONTENT_PLATFORMS[(slotOffset + platformRound) % CONTENT_PLATFORMS.length];
   const topic = CONTENT_TOPIC_SEEDS[seedIndexForDay(nowMs, slotOffset)];
   const b2bBrief=selectB2BAffinityBrief(persona.id,slotOffset);
-  const catalogBrief=await contentCatalogBrief();
+  const catalogBrief=await contentCatalogBrief(db);
   const prompt = [
     buildInfluencerPrompt(persona, topic, platform),
     ...(b2bBrief?[formatB2BAffinityPrompt(b2bBrief)]:[]),
@@ -242,8 +257,8 @@ async function generateContentDraft(llm: (messages: Message[]) => Promise<string
   if (!parsed) return { ok: false, reason: "Content-LLM lieferte nach Reparaturversuch kein auswertbares JSON." };
   const validated = validateDraftPayload("content", parsed);
   if (!validated.valid) return { ok: false, reason: validated.reason };
-  if (await contentWasAlreadySuggested(validated.payload)) return { ok: false, reason: "Content-Duplikat aus der Vorschlagshistorie verworfen." };
-  await insertPendingDraft("content", validated.title, validated.payload, "draft-engine");
+  if (await contentWasAlreadySuggested(validated.payload, db)) return { ok: false, reason: "Content-Duplikat aus der Vorschlagshistorie verworfen." };
+  await insertPendingDraft("content", validated.title, validated.payload, "draft-engine", db);
   return { ok: true };
 }
 
@@ -259,6 +274,7 @@ async function generateRevenueLoopDraft(
   nowMs: number,
   slotOffset: number,
   hubOverride?: RevenueHub,
+  db?: DraftEngineDb | null,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const hub = hubOverride ?? REVENUE_HUBS[slotOffset % REVENUE_HUBS.length]!;
   const prompt = [
@@ -277,11 +293,11 @@ async function generateRevenueLoopDraft(
   if (!loop.experiment || !loop.unit || typeof loop.targetValue !== "number") {
     return { ok: false, reason: "Revenue-Loop-LLM lieferte keinen ausfuehrbaren Experiment-/Zielplan." };
   }
-  await insertPendingDraft("revenue-loop", validated.title, validated.payload, "draft-engine");
+  await insertPendingDraft("revenue-loop", validated.title, validated.payload, "draft-engine", db);
   return { ok: true };
 }
 
-async function generateIdeaDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number): Promise<{ ok: true } | { ok: false; reason: string }> {
+async function generateIdeaDraft(llm: (messages: Message[]) => Promise<string>, nowMs: number, slotOffset: number, db?: DraftEngineDb | null): Promise<{ ok: true } | { ok: false; reason: string }> {
   const prompt = [
     "Du bist der Ideen-Scout des CyberSarah Control Centers (KI-Assistent-App mit Chat, Superagenten, Revenue-OS und Ideen-Inbox).",
     "Schlage EINE konkrete Produkt- oder Feature-Idee vor, die in unter 2 Wochen umsetzbar waere.",
@@ -292,7 +308,7 @@ async function generateIdeaDraft(llm: (messages: Message[]) => Promise<string>, 
   if (!parsed) return { ok: false, reason: "Ideen-LLM lieferte kein auswertbares JSON." };
   const validated = validateDraftPayload("idea", parsed);
   if (!validated.valid) return { ok: false, reason: validated.reason };
-  await insertPendingDraft("idea", validated.title, validated.payload, "draft-engine");
+  await insertPendingDraft("idea", validated.title, validated.payload, "draft-engine", db);
   return { ok: true };
 }
 
@@ -308,11 +324,12 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
   const budgetMs = deps.budgetMs ?? DRAFT_ENGINE_DEFAULT_BUDGET_MS;
   const deadlineMs = startedAtMs + Math.max(budgetMs, 1);
   const llm = deps.llm ?? defaultDraftLlm;
+  const db = deps.db;
 
   const result: DraftEngineRunResult = { plan: [], generated: {}, skipped: [], truncated: false };
   let coverage: PendingDraftCoverage | null = null;
   try {
-    coverage = await pendingDraftCoverage();
+    coverage = await pendingDraftCoverage(db);
   } catch (error) {
     result.skipped.push({ kind: "idea", reason: `DB nicht lesbar: ${error instanceof Error ? error.message : "unbekannt"}` });
     return result;
@@ -346,10 +363,10 @@ export async function runDraftEngine(deps: DraftEngineDeps = {}): Promise<DraftE
       try {
         const outcome =
           entry.kind === "content"
-            ? await generateContentDraft(llm, nowMs, slot)
+            ? await generateContentDraft(llm, nowMs, slot, db)
             : entry.kind === "revenue-loop"
-              ? await generateRevenueLoopDraft(llm, nowMs, slot, missingRevenueHubs[slot])
-              : await generateIdeaDraft(llm, nowMs, slot);
+              ? await generateRevenueLoopDraft(llm, nowMs, slot, missingRevenueHubs[slot], db)
+              : await generateIdeaDraft(llm, nowMs, slot, db);
         if (outcome.ok) okCount++;
         else {
           result.skipped.push({ kind: entry.kind, reason: outcome.reason });
