@@ -54,6 +54,13 @@ export type McpServerServiceDeps = {
    * bisher — die Registry bleibt nutzbar, ohne Governance zu erzwingen.
    */
   governance?: GovernanceGate;
+  /**
+   * Credential-Aufloesung (Sprint 4). Wird nur befragt, wenn die
+   * ENV-Variable fehlt oder gar keine referenziert ist.
+   */
+  resolveCredential?: (input: { serverKey: string; envVarName?: string | null }) => Promise<
+    { ok: true; token: string; source: "vault" | "env" } | { ok: false; reason: string }
+  >;
 };
 
 /**
@@ -387,7 +394,16 @@ export function createMcpServerService(deps: McpServerServiceDeps) {
     const gate = assertToolAllowed(descriptor, permissions);
     if (!gate.allowed) return { ok: false, reason: gate.reason };
 
-    const token = tokenFor(row);
+    let token = tokenFor(row);
+    if (!token && deps.resolveCredential) {
+      const resolved = await deps.resolveCredential({ serverKey: key, envVarName: row.credentialEnvVar });
+      if (resolved.ok) {
+        token = resolved.token;
+      } else if (row.credentialEnvVar) {
+        // Vault und ENV sind beide leer: den konkreten Grund nennen, nicht raten.
+        return { ok: false, reason: resolved.reason };
+      }
+    }
     if (row.credentialEnvVar && !token) {
       return { ok: false, reason: `Zugangsdaten fehlen: ENV ${row.credentialEnvVar} ist nicht gesetzt.` };
     }

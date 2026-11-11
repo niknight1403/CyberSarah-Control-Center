@@ -218,6 +218,13 @@
       "when": 1794301000000,
       "tag": "0030_mcp_governance",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794302000000,
+      "tag": "0031_mcp_credentials",
+      "breakpoints": true
     }
   ]
 }

@@ -833,3 +833,30 @@ export const mcpApprovals = pgTable("mcp_approvals", {
 
 export type McpApprovalRow = typeof mcpApprovals.$inferSelect;
 export type InsertMcpApprovalRow = typeof mcpApprovals.$inferInsert;
+
+/**
+ * Sprint 4 — Credential Vault je MCP-Server. Alle Geheimnisse liegen
+ * ausschliesslich verschluesselt (AES-256-GCM, bestehende Provider-Key-
+ * Infrastruktur) in `encrypted_payload`; nach aussen gehen nur Metadaten und
+ * eine maskierte Vorschau. ENV-Referenzen bleiben als Fallback bestehen.
+ */
+export const mcpCredentials = pgTable("mcp_credentials", {
+  id: serial("id").primaryKey(),
+  serverKey: varchar("server_key", { length: 64 }).notNull(),
+  kind: varchar("kind", { length: 32 }).notNull().default("bearer"),
+  /** AES-256-GCM: iv:tag:ciphertext (hex). JSON je nach kind. */
+  encryptedPayload: text("encrypted_payload").notNull(),
+  maskedPreview: varchar("masked_preview", { length: 48 }).notNull().default(""),
+  tokenUrl: text("token_url"),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  lastError: varchar("last_error", { length: 300 }),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("mcp_credentials_server_idx").on(table.serverKey),
+]);
+
+export type McpCredentialRow = typeof mcpCredentials.$inferSelect;
+export type InsertMcpCredentialRow = typeof mcpCredentials.$inferInsert;
