@@ -7,6 +7,7 @@ import {
   estimateCostEur,
   estimatePromptTokens,
   missingTemplateAgents,
+  resolveUsageProvider,
 } from "../lib/usage-metering-logic";
 
 const NOW = Date.UTC(2026, 10, 5, 12, 0, 0);
@@ -202,5 +203,53 @@ describe("missingTemplateAgents", () => {
       expect(template.prompt.length).toBeGreaterThan(60);
       expect(template.purpose.length).toBeGreaterThan(20);
     }
+  });
+});
+
+describe("resolveUsageProvider", () => {
+  it("ordnet Router-Präfixe dem Aggregator zu, auch bei Familien-Teilstrings", () => {
+    expect(resolveUsageProvider("openrouter/meta-llama/llama-3.1-70b")).toBe("openrouter");
+    expect(resolveUsageProvider("openrouter/anthropic/claude-3.5-sonnet")).toBe("openrouter");
+  });
+
+  it("bucht Llama-Modelle einheitlich als groq", () => {
+    // Der eigentliche Fix: zuvor galt llama-3.3-70b beim Reservieren als groq,
+    // beim Messen aber als unknown (teuerster Satz).
+    expect(resolveUsageProvider("llama-3.3-70b")).toBe("groq");
+    expect(resolveUsageProvider("meta-llama/llama-3.3-70b-versatile")).toBe("groq");
+    expect(resolveUsageProvider("groq/llama-3.3-70b")).toBe("groq");
+  });
+
+  it("erkennt Gemini und Google sowie lokale Modelle", () => {
+    expect(resolveUsageProvider("gemini-2.0-flash")).toBe("gemini");
+    expect(resolveUsageProvider("google/gemini-pro")).toBe("gemini");
+    expect(resolveUsageProvider("ollama/qwen2.5:14b")).toBe("ollama");
+    expect(resolveUsageProvider("local-mixtral")).toBe("ollama");
+  });
+
+  it("behandelt Pfadformen ohne bekannten Anbieter als Aggregator", () => {
+    expect(resolveUsageProvider("anthropic/claude-3.5-sonnet")).toBe("openrouter");
+    expect(resolveUsageProvider("mistralai/mistral-large")).toBe("openrouter");
+  });
+
+  it("fällt bei fehlender oder unklarer Angabe konservativ auf unknown zurück", () => {
+    expect(resolveUsageProvider(undefined)).toBe("unknown");
+    expect(resolveUsageProvider(null)).toBe("unknown");
+    expect(resolveUsageProvider("")).toBe("unknown");
+    expect(resolveUsageProvider("   ")).toBe("unknown");
+    expect(resolveUsageProvider("gpt-4o-mini")).toBe("unknown");
+  });
+
+  it("normalisiert Schreibweise und Leerraum", () => {
+    expect(resolveUsageProvider("  GROQ/Llama-3.3-70B  ")).toBe("groq");
+    expect(resolveUsageProvider("Gemini-2.0-Flash")).toBe("gemini");
+  });
+
+  it("liefert für jeden Provider einen Preis aus der Tabelle", () => {
+    for (const provider of ["groq", "openrouter", "gemini", "ollama", "unknown"] as const) {
+      expect(PROVIDER_PRICES[provider]).toBeDefined();
+    }
+    expect(resolveUsageProvider("ollama/llama3")).toBe("ollama");
+    expect(PROVIDER_PRICES[resolveUsageProvider("ollama/llama3")].inputEurPerMillion).toBe(0);
   });
 });

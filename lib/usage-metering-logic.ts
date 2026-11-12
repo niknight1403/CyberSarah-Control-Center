@@ -32,6 +32,31 @@ export const PROVIDER_PRICES: Record<UsageProvider, ProviderPrice> = {
   unknown: { inputEurPerMillion: 0.25, outputEurPerMillion: 0.85 },
 };
 
+/**
+ * Ordnet einen Modellnamen seinem Abrechnungs-Provider zu.
+ *
+ * Eine einzige Wahrheit fuer Reservierung (`server/api-v1.ts`, entscheidet ob
+ * ueberhaupt abgebucht wird) und Kostenzuordnung (`server/usage-metering.ts`).
+ * Zuvor gab es zwei Kopien mit abweichender Reihenfolge: `llama-3.3-70b` galt
+ * beim Buchen als `groq`, beim Messen aber als `unknown` (teuerster Satz) —
+ * derselbe Lauf wurde also zu zwei Preisen gefuehrt.
+ *
+ * Reihenfolge ist bindend: explizite Router-Praefixe gewinnen gegen
+ * Familien-Teilstrings, damit `openrouter/meta-llama/llama-3.1` nicht als
+ * `groq` gilt. Rueckfall `unknown` ist bewusst der konservative Preissatz.
+ */
+export function resolveUsageProvider(model: string | null | undefined): UsageProvider {
+  const value = String(model ?? "").trim().toLowerCase();
+  if (!value) return "unknown";
+  if (value.includes("openrouter")) return "openrouter";
+  if (value.includes("ollama") || value.includes("local")) return "ollama";
+  if (value.includes("gemini") || value.includes("google")) return "gemini";
+  if (value.includes("groq") || value.includes("llama-3")) return "groq";
+  // Pfadform `vendor/modell` ohne bekannten Anbieter laeuft ueber den Aggregator.
+  if (value.includes("/")) return "openrouter";
+  return "unknown";
+}
+
 /** Grobe Vorab-Schätzung der Token eines Auftrags (4 Zeichen ≈ 1 Token). */
 export function estimatePromptTokens(text: string): number {
   const clean = typeof text === "string" ? text.trim() : "";

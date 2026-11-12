@@ -10,7 +10,7 @@ import { agentExecutions } from "../drizzle/schema";
 import {
   aggregateUsage,
   estimateCostEur,
-  type UsageProvider,
+  resolveUsageProvider,
   type UsageRow,
   type UsageSummary,
 } from "../lib/usage-metering-logic";
@@ -38,7 +38,7 @@ export async function recordAgentExecution(input: ExecutionRecordInput): Promise
     input.promptTokens === null && input.completionTokens === null
       ? null
       : estimateCostEur({
-          provider: normalizeProvider(input.provider),
+          provider: resolveUsageProvider(input.provider),
           promptTokens: input.promptTokens ?? null,
           completionTokens: input.completionTokens ?? null,
         });
@@ -50,7 +50,7 @@ export async function recordAgentExecution(input: ExecutionRecordInput): Promise
         userOpenId: input.userOpenId,
         agentId: input.agentId ? input.agentId.slice(0, 64) : null,
         surface: (input.surface ?? "api").slice(0, 40),
-        provider: normalizeProvider(input.provider),
+        provider: resolveUsageProvider(input.provider),
         model: input.model ? input.model.slice(0, 120) : null,
         status: input.status,
         promptTokens: input.promptTokens ?? null,
@@ -129,13 +129,4 @@ export async function readUsageAnalytics(input: {
     );
     return { available: false, summary: empty };
   }
-}
-
-function normalizeProvider(provider: string): UsageProvider {
-  const value = String(provider ?? "").toLowerCase();
-  if (value.includes("groq")) return "groq";
-  if (value.includes("openrouter")) return "openrouter";
-  if (value.includes("gemini") || value.includes("google")) return "gemini";
-  if (value.includes("ollama") || value.includes("local")) return "ollama";
-  return "unknown";
 }

@@ -16,11 +16,11 @@ import type { Express, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { superAgents } from "../drizzle/schema";
 import {
-  PROVIDER_PRICES,
   TEMPLATE_AGENTS,
   buildPaymentRequiredPayload,
   estimatePromptTokens,
   missingTemplateAgents,
+  resolveUsageProvider,
 } from "../lib/usage-metering-logic";
 import { CREDIT_PACKS } from "../lib/monetization-logic";
 import { getDb } from "./db";
@@ -91,14 +91,6 @@ function readMessages(body: unknown): Message[] | null {
   return null;
 }
 
-function findProvider(model: string): keyof typeof PROVIDER_PRICES {
-  const value = model.toLowerCase();
-  if (value.includes("groq") || value.includes("llama-3")) return "groq";
-  if (value.includes("gemini")) return "gemini";
-  if (value.includes("ollama") || value.includes("local")) return "ollama";
-  if (value.includes("openrouter") || value.includes("/")) return "openrouter";
-  return "unknown";
-}
 
 
 /**
@@ -173,7 +165,7 @@ export function registerApiV1Routes(app: Express): void {
     const body = (req.body ?? {}) as { agentId?: unknown; model?: unknown; maxTokens?: unknown };
     const requestedModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "";
     const agentId = typeof body.agentId === "string" ? body.agentId : null;
-    const provider = findProvider(requestedModel);
+    const provider = resolveUsageProvider(requestedModel);
     const maxTokens = Math.max(64, Math.min(4000, Number(body.maxTokens) || DEFAULT_MAX_TOKENS));
 
     const promptTokens = messages.reduce((sum, message) => sum + estimatePromptTokens(String(message.content)), 0);
