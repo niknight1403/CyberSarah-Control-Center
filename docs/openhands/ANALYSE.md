@@ -41,9 +41,14 @@ Testabdeckung im Überblick: 465 Testdateien, ~3743 `it/test`-Vorkommen. Von 410
   findet nur die Datei selbst. Maßgebliche Tokens sind `lib/design/future-glass.ts`
   (vgl. `app/settings.tsx:10`, `app/(tabs)/cyber-dashboard.tsx:20` u. a.).
 - **Warum:** Ein zweites, ungenutztes Theme lädt zu neuen Hardcodes statt Token-Nutzung ein.
-- **Aufwand:** S · **Risiko:** niedrig (Löschen; falls ein Import auftaucht, umgekehrt)
+- **Aufwand:** S · **Risiko:** niedrig (beoben nur, falls ein Import auftaucht)
 - **Prüfung:** Datei entfernt oder von mindestens einem produktiven Import genutzt;
   `npm run check` bleibt grün.
+
+> ✅ Erledigt 2026-11-09 (Phase B): `lib/neon-pulse-theme.ts` entfernt.
+> Defensiv-Grep vor dem Loeschen: nur die Datei selbst; `npm run check`
+> und `npm run test` nachher gruen (472/473 Dateien, 3788/3791 Tests).
+> Siehe `docs/openhands/STATUS.md`.
 
 ### 4. `prompt-contract-logic.ts` ohne Tests, produktiv verdrahtet
 - **Was:** `lib/prompt-contract-logic.ts:12-33` (`buildProjectPromptContract`) wird über
