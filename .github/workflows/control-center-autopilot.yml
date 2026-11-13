@@ -76,7 +76,63 @@ jobs:
           if [ "$http_code" = "207" ] || [ "$deferred_count" != "0" ]; then
             echo "::warning::Control-Center-Cron wartet auf $deferred_count Konfigurationspunkt(e). Kein Defekt, aber nicht vollstaendig abgeschlossen."
           fi
-          jq -e '.result.scans.hara.ok == true and .result.scans.expansion.ok == true and (.result.blocked | length) == 0 and (.result.growthPulse != null) and (.result.growthPulse.generated >= 0) and (.result.growthPulse.externalActionsExecuted == 0) and (.result.growthPulse.plan.spendingAuthorized == false) and (.result.growthPulse.plan.publishingAuthorized == false) and (.result.growthPulse.plan.priceChangesAuthorized == false) and (.result.growth.influencerPersonasLearned >= 0) and (.result.growth.influencerExperimentsQueued >= 0) and (.result.growth.b2bNodes >= 0)' "$body_file" >/dev/null
+          # Vertrags-Gate mit Klartext-Diagnose: jeder verletzte Punkt wird benannt,
+          # damit ein roter Lauf nicht mehr nur "exit code 1" zeigt.
+          #
+          # `.result.scans.*.ok` ist bewusst KEIN hartes Gate: der Server stuft
+          # Infrastruktur-Ausfaelle der externen Scans als "wartet" ein (siehe
+          # Sprint 25). Verschwinden darf so ein Ausfall trotzdem nicht — er muss
+          # in `deferred` auftauchen, sonst schlaegt das Gate an.
+          # Vertrags-Gate mit Klartext-Diagnose: jeder verletzte Punkt wird
+          # benannt, damit ein roter Lauf nicht mehr nur "exit code 1" zeigt.
+          #
+          # `.result.scans.*.ok` ist bewusst KEIN hartes Gate: der Server stuft
+          # Infrastruktur-Ausfaelle der externen Scans als "wartet" ein und
+          # schreibt sie nach `deferred` (siehe Sprint 25). Verschwinden darf so
+          # ein Ausfall trotzdem nicht — fehlt der deferred-Eintrag, schlaegt das
+          # Gate an. Fehlt `growthPulse` ganz, wird genau das gemeldet, statt
+          # dreimal eine Freigabe-Verletzung zu behaupten.
+          gate_problems="$(jq -r '
+            def waiting(prefix): (.result.deferred // []) | any(startswith(prefix));
+            def gp: .result.growthPulse;
+            [
+              (if (.result.scans.hara.ok == true) then empty
+               elif waiting("HARA-") then empty
+               else "HARA-Scan weder ok noch als wartend gemeldet" end),
+              (if (.result.scans.expansion.ok == true) then empty
+               elif waiting("Expansion-") then empty
+               else "Expansion-Scan weder ok noch als wartend gemeldet" end),
+              (if ((.result.blocked // []) | length) == 0 then empty
+               else "echte Blockade(n): \((.result.blocked // []) | join(" · ") | .[0:200])" end),
+              (if gp == null then "Growth Pulse fehlt" else empty end),
+              (if gp == null then empty
+               elif (gp.generated // -1) >= 0 then empty
+               else "Growth Pulse ohne Entwurfszahl" end),
+              (if gp == null then empty
+               elif gp.externalActionsExecuted == 0 then empty
+               else "externe Aktion ohne Freigabe ausgefuehrt" end),
+              (if gp == null then empty
+               elif gp.plan.spendingAuthorized == false then empty
+               else "Ausgaben ohne Freigabe erlaubt" end),
+              (if gp == null then empty
+               elif gp.plan.publishingAuthorized == false then empty
+               else "Veroeffentlichung ohne Freigabe erlaubt" end),
+              (if gp == null then empty
+               elif gp.plan.priceChangesAuthorized == false then empty
+               else "Preisaenderung ohne Freigabe erlaubt" end),
+              (if (.result.growth.influencerPersonasLearned // -1) >= 0 then empty
+               else "Kennzahl influencerPersonasLearned fehlt" end),
+              (if (.result.growth.influencerExperimentsQueued // -1) >= 0 then empty
+               else "Kennzahl influencerExperimentsQueued fehlt" end),
+              (if (.result.growth.b2bNodes // -1) >= 0 then empty
+               else "Kennzahl b2bNodes fehlt" end)
+            ] | .[]
+          ' "$body_file")"
+          if [ -n "$gate_problems" ]; then
+            echo "::error::Control-Center-Autopilot verletzt Vertragsbedingungen; Ursachen siehe Liste."
+            printf '%s\n' "$gate_problems" | sed 's/^/- VERLETZT: /'
+            exit 1
+          fi
           # Signed-in diagnostics stay in GitHub Actions: no invented reach or
           # revenue metrics and never echo the authentication token.
           {
