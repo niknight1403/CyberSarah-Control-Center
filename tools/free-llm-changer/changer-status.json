@@ -1,9 +1,9 @@
 {
-  "stand": "2026-11-13T17:59:56",
+  "stand": "2026-11-13T23:27:51",
   "aktiv": "groq",
   "aktiv_name": "Groq Free Tier",
   "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "qwen/qwen3.8-27b",
+  "modell": "openai/gpt-oss-120b",
   "anbieter": [
     {
       "id": "gemini",
@@ -25,17 +25,17 @@
       "id": "groq",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "qwen/qwen3.8-27b",
-      "detail": "qwen/qwen3.8-27b",
+      "modell": "openai/gpt-oss-120b",
+      "detail": "openai/gpt-oss-120b",
       "hinweis": null
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT",
-      "http_status": 429,
-      "modell": "liquid/lfm-3-1.7b:free",
-      "detail": "429 liquid/lfm-3-1.7b:free",
-      "hinweis": "Changer rotiert weiter"
+      "status": "VERFUEGBAR",
+      "http_status": null,
+      "modell": "inclusionai/ling-3.2-flash:free",
+      "detail": "inclusionai/ling-3.2-flash:free",
+      "hinweis": null
     },
     {
       "id": "cerebras",
