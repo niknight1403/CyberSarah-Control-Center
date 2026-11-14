@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-13T23:27:51",
-  "aktiv": "groq",
-  "aktiv_name": "Groq Free Tier",
-  "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-120b",
+  "stand": "2026-11-14T03:28:13",
+  "aktiv": "gemini",
+  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
+  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
+  "modell": "gemma-4-26b-a4b-it",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "gemma-4-31b-it",
-      "detail": "000 gemma-4-31b-it",
+      "modell": "gemma-4-26b-a4b-it",
+      "detail": "gemma-4-26b-a4b-it",
       "hinweis": null
     },
     {
@@ -25,16 +25,16 @@
       "id": "groq",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "openai/gpt-oss-120b",
-      "detail": "openai/gpt-oss-120b",
+      "modell": "qwen/qwen3.8-27b",
+      "detail": "qwen/qwen3.8-27b",
       "hinweis": null
     },
     {
       "id": "openrouter",
-      "status": "VERFUEGBAR",
-      "http_status": null,
-      "modell": "inclusionai/ling-3.2-flash:free",
-      "detail": "inclusionai/ling-3.2-flash:free",
+      "status": "KEY UNGUELTIG",
+      "http_status": 403,
+      "modell": "thinkingmachines/inkling-2-small:free",
+      "detail": "403 thinkingmachines/inkling-2-small:free",
       "hinweis": null
     },
     {
