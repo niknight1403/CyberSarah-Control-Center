@@ -25,14 +25,20 @@ import {
 import { CREDIT_PACKS } from "../lib/monetization-logic";
 import { getDb } from "./db";
 import { sdk } from "./_core/sdk";
-import { invokeLLM, type Message } from "./_core/llm";
+import { invokeLLM } from "./_core/llm";
 import { creditPacksForCheckout, getUserTotalCredits, reserveCredits, settleCredits } from "./credit-ledger";
 import { readUsageAnalytics, recordAgentExecution } from "./usage-metering";
 import { readEntitlements } from "./entitlements";
 import { requireCredits } from "./credit-guard";
+import {
+  computeEstimatedTokens,
+  isBillableProvider,
+  readRequestMessages,
+  resolveAgentId,
+  resolveMaxTokens,
+  resolveRequestedModel,
+} from "../lib/api-v1-request-logic";
 
-const MAX_PROMPT_CHARS = 24_000;
-const DEFAULT_MAX_TOKENS = 900;
 const CHECKOUT_PATH = "/api/billing/stripe/checkout";
 
 type ApiUser = { id: number; openId: string; role?: string; name?: string | null };
@@ -67,31 +73,6 @@ function checkoutUrlFor(req: Request): string {
 function executionKeyOf(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
-
-function readMessages(body: unknown): Message[] | null {
-  const payload = body as { messages?: unknown; prompt?: unknown; system?: unknown } | null;
-  if (Array.isArray(payload?.messages)) {
-    const messages = payload.messages
-      .filter((entry): entry is { role?: unknown; content?: unknown } => !!entry && typeof entry === "object")
-      .map((entry) => ({
-        role: (["system", "user", "assistant"].includes(String(entry.role)) ? String(entry.role) : "user") as Message["role"],
-        content: String(entry.content ?? "").slice(0, MAX_PROMPT_CHARS),
-      }))
-      .filter((message) => message.content.trim().length > 0);
-    return messages.length > 0 ? messages : null;
-  }
-  if (typeof payload?.prompt === "string" && payload.prompt.trim()) {
-    const messages: Message[] = [];
-    if (typeof payload.system === "string" && payload.system.trim()) {
-      messages.push({ role: "system", content: payload.system.slice(0, MAX_PROMPT_CHARS) });
-    }
-    messages.push({ role: "user", content: payload.prompt.slice(0, MAX_PROMPT_CHARS) });
-    return messages;
-  }
-  return null;
-}
-
-
 
 /**
  * Legt fehlende Vorlagen-Agenten an (idempotent über den Namen).
@@ -153,7 +134,7 @@ export function registerApiV1Routes(app: Express): void {
       return;
     }
 
-    const messages = readMessages(req.body);
+    const messages = readRequestMessages(req.body);
     if (!messages) {
       res.status(400).json({
         error: "Feld 'messages' (Array) oder 'prompt' (Text) erforderlich.",
@@ -163,15 +144,18 @@ export function registerApiV1Routes(app: Express): void {
     }
 
     const body = (req.body ?? {}) as { agentId?: unknown; model?: unknown; maxTokens?: unknown };
-    const requestedModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : "";
-    const agentId = typeof body.agentId === "string" ? body.agentId : null;
+    const requestedModel = resolveRequestedModel(body.model);
+    const agentId = resolveAgentId(body.agentId);
     const provider = resolveUsageProvider(requestedModel);
-    const maxTokens = Math.max(64, Math.min(4000, Number(body.maxTokens) || DEFAULT_MAX_TOKENS));
+    const maxTokens = resolveMaxTokens(body.maxTokens);
 
-    const promptTokens = messages.reduce((sum, message) => sum + estimatePromptTokens(String(message.content)), 0);
-    const estimatedTokens = promptTokens + maxTokens;
+    const { promptTokens, estimatedTokens } = computeEstimatedTokens({
+      messages,
+      maxTokens,
+      estimatePromptTokens,
+    });
     // Eigene/lokale Provider kosten nichts: keine Reservierung nötig.
-    const billable = provider !== "ollama";
+    const billable = isBillableProvider(provider);
     const executionKey = executionKeyOf(surface);
     const startedAt = Date.now();
 
