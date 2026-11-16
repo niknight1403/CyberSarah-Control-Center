@@ -79,6 +79,14 @@ describe("evaluateEmailDomain", () => {
     expect(check.hint).toContain("nur an das eigene Postfach");
   });
 
+  it("bewertet die Testdomain auch ohne Anbieterabfrage als nutzbar", () => {
+    // Die Nutzbarkeit der Testdomain haengt nicht an der Domainliste; ein
+    // Abruffehler darf sie nicht als "ungeprueft" erscheinen lassen.
+    const check = evaluateEmailDomain({ fromAddress: `onboarding@${RESEND_TEST_DOMAIN}`, domains: null });
+    expect(check.status).toBe("ok");
+    expect(check.domainVerified).toBe(true);
+  });
+
   it("gibt bei kaputter Adresse eine klare Meldung", () => {
     const check = evaluateEmailDomain({ fromAddress: "kaputt", domains: [] });
     expect(check.status).toBe("unconfigured");

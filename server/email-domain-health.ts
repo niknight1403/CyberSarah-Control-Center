@@ -37,12 +37,27 @@ export async function checkEmailDomain(env: Record<string, string | undefined> =
   const apiKey = (env.RESEND_API_KEY ?? "").trim();
   const domains = config.configured && apiKey ? await fetchDomains(apiKey) : null;
   const value = evaluateEmailDomain({ fromAddress: config.from ?? null, domains });
-  if (!config.configured && domains === null) {
+  // Eine positive Bewertung der Domainpruefung bleibt bestehen: die Testdomain
+  // des Anbieters (resend.dev) ist nutzbar, auch wenn die Konfigurationspruefung
+  // sie als "nur fuer Tests" markiert. Ein Herabstufen auf "unconfigured"
+  // wuerde einen kaputten Mailversand melden, den es nicht gibt.
+  if (!config.configured && domains === null && value.status !== "ok") {
     // Ohne Schluessel gibt es nichts abzufragen; das ist kein "ungeprueft".
+    // Die konkrete Konfigurationsluecke hat Vorrang vor dem generischen Hinweis:
+    // sonst sucht der Betreiber beim Anbieter nach einem Fehler, der in der
+    // eigenen Umgebung liegt (z. B. falscher Schluessel oder leere Adresse).
+    // Ausnahme: Ist eine Adresse vorhanden, aber keine Domain erkennbar, ist die
+    // Domaindiagnose die genauere Auskunft ("enthaelt keine Domain").
+    const issueHint = config.issues.length > 0 ? config.issues.join(" ") : null;
+    const domainDiagnosis = value.fromAddress !== null && value.fromDomain === null ? value.hint : null;
     const unconfigured: EmailDomainCheck = {
       ...value,
       status: "unconfigured",
-      hint: value.hint ?? "Mailversand ist nicht konfiguriert (RESEND_API_KEY / RESEND_FROM_EMAIL fehlen).",
+      hint:
+        domainDiagnosis ??
+        issueHint ??
+        value.hint ??
+        "Mailversand ist nicht konfiguriert (RESEND_API_KEY / RESEND_FROM_EMAIL fehlen).",
     };
     cache = { at: now, value: unconfigured };
     return unconfigured;

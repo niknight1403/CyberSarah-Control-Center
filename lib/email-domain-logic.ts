@@ -76,17 +76,9 @@ export function evaluateEmailDomain(input: {
       hint: `Die Absenderadresse "${fromAddress}" enthaelt keine Domain und kann nicht zugestellt werden.`,
     };
   }
-  if (input.domains === null) {
-    return {
-      configured: true,
-      fromAddress,
-      fromDomain,
-      domainVerified: false,
-      status: "unknown",
-      hint: "Die Domainliste des Mailanbieters war nicht abrufbar; die Zustellbarkeit ist ungeprueft.",
-    };
-  }
   // Die Testdomain des Anbieters gilt immer als nutzbar, aber nur fuer den Betreiber.
+  // Sie wird vor der Anbieterabfrage bewertet: Ihre Nutzbarkeit haengt nicht an
+  // der Domainliste, ein Abruffehler darf sie nicht zu "ungeprueft" machen.
   if (fromDomain === RESEND_TEST_DOMAIN || fromDomain.endsWith(`.${RESEND_TEST_DOMAIN}`)) {
     return {
       configured: true,
@@ -95,6 +87,16 @@ export function evaluateEmailDomain(input: {
       domainVerified: true,
       status: "ok",
       hint: "Es wird die Testadresse des Mailanbieters genutzt: Mails gehen nur an das eigene Postfach, nicht an Kunden.",
+    };
+  }
+  if (input.domains === null) {
+    return {
+      configured: true,
+      fromAddress,
+      fromDomain,
+      domainVerified: false,
+      status: "unknown",
+      hint: "Die Domainliste des Mailanbieters war nicht abrufbar; die Zustellbarkeit ist ungeprueft.",
     };
   }
   const verified = input.domains.some(
