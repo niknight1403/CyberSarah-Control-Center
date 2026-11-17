@@ -124,7 +124,7 @@ export class ConfigViewManager {
       },
       {
         key: "GITHUB_TOKEN",
-        rawValue: "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+        rawValue: "",
         maskedValue: "ghp_****wxyz",
         isSecret: true,
         category: "Integrations",
