@@ -1,27 +1,39 @@
-name: CyberSarah Deploy & Sync Secrets
+name: CyberSarah secret readiness audit
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  deploy:
+  readiness:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Generate Production .env from GitHub Secrets
+      - name: Report configured publishing channels without exposing values
+        env:
+          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          YT_ACCESS_TOKEN: ${{ secrets.YT_ACCESS_TOKEN }}
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+        shell: bash
         run: |
-          echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}" >> .env
-          echo "FLASK_PORT=5000" >> .env
-          echo "IG_ACCESS_TOKEN=${{ secrets.IG_ACCESS_TOKEN }}" >> .env
-          echo "YT_ACCESS_TOKEN=${{ secrets.YT_ACCESS_TOKEN }}" >> .env
-          echo "TIKTOK_ACCESS_TOKEN=${{ secrets.TIKTOK_ACCESS_TOKEN }}" >> .env
-          echo "FB_ACCESS_TOKEN=${{ secrets.FB_ACCESS_TOKEN }}" >> .env
-
-      - name: Secure .env Permissions
-        run: chmod 600 .env
-        
-      - name: Status Report
-        run: echo "Secrets erfolgreich verschlüsselt injiziert. Bereit für Server-Sync."
+          set -euo pipefail
+          configured=0
+          inactive=0
+          for name in FB_ACCESS_TOKEN IG_ACCESS_TOKEN YT_ACCESS_TOKEN TIKTOK_ACCESS_TOKEN; do
+            if [ -n "${!name:-}" ]; then
+              echo "::notice::$name is configured."
+              configured=$((configured + 1))
+            else
+              echo "::warning::$name is not configured; its publishing channel must remain disabled."
+              inactive=$((inactive + 1))
+            fi
+          done
+          echo "Configured channels: $configured; inactive channels: $inactive."
+          echo "Readiness audit only: this workflow does not create .env files or deploy to a server."
