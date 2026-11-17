@@ -1,5 +1,5 @@
 {
-  "stand": "2026-11-17T01:32:26",
+  "stand": "2026-11-17T10:08:25",
   "aktiv": "groq",
   "aktiv_name": "Groq Free Tier",
   "endpunkt": "https://api.groq.com/openai/v1",
@@ -31,10 +31,10 @@
     },
     {
       "id": "openrouter",
-      "status": "KEY UNGUELTIG",
-      "http_status": 403,
-      "modell": "thinkingmachines/inkling-2-small:free",
-      "detail": "403 thinkingmachines/inkling-2-small:free",
+      "status": "VERFUEGBAR",
+      "http_status": null,
+      "modell": "inclusionai/ling-3.2-flash:free",
+      "detail": "inclusionai/ling-3.2-flash:free",
       "hinweis": null
     },
     {
