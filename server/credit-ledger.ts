@@ -20,6 +20,29 @@ import { CREDIT_PACKS_CANONICAL } from "../lib/pricing-config";
 
 export type LedgerKind = "grant" | "reserve" | "refund" | "settle" | "usage";
 
+/**
+ * Deterministic test seam (Repo-Konvention `setXForTests`).
+ *
+ * Why not `vi.mock("./db")`: the suite runs with `isolate: false`, so a module
+ * mock on the shared DB factory leaks into every neighbouring test file. The
+ * ledger therefore resolves its connection through this binding, which is only
+ * reachable in test mode. The production path is unchanged: without an
+ * override it calls `getDb()` exactly as before.
+ */
+let creditLedgerGetDb: typeof getDb = getDb;
+
+export function setCreditLedgerDbForTests(override: typeof getDb | null): void {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error("Credit-Ledger-Test-Hook ist nur im Test-Modus verfuegbar.");
+  }
+  creditLedgerGetDb = override ?? getDb;
+}
+
+/** Resolves the ledger connection through the test seam. */
+function ledgerDb(): Promise<Awaited<ReturnType<typeof getDb>>> {
+  return creditLedgerGetDb();
+}
+
 export interface ReservationResult {
   ok: boolean;
   /** Kontostand nach der Buchung; null, wenn nicht lesbar. */
@@ -57,7 +80,7 @@ export async function debitCredits(input: {
 }): Promise<boolean> {
   const tokens = Math.max(0, Math.ceil(input.tokens));
   if (tokens === 0) return false;
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db) return false;
   try {
     await db.execute(sql`
@@ -74,7 +97,7 @@ export async function debitCredits(input: {
 
 /** Aktueller Kontostand (Summe aller Buchungen). */
 export async function readCreditBalance(openId: string): Promise<number | null> {
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db || !openId) return null;
   try {
     const result = await db.execute(
@@ -100,7 +123,7 @@ export async function reserveCredits(input: {
 }): Promise<ReservationResult> {
   const tokens = Math.max(0, Math.ceil(input.tokens));
   if (tokens === 0) return { ok: true, balanceTokens: await readCreditBalance(input.openId), reason: null };
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db) return { ok: false, balanceTokens: null, reason: "unavailable" };
 
   try {
@@ -151,7 +174,7 @@ export async function settleCredits(input: {
   const actual = Math.max(0, Math.ceil(input.actualTokens));
   const delta = reserved - actual;
   if (delta === 0) return readCreditBalance(input.openId);
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db) return null;
   try {
     await db.execute(sql`
@@ -198,7 +221,7 @@ export async function grantCreditsDetailed(input: {
 }): Promise<GrantResult> {
   const tokens = Math.max(0, Math.ceil(input.tokens));
   if (tokens === 0) return { booked: false, duplicate: false };
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db) throw new Error("Kontodatenbank nicht verfuegbar — Gutschrift nicht gebucht.");
   const result = await db.execute(sql`
     INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key", "payment_intent")
@@ -251,7 +274,7 @@ export interface RefundDeps {
 export async function findGrantByPaymentIntent(
   paymentIntent: string,
 ): Promise<{ openId: string; tokens: number } | null> {
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db) throw new Error("Kontodatenbank nicht verfuegbar.");
   const result = await db.execute(sql`
     SELECT "user_open_id", SUM("delta_tokens")::int AS "tokens"
@@ -269,7 +292,7 @@ export async function findGrantByPaymentIntent(
 
 /** Bereits entzogene Tokens zu einer Zahlung. */
 export async function refundedTokensForPaymentIntent(openId: string, paymentIntent: string): Promise<number> {
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db) throw new Error("Kontodatenbank nicht verfuegbar.");
   const result = await db.execute(sql`
     SELECT COALESCE(-SUM("delta_tokens"), 0)::int AS "tokens"
@@ -290,7 +313,7 @@ async function bookRefundEntry(input: {
 }): Promise<GrantResult> {
   const tokens = Math.max(0, Math.floor(input.tokens));
   if (tokens === 0) return { booked: false, duplicate: false };
-  const db = await getDb();
+  const db = await ledgerDb();
   if (!db) throw new Error("Kontodatenbank nicht verfuegbar — Erstattung nicht gebucht.");
   const result = await db.execute(sql`
     INSERT INTO "credit_ledger_entries" ("user_open_id", "delta_tokens", "kind", "reason", "execution_key", "payment_intent")
