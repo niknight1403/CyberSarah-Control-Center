@@ -44,7 +44,10 @@ export const cxWorkforceRouter = router({
     message: z.string().min(3).max(12000),
     productInterest: z.string().max(100).optional(),
     purchaseIntent: z.string().max(100).optional(),
-  })).mutation(({ input }) => triageWithQualityGovernance(input)),
+  })).mutation(({ input }) => {
+    const result = triageWithQualityGovernance(input);
+    return { ...result.triage, qualityGovernance: result.qualityGovernance };
+  }),
   recordTriage: adminProcedure.input(z.object({
     subject: z.string().max(300).optional(),
     message: z.string().min(3).max(12000),
@@ -67,7 +70,10 @@ export const cxWorkforceRouter = router({
   })).mutation(({ input }) => ({
     items: input.requests.map((request, index) => ({
       index,
-      ...triageWithQualityGovernance(request),
+      triage: (() => {
+        const result = triageWithQualityGovernance(request);
+        return { ...result.triage, qualityGovernance: result.qualityGovernance };
+      })(),
     })),
     source: "admin_supplied_preview_only" as const,
     noHubspotRecordsWritten: true as const,
