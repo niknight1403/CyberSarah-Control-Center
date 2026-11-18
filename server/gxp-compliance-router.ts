@@ -4,14 +4,10 @@ import { z } from "zod";
 import { modelRouterSettings } from "../drizzle/schema";
 import { getDb } from "./db";
 import { adminProcedure, router } from "./_core/trpc";
+import { GXP_CONTROLLED_ACTIONS, GXP_POLICY_VERSION, evaluateGxpControlledAction } from "../lib/gxp-policy-logic";
 
-const POLICY_VERSION = "gxp-guardrails-v1";
 const AUDIT_PREFIX = "gxp:audit:";
-const CONTROLLED_ACTIONS = [
-  "batch_release", "deviation_disposition", "capa_approval",
-  "controlled_document_publish", "regulated_record_delete",
-  "quality_event_close", "electronic_signature",
-] as const;
+;
 
 type ControlledAction = typeof CONTROLLED_ACTIONS[number];
 
@@ -51,7 +47,7 @@ export const gxpComplianceRouter = router({
   readiness: adminProcedure.query(() => ({
     profile: "general_quality_governance",
     regulatedProfilesEnabled: false,
-    policyVersion: POLICY_VERSION,
+    policyVersion: GXP_POLICY_VERSION,
     electronicSignaturesEnabled: false,
     validatedAuditTrail: false,
     productionGxpClaim: false,
@@ -60,14 +56,15 @@ export const gxpComplianceRouter = router({
   })),
 
   evaluateAction: adminProcedure.input(z.object({
-    action: z.enum(CONTROLLED_ACTIONS),
+    action: z.enum(GXP_CONTROLLED_ACTIONS),
     reason: z.string().trim().min(8).max(1000),
     approvalReference: z.string().regex(/^[A-Za-z0-9_-]{8,128}$/).optional(),
   })).mutation(async ({ ctx, input }) => {
     const actor = String(ctx.user.openId);
     // No approval workflow exists yet. Therefore all regulated/controlled
     // actions fail closed even if a caller supplies an arbitrary reference.
-    const decision = "block" as const;
+    const policy = evaluateGxpControlledAction({ action: input.action, approvalWorkflowVerified: false, auditStoreAvailable: true });
+    const decision = policy.decision;
     const audit = await appendAuditEvent({
       action: input.action,
       decision,
