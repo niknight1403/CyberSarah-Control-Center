@@ -24,10 +24,10 @@ export type CapabilityDefinition = {
 
 export type CapabilityStatus = CapabilityDefinition & {
   configuration: "available" | "configured" | "partial" | "not_configured";
-  health: "not_checked";
+  health: "healthy" | "degraded" | "unavailable" | "not_checked";
   configuredEnv: string[];
   missingEnv: string[];
-  lastChecked: null;
+  lastChecked: string | null;
 };
 
 export const CAPABILITY_CATALOG: readonly CapabilityDefinition[] = [
