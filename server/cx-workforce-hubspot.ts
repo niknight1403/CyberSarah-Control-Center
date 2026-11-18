@@ -33,7 +33,7 @@ export async function getCxHubspotSnapshot(env: Record<string, string | undefine
       baseUrl: config.baseUrl,
       ticketRead: "not_configured" as const,
       conversationRead: "not_configured" as const,
-      tickets: { total: 0, openInSample: 0, sampleSize: 0, recent: [] as Array<Record<string, string | null>> },
+      tickets: { total: 0, sampleSize: 0, recent: [] as Array<Record<string, string | null>> },
       conversations: { totalReturned: 0, active: 0, recent: [] as Array<Record<string, string | null>> },
       problems: [config.problem ?? "HubSpot ist nicht konfiguriert."],
       writesPerformed: false as const,
@@ -50,7 +50,7 @@ export async function getCxHubspotSnapshot(env: Record<string, string | undefine
         method: "POST",
         body: {
           limit: 50,
-          properties: ["subject", "hs_pipeline_stage", "hs_ticket_priority", "hs_ticket_category", "createdate", "hs_lastmodifieddate"],
+          properties: ["hs_pipeline_stage", "hs_ticket_priority", "hs_ticket_category", "createdate", "hs_lastmodifieddate"],
           filterGroups: [],
           sorts: [{ propertyName: "createdate", direction: "DESCENDING" }],
         },
@@ -78,7 +78,6 @@ export async function getCxHubspotSnapshot(env: Record<string, string | undefine
 
   const recentTickets = ticketRows.slice(0, 10).map((ticket) => ({
     id: String(ticket.id ?? ""),
-    subject: ticket.properties?.subject ?? null,
     stage: ticket.properties?.hs_pipeline_stage ?? null,
     priority: ticket.properties?.hs_ticket_priority ?? null,
     category: ticket.properties?.hs_ticket_category ?? null,
