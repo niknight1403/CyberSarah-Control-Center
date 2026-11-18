@@ -44,3 +44,21 @@ Revenue panels use recorded values from the existing database. They do not infer
 ## Acceptance boundary
 
 This is an opt-in implementation scaffold. Runtime startup, authenticated Prometheus scraping, web RUM SDK integration, Android release instrumentation, Kubernetes manifests, Umami provisioning and real checkout synthetic tests require deployment-specific configuration and verification. No production state is changed by adding these files.
+
+## Revenue Guard
+
+Start the hourly Stripe overdue-invoice monitor:
+
+```bash
+npm run revenue:start
+```
+
+It is **dry-run by default** and never sends mail unless `REVENUE_RECOVERY_LIVE=1`, `RESEND_API_KEY`, and `RESEND_FROM` are explicitly configured. Live mode uses Stripe's hosted invoice URL and stores a deduplication job in the existing `revenue_jobs` table. Review the legal basis, sender identity, customer communication preferences and test-mode credentials before enabling live recovery. Digistore24 cart abandonment is not inferred from an IPN; it requires an actual checkout-abandonment event source.
+
+## Mobile/APK crash telemetry
+
+The app already has a crash-reporting router and self-healing module. Connect the mobile crash reporter to the same Grafana stack through an approved Sentry-compatible or OpenTelemetry exporter, and attach only app version, build number, device class, OS version, crash fingerprint and sanitized stack trace. Never export auth tokens, user-entered content, payment details or full device identifiers. Android native crash symbolication requires matching release mapping files and is not enabled by this Compose stack alone.
+
+## Kubernetes
+
+For Kubernetes workloads, deploy Grafana Alloy using the included example under `kubernetes/`. It discovers pod logs and cluster events and forwards them to the same Loki backend. Install kube-state-metrics and node-exporter separately to expose workload/node metrics. Point the cluster agent at a private Loki endpoint reachable from the cluster; do not expose Loki publicly.
