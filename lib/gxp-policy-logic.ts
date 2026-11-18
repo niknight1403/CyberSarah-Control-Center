@@ -44,3 +44,22 @@ export function evaluateGxpControlledAction(input: {
     policyVersion: GXP_POLICY_VERSION,
   };
 }
+
+const GXP_QUALITY_SIGNAL_TERMS = [
+  "abweichung", "deviation", "capa", "chargenfehler", "chargenfreigabe",
+  "rückruf", "rueckruf", "kontamination", "verunreinigung",
+  "datenintegrität", "datenintegritaet", "datenmanipulation",
+  "produktmangel", "qualitätsmangel", "qualitaetsmangel",
+  "nebenwirkung", "unerwünschte wirkung", "sicherheitsmangel",
+];
+
+export function detectGxpQualitySignal(input: { subject?: string; message: string }) {
+  const normalized = `${input.subject ?? ""} ${input.message}`.toLocaleLowerCase("de-DE");
+  const matchedTerms = GXP_QUALITY_SIGNAL_TERMS.filter((term) => normalized.includes(term));
+  return {
+    potentialQualityEvent: matchedTerms.length > 0,
+    matchedTerms,
+    requiresHumanQualityReview: matchedTerms.length > 0,
+    automaticDispositionAllowed: false as const,
+  };
+}
