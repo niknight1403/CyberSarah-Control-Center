@@ -37,7 +37,7 @@ describe("CX HubSpot read-only snapshot", () => {
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("connected");
     expect(result.tickets.total).toBe(1);
-    expect(result.tickets.open).toBe(1);
+    expect(result.tickets.openInSample).toBe(1);
     expect(result.conversations.active).toBe(1);
     expect(JSON.stringify(result)).not.toContain("private body");
     expect(result.writesPerformed).toBe(false);
