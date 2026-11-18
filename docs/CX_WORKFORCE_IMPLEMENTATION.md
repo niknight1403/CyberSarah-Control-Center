@@ -16,6 +16,7 @@ This slice adds an admin-only, deterministic CX triage foundation. It is deliber
 - `cxWorkforce.readiness`: admin-only integration boundary and remaining prerequisites.
 - `cxWorkforce.previewTriage`: admin-only single-request preview.
 - `cxWorkforce.batchPreview`: admin-only batch preview, maximum 50 items; no external writes.
+- `cxWorkforce.liveInboxSnapshot`: read-only ticket and conversation metadata snapshot; reports ticket and Conversations API access independently, limits each response to 50 records, and never returns message bodies.
 
 ## Production integration still required
 
