@@ -74,7 +74,7 @@ export const gxpComplianceRouter = router({
       decision,
       executable: false as const,
       reason: policy.reason,
-      policyVersion: POLICY_VERSION,
+      policyVersion: policy.policyVersion,
       audit,
     };
   }),
