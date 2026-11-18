@@ -3,6 +3,7 @@ import { adminProcedure, router } from "./_core/trpc";
 import { triageCxRequest } from "../lib/cx-workforce-logic";
 import { describeHubspotEnv } from "./integrations/hubspot";
 import { getCxHubspotSnapshot } from "./cx-workforce-hubspot";
+import { listCxCases, saveCxCase } from "./cx-workforce-store";
 
 export const cxWorkforceRouter = router({
   readiness: adminProcedure.query(() => {
@@ -25,12 +26,25 @@ export const cxWorkforceRouter = router({
     };
   }),
   liveInboxSnapshot: adminProcedure.query(() => getCxHubspotSnapshot()),
+  caseQueue: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(({ input }) => listCxCases(input?.limit ?? 50)),
   previewTriage: adminProcedure.input(z.object({
     subject: z.string().max(300).optional(),
     message: z.string().min(3).max(12000),
     productInterest: z.string().max(100).optional(),
     purchaseIntent: z.string().max(100).optional(),
   })).mutation(({ input }) => triageCxRequest(input)),
+  recordTriage: adminProcedure.input(z.object({
+    subject: z.string().max(300).optional(),
+    message: z.string().min(3).max(12000),
+    productInterest: z.string().max(100).optional(),
+    purchaseIntent: z.string().max(100).optional(),
+    externalReference: z.string().max(128).optional(),
+  })).mutation(async ({ input }) => {
+    const { externalReference, ...triageInput } = input;
+    const triage = triageCxRequest(triageInput);
+    const saved = await saveCxCase({ source: "admin_preview", externalReference, triage });
+    return { saved: true as const, case: saved, customerMessageStored: false as const };
+  }),
   batchPreview: adminProcedure.input(z.object({
     requests: z.array(z.object({
       subject: z.string().max(300).optional(),
