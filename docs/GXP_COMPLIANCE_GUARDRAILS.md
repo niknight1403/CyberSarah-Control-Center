@@ -69,3 +69,9 @@ These endpoints are not a substitute for server-side enforcement at every busine
 - The persisted CX case stores only the matched rule terms and review flags as governance metadata; it does not store the original customer message or subject.
 - `automaticDispositionAllowed` is always false. This is keyword-based triage support, not a validated classifier and not a determination that a report is legally a regulated quality event.
 - Ordinary support messages remain on the existing CX route. All customer replies remain draft-only; no HubSpot writes or outbound messages were added.
+## Dedicated CX quality-event queue
+
+- Admin-only `cxWorkforce.qualityEventQueue` lists persisted CX cases that contain a potential quality signal.
+- Newly detected signals receive the workflow marker `awaiting_human_quality_review`; routine cases are marked `not_applicable`.
+- This queue is a review inbox only. It does not permit closure, CAPA approval, disposition, document release, or customer communication.
+- There is not yet an assignment/ownership workflow, status-transition API, SLA engine, or immutable event history. Those must be implemented and tested before operational or regulated use.
