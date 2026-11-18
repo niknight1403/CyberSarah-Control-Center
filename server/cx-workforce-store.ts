@@ -41,7 +41,7 @@ export async function saveCxCase(input: {
   source: CxCaseRecord["source"];
   externalReference?: string;
   triage: CxTriageResult;
-  qualityGovernance?: CxCaseRecord["qualityGovernance"];
+  qualityGovernance?: Omit<NonNullable<CxCaseRecord["qualityGovernance"]>, "workflowStatus">;
 }) {
   const externalReference = normalizeCxExternalReference(input.externalReference);
   const db = await getDb();
