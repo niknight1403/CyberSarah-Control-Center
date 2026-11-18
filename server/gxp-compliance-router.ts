@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { desc, eq, like } from "drizzle-orm";
+import { desc, like } from "drizzle-orm";
 import { z } from "zod";
 import { modelRouterSettings } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -7,9 +7,6 @@ import { adminProcedure, router } from "./_core/trpc";
 import { GXP_CONTROLLED_ACTIONS, GXP_POLICY_VERSION, evaluateGxpControlledAction } from "../lib/gxp-policy-logic";
 
 const AUDIT_PREFIX = "gxp:audit:";
-;
-
-type ControlledAction = typeof CONTROLLED_ACTIONS[number];
 
 function digest(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -51,7 +48,7 @@ export const gxpComplianceRouter = router({
     electronicSignaturesEnabled: false,
     validatedAuditTrail: false,
     productionGxpClaim: false,
-    controlledActions: CONTROLLED_ACTIONS,
+    controlledActions: GXP_CONTROLLED_ACTIONS,
     status: "foundation_only" as const,
   })),
 
@@ -70,13 +67,13 @@ export const gxpComplianceRouter = router({
       decision,
       actor,
       reason: input.reason,
-      policyVersion: POLICY_VERSION,
+      policyVersion: policy.policyVersion,
       approvalReference: input.approvalReference,
     });
     return {
       decision,
       executable: false as const,
-      reason: "Keine implementierte, verifizierte Freigabeinstanz. Kontrollierte Aktion bleibt gesperrt.",
+      reason: policy.reason,
       policyVersion: POLICY_VERSION,
       audit,
     };
