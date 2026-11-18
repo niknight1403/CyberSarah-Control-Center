@@ -53,6 +53,7 @@ import { growthNetworkRouter } from "./growth-network-router";
 import { facelessChannelRouter } from "./faceless-channel-router";
 import { aiInfluenzaTeamRouter } from "./ai-influenza-team-router";
 import { cxWorkforceRouter } from "./cx-workforce-router";
+import { gxpComplianceRouter } from "./gxp-compliance-router";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -116,6 +117,7 @@ export const appRouter = router({
   facelessChannel: facelessChannelRouter,
   aiInfluenzaTeam: aiInfluenzaTeamRouter,
   cxWorkforce: cxWorkforceRouter,
+  gxpCompliance: gxpComplianceRouter,
   auth: router({
     // Sicherheitsfix: niemals den rohen DB-Datensatz (inkl. passwordHash)
     // an den Client senden — nur die oeffentlichen Felder.
