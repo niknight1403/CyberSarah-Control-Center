@@ -50,3 +50,14 @@ The initial default profile is **general quality governance**. Regulated profile
 ## Explicit exclusions in this foundation
 
 No electronic signatures, validated audit trail, validated computer system, Part 11 / Annex 11 compliance, GMP release workflow, adverse-event reporting, or regulated record retention is implemented or claimed by this document. These require a defined intended use and dedicated technical and quality validation.
+
+
+## Implemented technical foundation (PR branch)
+
+- Admin-only `gxpCompliance.readiness` reports the explicitly non-validated state and disabled regulated profiles.
+- Admin-only `gxpCompliance.evaluateAction` records a policy decision and **always blocks** controlled actions because no verified approval workflow exists yet. A caller-supplied approval reference is recorded but is not treated as authorization.
+- Admin-only `gxpCompliance.auditRecent` reads recent application audit records.
+- Audit records use unique keys and SHA-256 record digests. This is an application-level integrity aid only; the current KV-backed store is not independently immutable, tamper-proof, or a validated regulatory audit trail.
+- If the audit store is unavailable, policy evaluation throws and the controlled action remains blocked.
+
+These endpoints are not a substitute for server-side enforcement at every business write path. No existing batch, CAPA, document, refund or quality workflow is wired to this gate yet. The router is a guarded foundation, not an active system-wide interlock.
