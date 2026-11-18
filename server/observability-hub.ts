@@ -52,7 +52,7 @@ export function registerObservabilityHub(app: Express) {
           COALESCE(SUM("commissionCents"), 0)::bigint AS "commissionCents"
           FROM conversion_events
           WHERE "occurredAt" >= now() - interval '30 days'
-          GROUP BY currency, event_type ORDER BY currency, event_type`),
+          GROUP BY currency, "eventType" ORDER BY currency, "eventType"`),
       ]);
       const daily = rowsOf<Record<string, unknown>>(dailyResult);
       const funnels = rowsOf<Record<string, unknown>>(funnelResult);
