@@ -100,10 +100,6 @@ export async function getCxHubspotSnapshot(env: Record<string, string | undefine
     conversationRead: conversationResult.status === "fulfilled" ? "connected" as const : "failed" as const,
     tickets: {
       total: Number(ticketResult.status === "fulfilled" ? ticketResult.value.total ?? ticketRows.length : 0),
-      openInSample: ticketRows.filter((ticket) => {
-        const stage = String(ticket.properties?.hs_pipeline_stage ?? "").toLowerCase();
-        return stage !== "4" && stage !== "closed" && stage !== "closedwon";
-      }).length,
       sampleSize: ticketRows.length,
       recent: recentTickets,
     },
