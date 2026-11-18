@@ -28,6 +28,7 @@ export type CxCaseRecord = {
     matchedTerms: string[];
     requiresHumanQualityReview: boolean;
     automaticDispositionAllowed: false;
+    workflowStatus: "awaiting_human_quality_review" | "not_applicable";
   };
 };
 
@@ -55,7 +56,10 @@ export async function saveCxCase(input: {
     externalReference,
     status: input.triage.humanReviewRequired ? "needs_review" : "draft_ready",
     triage: input.triage,
-    qualityGovernance: input.qualityGovernance,
+    qualityGovernance: input.qualityGovernance ? {
+      ...input.qualityGovernance,
+      workflowStatus: input.qualityGovernance.potentialQualityEvent ? "awaiting_human_quality_review" : "not_applicable",
+    } : undefined,
     createdAt: new Date().toISOString(),
   };
 
@@ -81,4 +85,12 @@ export async function listCxCases(limit = 50): Promise<CxCaseRecord[]> {
     .orderBy(desc(modelRouterSettings.updatedAt))
     .limit(safeLimit);
   return rows.map((row) => row.value as CxCaseRecord);
+}
+
+/** Admin queue view: potential quality signals are separated from routine CX cases. */
+export async function listCxQualityEvents(limit = 50): Promise<CxCaseRecord[]> {
+  const cases = await listCxCases(100);
+  return cases
+    .filter((item) => item.qualityGovernance?.potentialQualityEvent === true)
+    .slice(0, Math.max(1, Math.min(100, Math.floor(limit))));
 }
