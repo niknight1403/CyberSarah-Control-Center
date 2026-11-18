@@ -44,9 +44,9 @@ services:
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - alloy_data:/var/lib/alloy
+      - alloy_data:/var/lib/alloy\n    environment:\n      FARO_INGEST_KEY: ${FARO_INGEST_KEY:?set FARO_INGEST_KEY}\n      APP_PUBLIC_ORIGIN: ${APP_PUBLIC_ORIGIN:?set APP_PUBLIC_ORIGIN}
     ports:
-      - "127.0.0.1:12345:12345"
+      - "127.0.0.1:12345:12345"\n      - "127.0.0.1:12347:12347"
     networks: [observe]
 
   grafana:
