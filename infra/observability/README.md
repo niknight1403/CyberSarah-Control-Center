@@ -73,3 +73,17 @@ npm run growth:autopilot
 ```
 
 It is disabled unless `GROWTH_AUTOPILOT_ENABLED=1` is set. When enabled it reads only the existing seven-day funnel/revenue aggregates and writes deduplicated proposals to `revenue_jobs` with status `pending_approval`. It does not publish content, send messages, change prices, create Stripe charges, or start/adjust ad spend. Configure `GROWTH_AUTOPILOT_MIN_CLICKS` to set the minimum evidence threshold (default 50). A separate admin approval and execution path must be implemented and audited before any proposal can become an external action.
+
+## Integrations and capability inventory
+
+The admin-only tRPC query `capabilityCatalog.list` exposes a unified inventory for LLM providers, TTS, MCP, payments, commerce/product catalogs, CRM, analytics/reach, social channels, email, media, developer tooling and observability. It returns configured environment-variable NAMES only, never values.
+
+Important status semantics:
+- `available`: built-in capability exists in the codebase (e.g. Edge TTS); it is not proof of live reachability.
+- `configured`: required environment slots are present (any-of alternatives are supported); it is not proof of successful authentication.
+- `partial` / `not_configured`: required configuration is incomplete or absent.
+- `health: not_checked`: no provider-specific live probe has verified this capability yet.
+
+Existing live checks remain separate: the current live-probe service verifies Resend sender-domain/DNS, TikTok token/client and Meta app/token. MCP has a real remote transport/client and approval/governance path; live execution remains explicitly gated. Existing LLM routing supports configured provider fallbacks. Edge TTS is built in; ElevenLabs is an optional provider slot. Stripe and Digistore24 catalog/payment paths remain separate and preserve their own approval boundaries.
+
+Run the focused inventory tests with `npm run capabilities:check`. For the broader provider audit use `npm run audit` and `npm run audit:strict`. Never infer social reach or publishing rights from a token's presence: each platform's approved scopes and live endpoint response are required.
