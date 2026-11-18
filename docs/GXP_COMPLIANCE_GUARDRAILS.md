@@ -61,3 +61,11 @@ No electronic signatures, validated audit trail, validated computer system, Part
 - If the audit store is unavailable, policy evaluation throws and the controlled action remains blocked.
 
 These endpoints are not a substitute for server-side enforcement at every business write path. No existing batch, CAPA, document, refund or quality workflow is wired to this gate yet. The router is a guarded foundation, not an active system-wide interlock.
+
+## CX quality-signal handling added in this branch
+
+- `cxWorkforce.recordTriage` now detects a conservative set of potential quality-event terms (for example deviation/CAPA, contamination, product defect, recall, adverse effect and data-integrity indicators).
+- A detected signal forces `humanReviewRequired=true` and adds the metadata escalation reason `potential_gxp_quality_event`.
+- The persisted CX case stores only the matched rule terms and review flags as governance metadata; it does not store the original customer message or subject.
+- `automaticDispositionAllowed` is always false. This is keyword-based triage support, not a validated classifier and not a determination that a report is legally a regulated quality event.
+- Ordinary support messages remain on the existing CX route. All customer replies remain draft-only; no HubSpot writes or outbound messages were added.
