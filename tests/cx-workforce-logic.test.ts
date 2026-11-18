@@ -38,3 +38,19 @@ describe("CX workforce triage", () => {
     expect(() => triageCxRequest({ message: "x".repeat(12001) })).toThrow();
   });
 });
+
+
+describe("CX external reference privacy guard", () => {
+  it("accepts opaque provider identifiers and normalizes whitespace", async () => {
+    const { normalizeCxExternalReference } = await import("@/server/cx-workforce-store");
+    expect(normalizeCxExternalReference("  thread_123-ABC  ")).toBe("thread_123-ABC");
+    expect(normalizeCxExternalReference("   ")).toBeNull();
+  });
+
+  it("rejects email addresses and free-form references before database access", async () => {
+    const { normalizeCxExternalReference } = await import("@/server/cx-workforce-store");
+    expect(() => normalizeCxExternalReference("customer@example.com")).toThrow(/opake ID/);
+    expect(() => normalizeCxExternalReference("thread id with spaces")).toThrow(/opake ID/);
+    expect(() => normalizeCxExternalReference("x".repeat(129))).toThrow(/opake ID/);
+  });
+});
