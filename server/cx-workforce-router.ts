@@ -2,6 +2,7 @@ import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
 import { triageCxRequest } from "../lib/cx-workforce-logic";
 import { describeHubspotEnv } from "./integrations/hubspot";
+import { getCxHubspotSnapshot } from "./cx-workforce-hubspot";
 
 export const cxWorkforceRouter = router({
   readiness: adminProcedure.query(() => {
@@ -23,6 +24,7 @@ export const cxWorkforceRouter = router({
       ],
     };
   }),
+  liveInboxSnapshot: adminProcedure.query(() => getCxHubspotSnapshot()),
   previewTriage: adminProcedure.input(z.object({
     subject: z.string().max(300).optional(),
     message: z.string().min(3).max(12000),
