@@ -33,7 +33,7 @@ export async function getCxHubspotSnapshot(env: Record<string, string | undefine
       baseUrl: config.baseUrl,
       ticketRead: "not_configured" as const,
       conversationRead: "not_configured" as const,
-      tickets: { total: 0, open: 0, recent: [] as Array<Record<string, string | null>> },
+      tickets: { total: 0, openInSample: 0, sampleSize: 0, recent: [] as Array<Record<string, string | null>> },
       conversations: { totalReturned: 0, active: 0, recent: [] as Array<Record<string, string | null>> },
       problems: [config.problem ?? "HubSpot ist nicht konfiguriert."],
       writesPerformed: false as const,
@@ -100,10 +100,11 @@ export async function getCxHubspotSnapshot(env: Record<string, string | undefine
     conversationRead: conversationResult.status === "fulfilled" ? "connected" as const : "failed" as const,
     tickets: {
       total: Number(ticketResult.status === "fulfilled" ? ticketResult.value.total ?? ticketRows.length : 0),
-      open: ticketRows.filter((ticket) => {
+      openInSample: ticketRows.filter((ticket) => {
         const stage = String(ticket.properties?.hs_pipeline_stage ?? "").toLowerCase();
         return stage !== "4" && stage !== "closed" && stage !== "closedwon";
       }).length,
+      sampleSize: ticketRows.length,
       recent: recentTickets,
     },
     conversations: {
