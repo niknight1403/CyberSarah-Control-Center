@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateGxpControlledAction, GXP_CONTROLLED_ACTIONS } from "@/lib/gxp-policy-logic";
+import { detectGxpQualitySignal, evaluateGxpControlledAction, GXP_CONTROLLED_ACTIONS } from "@/lib/gxp-policy-logic";
 
 describe("GxP controlled-action policy", () => {
   it("fails closed for every controlled action while approval is unverified", () => {
@@ -33,5 +33,21 @@ describe("GxP controlled-action policy", () => {
     });
     expect(result.decision).toBe("block");
     expect(result.executable).toBe(false);
+  });
+});
+
+describe("GxP quality signal detection", () => {
+  it("flags potential deviations and requires human quality review", () => {
+    const result = detectGxpQualitySignal({ message: "Wir melden eine Abweichung im Prozess." });
+    expect(result.potentialQualityEvent).toBe(true);
+    expect(result.requiresHumanQualityReview).toBe(true);
+    expect(result.automaticDispositionAllowed).toBe(false);
+  });
+
+  it("does not flag an ordinary support question", () => {
+    const result = detectGxpQualitySignal({ message: "Wie ändere ich mein Profilbild?" });
+    expect(result.potentialQualityEvent).toBe(false);
+    expect(result.requiresHumanQualityReview).toBe(false);
+    expect(result.matchedTerms).toEqual([]);
   });
 });
