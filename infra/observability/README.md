@@ -6,7 +6,7 @@ This opt-in stack consolidates Grafana dashboards, Prometheus metrics, Loki logs
 
 ```bash
 cd infra/observability
-export GRAFANA_ADMIN_PASSWORD="$(openssl rand -hex 24)"
+bash ./bootstrap-env.sh\n# Copy generated METRICS_TOKEN into the CyberSarah application environment.\n# Set APP_PUBLIC_ORIGIN to the exact deployed browser origin.
 docker compose up -d
 ```
 
