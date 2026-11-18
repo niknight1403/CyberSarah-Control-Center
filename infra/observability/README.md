@@ -18,7 +18,7 @@ The API module exposes:
 - `GET /api/observability/summary` — existing revenue_daily_stats, funnel_campaigns and conversion_events, with no customer email or raw webhook payload.
 - `GET /api/observability/metrics` — Prometheus text exposition for the same aggregate metrics.
 
-Both endpoints require `Authorization: Bearer $METRICS_TOKEN`. Do not put this token into a public browser bundle or commit it. Configure Prometheus authorization through a secret-mounted file or scrape through a protected private proxy; the example scrape config is a target template and must not be considered authenticated until configured.
+Both endpoints require `Authorization: Bearer $METRICS_TOKEN`. Do not put this token into a public browser bundle or commit it. The Compose stack passes the token to Prometheus through its local environment and expands it at scrape time. Set APP_METRICS_TARGET to the application host and port. The token must match the application environment and must never be included in a public browser bundle.
 
 ## Logs, RUM, APK and Kubernetes
 
@@ -32,7 +32,7 @@ Both endpoints require `Authorization: Bearer $METRICS_TOKEN`. Do not put this t
 ## Synthetic checks
 
 ```bash
-k6 run infra/observability/synthetics/checkout-smoke.js
+npm run obs:synthetic
 ```
 
 The initial synthetic is deliberately read-only and checks application health. It does not create Stripe payments, send emails, publish content or modify customer data. Add authenticated checkout test-mode flows only with dedicated Stripe test credentials.
