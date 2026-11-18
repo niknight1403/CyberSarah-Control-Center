@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
 import { triageCxRequest } from "../lib/cx-workforce-logic";
+import { detectGxpQualitySignal } from "../lib/gxp-policy-logic";
 import { describeHubspotEnv } from "./integrations/hubspot";
 import { getCxHubspotSnapshot } from "./cx-workforce-hubspot";
 import { listCxCases, saveCxCase } from "./cx-workforce-store";
@@ -42,8 +43,13 @@ export const cxWorkforceRouter = router({
   })).mutation(async ({ input }) => {
     const { externalReference, ...triageInput } = input;
     const triage = triageCxRequest(triageInput);
-    const saved = await saveCxCase({ source: "admin_preview", externalReference, triage });
-    return { saved: true as const, case: saved, customerMessageStored: false as const };
+    const qualityGovernance = detectGxpQualitySignal(triageInput);
+    if (qualityGovernance.potentialQualityEvent) {
+      triage.humanReviewRequired = true;
+      triage.escalationReasons = [...new Set([...triage.escalationReasons, "potential_gxp_quality_event"])];
+    }
+    const saved = await saveCxCase({ source: "admin_preview", externalReference, triage, qualityGovernance });
+    return { saved: true as const, case: saved, qualityGovernance, customerMessageStored: false as const };
   }),
   batchPreview: adminProcedure.input(z.object({
     requests: z.array(z.object({
