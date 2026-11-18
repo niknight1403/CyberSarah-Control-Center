@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, next-development, feat/unified-observability-growth-command-center]
   pull_request:
-    branches: [main, next-development]
+    branches: [main, next-development, feat/unified-observability-growth-command-center]
   workflow_dispatch:
 
 permissions:
