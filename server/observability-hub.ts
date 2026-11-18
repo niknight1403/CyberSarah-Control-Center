@@ -113,4 +113,27 @@ export function registerObservabilityHub(app: Express) {
       res.status(503).type("text/plain").send("metrics_query_failed\n");
     }
   });
+
+  app.get("/api/observability/autopilot/proposals", async (req, res) => {
+    if (!requireMetricsAccess(req, res)) return;
+    const db = await getDb();
+    if (!db) { res.status(503).json({ error: "database_unavailable" }); return; }
+    try {
+      const result = await db.execute(sql`SELECT kind, status, payload, updated_at
+        FROM revenue_jobs
+        WHERE kind LIKE 'growth_%'
+        ORDER BY updated_at DESC
+        LIMIT 50`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json({
+        generatedAt: new Date().toISOString(),
+        mode: "proposal-only",
+        approvalRequired: true,
+        proposals: rowsOf<Record<string, unknown>>(result),
+      });
+    } catch (error) {
+      console.error("[ObservabilityHub] autopilot proposals query failed:", error instanceof Error ? error.message : "unknown");
+      res.status(503).json({ error: "autopilot_proposals_unavailable" });
+    }
+  });
 }
