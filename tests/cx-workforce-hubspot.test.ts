@@ -12,14 +12,14 @@ describe("CX HubSpot read-only snapshot", () => {
     expect(result.writesPerformed).toBe(false);
   });
 
-  it("reads ticket and conversation metadata without exposing message bodies", async () => {
+  it("reads ticket and conversation metadata without exposing message bodies or subjects", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/crm/v3/objects/tickets/search")) {
         return new Response(JSON.stringify({
           total: 1,
           results: [{ id: "42", properties: {
-            subject: "Login issue",
+            subject: "Example private subject",
             hs_pipeline_stage: "1",
             hs_ticket_priority: "HIGH",
             hs_ticket_category: "TECHNICAL",
@@ -28,7 +28,7 @@ describe("CX HubSpot read-only snapshot", () => {
         }), { status: 200, headers: { "content-type": "application/json" } });
       }
       return new Response(JSON.stringify({
-        results: [{ id: "thread-1", status: "OPEN", inboxId: "inbox-1", messageText: "private body" }],
+        results: [{ id: "thread-1", status: "OPEN", inboxId: "inbox-1", messageText: "Example private body" }],
       }), { status: 200, headers: { "content-type": "application/json" } });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -37,9 +37,10 @@ describe("CX HubSpot read-only snapshot", () => {
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("connected");
     expect(result.tickets.total).toBe(1);
-    expect(result.tickets.openInSample).toBe(1);
+    expect(result.tickets.sampleSize).toBe(1);
     expect(result.conversations.active).toBe(1);
-    expect(JSON.stringify(result)).not.toContain("private body");
+    expect(JSON.stringify(result)).not.toContain("Example private body");
+    expect(JSON.stringify(result)).not.toContain("Example private subject");
     expect(result.writesPerformed).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
