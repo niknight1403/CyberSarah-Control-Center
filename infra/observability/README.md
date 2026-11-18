@@ -62,3 +62,14 @@ The app already has a crash-reporting router and self-healing module. Connect th
 ## Kubernetes
 
 For Kubernetes workloads, deploy Grafana Alloy using the included example under `kubernetes/`. It discovers pod logs and cluster events and forwards them to the same Loki backend. Install kube-state-metrics and node-exporter separately to expose workload/node metrics. Point the cluster agent at a private Loki endpoint reachable from the cluster; do not expose Loki publicly.
+
+
+## Growth Autopilot (proposal-only)
+
+Start the hourly, conservative growth signal evaluator:
+
+```bash
+npm run growth:autopilot
+```
+
+It is disabled unless `GROWTH_AUTOPILOT_ENABLED=1` is set. When enabled it reads only the existing seven-day funnel/revenue aggregates and writes deduplicated proposals to `revenue_jobs` with status `pending_approval`. It does not publish content, send messages, change prices, create Stripe charges, or start/adjust ad spend. Configure `GROWTH_AUTOPILOT_MIN_CLICKS` to set the minimum evidence threshold (default 50). A separate admin approval and execution path must be implemented and audited before any proposal can become an external action.
