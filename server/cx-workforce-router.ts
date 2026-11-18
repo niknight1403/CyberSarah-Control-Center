@@ -38,7 +38,7 @@ export const cxWorkforceRouter = router({
     message: z.string().min(3).max(12000),
     productInterest: z.string().max(100).optional(),
     purchaseIntent: z.string().max(100).optional(),
-    externalReference: z.string().max(128).optional(),
+    externalReference: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
   })).mutation(async ({ input }) => {
     const { externalReference, ...triageInput } = input;
     const triage = triageCxRequest(triageInput);
