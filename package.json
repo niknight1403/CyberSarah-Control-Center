@@ -42,7 +42,9 @@
     "backend:live": "python scripts/backend_health_check.py --live",
     "backend:worker": "python scripts/backend_health_check.py --worker",
     "backend:health:all": "python scripts/backend_health_check.py --all",
-    "audit:strict": "tsx scripts/integration-audit.ts --strict"
+    "audit:strict": "tsx scripts/integration-audit.ts --strict",
+    "obs:synthetic": "k6 run infra/observability/synthetics/checkout-smoke.js",
+    "revenue:start": "tsx server/jobs/revenueGuard.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
