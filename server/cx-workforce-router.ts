@@ -4,7 +4,7 @@ import { triageCxRequest } from "../lib/cx-workforce-logic";
 import { detectGxpQualitySignal } from "../lib/gxp-policy-logic";
 import { describeHubspotEnv } from "./integrations/hubspot";
 import { getCxHubspotSnapshot } from "./cx-workforce-hubspot";
-import { listCxCases, saveCxCase } from "./cx-workforce-store";
+import { listCxCases, listCxQualityEvents, saveCxCase } from "./cx-workforce-store";
 
 export const cxWorkforceRouter = router({
   readiness: adminProcedure.query(() => {
@@ -28,6 +28,7 @@ export const cxWorkforceRouter = router({
   }),
   liveInboxSnapshot: adminProcedure.query(() => getCxHubspotSnapshot()),
   caseQueue: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(({ input }) => listCxCases(input?.limit ?? 50)),
+  qualityEventQueue: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(({ input }) => listCxQualityEvents(input?.limit ?? 50)),
   previewTriage: adminProcedure.input(z.object({
     subject: z.string().max(300).optional(),
     message: z.string().min(3).max(12000),
