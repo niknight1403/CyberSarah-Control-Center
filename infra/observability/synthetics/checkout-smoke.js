@@ -1,3 +1,5 @@
+/* global __ENV */
+/* eslint-disable import/no-unresolved -- k6 modules are provided by the k6 runtime, not Node. */
 import http from "k6/http";
 import { check, sleep } from "k6";
 
