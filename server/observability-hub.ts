@@ -40,18 +40,18 @@ export function registerObservabilityHub(app: Express) {
 
     try {
       const [dailyResult, funnelResult, conversionResult] = await Promise.all([
-        db.execute(sql`SELECT day, clicks, conversions, revenue_cents AS "revenueCents"
+        db.execute(sql`SELECT day, clicks, conversions, "revenueCents" AS "revenueCents"
           FROM revenue_daily_stats ORDER BY day DESC LIMIT 30`),
         db.execute(sql`SELECT status, COUNT(*)::int AS campaigns,
-          COALESCE(SUM(view_count), 0)::bigint AS views,
-          COALESCE(SUM(click_count), 0)::bigint AS clicks
+          COALESCE(SUM("viewCount"), 0)::bigint AS views,
+          COALESCE(SUM("clickCount"), 0)::bigint AS clicks
           FROM funnel_campaigns GROUP BY status ORDER BY status`),
-        db.execute(sql`SELECT currency, event_type AS "eventType",
+        db.execute(sql`SELECT currency, "eventType" AS "eventType",
           COUNT(*)::int AS events,
-          COALESCE(SUM(amount_cents), 0)::bigint AS "amountCents",
-          COALESCE(SUM(commission_cents), 0)::bigint AS "commissionCents"
+          COALESCE(SUM("amountCents"), 0)::bigint AS "amountCents",
+          COALESCE(SUM("commissionCents"), 0)::bigint AS "commissionCents"
           FROM conversion_events
-          WHERE occurred_at >= now() - interval '30 days'
+          WHERE "occurredAt" >= now() - interval '30 days'
           GROUP BY currency, event_type ORDER BY currency, event_type`),
       ]);
       const daily = rowsOf<Record<string, unknown>>(dailyResult);
@@ -83,7 +83,7 @@ export function registerObservabilityHub(app: Express) {
     if (!db) { res.status(503).type("text/plain").send("database_unavailable\n"); return; }
     try {
       const result = await db.execute(sql`SELECT
-        COALESCE(SUM(revenue_cents), 0)::bigint AS revenue_cents,
+        COALESCE(SUM("revenueCents"), 0)::bigint AS revenue_cents,
         COALESCE(SUM(clicks), 0)::bigint AS funnel_clicks,
         COALESCE(SUM(conversions), 0)::bigint AS funnel_conversions
         FROM revenue_daily_stats WHERE day >= to_char(current_date - 29, 'YYYY-MM-DD')`);
