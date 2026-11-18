@@ -1,5 +1,40 @@
 # CyberSarah Control Center – Status
 
+## 2026-11-09 – Optimierungslauf (Phase B): Befund 3 umgesetzt
+
+- **Schritt:** Phase B, Befund 3 aus `docs/openhands/ANALYSE.md`
+  (`neon-pulse-theme.ts`). Defensiv-Grep vor dem Loeschen wiederholt:
+  `neonPulse|neon-pulse-theme` trifft nur die Datei selbst in `lib/`; die
+  `statusAccent`-/`statusAccents`-Treffer in
+  `components/glass/revenue-autopilot-card.tsx` und `app/memory.tsx` sind
+  lokale Variablen ohne Import (belegt per `head`).
+- **Geaendert (Produktcode-Diff dieses Laufs, 1 Datei):**
+  - `lib/neon-pulse-theme.ts` entfernt (48 Zeilen, Export `neonPulse` +
+    `statusAccent`). Kein Ersatz, keine Re-Export-Datei. Massgebliche Tokens
+    kommen aus `lib/design/future-glass.ts` (produktive Nutzung u. a. in
+    `lib/design/future-glass-runtime.ts:3`,
+    `components/monetization/paywall-modal.tsx:3`).
+- **Pruefungen (alle gelaufen, alle gruen):**
+  - Vorher (Baseline, Datei noch vorhanden): `npm run check` – Exit 0;
+    `npm run test` – 472 Dateien bestanden / 1 uebersprungen (473),
+    3788 Tests bestanden / 3 uebersprungen (3791), 0 Fehlschlaege.
+  - Nachher (Datei entfernt): Defensiv-Grep `neonPulse` in `lib/ app/
+    components/ server/ tests/` – kein Treffer (Exit 1);
+    `npm run check` – Exit 0; `npm run test` – 472 / 1 (473),
+    3788 / 3 (3791), 0 Fehlschlaege. Keine Regression gegenueber Baseline.
+  - `npm install --prefer-offline --no-audit --no-fund` einmalig noetig
+    (`node_modules/` fehlte). Nebenwirkung: `package-lock.json` wurde um
+    26 `"dev": true`-Zeilen normalisiert – per `git checkout` revertiert,
+    nicht Teil des Diffs.
+- **Ergebnis:** Befund 3 erledigt (Pruefkriterium erfuellt: Datei entfernt,
+  `npm run check` bleibt gruen, `npm run test` ohne neue Fehlschlaege).
+  Kein `any`, kein leeres Catch, keine neue Abhaengigkeit.
+- **Offen:** Befunde 2, 5–8 aus ANALYSE.md. Naechster Hebel nach
+  Wirkung/Aufwand: Befund 6 (`graphics-motion-runtime.ts`, S/niedrig) oder
+  Befund 8 (`AGENTS.md`, S/niedrig).
+- **Naechster Schritt:** Befund 6 umsetzen – Test fuer
+  `decorativeMotionEnabled` mit gestubbten `matchMedia`/Plattformen.
+
 ## 2026-11-09 – Optimierungslauf (Phase B): Befund 4 umgesetzt
 
 - **Schritt:** Phase B, Befund 4 aus `docs/openhands/ANALYSE.md`
