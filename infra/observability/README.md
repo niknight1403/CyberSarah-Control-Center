@@ -24,7 +24,7 @@ Both endpoints require `Authorization: Bearer $METRICS_TOKEN`. Do not put this t
 
 - Alloy discovers Docker containers and ships container logs to Loki.
 - Send OpenTelemetry traces to the Alloy OTLP receiver on port 4317/4318 (the receiver is internal to the Compose network by default; publish it only on a private interface if remote agents need it).
-- Web RUM: instrument the web client with Grafana Faro Web SDK and forward to a separately authenticated Faro receiver/Alloy pipeline. Do not send session tokens, form values, email addresses or payment data.
+- Web RUM: Alloy exposes the Grafana Faro receiver at port 12347 on loopback. Put it behind the authenticated app proxy at a dedicated path, configure the exact APP_PUBLIC_ORIGIN and a public ingest key, then instrument the web client with the Grafana Faro Web SDK. Rate limiting is enabled and arbitrary source-map downloads are disabled. Do not send session tokens, form values, email addresses or payment data.
 - Android/APK: instrument app lifecycle, handled exceptions and performance spans with an OpenTelemetry-compatible React Native exporter; use release/version/build identifiers and scrub PII before export. Native crash symbolication is a separate release-pipeline task.
 - Kubernetes: deploy Alloy as a DaemonSet for pod logs and OTLP, and scrape kube-state-metrics plus node-exporter. Keep cluster credentials read-only and namespace-scoped. Docker Compose remains supported for non-Kubernetes deployments.
 - Umami can be connected as an additional first-party analytics source after its own database and privacy/consent configuration are provisioned; it is not silently enabled by this stack.
