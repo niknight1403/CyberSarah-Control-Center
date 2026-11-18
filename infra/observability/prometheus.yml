@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # The application endpoint requires Authorization: Bearer METRICS_TOKEN.
+  # Configure this job only when a protected reverse-proxy or Prometheus
+  # authorization_file is provisioned; never place the token in Git.
+  - job_name: cybersarah
+    metrics_path: /api/observability/metrics
+    static_configs:
+      - targets: ["host.docker.internal:3000"]
+    relabel_configs:
+      - target_label: service
+        replacement: cybersarah-control-center
