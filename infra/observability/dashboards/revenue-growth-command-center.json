@@ -33,18 +33,18 @@
     },
     {
       "id": 4,
-      "title": "HTTP request rate",
+      "title": "Process uptime",
       "type": "timeseries",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"expr": "rate(cybersarah_http_requests_total[5m])", "refId": "A"}],
+      "targets": [{"expr": "cybersarah_process_uptime_seconds", "refId": "A"}],
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
     },
     {
       "id": 5,
-      "title": "HTTP 5xx rate",
+      "title": "Resident memory",
       "type": "timeseries",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"expr": "rate(cybersarah_http_5xx_total[5m])", "refId": "A"}],
+      "targets": [{"expr": "cybersarah_process_resident_memory_bytes", "refId": "A"}],
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
     },
     {
