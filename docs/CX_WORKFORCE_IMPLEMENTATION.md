@@ -32,4 +32,4 @@ This slice adds an admin-only, deterministic CX triage foundation. It is deliber
 
 ## Validation
 
-Unit tests cover routing, escalation, draft-only behavior, conservative fallback, and input bounds. The repository CI must run typecheck, lint, and the full test suite for this stacked PR (base branch: `feat/unified-observability-growth-command-center`) before merge.
+Unit tests cover routing, escalation, draft-only behavior, conservative fallback, and input bounds. The repository CI must run typecheck, lint, and the full test suite for this stacked PR (base branch: `feat/unified-observability-growth-command-center`). Both `push` and `pull_request` workflow filters include that base branch so PR synchronization runs the full gate.
