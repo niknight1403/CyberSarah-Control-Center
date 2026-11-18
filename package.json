@@ -45,7 +45,8 @@
     "audit:strict": "tsx scripts/integration-audit.ts --strict",
     "obs:synthetic": "k6 run infra/observability/synthetics/checkout-smoke.js",
     "revenue:start": "tsx server/jobs/revenueGuard.ts",
-    "growth:autopilot": "tsx server/jobs/growthAutopilot.ts"
+    "growth:autopilot": "tsx server/jobs/growthAutopilot.ts",
+    "capabilities:check": "vitest run tests/capability-catalog.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
