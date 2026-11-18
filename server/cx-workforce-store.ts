@@ -23,6 +23,12 @@ export type CxCaseRecord = {
   status: "needs_review" | "draft_ready";
   triage: CxTriageResult;
   createdAt: string;
+  qualityGovernance?: {
+    potentialQualityEvent: boolean;
+    matchedTerms: string[];
+    requiresHumanQualityReview: boolean;
+    automaticDispositionAllowed: false;
+  };
 };
 
 /**
@@ -34,6 +40,7 @@ export async function saveCxCase(input: {
   source: CxCaseRecord["source"];
   externalReference?: string;
   triage: CxTriageResult;
+  qualityGovernance?: CxCaseRecord["qualityGovernance"];
 }) {
   const externalReference = normalizeCxExternalReference(input.externalReference);
   const db = await getDb();
@@ -48,6 +55,7 @@ export async function saveCxCase(input: {
     externalReference,
     status: input.triage.humanReviewRequired ? "needs_review" : "draft_ready",
     triage: input.triage,
+    qualityGovernance: input.qualityGovernance,
     createdAt: new Date().toISOString(),
   };
 
