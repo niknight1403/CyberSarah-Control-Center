@@ -89,6 +89,23 @@ function isRenderColdStart(response: Response): boolean {
 const COLD_START_RETRY_DELAY_MS = 12_000;
 
 /**
+ * Deterministic test seam (Repo-Konvention `setXForTests`).
+ *
+ * Why not fake timers: the retry sits between two real `await fetch(...)`
+ * calls, so advancing timers around a pending promise chain is racy. This
+ * binding only shortens the documented wait in test mode; production without
+ * an override still waits the full 12 s.
+ */
+let coldStartRetryDelayMs = COLD_START_RETRY_DELAY_MS;
+
+export function setRenderProxyRetryDelayForTests(ms: number | null): void {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error("Render-Proxy-Test-Hook ist nur im Test-Modus verfuegbar.");
+  }
+  coldStartRetryDelayMs = ms ?? COLD_START_RETRY_DELAY_MS;
+}
+
+/**
  * Sprint 88 — Direkter Server-zu-Workspace-Aufruf fuer den autonomen Chat-
  * Agenten (server/development-chat.ts). Nutzt dieselbe Cold-Start-Retry-
  * Logik wie der HTTP-Proxy, aber ohne den Umweg ueber einen eigenen
@@ -129,7 +146,7 @@ export async function callWorkspaceService(
     let response = await fetch(upstreamUrl, request);
     if (isRenderColdStart(response)) {
       console.warn("[WorkspaceAgentTool] Cold-Start-502 vom Workspace-Service — Retry nach 12 s:", upstreamUrl);
-      await new Promise((resolve) => setTimeout(resolve, COLD_START_RETRY_DELAY_MS));
+      await new Promise((resolve) => setTimeout(resolve, coldStartRetryDelayMs));
       response = await fetch(upstreamUrl, request);
     }
     if (isRenderColdStart(response)) {
@@ -195,7 +212,7 @@ export function registerRenderProxy(app: Express) {
 
       if (isRenderColdStart(upstreamResponse)) {
         console.warn("[RenderProxy] Cold-Start-502 vom Workspace-Service — Retry nach 12 s:", upstreamUrl);
-        await new Promise((resolve) => setTimeout(resolve, COLD_START_RETRY_DELAY_MS));
+        await new Promise((resolve) => setTimeout(resolve, coldStartRetryDelayMs));
         upstreamResponse = await fetch(
           upstreamUrl,
           buildUpstreamRequest(req, upstreamBase, upstreamPath),
