@@ -7,6 +7,15 @@ import type { CxTriageResult } from "../lib/cx-workforce-logic";
 
 const KEY_PREFIX = "cx-workforce:case:";
 
+/** Accept only opaque provider IDs; reject email addresses and free-form PII. */
+export function normalizeCxExternalReference(value?: string | null): string | null {
+  const normalized = value?.trim() || null;
+  if (normalized && !/^[A-Za-z0-9_-]{1,128}$/.test(normalized)) {
+    throw new Error("Externe CX-Referenz muss eine opake ID sein; personenbezogene Daten sind nicht zulässig.");
+  }
+  return normalized;
+}
+
 export type CxCaseRecord = {
   id: string;
   source: "admin_preview" | "hubspot";
@@ -26,13 +35,9 @@ export async function saveCxCase(input: {
   externalReference?: string;
   triage: CxTriageResult;
 }) {
+  const externalReference = normalizeCxExternalReference(input.externalReference);
   const db = await getDb();
   if (!db) throw new Error("CX-Fall konnte nicht gespeichert werden: Datenbank nicht verfügbar.");
-
-  const externalReference = input.externalReference?.trim() || null;
-  if (externalReference && !/^[A-Za-z0-9_-]{1,128}$/.test(externalReference)) {
-    throw new Error("Externe CX-Referenz muss eine opake ID sein; personenbezogene Daten sind nicht zulässig.");
-  }
   const id = externalReference
     ? createHash("sha256").update(`${input.source}:${externalReference}`).digest("hex").slice(0, 32)
     : randomUUID().replace(/-/g, "");
