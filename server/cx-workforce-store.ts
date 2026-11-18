@@ -30,6 +30,9 @@ export async function saveCxCase(input: {
   if (!db) throw new Error("CX-Fall konnte nicht gespeichert werden: Datenbank nicht verfügbar.");
 
   const externalReference = input.externalReference?.trim() || null;
+  if (externalReference && !/^[A-Za-z0-9_-]{1,128}$/.test(externalReference)) {
+    throw new Error("Externe CX-Referenz muss eine opake ID sein; personenbezogene Daten sind nicht zulässig.");
+  }
   const id = externalReference
     ? createHash("sha256").update(`${input.source}:${externalReference}`).digest("hex").slice(0, 32)
     : randomUUID().replace(/-/g, "");
