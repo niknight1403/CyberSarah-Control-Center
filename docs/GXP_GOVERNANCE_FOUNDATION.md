@@ -8,9 +8,11 @@ This is a technical governance foundation, not a validated GxP system, regulator
 
 - Admin-only tRPC mutation: `gxpGovernance.evaluateGate`.
 - Deterministic assessment for document changes, quality events, deviations, CAPA, training, releases and support escalations.
+- The initiating actor is taken from the authenticated server session, never from client input.
 - Requires a controlled SOP reference and traceable evidence identifiers.
 - Document changes and releases require a change-control reference.
-- High-risk activities require two distinct quality approvers other than the initiating actor.
+- High-risk activities remain blocked until a trusted quality-approval workflow exists.
+- The API does not accept approver IDs. Client-declared identities are not evidence of approval and must never be treated as signatures.
 - Evidence references are constrained to opaque identifiers; free-form text and email-like identifiers are rejected.
 - The result is assessment-only. It always returns `allowedToExecute: false`; it cannot approve, release, close, modify, or send anything.
 
@@ -23,7 +25,7 @@ CX can flag a support case as a potential quality event or deviation for assessm
 1. Define intended use, applicable regulations/annexes, system boundary and GxP impact.
 2. Establish validated requirements, risk controls, traceability matrix and test evidence.
 3. Implement immutable, tamper-evident audit records with trusted time source and retention controls.
-4. Add identity federation, role separation, electronic signatures and signature meaning where applicable.
+4. Add identity federation, role separation, a trusted approval registry and electronic signatures with signature meaning where applicable.
 5. Implement controlled document/SOP lifecycle, training records, change control, deviation and CAPA workflows.
 6. Validate backup/restore, disaster recovery, access reviews, supplier controls and periodic review.
 7. Conduct formal validation and quality approval; do not represent this foundation as compliant until then.
