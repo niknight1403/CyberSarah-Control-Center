@@ -4,7 +4,6 @@ import { gxpAuditEvents } from "../drizzle/schema";
 import { getDb } from "./db";
 
 const GENESIS_HASH = "0".repeat(64);
-const AUDIT_LOCK_KEY = 721904321;
 
 type AuditInput = {
   actorUserId: number;
