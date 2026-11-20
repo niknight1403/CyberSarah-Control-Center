@@ -16,7 +16,7 @@ type AuditInput = {
 };
 
 function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
   const record = value as Record<string, unknown>;
   return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
@@ -50,7 +50,7 @@ export async function appendGxpAuditEvent(input: AuditInput): Promise<{ id: numb
 
   return db.transaction(async (tx) => {
     // Serialize writers so each event links to exactly the preceding committed event.
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(${AUDIT_LOCK_KEY})`);
+    await tx.execute(sql.raw("SELECT pg_advisory_xact_lock(721904321::bigint)"));
     const [previous] = await tx
       .select({ eventHash: gxpAuditEvents.eventHash })
       .from(gxpAuditEvents)
