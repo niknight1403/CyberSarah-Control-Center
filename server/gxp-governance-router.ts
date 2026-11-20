@@ -9,7 +9,6 @@ export const gxpGovernanceRouter = router({
     sopReference: z.string().max(128).optional(),
     changeControlReference: z.string().max(128).optional(),
     evidenceReferences: z.array(z.string().max(128)).max(50).optional(),
-    approverIds: z.array(z.string().max(128)).max(10).optional(),
     riskLevel: z.enum(["low", "medium", "high", "critical"]).optional(),
   })).mutation(({ input, ctx }) => evaluateGxpGate({ ...input, actorId: String(ctx.user.id) })),
 });
