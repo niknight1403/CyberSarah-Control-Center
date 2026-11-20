@@ -9,7 +9,6 @@ export interface GxpGateInput {
   sopReference?: string;
   changeControlReference?: string;
   evidenceReferences?: string[];
-  approverIds?: string[];
   riskLevel?: "low" | "medium" | "high" | "critical";
 }
 
@@ -36,8 +35,6 @@ export function evaluateGxpGate(input: GxpGateInput): GxpGateResult {
   if (evidence.some((item) => item.length > 128 || !/^[A-Za-z0-9._:/-]+$/.test(item))) {
     throw new Error("Evidence references must be opaque identifiers, not free-form or personal data.");
   }
-  const approvers = [...new Set((input.approverIds ?? []).map((item) => String(item).trim()).filter(Boolean))];
-  if (approvers.some((item) => item.length > 128)) throw new Error("Approver identifiers are too long.");
   const requiredControls = [...BASE_CONTROLS];
   if (CHANGE_CONTROL_ACTIVITIES.includes(input.activity)) requiredControls.push("approved_change_control_reference");
   if (HIGH_RISK_ACTIVITIES.includes(input.activity) || input.riskLevel === "high" || input.riskLevel === "critical") {
@@ -49,14 +46,11 @@ export function evaluateGxpGate(input: GxpGateInput): GxpGateResult {
   if (CHANGE_CONTROL_ACTIVITIES.includes(input.activity) && !input.changeControlReference?.trim()) {
     missingControls.push("approved_change_control_reference");
   }
-  if (requiredControls.includes("two_distinct_quality_approvers") && approvers.filter((id) => id !== actorId).length < 2) {
+  // No trusted approval registry/signature workflow exists yet. Never treat client-supplied IDs as approvals.
+  if (requiredControls.includes("two_distinct_quality_approvers")) {
     missingControls.push("two_distinct_quality_approvers");
   }
-  const status: GxpGateStatus = missingControls.length
-    ? "blocked"
-    : approvers.length >= 2
-      ? "ready_for_human_approval"
-      : "human_review_required";
+  const status: GxpGateStatus = missingControls.length ? "blocked" : "human_review_required";
   return {
     framework: input.framework,
     activity: input.activity,
@@ -66,6 +60,6 @@ export function evaluateGxpGate(input: GxpGateInput): GxpGateResult {
     requiredControls,
     missingControls: [...new Set(missingControls)],
     humanApprovalRequired: true,
-    distinctApproverCount: approvers.length,
+    distinctApproverCount: 0,
   };
 }
