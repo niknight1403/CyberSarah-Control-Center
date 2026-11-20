@@ -11,22 +11,24 @@ describe("GxP governance gate", () => {
     expect(result.missingControls).toContain("approved_change_control_reference");
   });
 
-  it("never executes a release automatically, even when references and approvers exist", () => {
+  it("never executes or marks a release ready without a trusted approval workflow", () => {
     const result = evaluateGxpGate({
       framework: "GMP", activity: "release", actorId: "author-1",
       sopReference: "SOP-12", changeControlReference: "CC-42",
-      evidenceReferences: ["evidence-1"], approverIds: ["qa-1", "qa-2"], riskLevel: "critical",
+      evidenceReferences: ["evidence-1"], riskLevel: "critical",
     });
-    expect(result.status).toBe("ready_for_human_approval");
+    expect(result.status).toBe("blocked");
+    expect(result.missingControls).toContain("two_distinct_quality_approvers");
     expect(result.allowedToExecute).toBe(false);
     expect(result.humanApprovalRequired).toBe(true);
     expect(result.automationMode).toBe("assessment_only");
+    expect(result.distinctApproverCount).toBe(0);
   });
 
-  it("requires two distinct approvers beyond the initiating actor for high-risk actions", () => {
+  it("does not accept client-declared approvers as quality approvals", () => {
     const result = evaluateGxpGate({
       framework: "GxP_GENERIC", activity: "capa", actorId: "author-1",
-      sopReference: "SOP-1", evidenceReferences: ["ev-1"], approverIds: ["author-1", "qa-1"],
+      sopReference: "SOP-1", evidenceReferences: ["ev-1"],
     });
     expect(result.status).toBe("blocked");
     expect(result.missingControls).toContain("two_distinct_quality_approvers");
