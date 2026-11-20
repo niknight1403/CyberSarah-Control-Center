@@ -1,7 +1,7 @@
 -- GxP-specific append-only audit ledger.
 -- Hash chaining is serialized by a transaction-scoped advisory lock in the application.
 CREATE TABLE IF NOT EXISTS "gxp_audit_events" (
-  "id" bigserial PRIMARY KEY,
+  "id" serial PRIMARY KEY,
   "actor_user_id" integer NOT NULL REFERENCES "users"("id"),
   "framework" varchar(16) NOT NULL,
   "activity" varchar(32) NOT NULL,
