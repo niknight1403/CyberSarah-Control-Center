@@ -74,3 +74,15 @@ export async function listCxCases(limit = 50): Promise<CxCaseRecord[]> {
     .limit(safeLimit);
   return rows.map((row) => row.value as CxCaseRecord);
 }
+
+/** Load one minimized CX case by its opaque internal ID for a quality assessment. */
+export async function getCxCaseById(id: string): Promise<CxCaseRecord | null> {
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("Ungültige CX-Fall-ID.");
+  const db = await getDb();
+  if (!db) throw new Error("CX-Fall konnte nicht geladen werden: Datenbank nicht verfügbar.");
+  const [row] = await db.select({ value: modelRouterSettings.value })
+    .from(modelRouterSettings)
+    .where(eq(modelRouterSettings.key, `${KEY_PREFIX}${id}`))
+    .limit(1);
+  return row ? row.value as CxCaseRecord : null;
+}
