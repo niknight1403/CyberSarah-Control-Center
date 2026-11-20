@@ -14,6 +14,9 @@ This is a technical governance foundation, not a validated GxP system, regulator
 - High-risk activities remain blocked until a trusted quality-approval workflow exists.
 - The API does not accept approver IDs. Client-declared identities are not evidence of approval and must never be treated as signatures.
 - Evidence references are constrained to opaque identifiers; free-form text and email-like identifiers are rejected.
+- Every successful gate assessment is written to the dedicated `gxp_audit_events` table. The event contains minimized assessment metadata only; SOP/evidence references and customer content are not copied.
+- Audit events are linked by SHA-256 hashes. Writers take a PostgreSQL transaction-scoped advisory lock so concurrent events cannot fork the chain.
+- Database triggers reject UPDATE, DELETE and TRUNCATE on the audit table. Admin-only `gxpGovernance.auditIntegrity` recomputes the chain and reports the first broken event.
 - The result is assessment-only. It always returns `allowedToExecute: false`; it cannot approve, release, close, modify, or send anything.
 
 ## CX Workforce relationship
@@ -24,7 +27,7 @@ CX can flag a support case as a potential quality event or deviation for assessm
 
 1. Define intended use, applicable regulations/annexes, system boundary and GxP impact.
 2. Establish validated requirements, risk controls, traceability matrix and test evidence.
-3. Implement immutable, tamper-evident audit records with trusted time source and retention controls.
+3. Harden the audit ledger operationally: restricted database roles, protected backups/WORM export, trusted time source, retention controls, external hash anchoring and periodic independent verification. The current database trigger/hash chain is tamper-evident against ordinary application writes, not proof against a database owner or privileged operator.
 4. Add identity federation, role separation, a trusted approval registry and electronic signatures with signature meaning where applicable.
 5. Implement controlled document/SOP lifecycle, training records, change control, deviation and CAPA workflows.
 6. Validate backup/restore, disaster recovery, access reviews, supplier controls and periodic review.
