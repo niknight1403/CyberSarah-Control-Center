@@ -20,6 +20,7 @@ on:
       - "drizzle/0038_gxp_audit_ledger.sql"
       - "tests/gxp-governance.test.ts"
       - "tests/gxp-audit-logic.test.ts"
+      - "scripts/test-gxp-audit-migration.ts"
       - ".github/workflows/content-pipeline-gate.yml"
   push:
     branches: [main]
@@ -41,6 +42,7 @@ on:
       - "drizzle/0038_gxp_audit_ledger.sql"
       - "tests/gxp-governance.test.ts"
       - "tests/gxp-audit-logic.test.ts"
+      - "scripts/test-gxp-audit-migration.ts"
       - ".github/workflows/content-pipeline-gate.yml"
 permissions:
   contents: read
@@ -48,6 +50,22 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gxp_audit_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gxp_audit_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      GXP_AUDIT_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/gxp_audit_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,3 +76,4 @@ jobs:
       - run: npm run check
       - run: npx vitest run tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/gxp-governance.test.ts tests/gxp-audit-logic.test.ts
       - run: npm run build
+      - run: npx tsx scripts/test-gxp-audit-migration.ts
