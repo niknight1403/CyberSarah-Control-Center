@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { triageCxRequest } from "../lib/cx-workforce-logic";
 
@@ -56,9 +57,10 @@ describe("CX workforce database store", () => {
 
   it("persists only a minimized case and verifies the stored record", async () => {
     const { db } = makeDb();
+    const expectedId = createHash("sha256").update("admin_preview:case_123").digest("hex").slice(0, 32);
     mocks.selectLimit.mockImplementation(async () => [{
       value: {
-        id: "a".repeat(32),
+        id: expectedId,
         source: "admin_preview",
         externalReference: "case_123",
         status: "needs_review",
