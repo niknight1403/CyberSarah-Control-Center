@@ -12,7 +12,7 @@ import {
 import { ObjectStorageService, ObjectNotFoundError, UploadNonCompliantError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { db, storageUploadIntentsTable, tenantMembershipsTable } from "@workspace/db";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -147,13 +147,15 @@ async function registerPendingUpload(
   });
 }
 
-async function beginPendingUploadConfirmation(objectPath: string, principal: string): Promise<boolean> {
+async function beginPendingUploadConfirmation(objectPath: string, principal: string, ownerUserId: number | null, tenantId: number | null): Promise<boolean> {
   if (!db) throw new Error("Upload intent database unavailable");
   const [claimed] = await db.update(storageUploadIntentsTable)
     .set({ status: "confirming", updatedAt: new Date() })
     .where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
       eq(storageUploadIntentsTable.principal, principal),
+      ownerUserId === null ? isNull(storageUploadIntentsTable.ownerUserId) : eq(storageUploadIntentsTable.ownerUserId, ownerUserId),
+      tenantId === null ? isNull(storageUploadIntentsTable.tenantId) : eq(storageUploadIntentsTable.tenantId, tenantId),
       eq(storageUploadIntentsTable.status, "pending"),
       gt(storageUploadIntentsTable.expiresAt, new Date()),
     ))
@@ -161,24 +163,28 @@ async function beginPendingUploadConfirmation(objectPath: string, principal: str
   return Boolean(claimed);
 }
 
-async function completePendingUploadConfirmation(objectPath: string, principal: string, status: "confirmed" | "rejected"): Promise<void> {
+async function completePendingUploadConfirmation(objectPath: string, principal: string, ownerUserId: number | null, tenantId: number | null, status: "confirmed" | "rejected"): Promise<void> {
   if (!db) throw new Error("Upload intent database unavailable");
   await db.update(storageUploadIntentsTable)
     .set({ status, updatedAt: new Date() })
     .where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
       eq(storageUploadIntentsTable.principal, principal),
+      ownerUserId === null ? isNull(storageUploadIntentsTable.ownerUserId) : eq(storageUploadIntentsTable.ownerUserId, ownerUserId),
+      tenantId === null ? isNull(storageUploadIntentsTable.tenantId) : eq(storageUploadIntentsTable.tenantId, tenantId),
       eq(storageUploadIntentsTable.status, "confirming"),
     ));
 }
 
-async function releasePendingUploadConfirmation(objectPath: string, principal: string): Promise<void> {
+async function releasePendingUploadConfirmation(objectPath: string, principal: string, ownerUserId: number | null, tenantId: number | null): Promise<void> {
   if (!db) throw new Error("Upload intent database unavailable");
   await db.update(storageUploadIntentsTable)
     .set({ status: "pending", updatedAt: new Date() })
     .where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
       eq(storageUploadIntentsTable.principal, principal),
+      ownerUserId === null ? isNull(storageUploadIntentsTable.ownerUserId) : eq(storageUploadIntentsTable.ownerUserId, ownerUserId),
+      tenantId === null ? isNull(storageUploadIntentsTable.tenantId) : eq(storageUploadIntentsTable.tenantId, tenantId),
       eq(storageUploadIntentsTable.status, "confirming"),
       gt(storageUploadIntentsTable.expiresAt, new Date()),
     ));
@@ -257,7 +263,9 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
   if (!requireUploadDatabase(res)) return;
 
   const principal = getPrincipal(res);
-  if (!(await beginPendingUploadConfirmation(objectPath, principal))) {
+  const ownerUserId = getOwnerUserId(res);
+  const tenantId = getTenantId(res);
+  if (!(await beginPendingUploadConfirmation(objectPath, principal, ownerUserId, tenantId))) {
     res.status(403).json({ error: "No pending upload for this object path" });
     return;
   }
@@ -273,21 +281,23 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
     }).from(storageUploadIntentsTable).where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
       eq(storageUploadIntentsTable.principal, principal),
+      ownerUserId === null ? isNull(storageUploadIntentsTable.ownerUserId) : eq(storageUploadIntentsTable.ownerUserId, ownerUserId),
+      tenantId === null ? isNull(storageUploadIntentsTable.tenantId) : eq(storageUploadIntentsTable.tenantId, tenantId),
     )).limit(1);
     if (!intent || !matchesDeclaredUploadMetadata(
       { contentType: intent.declaredContentType, size: intent.declaredSize },
       { contentType, size },
     )) {
       await objectStorageService.deleteObjectEntity(objectPath);
-      await completePendingUploadConfirmation(objectPath, principal, "rejected");
+      await completePendingUploadConfirmation(objectPath, principal, ownerUserId, tenantId, "rejected");
       res.status(422).json({ error: "Upload-Metadaten stimmen nicht mit dem Auftrag überein" });
       return;
     }
-    await completePendingUploadConfirmation(objectPath, principal, "confirmed");
+    await completePendingUploadConfirmation(objectPath, principal, ownerUserId, tenantId, "confirmed");
     res.json(ConfirmUploadResponse.parse({ ok: true, contentType, size }));
   } catch (error) {
     if (error instanceof ObjectNotFoundError) {
-      await releasePendingUploadConfirmation(objectPath, principal);
+      await releasePendingUploadConfirmation(objectPath, principal, ownerUserId, tenantId);
       res.status(404).json({ error: "Object not found" });
       return;
     }
