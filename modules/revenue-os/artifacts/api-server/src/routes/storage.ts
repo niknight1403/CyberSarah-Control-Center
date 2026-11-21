@@ -9,6 +9,8 @@ import {
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError, UploadNonCompliantError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { db, storageUploadIntentsTable } from "@workspace/db";
+import { and, eq, gt } from "drizzle-orm";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -65,40 +67,72 @@ function uploadRateLimiter(req: Request, res: Response, next: NextFunction): voi
   next();
 }
 
-// Keep upload intents process-local until a durable, owner-bound store is available.
-// Confirmation uses a short claim so concurrent requests cannot both finalize the
-// same intent. Transient GCS errors release the claim for a safe retry.
-const OBJECT_PATH_PATTERN = /^\/objects\/uploads\/[0-9a-f-]{36}$/;
-const PENDING_UPLOAD_TTL_MS = 30 * 60 * 1000; // presigned URL TTL (15 min) + grace period
-type PendingUploadState = { expiresAt: number; status: "pending" | "confirming" };
-const pendingUploads = new Map<string, PendingUploadState>();
+// Upload intent state is durable in the Revenue OS PostgreSQL database.
+// This service identity is deliberately not represented as an end-user or tenant.
+const STORAGE_UPLOAD_PRINCIPAL = "revenue-os-storage-service";
+const OBJECT_PATH_PATTERN = /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/;
+const PENDING_UPLOAD_TTL_MS = 30 * 60 * 1000;
 
-function registerPendingUpload(objectPath: string): void {
-  pendingUploads.set(objectPath, { expiresAt: Date.now() + PENDING_UPLOAD_TTL_MS, status: "pending" });
+function requireUploadDatabase(res: Response): boolean {
+  if (db) return true;
+  res.status(503).json({ error: "Upload-Auftragsdatenbank nicht verfügbar" });
+  return false;
 }
 
-function beginPendingUploadConfirmation(objectPath: string): boolean {
-  const intent = pendingUploads.get(objectPath);
-  if (!intent || intent.expiresAt <= Date.now() || intent.status !== "pending") {
-    if (intent && intent.expiresAt <= Date.now()) pendingUploads.delete(objectPath);
-    return false;
-  }
-  intent.status = "confirming";
-  return true;
+async function registerPendingUpload(
+  objectPath: string,
+  declaredContentType: string,
+  declaredSize: number,
+): Promise<void> {
+  if (!db) throw new Error("Upload intent database unavailable");
+  const now = new Date();
+  await db.insert(storageUploadIntentsTable).values({
+    objectPath,
+    principal: STORAGE_UPLOAD_PRINCIPAL,
+    declaredContentType,
+    declaredSize,
+    status: "pending",
+    expiresAt: new Date(now.getTime() + PENDING_UPLOAD_TTL_MS),
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
-function completePendingUploadConfirmation(objectPath: string): void {
-  pendingUploads.delete(objectPath);
+async function beginPendingUploadConfirmation(objectPath: string): Promise<boolean> {
+  if (!db) throw new Error("Upload intent database unavailable");
+  const [claimed] = await db.update(storageUploadIntentsTable)
+    .set({ status: "confirming", updatedAt: new Date() })
+    .where(and(
+      eq(storageUploadIntentsTable.objectPath, objectPath),
+      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+      eq(storageUploadIntentsTable.status, "pending"),
+      gt(storageUploadIntentsTable.expiresAt, new Date()),
+    ))
+    .returning({ id: storageUploadIntentsTable.id });
+  return Boolean(claimed);
 }
 
-function releasePendingUploadConfirmation(objectPath: string): void {
-  const intent = pendingUploads.get(objectPath);
-  if (!intent) return;
-  if (intent.expiresAt <= Date.now()) {
-    pendingUploads.delete(objectPath);
-    return;
-  }
-  if (intent.status === "confirming") intent.status = "pending";
+async function completePendingUploadConfirmation(objectPath: string, status: "confirmed" | "rejected"): Promise<void> {
+  if (!db) throw new Error("Upload intent database unavailable");
+  await db.update(storageUploadIntentsTable)
+    .set({ status, updatedAt: new Date() })
+    .where(and(
+      eq(storageUploadIntentsTable.objectPath, objectPath),
+      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+      eq(storageUploadIntentsTable.status, "confirming"),
+    ));
+}
+
+async function releasePendingUploadConfirmation(objectPath: string): Promise<void> {
+  if (!db) throw new Error("Upload intent database unavailable");
+  await db.update(storageUploadIntentsTable)
+    .set({ status: "pending", updatedAt: new Date() })
+    .where(and(
+      eq(storageUploadIntentsTable.objectPath, objectPath),
+      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+      eq(storageUploadIntentsTable.status, "confirming"),
+      gt(storageUploadIntentsTable.expiresAt, new Date()),
+    ));
 }
 
 /**
@@ -117,6 +151,8 @@ router.post("/storage/uploads/request-url", requireStorageUploadAuth, uploadRate
 
   const { name, size, contentType } = parsed.data;
 
+  if (!requireUploadDatabase(res)) return;
+
   if (!ALLOWED_UPLOAD_CONTENT_TYPES.has(contentType)) {
     res.status(415).json({ error: "Nicht unterstützter Dateityp" });
     return;
@@ -130,7 +166,7 @@ router.post("/storage/uploads/request-url", requireStorageUploadAuth, uploadRate
   try {
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-    registerPendingUpload(objectPath);
+    await registerPendingUpload(objectPath, contentType, size);
 
     res.json(
       RequestUploadUrlResponse.parse({
@@ -169,7 +205,9 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
     return;
   }
 
-  if (!beginPendingUploadConfirmation(objectPath)) {
+  if (!requireUploadDatabase(res)) return;
+
+  if (!(await beginPendingUploadConfirmation(objectPath))) {
     res.status(403).json({ error: "No pending upload for this object path" });
     return;
   }
@@ -179,16 +217,29 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       allowedContentTypes: ALLOWED_UPLOAD_CONTENT_TYPES,
       maxSizeBytes: MAX_UPLOAD_SIZE_BYTES,
     });
-    completePendingUploadConfirmation(objectPath);
+    const [intent] = await db.select({
+      declaredContentType: storageUploadIntentsTable.declaredContentType,
+      declaredSize: storageUploadIntentsTable.declaredSize,
+    }).from(storageUploadIntentsTable).where(and(
+      eq(storageUploadIntentsTable.objectPath, objectPath),
+      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+    )).limit(1);
+    if (!intent || intent.declaredContentType !== contentType || intent.declaredSize !== size) {
+      await objectStorageService.deleteObjectEntity(objectPath);
+      await completePendingUploadConfirmation(objectPath, "rejected");
+      res.status(422).json({ error: "Upload-Metadaten stimmen nicht mit dem Auftrag überein" });
+      return;
+    }
+    await completePendingUploadConfirmation(objectPath, "confirmed");
     res.json(ConfirmUploadResponse.parse({ ok: true, contentType, size }));
   } catch (error) {
     if (error instanceof ObjectNotFoundError) {
-      releasePendingUploadConfirmation(objectPath);
+      await releasePendingUploadConfirmation(objectPath);
       res.status(404).json({ error: "Object not found" });
       return;
     }
     if (error instanceof UploadNonCompliantError) {
-      completePendingUploadConfirmation(objectPath);
+      await completePendingUploadConfirmation(objectPath, "rejected");
       req.log.warn(
         { objectPath, contentType: error.contentType, size: error.size },
         "Upload verstößt gegen Richtlinie, Objekt gelöscht"
