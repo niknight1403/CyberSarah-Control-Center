@@ -153,6 +153,6 @@ export async function retryFailedJobsControlled(options: {
     requeued: requeued.length,
     skipped,
     tokenRefresh,
-    detail: `${requeued.length} erneut eingeplant, ${plan.skipped.length} uebersprungen`,
+    detail: `${requeued.length} erneut eingeplant, ${skipped.length} uebersprungen`,
   };
 }
