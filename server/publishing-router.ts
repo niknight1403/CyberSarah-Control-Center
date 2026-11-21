@@ -140,6 +140,7 @@ export const publishingRouter = router({
           status: job.status,
           requiresManualReview: job.status === "versand_ungeklaert",
           mode: job.mode,
+          visibility: job.mode === "live_private" ? "private" : job.mode === "live" ? "public" : null,
           scheduledFor: job.scheduledFor.toISOString(),
           publishedAt: job.publishedAt?.toISOString() ?? null,
           lastError: job.lastError,
