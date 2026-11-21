@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { Readable } from "stream";
 import { isValidStorageUploadKey } from "../lib/storageUploadAuth";
+import { matchesDeclaredUploadMetadata } from "../lib/storageUploadIntentLogic";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -224,7 +225,10 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       eq(storageUploadIntentsTable.objectPath, objectPath),
       eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
     )).limit(1);
-    if (!intent || intent.declaredContentType !== contentType || intent.declaredSize !== size) {
+    if (!intent || !matchesDeclaredUploadMetadata(
+      { contentType: intent.declaredContentType, size: intent.declaredSize },
+      { contentType, size },
+    )) {
       await objectStorageService.deleteObjectEntity(objectPath);
       await completePendingUploadConfirmation(objectPath, "rejected");
       res.status(422).json({ error: "Upload-Metadaten stimmen nicht mit dem Auftrag überein" });
