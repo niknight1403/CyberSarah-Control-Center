@@ -38,7 +38,7 @@ function makeDb() {
   return { db, chain };
 }
 
-const triage = () => triageCxRequest({ message: "Ich habe eine Frage zu meinem Konto." });
+const triage = () => triageCxRequest({ message: "Ich möchte eine Rückerstattung, bitte Geld zurück." });
 
 describe("CX workforce database store", () => {
   beforeEach(() => {
