@@ -401,6 +401,22 @@ export async function listDraftQueue(limit = 50): Promise<DraftQueueRow[]> {
 export async function decideDraft(id: number, action: "approve" | "reject", decidedBy: string): Promise<DraftQueueRow | null> {
   const db = await getDb();
   if (!db) throw new Error("Datenbank nicht verfuegbar — Entscheidung nicht speicherbar.");
+  const [pending] = await db.select().from(draftQueue)
+    .where(and(eq(draftQueue.id, id), eq(draftQueue.status, "pending"))).limit(1);
+  if (!pending) return null;
+  if (action === "approve" && pending.kind === "content") {
+    const payload = pending.payload && typeof pending.payload === "object"
+      ? pending.payload as { personaId?: unknown; platform?: unknown; topic?: unknown; content?: unknown }
+      : {};
+    const supported = new Set(["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"]);
+    const personaId = typeof payload.personaId === "string" ? payload.personaId.trim() : "";
+    const platform = typeof payload.platform === "string" ? payload.platform.trim().toLowerCase() : "";
+    const topic = typeof payload.topic === "string" ? payload.topic.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    if (!personaId || !supported.has(platform) || !topic || content.length < 10) {
+      throw new Error("Dieser Content-Entwurf ist unvollständig oder nutzt eine nicht unterstützte Plattform. Er bleibt zur Korrektur offen.");
+    }
+  }
   const status: DraftStatus = action === "approve" ? "approved" : "rejected";
   const [row] = await db
     .update(draftQueue)
