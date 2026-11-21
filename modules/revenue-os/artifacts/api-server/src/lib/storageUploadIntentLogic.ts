@@ -19,8 +19,9 @@ export function resolveUploadTenantId(
   requestedTenant: string | undefined,
 ): UploadTenantResolution {
   if (requestedTenant !== undefined && requestedTenant !== "") {
+    if (!/^[1-9][0-9]*$/.test(requestedTenant)) return { ok: false, reason: "invalid" };
     const tenantId = Number(requestedTenant);
-    if (!Number.isSafeInteger(tenantId) || tenantId <= 0) return { ok: false, reason: "invalid" };
+    if (!Number.isSafeInteger(tenantId)) return { ok: false, reason: "invalid" };
     return memberships.includes(tenantId)
       ? { ok: true, tenantId }
       : { ok: false, reason: "forbidden" };
