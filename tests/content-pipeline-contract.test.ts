@@ -49,6 +49,37 @@ describe("X auth refresh contract", () => {
     expect(source).toContain("if (force) {");
   });
 });
+describe("publishing worker atomic claim contract", () => {
+  it("claims only due jobs for the authenticated tenant with a compare-and-set", () => {
+    const claim = readFileSync("server/publishing-claim.ts", "utf8");
+    const start = claim.indexOf("export async function claimDuePublishingJob");
+    const end = claim.indexOf("export type StalePublishingRecovery", start);
+    const fn = claim.slice(start, end);
+    expect(fn).toContain('eq(publishingJobs.userOpenId, userOpenId)');
+    expect(fn).toContain('eq(publishingJobs.status, "geplant")');
+    expect(fn).toContain("lte(publishingJobs.scheduledFor, now)");
+    expect(fn).toContain("returning()");
+    expect(fn).toContain("sql`${publishingJobs.attempts} + 1`");
+  });
+
+  it("arms provider dispatch only once and quarantines ambiguous outcomes", () => {
+    const claim = readFileSync("server/publishing-claim.ts", "utf8");
+    const armStart = claim.indexOf("export async function armPublishingDispatch");
+    const receiptStart = claim.indexOf("export async function confirmPublishingReceipt", armStart);
+    const arm = claim.slice(armStart, receiptStart);
+    expect(arm).toContain('eq(publishingJobs.status, "in_bearbeitung")');
+    expect(arm).toContain("isNull(publishingJobs.mode)");
+    expect(claim).toContain('eq(publishingJobs.mode, "dispatching")');
+    expect(claim).toContain('status: "versand_ungeklaert"');
+  });
+
+  it("recovers stale claims only at the persisted pre-dispatch boundary", () => {
+    const claim = readFileSync("server/publishing-claim.ts", "utf8");
+    expect(claim).toContain("activeAndStale, isNull(publishingJobs.mode)");
+    expect(claim).toContain("activeAndStale, isNotNull(publishingJobs.mode)");
+    expect(claim).toContain('status: "versand_ungeklaert"');
+  });
+});
 describe("publishing retry credential safety", () => {
   it("does not requeue auth failures without a successful supported token refresh", () => {
     const service = readFileSync("server/publishing-retry-service.ts", "utf8");
