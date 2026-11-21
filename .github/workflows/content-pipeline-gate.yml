@@ -17,6 +17,8 @@ on:
       - "lib/tiktok-publish-status-logic.ts"
       - "lib/draft-engine-logic.ts"
       - "lib/image-generation-logic.ts"
+      - "lib/asset-card-logic.ts"
+      - "tests/asset-card-logic.test.ts"
       - "lib/content-dedupe-logic.ts"
       - "drizzle/schema.ts"
       - "drizzle/0026_approved_content_pipeline.sql"
@@ -43,6 +45,8 @@ on:
       - "lib/tiktok-publish-status-logic.ts"
       - "lib/draft-engine-logic.ts"
       - "lib/image-generation-logic.ts"
+      - "lib/asset-card-logic.ts"
+      - "tests/asset-card-logic.test.ts"
       - "lib/content-dedupe-logic.ts"
       - "drizzle/schema.ts"
       - "drizzle/0026_approved_content_pipeline.sql"
@@ -66,5 +70,5 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run check
-      - run: npx vitest run tests/content-pipeline-contract.test.ts tests/content-dedupe-logic.test.ts tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/tiktok-publish-status-logic.test.ts tests/publishing-queue-logic.test.ts
+      - run: npx vitest run tests/content-pipeline-contract.test.ts tests/content-dedupe-logic.test.ts tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/asset-card-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/tiktok-publish-status-logic.test.ts tests/publishing-queue-logic.test.ts
       - run: npm run build
