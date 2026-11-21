@@ -37,8 +37,10 @@ jobs:
         id: version
         env:
           GH_TOKEN: ${{ github.token }}
+          # Keep workflow_dispatch input out of the generated shell source.
+          REQUESTED_VERSION_INPUT: ${{ github.event.inputs.version_name }}
         run: |
-          REQUESTED_VERSION="${{ github.event.inputs.version_name || '' }}"
+          REQUESTED_VERSION="${REQUESTED_VERSION_INPUT:-}"
           if [ -z "$REQUESTED_VERSION" ] && [ -f .github/release-requests/version.txt ]; then
             REQUESTED_VERSION="$(tr -d '\r\n ' < .github/release-requests/version.txt)"
           fi
@@ -130,8 +132,10 @@ jobs:
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cybersarah-release.keystore"
-          ls -l "$RUNNER_TEMP/cybersarah-release.keystore"
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/cybersarah-release.keystore"
+          chmod 600 "$RUNNER_TEMP/cybersarah-release.keystore"
+          test -s "$RUNNER_TEMP/cybersarah-release.keystore"
 
       - name: Expo-Web-Export — Variante Admin (web-dist ueberschreiben)
         run: EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo export -p web --output-dir web-dist
