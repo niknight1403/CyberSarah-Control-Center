@@ -209,7 +209,7 @@ export async function resolveXToken(options: { now?: Date; force?: boolean } = {
   const store = activeStore();
   const row = await store.load();
 
-  if (row && !shouldRefreshXToken(row.expiresAt, now)) {
+  if (row && !force && !shouldRefreshXToken(row.expiresAt, now)) {
     return { token: row.accessToken, refreshed: false };
   }
 
