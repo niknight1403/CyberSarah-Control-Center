@@ -19,8 +19,8 @@ import {
   setPublishingJobAsset,
   enqueueCampaignForUser,
   listPublishingJobsForUser,
-  retryFailedPublishingJobs,
 } from "./publishing-service";
+import { retryFailedJobsControlled } from "./publishing-retry-service";
 
 export const publishingRouter = router({
   /** Read-only monitoring; no secrets and no cross-account totals. */
@@ -161,7 +161,15 @@ export const publishingRouter = router({
     .input(z.object({ jobId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => ({ cancelled: await cancelPublishingJob(ctx.user.openId, input.jobId) })),
 
-  retryFailed: protectedProcedure.mutation(async ({ ctx }) => ({
-    requeued: await retryFailedPublishingJobs(ctx.user.openId),
-  })),
+  retryFailed: protectedProcedure.mutation(async ({ ctx }) => {
+    const result = await retryFailedJobsControlled({ userOpenId: ctx.user.openId });
+    if (!result.ok) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: result.detail ?? "Retry-Prüfung fehlgeschlagen." });
+    return {
+      requeued: result.requeued,
+      considered: result.considered,
+      skipped: result.skipped,
+      tokenRefresh: result.tokenRefresh,
+      detail: result.detail,
+    };
+  }),
 });
