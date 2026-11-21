@@ -1,6 +1,7 @@
 import { pgTable, serial, text, timestamp, varchar, integer, numeric, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -78,6 +79,22 @@ export const tenantsTable = pgTable(
   ]
 );
 
+// ─── Benutzer-Tenant-Mitgliedschaften ─────────────────────────────────────────
+export const tenantMembershipsTable = pgTable(
+  "tenant_memberships",
+  {
+    id: serial("id").primaryKey(),
+    tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 32 }).notNull().default("member"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tenant_memberships_tenant_user_idx").on(table.tenantId, table.userId),
+    index("tenant_memberships_user_idx").on(table.userId),
+  ],
+);
+
 // ─── token_logs ────────────────────────────────────────────────────────────────
 
 export const tokenLogsTable = pgTable(
@@ -132,6 +149,7 @@ export const insertTokenLogSchema = createInsertSchema(tokenLogsTable).omit({ id
 export const insertBlacklistSchema = createInsertSchema(blacklistsTable).omit({ id: true, createdAt: true });
 
 export type Tenant = typeof tenantsTable.$inferSelect;
+export type TenantMembership = typeof tenantMembershipsTable.$inferSelect;
 export type TokenLog = typeof tokenLogsTable.$inferSelect;
 export type Blacklist = typeof blacklistsTable.$inferSelect;
 
