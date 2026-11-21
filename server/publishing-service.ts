@@ -426,7 +426,9 @@ async function publishLive(
     // senden — ein zweiter 401 ist ein ehrlicher Fehler (kein Blind-Retry).
     try {
       const response = await client.post("/tweets", { text: content.slice(0, 280) });
-      return { externalId: String(response.data?.data?.id ?? "x-unknown") };
+      const postId = response.data?.data?.id;
+      if (typeof postId !== "string" || !postId.trim()) throw new Error("X lieferte keine Tweet-ID.");
+      return { externalId: postId.trim() };
     } catch (error) {
       const status = (error as { response?: { status?: number } })?.response?.status;
       if (status !== 401 || !options.onXUnauthorized) throw error;
@@ -434,7 +436,9 @@ async function publishLive(
       if (!freshToken) throw error;
       const retryClient = platformClient("x", freshToken);
       const retry = await retryClient.post("/tweets", { text: content.slice(0, 280) });
-      return { externalId: String(retry.data?.data?.id ?? "x-unknown") };
+      const postId = retry.data?.data?.id;
+      if (typeof postId !== "string" || !postId.trim()) throw new Error("X lieferte nach Token-Refresh keine Tweet-ID.");
+      return { externalId: postId.trim() };
     }
   }
   if (platform === "linkedin") {
@@ -450,14 +454,24 @@ async function publishLive(
       },
       visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
     });
-    return { externalId: String(response.data?.id ?? "linkedin-unknown") };
+    const postId = response.data?.id;
+    if (typeof postId !== "string" || !postId.trim()) throw new Error("LinkedIn lieferte keine Post-ID.");
+    return { externalId: postId.trim() };
   }
   if (platform === "threads") {
     if (!cred.endpointUserId) throw new Error("Threads-User-ID fehlt.");
-    const response = await client.post(`/${cred.endpointUserId}/threads`, null, {
+    const created = await client.post(`/${cred.endpointUserId}/threads`, null, {
       params: { access_token: cred.token, text: content.slice(0, 500), media_type: "TEXT" },
     });
-    return { externalId: String(response.data?.id ?? "threads-unknown") };
+    const creationId = created.data?.id;
+    if (typeof creationId !== "string" || !creationId.trim()) throw new Error("Threads lieferte keine Container-ID.");
+    // Threads requires a separate publish call; container creation is not a post.
+    const published = await client.post(`/${cred.endpointUserId}/threads_publish`, null, {
+      params: { access_token: cred.token, creation_id: creationId },
+    });
+    const postId = published.data?.id;
+    if (typeof postId !== "string" || !postId.trim()) throw new Error("Threads-Publish lieferte keine Beitrags-ID.");
+    return { externalId: postId.trim() };
   }
   if (platform === "instagram") {
     if (!cred.endpointUserId) throw new Error("Instagram-User-ID fehlt (INSTAGRAM_PUBLISH_USER_ID).");
@@ -579,7 +593,9 @@ async function publishInstagramLive(
     const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
       params: { access_token: cred.token, creation_id: carouselId },
     });
-    return { externalId: String(publish.data?.id ?? `ig-${carouselId}`) };
+    const postId = publish.data?.id;
+    if (typeof postId !== "string" || !postId.trim()) throw new Error("Instagram-Carousel lieferte keine Beitrags-ID.");
+    return { externalId: postId.trim() };
   }
 
   if (assets.length === 1) {
@@ -597,7 +613,9 @@ async function publishInstagramLive(
       const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
         params: { access_token: cred.token, creation_id: containerId },
       });
-      return { externalId: String(publish.data?.id ?? `ig-${containerId}`) };
+      const postId = publish.data?.id;
+      if (typeof postId !== "string" || !postId.trim()) throw new Error("Instagram-Reel lieferte keine Beitrags-ID.");
+      return { externalId: postId.trim() };
     }
     const check = validateAssetUrl(url, "image");
     if (!check.valid) throw new Error(`Bild-Asset ungueltig: ${check.reason}`);
@@ -606,7 +624,9 @@ async function publishInstagramLive(
     const publish = await client.post(`/${cred.endpointUserId}/media_publish`, null, {
       params: { access_token: cred.token, creation_id: containerId },
     });
-    return { externalId: String(publish.data?.id ?? `ig-${containerId}`) };
+    const postId = publish.data?.id;
+    if (typeof postId !== "string" || !postId.trim()) throw new Error("Instagram-Bild lieferte keine Beitrags-ID.");
+    return { externalId: postId.trim() };
   }
 
   throw new Error("Instagram braucht mindestens eine Asset-URL — Job ohne Asset nicht live.");
