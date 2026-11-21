@@ -25,7 +25,6 @@ on:
       - "tests/gxp-audit-logic.test.ts"
       - "tests/gxp-audit-store.test.ts"
       - "tests/gxp-cx-link.test.ts"
-      - "tests/cx-workforce-logic.test.ts tests/cx-workforce-store.test.ts tests/cx-workforce-store.test.ts"
       - "tests/cx-workforce-store.test.ts"
       - "scripts/test-gxp-audit-migration.ts"
       - ".github/workflows/content-pipeline-gate.yml"
@@ -54,6 +53,7 @@ on:
       - "tests/gxp-audit-logic.test.ts"
       - "tests/gxp-cx-link.test.ts"
       - "tests/cx-workforce-logic.test.ts"
+      - "tests/cx-workforce-store.test.ts"
       - "scripts/test-gxp-audit-migration.ts"
       - ".github/workflows/content-pipeline-gate.yml"
 permissions:
@@ -86,6 +86,6 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run check
-      - run: npx vitest run tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/gxp-governance.test.ts tests/gxp-governance-router.test.ts tests/gxp-audit-logic.test.ts tests/gxp-audit-store.test.ts tests/gxp-cx-link.test.ts tests/cx-workforce-logic.test.ts
+      - run: npx vitest run tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/gxp-governance.test.ts tests/gxp-governance-router.test.ts tests/gxp-audit-logic.test.ts tests/gxp-audit-store.test.ts tests/gxp-cx-link.test.ts tests/cx-workforce-logic.test.ts tests/cx-workforce-store.test.ts
       - run: npm run build
       - run: npx tsx scripts/test-gxp-audit-migration.ts
