@@ -41,6 +41,18 @@ describe("GxP governance gate", () => {
     })).toThrow(/opaque identifiers/);
   });
 
+  it("rejects free-form SOP and change-control references", () => {
+    expect(() => evaluateGxpGate({
+      framework: "GDP", activity: "support_escalation", actorId: "user-1",
+      sopReference: "customer@example.com", evidenceReferences: ["ev-1"],
+    })).toThrow(/SOP reference.*opaque identifier/);
+    expect(() => evaluateGxpGate({
+      framework: "GMP", activity: "release", actorId: "user-1",
+      sopReference: "SOP-1", changeControlReference: "customer@example.com",
+      evidenceReferences: ["ev-1"],
+    })).toThrow(/Change-control reference.*opaque identifier/);
+  });
+
   it("requires human review for ordinary support escalations", () => {
     const result = evaluateGxpGate({
       framework: "GxP_GENERIC", activity: "support_escalation", actorId: "agent-1",
