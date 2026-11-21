@@ -23,6 +23,7 @@ async function expectBlocked(label: string, operation: () => Promise<unknown>) {
   throw new Error(`Expected GxP audit ${label} to be rejected by database trigger.`);
 }
 
+async function main() {
 try {
   await pool.query("CREATE TABLE IF NOT EXISTS users (id serial PRIMARY KEY)");
   await pool.query(migration);
@@ -90,3 +91,10 @@ try {
 } finally {
   await pool.end();
 }
+
+}
+
+void main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
