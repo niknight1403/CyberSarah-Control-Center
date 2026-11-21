@@ -36,7 +36,7 @@ export const draftEngineRouter = router({
   decide: adminProcedure
     .input(z.object({ id: z.number().int().positive(), action: z.enum(["approve", "reject"]) }))
     .mutation(async ({ input, ctx }) => {
-      const decidedBy = ctx.user?.openId ?? ctx.user?.email ?? "unbekannt";
+      const decidedBy = ctx.user.openId;
       const row = await decideDraft(input.id, input.action, String(decidedBy));
       if (!row) return { ok: false as const, reason: "Entwurf nicht (mehr) offen — vielleicht schon entschieden." };
       let processing: { inserted: boolean; jobId: number | null } | null = null;
