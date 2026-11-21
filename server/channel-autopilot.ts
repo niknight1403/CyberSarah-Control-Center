@@ -1,5 +1,5 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
-import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments } from "../drizzle/schema";
+import { and, desc, eq, gte, or, sql } from "drizzle-orm";
+import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments,users } from "../drizzle/schema";
 import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
 import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
@@ -84,7 +84,11 @@ export async function reconcileApprovedContentDrafts(limit=50){
       invalid++;
       continue;
     }
-    const result=await enqueueApprovedContentDraft(row.decidedBy,{id:row.id,personaId,platform,topic,content});
+    // Older builds stored email as decidedBy; resolve it to the canonical OAuth openId.
+    const [owner]=await db.select({openId:users.openId}).from(users)
+      .where(or(eq(users.openId,row.decidedBy),eq(users.email,row.decidedBy))).limit(1);
+    if(!owner?.openId){invalid++;continue;}
+    const result=await enqueueApprovedContentDraft(owner.openId,{id:row.id,personaId,platform,topic,content});
     result.inserted?inserted++:reused++;
   }
   return {scanned:rows.length,inserted,reused,invalid};
