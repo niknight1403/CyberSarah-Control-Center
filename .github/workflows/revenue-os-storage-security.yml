@@ -1,0 +1,29 @@
+name: Revenue OS Storage Security
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/revenue-os/artifacts/api-server/src/lib/storageUploadAuth.ts"
+      - "modules/revenue-os/artifacts/api-server/src/routes/storage.ts"
+      - "tests/storage-upload-auth.test.ts"
+      - ".github/workflows/revenue-os-storage-security.yml"
+  pull_request:
+    paths:
+      - "modules/revenue-os/artifacts/api-server/src/lib/storageUploadAuth.ts"
+      - "modules/revenue-os/artifacts/api-server/src/routes/storage.ts"
+      - "tests/storage-upload-auth.test.ts"
+      - ".github/workflows/revenue-os-storage-security.yml"
+permissions:
+  contents: read
+jobs:
+  storage-upload-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx vitest run tests/storage-upload-auth.test.ts
