@@ -17,6 +17,7 @@ on:
       - "lib/gxp-audit-logic.ts"
       - "server/gxp-audit-store.ts"
       - "server/gxp-governance-router.ts"
+      - "server/cx-workforce-store.ts"
       - "drizzle/0038_gxp_audit_ledger.sql"
       - "tests/gxp-governance.test.ts"
       - "tests/gxp-audit-logic.test.ts"
