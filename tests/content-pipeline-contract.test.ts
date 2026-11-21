@@ -156,6 +156,7 @@ describe("provider publication receipt contract", () => {
     expect(source).toContain("X lieferte keine Tweet-ID");
     expect(source).toContain("LinkedIn lieferte keine Post-ID");
     expect(source).toContain("Bluesky lieferte keinen gültigen Record-URI");
+    expect(source).not.toContain('?? "bluesky-unknown"');
     expect(source).not.toContain('?? "x-unknown"');
     expect(source).not.toContain('?? "linkedin-unknown"');
     expect(source).not.toContain('?? "threads-unknown"');
