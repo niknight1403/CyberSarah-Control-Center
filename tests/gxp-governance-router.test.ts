@@ -6,15 +6,15 @@ const mocks = vi.hoisted(() => ({
   getCxCaseById: vi.fn(),
 }));
 
-vi.mock("@/server/gxp-audit-store", () => ({
+vi.mock("../server/gxp-audit-store", () => ({
   appendGxpAuditEvent: mocks.appendGxpAuditEvent,
   verifyGxpAuditChain: mocks.verifyGxpAuditChain,
 }));
-vi.mock("@/server/cx-workforce-store", () => ({
+vi.mock("../server/cx-workforce-store", () => ({
   getCxCaseById: mocks.getCxCaseById,
 }));
 
-import { gxpGovernanceRouter } from "@/server/gxp-governance-router";
+import { gxpGovernanceRouter } from "../server/gxp-governance-router";
 
 const adminContext = {
   req: {} as never,
