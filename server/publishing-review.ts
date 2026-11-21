@@ -6,6 +6,7 @@ import {and, asc, count, desc, eq, ilike, ne, or, sql} from "drizzle-orm";
 import {TRPCError} from "@trpc/server";
 import {publishingJobs,publishingReviewEvents} from "../drizzle/schema";
 import {cleanReviewSearch,validManualReviewReceipt,type ReviewPlatform} from "../lib/publishing-review-logic";
+import {publishingReceiptMode} from "../lib/publishing-queue-logic";
 import {getDb} from "./db";
 
 type PublishingDb=NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -136,7 +137,7 @@ export async function reconcileUncertainPublishingJob(
     }
 
     const [changed]=await tx.update(publishingJobs).set(decision.resolution==="confirmed_published"
-      ? {status:"veroeffentlicht" as const,mode:"live",externalId:decision.externalId.trim(),
+      ? {status:"veroeffentlicht" as const,mode:publishingReceiptMode(decision.externalId.trim()),externalId:decision.externalId.trim(),
           publishedAt:now,lastError:null,updatedAt:now}
       : {status:"abgebrochen" as const,
           lastError:"Manuell geprüft und ohne erneute Veröffentlichung abgeschlossen.",
