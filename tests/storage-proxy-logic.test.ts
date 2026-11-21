@@ -13,8 +13,7 @@ describe("storage proxy validation", () => {
     }
   });
 
-  it("accepts HTTPS signed URLs from supported object-storage providers", () => {
-    expect(validateSignedStorageUrl("https://storage.googleapis.com/bucket/object?X-Goog-Signature=abc")).toBe(true);
+  it("accepts HTTPS signed URLs from the configured GCS host", () => {
     expect(validateSignedStorageUrl("https://storage.googleapis.com/bucket/object?X-Goog-Signature=abc")).toBe(true);
   });
 
