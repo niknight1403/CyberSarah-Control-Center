@@ -1039,3 +1039,23 @@ export const mcpApprovalRequests = pgTable("mcp_approval_requests", {
 
 export type McpApprovalRequestRow = typeof mcpApprovalRequests.$inferSelect;
 export type InsertMcpApprovalRequestRow = typeof mcpApprovalRequests.$inferInsert;
+
+
+/**
+ * GxP-specific append-only audit chain. The database migration installs
+ * UPDATE/DELETE/TRUNCATE rejection triggers; inserts are serialized by the store.
+ */
+export const gxpAuditEvents = pgTable("gxp_audit_events", {
+  id: serial("id").primaryKey(),
+  actorUserId: integer("actor_user_id").notNull().references(() => users.id),
+  framework: varchar("framework", { length: 16 }).notNull(),
+  activity: varchar("activity", { length: 32 }).notNull(),
+  assessmentStatus: varchar("assessment_status", { length: 32 }).notNull(),
+  missingControls: jsonb("missing_controls").$type<string[]>().notNull().default([]),
+  eventPayload: jsonb("event_payload").$type<Record<string, unknown>>().notNull().default({}),
+  previousHash: varchar("previous_hash", { length: 64 }).notNull(),
+  eventHash: varchar("event_hash", { length: 64 }).notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type GxpAuditEventRow = typeof gxpAuditEvents.$inferSelect;

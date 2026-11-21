@@ -39,7 +39,6 @@ describe("CX workforce triage", () => {
   });
 });
 
-
 describe("CX external reference privacy guard", () => {
   it("accepts opaque provider identifiers and normalizes whitespace", async () => {
     const { normalizeCxExternalReference } = await import("@/server/cx-workforce-store");
@@ -52,5 +51,50 @@ describe("CX external reference privacy guard", () => {
     expect(() => normalizeCxExternalReference("customer@example.com")).toThrow(/opake ID/);
     expect(() => normalizeCxExternalReference("thread id with spaces")).toThrow(/opake ID/);
     expect(() => normalizeCxExternalReference("x".repeat(129))).toThrow(/opake ID/);
+  });
+});
+
+describe("persisted CX record validation", () => {
+  it("accepts a valid minimized case record", async () => {
+    const { parseCxCaseRecord } = await import("@/server/cx-workforce-store");
+    const triage = triageCxRequest({ message: "Hallo, ich habe eine Frage." });
+    const record = {
+      id: "a".repeat(32),
+      source: "hubspot",
+      externalReference: "thread_123",
+      status: "needs_review",
+      triage,
+      createdAt: "2026-11-21T00:00:00.000Z",
+    };
+    expect(parseCxCaseRecord(record, record.id)).toEqual(record);
+  });
+
+  it("rejects malformed triage payloads, unexpected fields and mismatched IDs", async () => {
+    const { parseCxCaseRecord } = await import("@/server/cx-workforce-store");
+    const triage = triageCxRequest({ message: "Hallo, ich habe eine Frage." });
+    const record = {
+      id: "b".repeat(32),
+      source: "hubspot",
+      externalReference: "thread_123",
+      status: "needs_review",
+      triage,
+      createdAt: "2026-11-21T00:00:00.000Z",
+    };
+    expect(() => parseCxCaseRecord({ ...record, triage: { ...triage, category: "unknown" } })).toThrow(/Ungültiger gespeicherter CX-Fall/);
+    expect(() => parseCxCaseRecord({ ...record, rawMessage: "PII must not be accepted" })).toThrow(/Ungültiger gespeicherter CX-Fall/);
+    expect(() => parseCxCaseRecord(record, "c".repeat(32))).toThrow(/Datenbankschlüssel/);
+  });
+
+  it("rejects a status that bypasses mandatory human review", async () => {
+    const { parseCxCaseRecord } = await import("@/server/cx-workforce-store");
+    const triage = triageCxRequest({ message: "Hallo, ich habe eine Frage." });
+    expect(() => parseCxCaseRecord({
+      id: "d".repeat(32),
+      source: "admin_preview",
+      externalReference: null,
+      status: "draft_ready",
+      triage,
+      createdAt: "2026-11-21T00:00:00.000Z",
+    })).toThrow(/Ungültiger gespeicherter CX-Fall/);
   });
 });
