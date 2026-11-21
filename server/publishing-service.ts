@@ -23,7 +23,6 @@ import { create, type AxiosInstance } from "axios";
 import {
   autoCardAssetUrl,
   validateAssetUrl,
-  VIDEO_ASSET_EXTENSIONS,
 } from "../lib/asset-card-logic";
 
 import { publishingJobs, type InsertPublishingJobRow, type PublishingJobRow } from "../drizzle/schema";
@@ -602,7 +601,7 @@ async function publishInstagramLive(
 
   if (assets.length === 1) {
     const url = assets[0];
-    const isVideo = VIDEO_ASSET_EXTENSIONS.some((ext) => url.toLowerCase().split("?")[0].endsWith(ext));
+    const isVideo = validateAssetUrl(url, "video").valid;
     if (isVideo) {
       const check = validateAssetUrl(url, "video");
       if (!check.valid) throw new Error(`Reels-Asset ungueltig: ${check.reason}`);
