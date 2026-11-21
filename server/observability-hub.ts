@@ -3,6 +3,17 @@ import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 
+/**
+ * I/O-Seam: Der Hub haengt nur an der Datenbank. Tests koennen sie ersetzen,
+ * ohne `vi.mock` zu benutzen (die Suite laeuft mit `isolate: false`, ein Mock
+ * wuerde in Nachbardateien desselben Workers lecken).
+ */
+export interface ObservabilityDeps {
+  getDb: typeof getDb;
+}
+
+export const defaultObservabilityDeps: ObservabilityDeps = { getDb };
+
 function authorized(req: Request): boolean {
   const expected = (process.env.METRICS_TOKEN ?? "").trim();
   const supplied = (req.header("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
@@ -32,10 +43,14 @@ function requireMetricsAccess(req: Request, res: Response): boolean {
  * Read-only aggregation over the existing CyberSarah revenue tables.
  * No second billing database and no raw customer PII leave this endpoint.
  */
-export function registerObservabilityHub(app: Express) {
+export function registerObservabilityHub(
+  app: Express,
+  deps: ObservabilityDeps = defaultObservabilityDeps,
+) {
+  const resolveDb = () => deps.getDb();
   app.get("/api/observability/summary", async (req, res) => {
     if (!requireMetricsAccess(req, res)) return;
-    const db = await getDb();
+    const db = await resolveDb();
     if (!db) { res.status(503).json({ error: "database_unavailable" }); return; }
 
     try {
@@ -79,7 +94,7 @@ export function registerObservabilityHub(app: Express) {
 
   app.get("/api/observability/metrics", async (req, res) => {
     if (!requireMetricsAccess(req, res)) return;
-    const db = await getDb();
+    const db = await resolveDb();
     if (!db) { res.status(503).type("text/plain").send("database_unavailable\n"); return; }
     try {
       const result = await db.execute(sql`SELECT
@@ -116,7 +131,7 @@ export function registerObservabilityHub(app: Express) {
 
   app.get("/api/observability/autopilot/proposals", async (req, res) => {
     if (!requireMetricsAccess(req, res)) return;
-    const db = await getDb();
+    const db = await resolveDb();
     if (!db) { res.status(503).json({ error: "database_unavailable" }); return; }
     try {
       const result = await db.execute(sql`SELECT kind, status, payload, updated_at
