@@ -15,6 +15,7 @@ vi.mock("../server/cx-workforce-store", () => ({
   getCxCaseById: mocks.getCxCaseById,
 }));
 
+import { CxCaseRecordValidationError } from "../server/cx-workforce-store";
 import { gxpGovernanceRouter } from "../server/gxp-governance-router";
 
 const adminContext = {
@@ -101,7 +102,7 @@ describe("GxP governance router audit behavior", () => {
   });
   it("audits malformed persisted CX records without exposing stored values", async () => {
     mocks.getCxCaseById.mockRejectedValueOnce(
-      new (class CxCaseRecordValidationError extends Error {})("invalid stored CX case"),
+      new CxCaseRecordValidationError("invalid stored CX case"),
     );
     const caller = gxpGovernanceRouter.createCaller(adminContext);
 
