@@ -15,6 +15,9 @@ describe("approved content production contract", () => {
     expect(publishing).toContain("job.contentOverride?.trim()");
     expect(publishing).toContain("approved-draft:");
     expect(readFileSync("server/draft-engine-router.ts", "utf8")).toContain("enqueueApprovedContentDraft");
+    const decision = readFileSync("server/draft-engine.ts", "utf8");
+    expect(decision).toContain("Dieser Content-Entwurf ist unvollständig oder nutzt eine nicht unterstützte Plattform");
+    expect(decision.indexOf("Dieser Content-Entwurf ist unvollständig")).toBeLessThan(decision.indexOf(".update(draftQueue)"));
     expect(readFileSync("server/channel-autopilot.ts", "utf8")).toContain("reconcileApprovedContentDrafts");
     const reconciler = readFileSync("server/channel-autopilot.ts", "utf8");
     expect(reconciler).toContain('supported.has(platform)');
