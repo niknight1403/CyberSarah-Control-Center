@@ -229,6 +229,17 @@ export async function resolveXToken(options: { now?: Date; force?: boolean } = {
     }
   }
 
+  // force=true is used after a provider 401. In that path an old DB/ENV
+  // access token is not an acceptable fallback: only a completed rotation
+  // may authorize the single controlled provider retry.
+  if (force) {
+    return {
+      token: null,
+      refreshed: false,
+      reason: "Erzwungener Refresh lieferte keinen neuen Token — kein Fallback auf den abgelehnten Zugang.",
+    };
+  }
+
   const envToken = process.env.X_PUBLISH_TOKEN?.trim() || null;
   const dbTokenExpired = Boolean(row?.expiresAt && row.expiresAt.getTime() <= now.getTime());
   if (row?.accessToken && !dbTokenExpired) {
