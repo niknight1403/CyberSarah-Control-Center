@@ -17,8 +17,8 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
-// Upload capabilities are privileged. Require a dedicated server-to-server key;
-// do not reuse the dashboard/browser key or rely on the private deployment boundary.
+// Upload capabilities are privileged. Accept either a verified Revenue OS session
+// or a dedicated server-to-server key; never trust a caller-supplied user/tenant ID.
 async function requireStorageUploadAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const expected = process.env["REVENUE_OS_STORAGE_API_KEY"] ?? "";
   const supplied = req.get("X-Revenue-Storage-Key") ?? "";
@@ -72,8 +72,8 @@ async function requireStorageUploadAuth(req: Request, res: Response, next: NextF
   });
 }
 
-// Only server-side agents currently mint uploads. Keep the allowlist and size cap
-// aligned with the actual generated-image workflow; video upload is not enabled.
+// Keep the allowlist and size cap aligned with the supported image workflow;
+// video upload is intentionally disabled until its separate delivery path is verified.
 const ALLOWED_UPLOAD_CONTENT_TYPES = new Set([
   "image/png",
   "image/jpeg",
