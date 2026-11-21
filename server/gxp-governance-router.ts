@@ -63,7 +63,7 @@ export const gxpGovernanceRouter = router({
     evidenceReferences: z.array(z.string().max(128)).max(50).optional(),
     riskLevel: z.enum(["low", "medium", "high", "critical"]).optional(),
   })).mutation(async ({ input, ctx }) => {
-    let cxCase;
+    let cxCase: Awaited<ReturnType<typeof getCxCaseById>>;
     try {
       cxCase = await getCxCaseById(input.caseId);
     } catch (error) {
