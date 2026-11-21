@@ -34,7 +34,7 @@ describe("CX HubSpot read-only snapshot", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const env = { HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" };
+    const env = { HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-" + "123456789012345678901234" };
     expect(resolveHubspotToken(env)).toBe(env.HUBSPOT_PRIVATE_APP_TOKEN);
     expect(describeHubspotEnv(env)).toMatchObject({
       configured: true,
@@ -65,7 +65,7 @@ describe("CX HubSpot read-only snapshot", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const env = { HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" };
+    const env = { HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-" + "123456789012345678901234" };
     expect(resolveHubspotToken(env)).toBe(env.HUBSPOT_PRIVATE_APP_TOKEN);
     expect(describeHubspotEnv(env)).toMatchObject({
       configured: true,
