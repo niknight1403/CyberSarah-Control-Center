@@ -1,0 +1,89 @@
+# CyberSarah Unified Observability
+
+This opt-in stack consolidates Grafana dashboards, Prometheus metrics, Loki logs, Tempo traces and Alloy Docker-log collection. It is designed to complement the existing CyberSarah billing, funnel, conversion and Agentforge telemetry tables rather than creating a second revenue database.
+
+## Start
+
+```bash
+cd infra/observability
+bash ./bootstrap-env.sh\n# Copy generated METRICS_TOKEN into the CyberSarah application environment.\n# Set APP_PUBLIC_ORIGIN to the exact deployed browser origin.
+docker compose up -d
+```
+
+All host-published ports bind to loopback: Grafana `http://127.0.0.1:3000`, Prometheus `http://127.0.0.1:9090`, Loki `http://127.0.0.1:3100`, Tempo `http://127.0.0.1:3200`. Put Grafana behind the existing authenticated application proxy before remote access.
+
+## Application integration
+
+The API module exposes:
+- `GET /api/observability/summary` — existing revenue_daily_stats, funnel_campaigns and conversion_events, with no customer email or raw webhook payload.
+- `GET /api/observability/metrics` — Prometheus text exposition for the same aggregate metrics.
+
+Both endpoints require `Authorization: Bearer $METRICS_TOKEN`. Do not put this token into a public browser bundle or commit it. The Compose stack passes the token to Prometheus through its local environment and expands it at scrape time. Set APP_METRICS_TARGET to the application host and port. The token must match the application environment and must never be included in a public browser bundle.
+
+## Logs, RUM, APK and Kubernetes
+
+- Alloy discovers Docker containers and ships container logs to Loki.
+- Send OpenTelemetry traces to the Alloy OTLP receiver on port 4317/4318 (the receiver is internal to the Compose network by default; publish it only on a private interface if remote agents need it).
+- Web RUM: Alloy exposes the Grafana Faro receiver at port 12347 on loopback. Put it behind the authenticated app proxy at a dedicated path, configure the exact APP_PUBLIC_ORIGIN and a public ingest key, then instrument the web client with the Grafana Faro Web SDK. Rate limiting is enabled and arbitrary source-map downloads are disabled. Do not send session tokens, form values, email addresses or payment data.
+- Android/APK: instrument app lifecycle, handled exceptions and performance spans with an OpenTelemetry-compatible React Native exporter; use release/version/build identifiers and scrub PII before export. Native crash symbolication is a separate release-pipeline task.
+- Kubernetes: deploy Alloy as a DaemonSet for pod logs and OTLP, and scrape kube-state-metrics plus node-exporter. Keep cluster credentials read-only and namespace-scoped. Docker Compose remains supported for non-Kubernetes deployments.
+- Umami can be connected as an additional first-party analytics source after its own database and privacy/consent configuration are provisioned; it is not silently enabled by this stack.
+
+## Synthetic checks
+
+```bash
+npm run obs:synthetic
+```
+
+The initial synthetic is deliberately read-only and checks application health. It does not create Stripe payments, send emails, publish content or modify customer data. Add authenticated checkout test-mode flows only with dedicated Stripe test credentials.
+
+## Revenue semantics
+
+Revenue panels use recorded values from the existing database. They do not infer MRR from one-off sales, and they do not label gross volume as net revenue. Stripe and Digistore24 figures must be reconciled by currency, refunds, fees and event type before profitability/ROI is shown.
+
+## Acceptance boundary
+
+This is an opt-in implementation scaffold. Runtime startup, authenticated Prometheus scraping, web RUM SDK integration, Android release instrumentation, Kubernetes manifests, Umami provisioning and real checkout synthetic tests require deployment-specific configuration and verification. No production state is changed by adding these files.
+
+## Revenue Guard
+
+Start the hourly Stripe overdue-invoice monitor:
+
+```bash
+npm run revenue:start
+```
+
+It is **dry-run by default** and never sends mail unless `REVENUE_RECOVERY_LIVE=1`, `RESEND_API_KEY`, and `RESEND_FROM` are explicitly configured. Live mode uses Stripe's hosted invoice URL and stores a deduplication job in the existing `revenue_jobs` table. Review the legal basis, sender identity, customer communication preferences and test-mode credentials before enabling live recovery. Digistore24 cart abandonment is not inferred from an IPN; it requires an actual checkout-abandonment event source.
+
+## Mobile/APK crash telemetry
+
+The app already has a crash-reporting router and self-healing module. Connect the mobile crash reporter to the same Grafana stack through an approved Sentry-compatible or OpenTelemetry exporter, and attach only app version, build number, device class, OS version, crash fingerprint and sanitized stack trace. Never export auth tokens, user-entered content, payment details or full device identifiers. Android native crash symbolication requires matching release mapping files and is not enabled by this Compose stack alone.
+
+## Kubernetes
+
+For Kubernetes workloads, deploy Grafana Alloy using the included example under `kubernetes/`. It discovers pod logs and cluster events and forwards them to the same Loki backend. Install kube-state-metrics and node-exporter separately to expose workload/node metrics. Point the cluster agent at a private Loki endpoint reachable from the cluster; do not expose Loki publicly.
+
+
+## Growth Autopilot (proposal-only)
+
+Start the hourly, conservative growth signal evaluator:
+
+```bash
+npm run growth:autopilot
+```
+
+It is disabled unless `GROWTH_AUTOPILOT_ENABLED=1` is set. When enabled it reads only the existing seven-day funnel/revenue aggregates and writes deduplicated proposals to `revenue_jobs` with status `pending_approval`. It does not publish content, send messages, change prices, create Stripe charges, or start/adjust ad spend. Configure `GROWTH_AUTOPILOT_MIN_CLICKS` to set the minimum evidence threshold (default 50). A separate admin approval and execution path must be implemented and audited before any proposal can become an external action.
+
+## Integrations and capability inventory
+
+The admin-only tRPC query `capabilityCatalog.list` exposes a unified inventory for LLM providers, TTS, MCP, payments, commerce/product catalogs, CRM, analytics/reach, social channels, email, media, developer tooling and observability. It returns configured environment-variable NAMES only, never values.
+
+Important status semantics:
+- `available`: built-in capability exists in the codebase (e.g. Edge TTS); it is not proof of live reachability.
+- `configured`: required environment slots are present (any-of alternatives are supported); it is not proof of successful authentication.
+- `partial` / `not_configured`: required configuration is incomplete or absent.
+- `health: not_checked`: no provider-specific live probe has verified this capability yet.
+
+Existing live checks remain separate: the current live-probe service verifies Resend sender-domain/DNS, TikTok token/client and Meta app/token. MCP has a real remote transport/client and approval/governance path; live execution remains explicitly gated. Existing LLM routing supports configured provider fallbacks. Edge TTS is built in; ElevenLabs is an optional provider slot. Stripe and Digistore24 catalog/payment paths remain separate and preserve their own approval boundaries.
+
+Run the focused inventory tests with `npm run capabilities:check`. For the broader provider audit use `npm run audit` and `npm run audit:strict`. Never infer social reach or publishing rights from a token's presence: each platform's approved scopes and live endpoint response are required.

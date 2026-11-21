@@ -74,6 +74,7 @@ import { agenticLoopTelemetryBus } from "../agentic-loop-telemetry";
 import { isValidLoopSessionId } from "../../lib/agentic-loop-telemetry-logic";
 import { registerAgentforgeTelemetryRoutes } from "../agentforge-telemetry";
 import { registerApiV1Routes } from "../api-v1";
+import { registerObservabilityHub } from "../observability-hub";
 import { revenueLoopHistory, runRevenueLoopIteration } from "../revenue-loop-orchestrator";
 
 async function requireBillingUser(req: express.Request, res: express.Response) {
@@ -191,6 +192,8 @@ async function startServer() {
   // Agentforge-Telemetrie: POST /api/agentforge/events,
   // POST /api/agentforge/checkpoints, GET /api/agentforge/stream
   registerAgentforgeTelemetryRoutes(app);
+  // Unified read-only revenue, funnel and Prometheus observability API.
+  registerObservabilityHub(app);
   // v1-API: Health, Agenten-Lauf, LLM-Kaskade, Nutzungsbericht, Onboarding.
   registerApiV1Routes(app);
 

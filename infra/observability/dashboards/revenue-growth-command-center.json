@@ -1,0 +1,59 @@
+{
+  "uid": "cybersarah-revenue-growth",
+  "title": "CyberSarah | Revenue & Growth Command Center",
+  "tags": ["cybersarah", "revenue", "growth", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Recorded revenue · last 30 days (EUR cents)",
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "cybersarah_revenue_30d_cents", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "title": "Funnel clicks · last 30 days",
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "cybersarah_funnel_clicks_30d", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0}
+    },
+    {
+      "id": 3,
+      "title": "Funnel conversions · last 30 days",
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "cybersarah_funnel_conversions_30d", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0}
+    },
+    {
+      "id": 4,
+      "title": "Process uptime",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "cybersarah_process_uptime_seconds", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
+    },
+    {
+      "id": 5,
+      "title": "Resident memory",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "cybersarah_process_resident_memory_bytes", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
+    },
+    {
+      "id": 6,
+      "title": "Application errors",
+      "type": "logs",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"expr": "{service=~\".*\"} |= \"error\""}],
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 13}
+    }
+  ]
+}

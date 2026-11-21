@@ -22,6 +22,12 @@ export default function PluginsScreen() {
   const { settings } = useStudioSettings();
   // Server-Wahrheit statt Handpflege: welche Integration ist wirklich bereit?
   const integrations = trpc.integrations.list.useQuery(undefined, { retry: false, refetchInterval: 60_000 });
+  const me = trpc.account.me.useQuery(undefined, { retry: false });
+  const capabilityCatalog = trpc.capabilityCatalog.list.useQuery(undefined, {
+    enabled: me.data?.role === "admin",
+    retry: false,
+    refetchInterval: 60_000,
+  });
 
   const plugins = [
     {
@@ -98,6 +104,42 @@ export default function PluginsScreen() {
           </View>
         );
       })}
+
+      {me.data?.role === "admin" ? (
+        <>
+          <DrawerCard accent={`${glass.glassPalette.cyan}55`}>
+            <DrawerCardTitle>Capability-Katalog · Administrator</DrawerCardTitle>
+            <DrawerBodyText>
+              {capabilityCatalog.data
+                ? `${capabilityCatalog.data.summary.total} Einträge · ${capabilityCatalog.data.summary.configured} konfiguriert/verfügbar · ${capabilityCatalog.data.summary.partial} teilweise · ${capabilityCatalog.data.summary.notConfigured} nicht konfiguriert`
+                : capabilityCatalog.isLoading ? "Capability-Inventar wird geladen …" : "Capability-Inventar nicht erreichbar."}
+            </DrawerBodyText>
+            <DrawerBodyText>
+              Konfiguration ist kein Live-Test. Gesundheitsstatus wird erst nach einem echten Provider-Probe als verifiziert angezeigt.
+            </DrawerBodyText>
+          </DrawerCard>
+          {(capabilityCatalog.data?.capabilities ?? []).map((entry) => {
+            const configured = entry.configuration === "configured" || entry.configuration === "available";
+            const partial = entry.configuration === "partial";
+            const tone = configured ? glass.glassPalette.green : partial ? glass.glassPalette.amber : glass.glassPalette.magenta;
+            return (
+              <View key={entry.id} style={[styles.pluginCard, { borderColor: `${tone}55` }]}>
+                <View style={styles.pluginHeader}>
+                  <Text style={styles.pluginTitle}>{entry.name}</Text>
+                  <View style={[styles.badge, { backgroundColor: `${tone}22`, borderColor: tone }]}>
+                    <Text style={[styles.badgeText, { color: tone }]}>{entry.configuration}</Text>
+                  </View>
+                </View>
+                <Text style={styles.pluginDetail}>{entry.category.toUpperCase()} · Health: nicht geprüft</Text>
+                <Text style={styles.pluginDetail}>
+                  {entry.missingEnv.length > 0 ? `Fehlt: ${entry.missingEnv.join(", ")}` : entry.configuration === "available" ? "Im Code verfügbar; Live-Erreichbarkeit noch nicht geprüft." : "Konfigurationsslots vorhanden; Live-Authentifizierung noch nicht geprüft."}
+                </Text>
+                <Text style={styles.pluginDetail}>{entry.capabilities.join(" · ")}</Text>
+              </View>
+            );
+          })}
+        </>
+      ) : null}
 
       <Text style={styles.hint}>
         Verwaltung: <Link href="/settings" style={styles.hintLink}>Agenteneinstellungen</Link> · Neue Anschlüsse (MCP-Transporte) sind im Admin-Bereich konfiguriert.
