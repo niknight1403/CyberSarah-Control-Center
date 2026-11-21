@@ -56,14 +56,6 @@ describe("CX workforce database store", () => {
 
   it("persists only a minimized case and verifies the stored record", async () => {
     const { db } = makeDb();
-    const saved = {
-      id: "a".repeat(32),
-      source: "admin_preview",
-      externalReference: "case_123",
-      status: "needs_review",
-      triage: triage(),
-      createdAt: expect.any(String),
-    };
     mocks.selectLimit.mockImplementation(async () => [{
       value: { ...saved, createdAt: new Date().toISOString() },
     }]);
