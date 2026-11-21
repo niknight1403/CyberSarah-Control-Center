@@ -42,6 +42,13 @@ describe("publishing operations UI contract", () => {
     expect(card).toContain("stats.failureReasons.retryable===0");
   });
 });
+describe("X auth refresh contract", () => {
+  it("forces a fresh X token refresh after provider auth failure", () => {
+    const source = readFileSync("server/x-token-service.ts", "utf8");
+    expect(source).toContain("if (row && !force && !shouldRefreshXToken(row.expiresAt, now))");
+    expect(source).toContain("if (force) {");
+  });
+});
 describe("publishing retry credential safety", () => {
   it("does not requeue auth failures without a successful supported token refresh", () => {
     const service = readFileSync("server/publishing-retry-service.ts", "utf8");
