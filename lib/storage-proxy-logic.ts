@@ -2,12 +2,6 @@
  * Validates storage-proxy inputs before a privileged backend lookup or redirect.
  * Keep this pure so path and URL policy can be regression-tested without network access.
  */
-const STORAGE_HOST_SUFFIXES = [
-  "storage.googleapis.com",
-  "cloudflarestorage.com",
-  "blob.core.windows.net",
-];
-
 export function validateStorageObjectKey(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0 || value.length > 512) return false;
   if (value.startsWith("/") || value.includes("\\") || value.includes("%")) return false;
@@ -25,15 +19,11 @@ export function validateSignedStorageUrl(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 4096) return false;
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password || url.hash) return false;
+    if (url.protocol !== "https:" || url.username || url.password || url.hash || url.port) return false;
     const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
     if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) return false;
     if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":")) return false;
-    const trustedProviderHost = STORAGE_HOST_SUFFIXES.some((suffix) =>
-      hostname === suffix || hostname.endsWith("." + suffix)
-    );
-    const trustedS3Host = /(^|\.)s3([.-][a-z0-9-]+)?\.amazonaws\.com$/.test(hostname);
-    return trustedProviderHost || trustedS3Host;
+    return hostname === "storage.googleapis.com";
   } catch {
     return false;
   }
