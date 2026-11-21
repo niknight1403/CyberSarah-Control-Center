@@ -302,7 +302,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       return;
     }
     if (error instanceof UploadNonCompliantError) {
-      await completePendingUploadConfirmation(objectPath, principal, "rejected");
+      await completePendingUploadConfirmation(objectPath, principal, ownerUserId, tenantId, "rejected");
       req.log.warn(
         { objectPath, contentType: error.contentType, size: error.size },
         "Upload verstößt gegen Richtlinie, Objekt gelöscht"
@@ -310,7 +310,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       res.status(422).json({ error: "Upload verstößt gegen Größen-/Dateityp-Richtlinie" });
       return;
     }
-    await releasePendingUploadConfirmation(objectPath, principal);
+    await releasePendingUploadConfirmation(objectPath, principal, ownerUserId, tenantId);
     req.log.error({ err: error }, "Error confirming upload");
     res.status(500).json({ error: "Failed to confirm upload" });
   }
