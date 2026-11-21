@@ -176,7 +176,8 @@ async function startServer() {
       });
       logger.info("✅ DB-Schema synchronisiert");
     } catch (e: any) {
-      logger.warn("DB-Schema-Push übersprungen: " + (e?.stderr?.toString()?.slice(0, 120) ?? e?.message ?? ""));
+      logger.error({ err: e }, "DB-Schema-Synchronisierung fehlgeschlagen — Serverstart wird abgebrochen");
+      throw new Error("DB schema synchronization failed; refusing to start with a potentially incomplete schema", { cause: e });
     }
   }
 
