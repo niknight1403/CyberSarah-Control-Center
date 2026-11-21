@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getCxHubspotSnapshot } from "@/server/cx-workforce-hubspot";
+import { describeHubspotEnv, resolveHubspotToken } from "@/server/integrations/hubspot";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -33,7 +34,17 @@ describe("CX HubSpot read-only snapshot", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await getCxHubspotSnapshot({ HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" });
+    const env = { HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" };
+    expect(resolveHubspotToken(env)).toBe(env.HUBSPOT_PRIVATE_APP_TOKEN);
+    expect(describeHubspotEnv(env)).toMatchObject({
+      configured: true,
+      validFormat: true,
+      variable: "HUBSPOT_PRIVATE_APP_TOKEN",
+      kind: "private_app",
+      baseUrl: "https://api-eu1.hubapi.com",
+      problem: null,
+    });
+    const result = await getCxHubspotSnapshot(env);
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("connected");
     expect(result.tickets.total).toBe(1);
@@ -54,7 +65,17 @@ describe("CX HubSpot read-only snapshot", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await getCxHubspotSnapshot({ HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" });
+    const env = { HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" };
+    expect(resolveHubspotToken(env)).toBe(env.HUBSPOT_PRIVATE_APP_TOKEN);
+    expect(describeHubspotEnv(env)).toMatchObject({
+      configured: true,
+      validFormat: true,
+      variable: "HUBSPOT_PRIVATE_APP_TOKEN",
+      kind: "private_app",
+      baseUrl: "https://api-eu1.hubapi.com",
+      problem: null,
+    });
+    const result = await getCxHubspotSnapshot(env);
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("failed");
     expect(result.problems).toHaveLength(1);
