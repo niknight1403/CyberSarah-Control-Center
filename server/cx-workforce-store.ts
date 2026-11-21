@@ -1,11 +1,51 @@
 import { createHash, randomUUID } from "node:crypto";
 import { desc, eq, like } from "drizzle-orm";
+import { z } from "zod";
 
 import { modelRouterSettings } from "../drizzle/schema";
 import { getDb } from "./db";
 import type { CxTriageResult } from "../lib/cx-workforce-logic";
 
 const KEY_PREFIX = "cx-workforce:case:";
+
+const cxTriageRecordSchema = z.object({
+  category: z.enum(["billing", "refund", "technical", "account", "product", "security", "complaint", "general"]),
+  priority: z.enum(["critical", "high", "normal", "low"]),
+  confidence: z.number().min(0).max(1),
+  queue: z.enum(["security", "billing-specialist", "technical-support", "customer-success", "general-support"]),
+  ticketStage: z.enum(["1", "3"]),
+  humanReviewRequired: z.boolean(),
+  escalationReasons: z.array(z.string().min(1).max(100)).max(30),
+  responseDraft: z.string().min(1).max(4000),
+  automationMode: z.literal("draft_only"),
+  classifier: z.literal("deterministic_rules_v1"),
+}).strict();
+
+const cxCaseRecordSchema = z.object({
+  id: z.string().regex(/^[a-f0-9]{32}$/),
+  source: z.enum(["admin_preview", "hubspot"]),
+  externalReference: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).nullable(),
+  status: z.enum(["needs_review", "draft_ready"]),
+  triage: cxTriageRecordSchema,
+  createdAt: z.string().datetime({ offset: true }),
+}).strict().superRefine((record, context) => {
+  const expectedStatus = record.triage.humanReviewRequired ? "needs_review" : "draft_ready";
+  if (record.status !== expectedStatus) {
+    context.addIssue({ code: "custom", path: ["status"], message: "CX-Fallstatus stimmt nicht mit dem Review-Status überein." });
+  }
+});
+
+/** Validate untrusted JSON read from the shared settings table before using it. */
+export function parseCxCaseRecord(value: unknown, expectedId?: string): CxCaseRecord {
+  const parsed = cxCaseRecordSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("Ungültiger gespeicherter CX-Fall: Datenstruktur oder Triage-Metadaten sind fehlerhaft.");
+  }
+  if (expectedId && parsed.data.id !== expectedId) {
+    throw new Error("Ungültiger gespeicherter CX-Fall: interne ID stimmt nicht mit dem Datenbankschlüssel überein.");
+  }
+  return parsed.data;
+}
 
 /** Accept only opaque provider IDs; reject email addresses and free-form PII. */
 export function normalizeCxExternalReference(value?: string | null): string | null {
@@ -60,7 +100,7 @@ export async function saveCxCase(input: {
     .where(eq(modelRouterSettings.key, key))
     .limit(1);
   if (!saved) throw new Error("CX-Fall konnte nach dem Speichern nicht verifiziert werden.");
-  return saved.value as CxCaseRecord;
+  return parseCxCaseRecord(saved.value, id);
 }
 
 export async function listCxCases(limit = 50): Promise<CxCaseRecord[]> {
@@ -72,7 +112,7 @@ export async function listCxCases(limit = 50): Promise<CxCaseRecord[]> {
     .where(like(modelRouterSettings.key, `${KEY_PREFIX}%`))
     .orderBy(desc(modelRouterSettings.updatedAt))
     .limit(safeLimit);
-  return rows.map((row) => row.value as CxCaseRecord);
+  return rows.map((row) => parseCxCaseRecord(row.value));
 }
 
 /** Load one minimized CX case by its opaque internal ID for a quality assessment. */
@@ -84,5 +124,5 @@ export async function getCxCaseById(id: string): Promise<CxCaseRecord | null> {
     .from(modelRouterSettings)
     .where(eq(modelRouterSettings.key, `${KEY_PREFIX}${id}`))
     .limit(1);
-  return row ? row.value as CxCaseRecord : null;
+  return row ? parseCxCaseRecord(row.value, id) : null;
 }
