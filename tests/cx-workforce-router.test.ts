@@ -145,7 +145,7 @@ describe("CX workforce router access and operations", () => {
     const result = await cxWorkforceRouter.createCaller(adminContext).batchPreview({
       requests: [
         { message: "Mein Konto wurde gehackt." },
-        { message: "Die App stürzt ab." },
+        { message: "Die App stürzt ab und funktioniert nicht." },
       ],
     });
 
