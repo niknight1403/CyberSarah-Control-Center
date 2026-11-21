@@ -130,6 +130,7 @@ describe("publishing queue logic (Sprint 365)", () => {
     expect(isConfirmedPublishingReceipt("")).toBe(false);
     expect(isConfirmedPublishingReceipt("23123459392")).toBe(true);
     expect(isConfirmedPublishingReceipt("at://did:plc:abc/app.bsky.feed.post/xyz")).toBe(true);
+    expect(isConfirmedPublishingReceipt("tiktok-publish:publish-123")).toBe(true);
   });
 
   it("detects abandoned claims without expiring fresh workers", () => {
