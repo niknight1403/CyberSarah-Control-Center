@@ -1,8 +1,12 @@
-import { desc, sql } from "drizzle-orm";
+import { and, asc, desc, gt, lte, sql } from "drizzle-orm";
 import { gxpAuditEvents } from "../drizzle/schema";
 import { getDb } from "./db";
 
-import { GXP_AUDIT_GENESIS_HASH, hashGxpAuditEvent, verifyGxpAuditEvents } from "../lib/gxp-audit-logic";
+import {
+  GXP_AUDIT_GENESIS_HASH,
+  hashGxpAuditEvent,
+  verifyGxpAuditEventsChunk,
+} from "../lib/gxp-audit-logic";
 
 type AuditInput = {
   actorUserId: number;
@@ -12,6 +16,9 @@ type AuditInput = {
   missingControls: string[];
   eventPayload: Record<string, unknown>;
 };
+
+/** Bound memory use during integrity checks; the chain hash is carried between pages. */
+export const GXP_AUDIT_VERIFY_BATCH_SIZE = 500;
 
 export async function appendGxpAuditEvent(input: AuditInput): Promise<{ id: number; eventHash: string }> {
   const db = await getDb();
@@ -51,6 +58,48 @@ export async function appendGxpAuditEvent(input: AuditInput): Promise<{ id: numb
 export async function verifyGxpAuditChain() {
   const db = await getDb();
   if (!db) throw new Error("GxP audit ledger requires an available database.");
-  const rows = await db.select().from(gxpAuditEvents).orderBy(gxpAuditEvents.id);
-  return verifyGxpAuditEvents(rows);
+
+  // Fix the verification boundary first. Appends committed after this read are
+  // intentionally verified on the next run, not mixed into this snapshot.
+  const [head] = await db
+    .select({ id: gxpAuditEvents.id })
+    .from(gxpAuditEvents)
+    .orderBy(desc(gxpAuditEvents.id))
+    .limit(1);
+  if (!head) {
+    return {
+      valid: true,
+      checkedEvents: 0,
+      brokenAtId: null,
+      latestHash: GXP_AUDIT_GENESIS_HASH,
+    };
+  }
+
+  let lastId = 0;
+  let result = verifyGxpAuditEventsChunk([]);
+  while (lastId < head.id) {
+    const rows = await db
+      .select()
+      .from(gxpAuditEvents)
+      .where(and(gt(gxpAuditEvents.id, lastId), lte(gxpAuditEvents.id, head.id)))
+      .orderBy(asc(gxpAuditEvents.id))
+      .limit(GXP_AUDIT_VERIFY_BATCH_SIZE);
+
+    if (rows.length === 0) break;
+    result = verifyGxpAuditEventsChunk(rows, result.latestHash, result.checkedEvents);
+    if (!result.valid) return result;
+    lastId = rows[rows.length - 1]!.id;
+  }
+
+  // A missing row inside the captured ID range indicates an incomplete read;
+  // fail closed instead of reporting a partial ledger as valid.
+  if (lastId !== head.id) {
+    return {
+      valid: false,
+      checkedEvents: result.checkedEvents,
+      brokenAtId: null,
+      latestHash: result.latestHash,
+    };
+  }
+  return result;
 }
