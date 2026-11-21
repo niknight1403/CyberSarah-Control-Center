@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { desc, sql } from "drizzle-orm";
 import { gxpAuditEvents } from "../drizzle/schema";
 import { getDb } from "./db";
