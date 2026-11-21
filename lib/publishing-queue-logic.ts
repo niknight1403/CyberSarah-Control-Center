@@ -44,6 +44,11 @@ export function publishingFailureDecision(dispatched: boolean, attempts: number,
 }
 
 /** Remote API acknowledgements without an actual post ID are uncertain. */
+/** Distinguishes TikTok's completed SELF_ONLY receipt from a public post. */
+export function publishingReceiptMode(externalId: string): "live" | "live_private" {
+  return externalId.startsWith("tiktok-publish:") ? "live_private" : "live";
+}
+
 export function isConfirmedPublishingReceipt(externalId: string): boolean {
   return typeof externalId === "string" && externalId.length > 0 &&
     !externalId.endsWith("-unknown") && !externalId.startsWith("ig-");
