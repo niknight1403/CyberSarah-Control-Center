@@ -32,6 +32,16 @@ describe("approved content production contract", () => {
     expect(reconciler).not.toContain('replace("youtube/shorts","tiktok")');
   });
 });
+describe("publishing operations UI contract", () => {
+  it("renders real failure causes and exposes only the controlled retry action", () => {
+    const card = readFileSync("components/studio/publishing-ops-admin-card.tsx", "utf8");
+    expect(card).toContain("stats.failureReasons.byCause.map");
+    expect(card).toContain("stats.failureReasons.byPlatform.map");
+    expect(card).toContain('retry.mutate()');
+    expect(card).toContain("retry.data?.skipped.map");
+    expect(card).toContain("stats.failureReasons.retryable===0");
+  });
+});
 describe("publishing retry safety contract", () => {
   it("uses bounded, tenant-scoped retry policy instead of resetting every failed job", () => {
     const router = readFileSync("server/publishing-router.ts", "utf8");
