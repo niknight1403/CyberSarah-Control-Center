@@ -32,6 +32,19 @@ describe("approved content production contract", () => {
     expect(reconciler).not.toContain('replace("youtube/shorts","tiktok")');
   });
 });
+describe("publishing retry safety contract", () => {
+  it("uses bounded, tenant-scoped retry policy instead of resetting every failed job", () => {
+    const router = readFileSync("server/publishing-router.ts", "utf8");
+    const retryService = readFileSync("server/publishing-retry-service.ts", "utf8");
+    const publishingService = readFileSync("server/publishing-service.ts", "utf8");
+    expect(router).toContain('retryFailedJobsControlled({ userOpenId: ctx.user.openId })');
+    expect(router).not.toContain('retryFailedPublishingJobs(ctx.user.openId)');
+    expect(retryService).toContain('filters.push(eq(publishingJobs.userOpenId, userOpenId))');
+    expect(retryService).toContain('attempts: rows.find((row) => row.id === entry.id)?.attempts ?? 0');
+    expect(publishingService).toContain('attempts: 0');
+    expect(retryService).toContain('planFailedJobRetries');
+  });
+});
 describe("zero-cost media safety contract", () => {
   it("rejects unsafe prompts and retains local fallback", () => {
     expect(validateImageRequest({ prompt: "deepfake face swap of a celebrity" }).valid).toBe(false);
