@@ -5,7 +5,7 @@ import { appendGxpAuditEvent, verifyGxpAuditChain } from "./gxp-audit-store";
 import { CxCaseRecordValidationError, getCxCaseById } from "./cx-workforce-store";
 import { buildGxpCxCaseAuditPayload } from "../lib/gxp-cx-link";
 
-async function recordRejectedAssessment(actorUserId: number, framework: string, activity: string) {
+async function recordRejectedAssessment(actorUserId: number, framework: string, activity: string, rejectionReason = "opaque_reference_validation_failed") {
   // Never persist rejected input values: they may contain free-form or personal data.
   return appendGxpAuditEvent({
     actorUserId,
@@ -17,7 +17,7 @@ async function recordRejectedAssessment(actorUserId: number, framework: string, 
       allowedToExecute: false,
       automationMode: "assessment_only",
       humanApprovalRequired: true,
-      rejectionReason: "opaque_reference_validation_failed",
+      rejectionReason,
     },
   });
 }
@@ -68,7 +68,7 @@ export const gxpGovernanceRouter = router({
       cxCase = await getCxCaseById(input.caseId);
     } catch (error) {
       if (error instanceof CxCaseRecordValidationError) {
-        await recordRejectedAssessment(ctx.user.id, input.framework, input.activity);
+        await recordRejectedAssessment(ctx.user.id, input.framework, input.activity, "stored_cx_record_validation_failed");
       }
       // Database and infrastructure failures are not input-validation events.
       throw error;
