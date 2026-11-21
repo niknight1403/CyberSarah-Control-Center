@@ -238,9 +238,14 @@ export function validateAssetUrl(url: string, expected: "image" | "video"): Asse
   if (!/^https?:\/\/[^\s]+$/.test(trimmed)) {
     return { valid: false, reason: "Asset-URL muss mit http(s):// beginnen (keine relativen Pfade, keine Data-URIs)." };
   }
-  const lower = trimmed.toLowerCase().split("?")[0];
+  let pathname: string;
+  try {
+    pathname = new URL(trimmed).pathname.toLowerCase();
+  } catch {
+    return { valid: false, reason: "Asset-URL ist ungueltig." };
+  }
   const allowed = expected === "image" ? IMAGE_ASSET_EXTENSIONS : VIDEO_ASSET_EXTENSIONS;
-  if (!allowed.some((ext) => lower.endsWith(ext))) {
+  if (!allowed.some((ext) => pathname.endsWith(ext))) {
     return {
       valid: false,
       reason: `Asset-Endung unpassend fuer ${expected === "image" ? "Bild" : "Video"} — erlaubt: ${allowed.join(", ")}.`,
