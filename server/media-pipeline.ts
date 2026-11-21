@@ -124,6 +124,9 @@ export type GenerateVideoResult =
       ok: true;
       source: "cache" | "render";
       dataUrl: string;
+      /** Local preview only until a verified public media-storage adapter is configured. */
+      publishable: false;
+      deliveryStatus: "local_preview_only";
       note: string;
       sceneCount: number;
       totalSeconds: number;
@@ -256,6 +259,8 @@ export async function renderVideoRun(
       ok: true,
       source: "render",
       dataUrl: `data:video/mp4;base64,${bytes.toString("base64")}`,
+      publishable: false,
+      deliveryStatus: "local_preview_only",
       note: `${script.scenes.length} Szenen, ~${script.estimatedTotalSeconds}s, 1080p mit Untertiteln — ${visualNote}, Stimme ${input.voice}. ${describePacksInNote(deps.packs ?? { outfit: null, sets: null })}.`,
       sceneCount: script.scenes.length,
       totalSeconds: script.estimatedTotalSeconds,
@@ -294,6 +299,8 @@ export async function generateVideoForUser(
       ok: true,
       source: "cache",
       dataUrl: `data:video/mp4;base64,${cached.base64Mp4}`,
+      publishable: false,
+      deliveryStatus: "local_preview_only",
       note: `Aus dem Video-Cache (${Math.round(cached.bytes / 1024 / 1024)} MB, ${cached.sceneCount} Szenen, ~${cached.totalSeconds}s).`,
       sceneCount: cached.sceneCount,
       totalSeconds: cached.totalSeconds,
@@ -333,6 +340,10 @@ export async function mediaPipelineStatus() {
         maxTotalSeconds: VIDEO_LIMITS.maxTotalSeconds,
         maxDailyVideosPerUser: VIDEO_LIMITS.maxDailyVideosPerUser,
         ttsTextMax: TTS_LIMITS.text.max,
+      },
+      publishingAsset: {
+        available: false,
+        reason: "Kein verifizierter öffentlicher MP4-Speicheradapter in dieser App-Instanz angebunden. Gerenderte Videos sind lokale Vorschauen und nicht direkt an TikTok oder Instagram übergebbar.",
       },
     },
   };
