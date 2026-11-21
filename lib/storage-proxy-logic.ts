@@ -32,7 +32,7 @@ export function validateSignedStorageUrl(value: unknown): value is string {
     const trustedProviderHost = STORAGE_HOST_SUFFIXES.some((suffix) =>
       hostname === suffix || hostname.endsWith("." + suffix)
     );
-    const trustedS3Host = /(^|\\.)s3([.-][a-z0-9-]+)?\\.amazonaws\\.com$/.test(hostname);
+    const trustedS3Host = /(^|\.)s3([.-][a-z0-9-]+)?\.amazonaws\.com$/.test(hostname);
     return trustedProviderHost || trustedS3Host;
   } catch {
     return false;
