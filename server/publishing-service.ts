@@ -419,7 +419,9 @@ async function publishLive(
       collection: "app.bsky.feed.post",
       record: { text: content.slice(0, 300), createdAt: new Date().toISOString() },
     });
-    return { externalId: String(response.data?.uri ?? "bluesky-unknown") };
+    const uri = response.data?.uri;
+    if (typeof uri !== "string" || !uri.startsWith("at://") || !uri.trim()) throw new Error("Bluesky lieferte keinen gültigen Record-URI.");
+    return { externalId: uri.trim() };
   }
   if (platform === "x") {
     // Sprint 370 (X-Auto-Refresh): bei 401 einmal frisch rotieren und neu
