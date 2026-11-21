@@ -13,15 +13,16 @@ on:
       - "tests/storage-upload-intent-logic.test.ts"
       - ".github/workflows/revenue-os-storage-security.yml"
   pull_request:
-      - "modules/revenue-os/artifacts/api-server/src/lib/storageUploadAuth.ts"
-      - "modules/revenue-os/artifacts/api-server/src/lib/storageUploadIntentLogic.ts"
-      - "modules/revenue-os/lib/db/src/schema/storageUploadIntents.ts"
-      - "modules/revenue-os/lib/db/src/schema/index.ts"
-      - "modules/revenue-os/artifacts/api-server/src/lib/objectStorage.ts"
-      - "modules/revenue-os/artifacts/api-server/src/routes/storage.ts"
-      - "tests/storage-upload-auth.test.ts"
-      - "tests/storage-upload-intent-logic.test.ts"
-      - ".github/workflows/revenue-os-storage-security.yml"
+    paths:
+        - "modules/revenue-os/artifacts/api-server/src/lib/storageUploadAuth.ts"
+        - "modules/revenue-os/artifacts/api-server/src/lib/storageUploadIntentLogic.ts"
+        - "modules/revenue-os/lib/db/src/schema/storageUploadIntents.ts"
+        - "modules/revenue-os/lib/db/src/schema/index.ts"
+        - "modules/revenue-os/artifacts/api-server/src/lib/objectStorage.ts"
+        - "modules/revenue-os/artifacts/api-server/src/routes/storage.ts"
+        - "tests/storage-upload-auth.test.ts"
+        - "tests/storage-upload-intent-logic.test.ts"
+        - ".github/workflows/revenue-os-storage-security.yml"
 permissions:
   contents: read
 jobs:
