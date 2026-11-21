@@ -70,7 +70,7 @@ function uploadRateLimiter(req: Request, res: Response, next: NextFunction): voi
 // Upload intent state is durable in the Revenue OS PostgreSQL database.
 // This service identity is deliberately not represented as an end-user or tenant.
 const STORAGE_UPLOAD_PRINCIPAL = "revenue-os-storage-service";
-const OBJECT_PATH_PATTERN = /^\\/objects\\/uploads\\/[0-9a-f-]{36}$/;
+const OBJECT_PATH_PATTERN = /^\/objects\/uploads\/[0-9a-f-]{36}$/;
 const PENDING_UPLOAD_TTL_MS = 30 * 60 * 1000;
 
 function requireUploadDatabase(res: Response): boolean {
@@ -247,7 +247,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       res.status(422).json({ error: "Upload verstößt gegen Größen-/Dateityp-Richtlinie" });
       return;
     }
-    releasePendingUploadConfirmation(objectPath);
+    await releasePendingUploadConfirmation(objectPath);
     req.log.error({ err: error }, "Error confirming upload");
     res.status(500).json({ error: "Failed to confirm upload" });
   }
