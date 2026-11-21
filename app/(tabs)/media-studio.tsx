@@ -74,6 +74,12 @@ export default function MediaStudioScreen() {
                 <Text style={styles.subtitle}>Deterministisches Szenen-Manuskript, Edge-TTS, ffmpeg — synthetisch-only</Text>
               </View>
             </View>
+            <View style={styles.warningBox}>
+              <Text style={styles.warningTitle}>Nur Vorschau – noch nicht veröffentlichungsfähig</Text>
+              <Text style={styles.warningBody}>
+                Videos werden derzeit lokal als MP4-Vorschau gerendert. Ein verifizierter öffentlicher HTTPS-Medienspeicher ist noch nicht angebunden; TikTok und Instagram können diese Vorschau daher nicht direkt abrufen.
+              </Text>
+            </View>
             {limits ? (
               <Text style={styles.body}>
                 Grenzen (ehrlich, nicht verhandelbar): max. {limits.maxScenes} Szenen, ~{limits.maxTotalSeconds}s Videodauer, {limits.maxDailyVideosPerUser} Videos/Tag.
@@ -143,6 +149,10 @@ export default function MediaStudioScreen() {
                   {result.sceneCount} Szenen · ~{result.totalSeconds}s · {result.source === "cache" ? "aus dem Cache" : "frisch gerendert"}
                 </Text>
                 <Text style={styles.resultBody}>{result.note}</Text>
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningTitle}>Veröffentlichung blockiert</Text>
+                  <Text style={styles.warningBody}>Dieses MP4 ist eine lokale Vorschau ({result.deliveryStatus}). Es besitzt keine bestätigte öffentliche HTTPS-Asset-URL und darf nicht als veröffentlichungsfertig markiert werden.</Text>
+                </View>
                 {Platform.OS === "web" && (
                   <video src={result.dataUrl} controls style={{ width: "100%", borderRadius: 12, marginTop: 12, maxHeight: 420 }} />
                 )}
@@ -262,6 +272,9 @@ function createStyles() {
     errorTitle: { fontSize: 12, fontWeight: "800", color: "#b91c1c", marginBottom: 4 },
     errorBody: { fontSize: 12, color: glassSurface.textPrimary, lineHeight: 17 },
     errorHint: { fontSize: 11, color: glassSurface.textSecondary, marginTop: 6 },
+    warningBox: { borderWidth: 1, borderColor: "#D97706", backgroundColor: "rgba(217,119,6,0.10)", borderRadius: 12, padding: 12, marginTop: 12 },
+    warningTitle: { fontSize: 12, fontWeight: "800", color: "#F59E0B", marginBottom: 4 },
+    warningBody: { fontSize: 12, color: glassSurface.textSecondary, lineHeight: 17 },
     resultBox: { marginTop: 14, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: `${glassPalette.purple}55` },
     resultTitle: { fontSize: 13, fontWeight: "800", color: glassSurface.textPrimary, marginBottom: 6 },
     resultBody: { fontSize: 12, color: glassSurface.textSecondary, lineHeight: 17 },
