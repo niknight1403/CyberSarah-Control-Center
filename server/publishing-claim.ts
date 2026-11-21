@@ -5,7 +5,7 @@
  */
 import { and, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { publishingJobs, type PublishingJobRow } from "../drizzle/schema";
-import { STALE_PUBLISHING_CLAIM_MINUTES, UNCERTAIN_PUBLISHING_MESSAGE, isConfirmedPublishingReceipt, nextRetryAt } from "../lib/publishing-queue-logic";
+import { STALE_PUBLISHING_CLAIM_MINUTES, UNCERTAIN_PUBLISHING_MESSAGE, isConfirmedPublishingReceipt, nextRetryAt, publishingReceiptMode } from "../lib/publishing-queue-logic";
 import type { getDb } from "./db";
 
 type PublishingDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -145,7 +145,7 @@ export async function confirmPublishingReceipt(
     throw new Error("Plattform lieferte keinen überprüfbaren Beitragsschlüssel.");
   const [stored] = await db.update(publishingJobs).set({
     status: "veroeffentlicht",
-    mode: "live",
+    mode: publishingReceiptMode(externalId),
     externalId,
     publishedAt: now,
     lastError: null,
