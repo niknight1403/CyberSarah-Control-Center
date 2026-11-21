@@ -53,6 +53,7 @@ import {
 import { resolveXToken } from "./x-token-service";
 import { assertPublishingMediaUrls, reviewPublishingMediaUrl } from "../lib/publishing-asset-url-logic";
 import { invokeLLM } from "./_core/llm";
+import { retryFailedJobsControlled } from "./publishing-retry-service";
 
 const PUBLISHING_HTTP_TIMEOUT_MS = 15_000;
 const AUTOPILOT_INTERVAL_MS = 60_000;
@@ -791,6 +792,20 @@ async function autopilotTick(): Promise<void> {
   autopilotBusy = true;
   try {
     if (!isAutopilotEnabled(process.env.PUBLISHING_AUTOPILOT)) return;
+    // Requeue only pre-dispatch failures with a classified transient cause.
+    // The retry service enforces attempt caps, delays, and provider-token checks;
+    // ambiguous/provider-reached jobs remain quarantined and are never replayed.
+    const retry = await retryFailedJobsControlled({ limit: 25 });
+    if (!retry.ok) {
+      console.warn("[Publishing-Autopilot] Kontrollierter Retry nicht verfügbar:", retry.detail ?? "unbekannt");
+    } else if (retry.requeued || retry.skipped.length) {
+      console.info("[Publishing-Autopilot] Kontrollierter Retry:", JSON.stringify({
+        considered: retry.considered,
+        requeued: retry.requeued,
+        skipped: retry.skipped.length,
+        tokenRefresh: retry.tokenRefresh?.ok ?? null,
+      }));
+    }
     const stale = await recoverStalePublishingClaims();
     if (stale.requeued || stale.failed || stale.uncertain) {
       console.warn(`[Publishing-Autopilot] Verwaiste Claims: ${stale.requeued} sicher neu geplant, ${stale.failed} erschöpft, ${stale.uncertain} unklar (keine automatische Wiederholung).`);
