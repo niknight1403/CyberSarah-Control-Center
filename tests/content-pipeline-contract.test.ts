@@ -142,3 +142,23 @@ describe("zero-cost media safety contract", () => {
     expect(source).toContain("gradientFallback");
   });
 });
+
+describe("provider publication receipt contract", () => {
+  it("requires real provider post identifiers and completes Threads publication", () => {
+    const source = readFileSync("server/publishing-service.ts", "utf8");
+    const threadsStart = source.indexOf('if (platform === "threads")');
+    const threadsEnd = source.indexOf('if (platform === "instagram")', threadsStart);
+    const threads = source.slice(threadsStart, threadsEnd);
+    expect(threads).toContain("/threads_publish");
+    expect(threads.indexOf("/threads_publish")).toBeGreaterThan(threads.indexOf('"/threads"'));
+    expect(threads).toContain("published.data?.id");
+    expect(threads).toContain("Threads-Publish lieferte keine Beitrags-ID");
+    expect(source).toContain("X lieferte keine Tweet-ID");
+    expect(source).toContain("LinkedIn lieferte keine Post-ID");
+    expect(source).toContain("Bluesky lieferte keinen gültigen Record-URI");
+    expect(source).not.toContain('?? "x-unknown"');
+    expect(source).not.toContain('?? "linkedin-unknown"');
+    expect(source).not.toContain('?? "threads-unknown"');
+    expect(source).not.toContain('?? `ig-${containerId}`');
+  });
+});
