@@ -8,7 +8,7 @@ describe("storage proxy validation", () => {
   });
 
   it("rejects traversal, absolute paths and encoded separators", () => {
-    for (const key of ["../secret", "a/../secret", "/bucket/object", "a%2f..%2fsecret", "a\\\\b", "a//b", "a?x=1"]) {
+    for (const key of ["../secret", "a/../secret", "/bucket/object", "a%2f..%2fsecret", "a\\b", "a//b", "a?x=1"]) {
       expect(validateStorageObjectKey(key), key).toBe(false);
     }
   });
