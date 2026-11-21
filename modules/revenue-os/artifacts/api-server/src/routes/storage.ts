@@ -22,14 +22,13 @@ const objectStorageService = new ObjectStorageService();
 function requireStorageUploadAuth(req: Request, res: Response, next: NextFunction): void {
   const expected = process.env["REVENUE_OS_STORAGE_API_KEY"] ?? "";
   const supplied = req.get("X-Revenue-Storage-Key") ?? "";
-  if (!expected) {
-    res.status(503).json({ error: "Storage upload authentication is not configured" });
+  if (expected && isValidStorageUploadKey(expected, supplied)) {
+    res.locals.storageUploadPrincipal = STORAGE_UPLOAD_PRINCIPAL;
+    res.locals.storageUploadOwnerUserId = null;
+    next();
     return;
   }
-  if (!isValidStorageUploadKey(expected, supplied)) {
-    res.status(403).json({ error: "Storage upload access denied" });
-    return;
-  }
+
   const authorization = req.headers.authorization ?? "";
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
   const session = bearer ? verifiziereToken(bearer) : null;
@@ -39,7 +38,10 @@ function requireStorageUploadAuth(req: Request, res: Response, next: NextFunctio
     next();
     return;
   }
-  res.status(expected ? 403 : 503).json({ error: "Storage upload access denied or not configured" });
+
+  res.status(expected ? 403 : 503).json({
+    error: expected ? "Storage upload access denied" : "Storage upload authentication is not configured",
+  });
 }
 
 // Only server-side agents currently mint uploads. Keep the allowlist and size cap
