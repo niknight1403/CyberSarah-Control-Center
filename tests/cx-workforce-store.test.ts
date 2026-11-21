@@ -63,7 +63,7 @@ describe("CX workforce database store", () => {
         id: expectedId,
         source: "admin_preview",
         externalReference: "case_123",
-        status: "needs_review",
+        status: "draft_ready",
         triage: triage(),
         createdAt: new Date().toISOString(),
       },
@@ -82,7 +82,7 @@ describe("CX workforce database store", () => {
       value: expect.objectContaining({
         source: "admin_preview",
         externalReference: "case_123",
-        status: "needs_review",
+        status: "draft_ready",
         triage: expect.any(Object),
       }),
     }));
@@ -110,7 +110,7 @@ describe("CX workforce database store", () => {
       id: "b".repeat(32),
       source: "admin_preview",
       externalReference: null,
-      status: "needs_review",
+      status: "draft_ready",
       triage: triage(),
       createdAt: new Date().toISOString(),
     };
@@ -129,7 +129,7 @@ describe("CX workforce database store", () => {
       id: "c".repeat(32),
       source: "admin_preview",
       externalReference: null,
-      status: "needs_review",
+      status: "draft_ready",
       triage: triage(),
       createdAt: new Date().toISOString(),
     };
