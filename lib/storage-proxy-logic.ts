@@ -31,7 +31,7 @@ export function validateSignedStorageUrl(value: unknown): value is string {
     if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) return false;
     if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":")) return false;
     return STORAGE_HOST_SUFFIXES.some((suffix) =>
-      hostname === suffix || hostname.endsWith(\`.\${suffix}\`)
+      hostname === suffix || hostname.endsWith("." + suffix)
     );
   } catch {
     return false;
