@@ -33,7 +33,7 @@ describe("CX HubSpot read-only snapshot", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await getCxHubspotSnapshot({ HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" });
+    const result = await getCxHubspotSnapshot({ HUBSPOT_PRIVATE_APP_TOKEN: "test-hubspot-token" });
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("connected");
     expect(result.tickets.total).toBe(1);
@@ -54,7 +54,7 @@ describe("CX HubSpot read-only snapshot", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await getCxHubspotSnapshot({ HUBSPOT_PRIVATE_APP_TOKEN: "pat-eu1-123456789012345678901234" });
+    const result = await getCxHubspotSnapshot({ HUBSPOT_PRIVATE_APP_TOKEN: "test-hubspot-token" });
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("failed");
     expect(result.problems).toHaveLength(1);
