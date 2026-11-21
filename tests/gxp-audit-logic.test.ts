@@ -49,4 +49,25 @@ describe("GxP audit hash chain", () => {
     const reordered = { ...first, eventPayload: { nested: { a: 1, b: 2 }, automationMode: "assessment_only" } };
     expect(hashGxpAuditEvent(reordered)).toBe(first.eventHash);
   });
+
+  it("reports zero checked events when the first event is broken", () => {
+    const broken = makeEvent(1, "f".repeat(64));
+    expect(verifyGxpAuditEvents([broken])).toMatchObject({
+      valid: false, checkedEvents: 0, brokenAtId: 1,
+    });
+  });
+
+  it("counts only preceding verified events when a later event is broken", () => {
+    const first = makeEvent(1, GXP_AUDIT_GENESIS_HASH);
+    const broken = makeEvent(2, "f".repeat(64));
+    expect(verifyGxpAuditEvents([first, broken])).toMatchObject({
+      valid: false, checkedEvents: 1, brokenAtId: 2, latestHash: first.eventHash,
+    });
+  });
+
+  it("accepts an empty ledger with zero checked events", () => {
+    expect(verifyGxpAuditEvents([])).toMatchObject({
+      valid: true, checkedEvents: 0, brokenAtId: null, latestHash: GXP_AUDIT_GENESIS_HASH,
+    });
+  });
 });
