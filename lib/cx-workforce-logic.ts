@@ -76,11 +76,14 @@ export function triageCxRequest(input: CxTriageInput): CxTriageResult {
   const hits = RULES.map((rule) => ({ category: rule.category, matches: includesAny(text, rule.terms) }))
     .filter((rule) => rule.matches.length > 0)
     .sort((a, b) => b.matches.length - a.matches.length);
-  const category = hits[0]?.category ?? "general";
-  const matched = hits[0]?.matches.length ?? 0;
+  // Security indicators always override ordinary keyword scoring. A mixed billing/security
+  // message must never be downgraded to the billing queue or a non-critical priority.
+  const securityMatches = includesAny(text, RULES.find((rule) => rule.category === "security")?.terms ?? []);
+  const security = securityMatches.length > 0;
+  const category = security ? "security" : hits[0]?.category ?? "general";
+  const matched = security ? securityMatches.length : hits[0]?.matches.length ?? 0;
   const confidence = category === "general" ? 0.35 : Math.min(0.95, 0.55 + matched * 0.12);
   const escalationReasons = includesAny(text, ESCALATION_TERMS);
-  const security = category === "security";
   const sensitive = security || category === "refund" || category === "complaint" || escalationReasons.length > 0;
   const priority: CxPriority = security ? "critical"
     : sensitive || category === "technical" ? "high"
