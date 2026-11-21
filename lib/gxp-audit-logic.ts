@@ -38,14 +38,21 @@ export function hashGxpAuditEvent(event: GxpAuditHashInput): string {
   })).digest("hex");
 }
 
-export function verifyGxpAuditEvents(rows: GxpAuditChainRow[]): {
+export interface GxpAuditVerificationResult {
   valid: boolean;
   checkedEvents: number;
   brokenAtId: number | null;
   latestHash: string;
-} {
-  let expectedPreviousHash = GXP_AUDIT_GENESIS_HASH;
-  let checkedEvents = 0;
+}
+
+/** Verifies one ordered page while carrying the verified chain state across pages. */
+export function verifyGxpAuditEventsChunk(
+  rows: GxpAuditChainRow[],
+  initialPreviousHash = GXP_AUDIT_GENESIS_HASH,
+  initialCheckedEvents = 0,
+): GxpAuditVerificationResult {
+  let expectedPreviousHash = initialPreviousHash;
+  let checkedEvents = initialCheckedEvents;
   for (const row of rows) {
     if (row.previousHash !== expectedPreviousHash) {
       return { valid: false, checkedEvents, brokenAtId: row.id, latestHash: expectedPreviousHash };
@@ -57,4 +64,9 @@ export function verifyGxpAuditEvents(rows: GxpAuditChainRow[]): {
     checkedEvents += 1;
   }
   return { valid: true, checkedEvents, brokenAtId: null, latestHash: expectedPreviousHash };
+}
+
+/** Convenience wrapper for callers that already hold the complete ordered chain. */
+export function verifyGxpAuditEvents(rows: GxpAuditChainRow[]): GxpAuditVerificationResult {
+  return verifyGxpAuditEventsChunk(rows);
 }
