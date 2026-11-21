@@ -34,7 +34,7 @@ function queryBuilder(result: QueryResult) {
     from: () => builder,
     where: () => builder,
     orderBy: () => builder,
-    limit: vi.fn(async () => result),
+    limit: vi.fn(async (_limit?: number) => result),
   };
   return builder;
 }
@@ -145,9 +145,9 @@ describe("GxP audit database store", () => {
       const page = pageResults.shift() ?? [];
       const builder = queryBuilder(page);
       const originalLimit = builder.limit;
-      builder.limit = vi.fn(async (limit: number) => {
-        limitCalls.push(limit);
-        return originalLimit();
+      builder.limit = vi.fn(async (limit?: number) => {
+        limitCalls.push(limit ?? -1);
+        return originalLimit(limit);
       });
       return builder;
     };
