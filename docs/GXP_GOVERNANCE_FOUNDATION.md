@@ -21,7 +21,7 @@ This is a technical governance foundation, not a validated GxP system, regulator
 
 ## CX Workforce relationship
 
-CX can flag a support case as a potential quality event or deviation for assessment. It must not create a formal deviation/CAPA record or notify regulators automatically. A qualified quality owner must review and decide the regulated workflow.
+CX can flag a support case as a potential quality event or deviation for assessment. The GxP link validates the opaque internal case ID and allow-lists only the known triage category and priority; it never spreads the stored CX record into the audit event. It must not create a formal deviation/CAPA record or notify regulators automatically. A qualified quality owner must review and decide the regulated workflow.
 
 ## Required before any regulated production use
 
