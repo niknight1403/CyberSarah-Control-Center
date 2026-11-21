@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { validateImageRequest } from "../lib/image-generation-logic";
+import { publishingReceiptMode } from "../lib/publishing-queue-logic";
 
 describe("approved content production contract", () => {
   it("persists approved content and source draft identity", () => {
@@ -140,6 +141,13 @@ describe("zero-cost media safety contract", () => {
     const source = readFileSync("server/media-pipeline.ts", "utf8");
     expect(source).toContain('run("ffmpeg"');
     expect(source).toContain("gradientFallback");
+  });
+});
+
+describe("TikTok receipt visibility mapping", () => {
+  it("maps SELF_ONLY fallback receipts to private completion only", () => {
+    expect(publishingReceiptMode("tiktok-publish:publish-123")).toBe("live_private");
+    expect(publishingReceiptMode("987654321")).toBe("live");
   });
 });
 
