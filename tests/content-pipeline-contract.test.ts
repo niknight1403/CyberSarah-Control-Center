@@ -42,6 +42,21 @@ describe("publishing operations UI contract", () => {
     expect(card).toContain("stats.failureReasons.retryable===0");
   });
 });
+describe("publishing autopilot retry integration", () => {
+  it("runs bounded classified retries before processing due jobs", () => {
+    const service = readFileSync("server/publishing-service.ts", "utf8");
+    const tick = service.indexOf("async function autopilotTick");
+    const retry = service.indexOf("retryFailedJobsControlled({ limit: 25 })", tick);
+    const due = service.indexOf("usersWithDueJobs()", tick);
+    expect(retry).toBeGreaterThan(tick);
+    expect(due).toBeGreaterThan(retry);
+    expect(service).toContain("retry.skipped.length");
+    const policy = readFileSync("lib/publishing-retry-logic.ts", "utf8");
+    expect(policy).toContain("SYSTEM_RETRY_ATTEMPT_CAP = 3");
+    expect(policy).toContain('AUTO_RETRYABLE_CAUSES: PublishingFailureCause[] = ["auth", "rate_limit", "network"]');
+    expect(policy).toContain("provider_bereits_erreicht");
+  });
+});
 describe("publishing retry safety contract", () => {
   it("uses bounded, tenant-scoped retry policy instead of resetting every failed job", () => {
     const router = readFileSync("server/publishing-router.ts", "utf8");
