@@ -45,14 +45,16 @@ export function verifyGxpAuditEvents(rows: GxpAuditChainRow[]): {
   latestHash: string;
 } {
   let expectedPreviousHash = GXP_AUDIT_GENESIS_HASH;
+  let checkedEvents = 0;
   for (const row of rows) {
     if (row.previousHash !== expectedPreviousHash) {
-      return { valid: false, checkedEvents: rows.length, brokenAtId: row.id, latestHash: expectedPreviousHash };
+      return { valid: false, checkedEvents, brokenAtId: row.id, latestHash: expectedPreviousHash };
     }
     if (hashGxpAuditEvent(row) !== row.eventHash) {
-      return { valid: false, checkedEvents: rows.length, brokenAtId: row.id, latestHash: expectedPreviousHash };
+      return { valid: false, checkedEvents, brokenAtId: row.id, latestHash: expectedPreviousHash };
     }
     expectedPreviousHash = row.eventHash;
+    checkedEvents += 1;
   }
-  return { valid: true, checkedEvents: rows.length, brokenAtId: null, latestHash: expectedPreviousHash };
+  return { valid: true, checkedEvents, brokenAtId: null, latestHash: expectedPreviousHash };
 }
