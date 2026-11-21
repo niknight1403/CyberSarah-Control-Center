@@ -22,7 +22,8 @@ export async function publishingOpsOverviewDb(
     uncertain:sql<number>`count(*) FILTER (WHERE ${publishingJobs.status}='versand_ungeklaert')::int`,
     failed:sql<number>`count(*) FILTER (WHERE ${publishingJobs.status}='fehlgeschlagen')::int`,
     retryableFailed:sql<number>`count(*) FILTER (WHERE ${publishingJobs.status}='fehlgeschlagen' AND ${publishingJobs.mode} IS NULL)::int`,
-    published24h:sql<number>`count(*) FILTER (WHERE ${publishingJobs.status}='veroeffentlicht' AND ${publishingJobs.publishedAt}>=${since24h})::int`,
+    published24h:sql<number>`count(*) FILTER (WHERE ${publishingJobs.status}='veroeffentlicht' AND ${publishingJobs.mode}='live' AND ${publishingJobs.publishedAt}>=${since24h})::int`,
+    privateCompleted24h:sql<number>`count(*) FILTER (WHERE ${publishingJobs.status}='veroeffentlicht' AND ${publishingJobs.mode}='live_private' AND ${publishingJobs.publishedAt}>=${since24h})::int`,
   }).from(publishingJobs).where(eq(publishingJobs.userOpenId,userOpenId));
   return {
     ...counts,
