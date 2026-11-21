@@ -23,6 +23,7 @@ on:
       - "tests/gxp-governance.test.ts"
       - "tests/gxp-audit-logic.test.ts"
       - "tests/gxp-cx-link.test.ts"
+      - "tests/cx-workforce-logic.test.ts"
       - "scripts/test-gxp-audit-migration.ts"
       - ".github/workflows/content-pipeline-gate.yml"
   push:
@@ -45,6 +46,7 @@ on:
       - "drizzle/0038_gxp_audit_ledger.sql"
       - "tests/gxp-governance.test.ts"
       - "tests/gxp-audit-logic.test.ts"
+      - "tests/cx-workforce-logic.test.ts"
       - "scripts/test-gxp-audit-migration.ts"
       - ".github/workflows/content-pipeline-gate.yml"
 permissions:
@@ -77,6 +79,6 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run check
-      - run: npx vitest run tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/gxp-governance.test.ts tests/gxp-audit-logic.test.ts tests/gxp-cx-link.test.ts
+      - run: npx vitest run tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/gxp-governance.test.ts tests/gxp-audit-logic.test.ts tests/gxp-cx-link.test.ts tests/cx-workforce-logic.test.ts
       - run: npm run build
       - run: npx tsx scripts/test-gxp-audit-migration.ts
