@@ -54,6 +54,7 @@ import { resolveXToken } from "./x-token-service";
 import { assertPublishingMediaUrls, reviewPublishingMediaUrl } from "../lib/publishing-asset-url-logic";
 import { invokeLLM } from "./_core/llm";
 import { retryFailedJobsControlled } from "./publishing-retry-service";
+import { resolveTikTokPublishStatus } from "../lib/tiktok-publish-status-logic";
 
 const PUBLISHING_HTTP_TIMEOUT_MS = 15_000;
 const AUTOPILOT_INTERVAL_MS = 60_000;
@@ -473,8 +474,20 @@ async function publishLive(
       },
     });
     const publishId = response.data?.data?.publish_id;
-    if (!publishId) throw new Error("TikTok-Publish konnte nicht initialisiert werden — keine publish_id.");
-    return { externalId: String(publishId) };
+    if (!publishId || typeof publishId !== "string") throw new Error("TikTok-Publish konnte nicht initialisiert werden — keine publish_id.");
+    // TikTok returns publish_id at initialization, before asynchronous processing.
+    // Only PUBLISH_COMPLETE is a successful receipt; pending/timeout remains
+    // quarantined by the outer dispatch boundary and is never replayed blindly.
+    const maxPolls = Math.min(10, Math.max(1, Number(process.env.TIKTOK_STATUS_MAX_POLLS ?? 5)));
+    const pollDelayMs = Math.min(10_000, Math.max(500, Number(process.env.TIKTOK_STATUS_POLL_DELAY_MS ?? 2_000)));
+    for (let attempt = 1; attempt <= maxPolls; attempt += 1) {
+      const statusResponse = await client.post("/post/publish/status/fetch/", { publish_id: publishId });
+      const status = resolveTikTokPublishStatus(statusResponse.data, publishId);
+      if (status.state === "complete") return { externalId: status.externalId };
+      if (status.state === "failed") throw new Error(`TikTok-Veröffentlichung fehlgeschlagen: ${status.reason}`);
+      if (attempt < maxPolls) await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
+    }
+    throw new Error("TikTok-Veröffentlichung läuft noch; Status bleibt unbestätigt und wird nicht als live markiert.");
   }
   throw new Error(`Kein Live-Adapter fuer "${platform}" — Veröffentlichung blockiert.`);
 }
