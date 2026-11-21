@@ -15,8 +15,7 @@ describe("storage proxy validation", () => {
 
   it("accepts HTTPS signed URLs from supported object-storage providers", () => {
     expect(validateSignedStorageUrl("https://storage.googleapis.com/bucket/object?X-Goog-Signature=abc")).toBe(true);
-    expect(validateSignedStorageUrl("https://bucket.s3.eu-central-1.amazonaws.com/object?X-Amz-Signature=abc")).toBe(true);
-    expect(validateSignedStorageUrl("https://account.r2.cloudflarestorage.com/object?sig=abc")).toBe(true);
+    expect(validateSignedStorageUrl("https://storage.googleapis.com/bucket/object?X-Goog-Signature=abc")).toBe(true);
   });
 
   it("rejects insecure, credentialed, local and untrusted redirect targets", () => {
@@ -28,6 +27,10 @@ describe("storage proxy validation", () => {
       "https://attacker.example/object",
       "https://storage.googleapis.com.attacker.example/object",
       "https://storage.googleapis.com/object#fragment",
+      "https://storage.googleapis.com:8443/object?sig=abc",
+      "https://bucket.s3.eu-central-1.amazonaws.com/object?X-Amz-Signature=abc",
+      "https://account.r2.cloudflarestorage.com/object?sig=abc",
+      "https://evil.storage.googleapis.com/object?sig=abc",
     ]) {
       expect(validateSignedStorageUrl(url), url).toBe(false);
     }
