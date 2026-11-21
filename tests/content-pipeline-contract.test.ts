@@ -20,6 +20,7 @@ describe("approved content production contract", () => {
     expect(decision.indexOf("Dieser Content-Entwurf ist unvollständig")).toBeLessThan(decision.indexOf(".update(draftQueue)"));
     expect(readFileSync("server/channel-autopilot.ts", "utf8")).toContain("reconcileApprovedContentDrafts");
     const reconciler = readFileSync("server/channel-autopilot.ts", "utf8");
+    expect(reconciler).toContain('orderBy(sql`${draftQueue.decidedAt} ASC NULLS FIRST`,sql`${draftQueue.id} ASC`)');
     expect(reconciler).toContain('supported.has(platform)');
     expect(reconciler).toContain('content.length<10');
     expect(reconciler).toContain('users.openId');
