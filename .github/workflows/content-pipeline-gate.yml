@@ -15,6 +15,7 @@ on:
       - "tests/content-pipeline*.test.ts"
       - "lib/gxp-governance.ts"
       - "lib/gxp-cx-link.ts"
+      - "lib/gxp-cx-link.ts"
       - "lib/gxp-audit-logic.ts"
       - "server/gxp-audit-store.ts"
       - "server/gxp-governance-router.ts"
