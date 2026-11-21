@@ -4,7 +4,6 @@
  */
 const STORAGE_HOST_SUFFIXES = [
   "storage.googleapis.com",
-  "amazonaws.com",
   "cloudflarestorage.com",
   "blob.core.windows.net",
 ];
@@ -30,9 +29,11 @@ export function validateSignedStorageUrl(value: unknown): value is string {
     const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
     if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) return false;
     if (/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(":")) return false;
-    return STORAGE_HOST_SUFFIXES.some((suffix) =>
+    const trustedProviderHost = STORAGE_HOST_SUFFIXES.some((suffix) =>
       hostname === suffix || hostname.endsWith("." + suffix)
     );
+    const trustedS3Host = /(^|\\.)s3([.-][a-z0-9-]+)?\\.amazonaws\\.com$/.test(hostname);
+    return trustedProviderHost || trustedS3Host;
   } catch {
     return false;
   }
