@@ -35,14 +35,21 @@ const cxCaseRecordSchema = z.object({
   }
 });
 
+export class CxCaseRecordValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CxCaseRecordValidationError";
+  }
+}
+
 /** Validate untrusted JSON read from the shared settings table before using it. */
 export function parseCxCaseRecord(value: unknown, expectedId?: string): CxCaseRecord {
   const parsed = cxCaseRecordSchema.safeParse(value);
   if (!parsed.success) {
-    throw new Error("Ungültiger gespeicherter CX-Fall: Datenstruktur oder Triage-Metadaten sind fehlerhaft.");
+    throw new CxCaseRecordValidationError("Ungültiger gespeicherter CX-Fall: Datenstruktur oder Triage-Metadaten sind fehlerhaft.");
   }
   if (expectedId && parsed.data.id !== expectedId) {
-    throw new Error("Ungültiger gespeicherter CX-Fall: interne ID stimmt nicht mit dem Datenbankschlüssel überein.");
+    throw new CxCaseRecordValidationError("Ungültiger gespeicherter CX-Fall: interne ID stimmt nicht mit dem Datenbankschlüssel überein.");
   }
   return parsed.data;
 }
