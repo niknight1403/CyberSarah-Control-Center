@@ -1,47 +1,67 @@
-# Play-Store-Einreichung — Schritt-für-Schritt-Handoff für den Owner
+# Android-Release und Google-Play-Handoff
 
-Stand: 14.09.2026 — Release **v1.3.5** (Paket-ID `com.app.customaistudiomobile`)
+**Gültige Paket-ID:** `com.cybersarah.controlcenter`  
+**Build-Workflow:** `.github/workflows/build-apk.yml` — GitHub Actions, Expo-Web-Export, Capacitor und Gradle.
 
-Dieses Dokument ist die Anleitung für die Einreichung in der Google Play Console. Alle Vorarbeiten (Listing-Texte, Data-Safety-Antworten, signierte Artefakte) liegen abgeschlossen vor. Der Upload selbst bleibt bewusst Owner-Handoff.
+Dieses Dokument beschreibt den aktuell im Repository vorhandenen Build-Ablauf. Es ist keine Bestätigung, dass ein aktueller Release-Build bereits ausgeführt, auf einem Gerät getestet oder bei Google Play eingereicht wurde.
 
-## Benötigte Dateien
+## 1. Release-Artefakte
 
-Aus dem GitHub-Release **`v1.3.5-apk`** (https://github.com/niknight1403/CyberSarah-Control-Center/releases/tag/v1.3.5-apk):
+Im GitHub-Repository unter **Actions → Build Android APK → Run workflow** kann optional eine Version im Format `X.Y.Z` angegeben werden. Ohne Angabe leitet der Workflow die nächste freie Patch-Version aus vorhandenen `vX.Y.Z-apk`-Releases ab.
 
-| Datei | Zweck |
+Ein erfolgreicher Lauf soll diese Dateien im GitHub-Release `vX.Y.Z-apk` erzeugen:
+
+| Artefakt | Zweck |
 |---|---|
-| `CyberSarah-ControlCenter-v1.3.5-release.aab` | **Upload für Google Play** — signiert (jarsigner-verifiziert), R8-konforme Bundle-Auslieferung über Play App Signing |
-| `CyberSarah-ControlCenter-v1.3.5-release.apk` | Direktinstallation zum Selbsttest (gleiche Signatur wie das AAB) |
-| `CyberSarah-ControlCenter-v1.3.5-debug.apk` | Nur Debug-Zwecke — NICHT einreichen
+| `CyberSarah-ControlCenter-vX.Y.Z-dev.apk` | Debug-/Entwicklungsvariante; nicht bei Google Play hochladen |
+| `CyberSarah-ControlCenter-vX.Y.Z-admin.apk` | Signierte Admin-Release-APK für direkten Gerätetest |
+| `CyberSarah-ControlCenter-vX.Y.Z-release.aab` | Signiertes Android App Bundle für Google Play |
+| `CyberSarah-ControlCenter-vX.Y.Z-manifest.json` | Build- und Signaturnachweis für die drei Artefakte |
+| `CyberSarah-ControlCenter-vX.Y.Z-SHA256SUMS.txt` | Prüfsummen der Release-Dateien |
 
-Die Pipeline (`.github/workflows/build-apk.yml`, Workflow „Build Android APK", `version_name` = 1.3.5) baut Web-Export → Capacitor-Sync → signierte APK + signiertes AAB in einem Durchlauf und lädt alles in denselben Release hoch. Ein Neuaufbau jederzeit per Workflow-Dispatch möglich.
+Die konkrete Versionsnummer und die tatsächlich veröffentlichten Dateien sind immer im jeweiligen Actions-Lauf und GitHub-Release zu prüfen. Ein grüner allgemeiner CI-Lauf ersetzt diesen Android-Release-Lauf nicht.
 
-## Vorbereitung (einmalig pro Play-Console-Konto)
+## 2. Voraussetzungen für einen signierten Build
 
-1. **Play Console** öffnen (https://play.google.com/console) — persönliches Entwicklerkonto erforderlich (falls noch nicht geschehen: einmalige Registrierungsgebühr, Identitätsprüfung).
-2. **Play App Signing**: Bei der ersten AAB-Einreichung bietet Google an, einen App-Signing-Key von Google verwalten zu lassen — empfohlen: „Export and upload a key from Java keystore" wählen und den Upload-Key (der Release-Keystore aus den GitHub-Secrets `ANDROID_KEYSTORE_*`) verwenden. Danach signiert Google die Auslieferung; Updates werden mit dem Upload-Key geprüft.
-3. **Paket-ID bestätigen**: `com.app.customaistudiomobile` — nach der ersten Einreichung nicht mehr änderbar.
+Der Workflow verlangt folgende GitHub-Actions-Secrets:
 
-## Schritt für Schritt (App anlegen)
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
 
-1. **App erstellen**: „Alle Apps" → „App erstellen" → App-Name `CyberSarah Control Center`, Standardsprache Deutsch, App/Kostenlos.
-2. **App-Release**: Interner Test oder geschlossener Test → „Neuen Release erstellen" → AAB `CyberSarah-ControlCenter-v1.3.5-release.aab` hochladen → Release-Notes aus `docs/PLAY_STORE_LISTING_DE_EN.md` (Abschnitt „Versionshinweise 1.3.5", DE + EN) übernehmen.
-3. **Store-Listing** („Haupt-Store-Listing"): Texte aus `docs/PLAY_STORE_LISTING_DE_EN.md` übernehmen — App-Name, Kurzbeschreibung (79/80 Zeichen), Langbeschreibung (DE primär, EN als zusätzliche Sprache). Grafiken: Icon + Feature-Grafik liegen im Projekt bereit; finale Screenshots vom Realgerät unter `docs/store-assets/` ergänzen (Motivliste: `docs/store-assets/README.md`).
-4. **Data Safety**: Das Formular nach `docs/PLAY_STORE_DATA_SAFETY.md` ausfüllen (Antwortsatz liegt dort vollständig vor).
-5. **Inhalt und Zielgruppe**: Zielgruppe 13+, Inhaltsrating-Fragebogen ausfüllen (keine sensiblen Inhalte — Antworten ableitbar aus `PLAY_STORE_BEREITSCHAFT.md`, Abschnitt Content-Compliance).
-6. **App-Zugriff**: Falls ein Login erforderlich ist, Test-Zugangsdaten für die Prüfung hinterlegen (Admin-Account, NICHT öffentlich teilen).
-7. Einreichen und Google-Prüfung abwarten (neue Apps: meist einige Tage).
+Der Keystore darf nicht ins Repository eingecheckt oder in Logs ausgegeben werden. Fehlt eines der Secrets, muss der Release-Preflight den Build abbrechen.
 
-## Checkliste direkt vor dem Upload
+Der Workflow prüft außerdem Paket-ID, Versionsname, Android-Versioncode, Launcher-/Manifest-Voraussetzungen und anschließend die APK-/AAB-Signaturen. Das Release-Manifest enthält den Quell-Commit, die Workflow-Run-ID, Artefaktgrößen, SHA-256-Prüfsummen und öffentliche Zertifikatsfingerprints.
 
-- [ ] `jarsigner -verify` wurde grün gemeldet (steht im Workflow-Log des AAB-Schritts)
-- [ ] APK der gleichen Version auf einem echten Gerät installiert und geloggt (Backend `https://app.cybersarah-ki.com`)
-- [ ] On-Server-KI-Test im Chat-Tab der App: Verbindung „On-Server" → Test muss grün melden (`gemini-flash-latest`)
-- [ ] Datenschutzrichtlinien-URL hinterlegt (offener Punkt aus `PLAY_STORE_BEREITSCHAFT.md` — Dokument muss öffentlich erreichbar sein, z. B. GitHub-Pages oder im Backend ausgeliefert)
-- [ ] Screenshots (5–8) vom Realgerät hochgeladen
+## 3. Google Play: vor dem Upload verifizieren
 
-## Nach der Freigabe
+1. In der Google Play Console prüfen, ob die App bereits mit der Paket-ID `com.cybersarah.controlcenter` angelegt wurde. Eine vorhandene App mit einer anderen Paket-ID ist nicht dieselbe App; Paket-IDs dürfen nicht aus älteren Dokumenten übernommen werden.
+2. Das AAB aus genau dem erfolgreich abgeschlossenen Android-Release-Lauf herunterladen.
+3. Manifest und SHA-256-Datei gegen die heruntergeladenen Artefakte prüfen.
+4. Im Actions-Log kontrollieren, dass `apksigner verify` für beide APKs und `jarsigner -verify` für das AAB erfolgreich waren.
+5. Die Admin-APK auf einem realen Android-Gerät installieren und Login, Backend-Verbindung, zentrale Arbeitsabläufe, Berechtigungen und Absturzverhalten prüfen.
+6. Store-Eintrag, Datenschutzangaben, Data-Safety-Antworten, Zielgruppe, Inhaltsfreigaben, App-Zugriff und Screenshots anhand des tatsächlich ausgelieferten Funktionsumfangs neu prüfen. Ältere Listing- oder Compliance-Texte sind keine automatische Bestätigung ihrer Aktualität.
+7. Erst danach das AAB in einem internen oder geschlossenen Testtrack hochladen. Die Produktionsfreigabe bleibt eine bewusste Owner-Entscheidung.
 
-- Produktiver Release-Track von Test auf Produktion hochstufen.
-- Betriebsbeobachtung: Crash-Berichte (ANR/Abstürze) und die Server-Metriken des Workspace-Services im Blick behalten; die Health-Endpunkte von App und Workspace melden Persistenz- und Provider-Status.
-- Realgerät-Betriebserfahrung in die Key-Rotations-Parameter zurückfließen lassen (siehe `NEXT_STEPS.md`, mittelfristige Richtung).
+## 4. EAS und GitHub Actions auseinanderhalten
+
+Die Datei `.github/workflows/create-production-builds.yml` ist ein Integrations-Platzhalter und baut keine APK. Der dokumentierte Android-APK-/AAB-Pfad ist `.github/workflows/build-apk.yml`.
+
+Ein roter EAS-Status ist deshalb nicht automatisch ein Fehler des GitHub-Android-Builds. Umgekehrt beweist ein grüner Platzhalter- oder allgemeiner CI-Status keinen erfolgreichen Android-Release.
+
+Die Repository-Konfiguration weist darauf hin, dass die EAS-Verknüpfung noch an einen alten Kontonamen gebunden ist. Diese Verbindung muss separat neu eingerichtet werden, falls EAS weiterhin genutzt werden soll; sie ist keine Voraussetzung für den oben beschriebenen GitHub-Actions-APK-Workflow.
+
+## 5. Aktueller Nachweisstatus
+
+Vor einer Veröffentlichung müssen für den konkreten Commit alle folgenden Nachweise vorliegen:
+
+- [ ] Android-Workflow erfolgreich abgeschlossen
+- [ ] Entwicklungs-APK und signierte Admin-APK vorhanden
+- [ ] AAB vorhanden und Signatur verifiziert
+- [ ] Release-Manifest und SHA-256-Prüfsummen vorhanden und geprüft
+- [ ] Admin-APK auf echtem Gerät installiert und getestet
+- [ ] Datenschutz-/Store-Angaben für den aktuellen Build geprüft
+- [ ] Interner oder geschlossener Play-Test durchgeführt
+
+**Stand dieser Dokumentation:** Pipeline-Konfiguration geprüft; ein aktueller signierter Android-Build und ein Realgerätetest werden hiermit ausdrücklich nicht behauptet.
