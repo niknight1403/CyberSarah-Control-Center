@@ -12,6 +12,9 @@ export function PublishingOpsAdminCard({isAdmin}:{isAdmin:boolean}){
   });
   if(!isAdmin)return null;
   const stats=q.data;
+  const retry=trpc.publishing.retryFailed.useMutation({
+    onSuccess:()=>{void q.refetch();},
+  });
   const metrics=[
     {name:"Fällig",value:stats?.due??null,severity:"normal"},
     {name:"Geplant",value:stats?.scheduled??null,severity:"normal"},
@@ -55,6 +58,44 @@ export function PublishingOpsAdminCard({isAdmin}:{isAdmin:boolean}){
           <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>{m.name}</Text>
         </View>)}
       </View>
+      {stats.failureReasons.totalFailedJobs>0?<View style={[styles.blocker,{borderColor:glassPalette.red}]}>
+        <Text style={[styles.title,{color:glassPalette.red}]}>Fehlerdiagnose</Text>
+        <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>
+          {stats.failureReasons.totalFailedJobs} fehlgeschlagene oder unklare Jobs · {stats.failureReasons.withoutErrorText} ohne gespeicherten Fehlertext
+        </Text>
+        {stats.failureReasons.byCause.map(item=><View key={item.cause} style={styles.failureRow}>
+          <View style={{flex:1,gap:2}}>
+            <Text style={[styles.failureTitle,{color:glassSurface.textPrimary}]}>{item.cause.replaceAll("_"," ") } · {item.count}</Text>
+            <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>{item.hint}</Text>
+            <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>Plattformen: {item.platforms.map(p=>p.toUpperCase()).join(", ")}</Text>
+          </View>
+        </View>)}
+        {stats.failureReasons.byPlatform.map(item=><View key={item.platform} style={styles.modeRow}>
+          <Text style={[styles.modeLabel,{color:glassSurface.textPrimary}]}>{item.platform.toUpperCase()}</Text>
+          <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>
+            {item.failures} Fehler · {item.retryable} wiederholbar · {item.manualReview} manuell
+          </Text>
+        </View>)}
+        <Text style={[styles.hint,{color:glassSurface.textSecondary}]}>{stats.failureReasons.note}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Sicher wiederholbare fehlgeschlagene Jobs erneut einplanen"
+          disabled={retry.isPending||stats.failureReasons.retryable===0}
+          onPress={()=>retry.mutate()}
+          style={[styles.refresh,{borderColor:glassSurface.border,opacity:retry.isPending||stats.failureReasons.retryable===0?0.5:1}]}>
+          <Text style={{color:glassPalette.cyan,fontWeight:"700"}}>
+            {retry.isPending?"Prüfe Jobs …":"Sichere Wiederholungen prüfen"}
+          </Text>
+        </Pressable>
+        {retry.error?<Text style={[styles.warning,{color:glassPalette.red}]}>{retry.error.message}</Text>:null}
+        {retry.data?<Text style={[styles.hint,{color:glassSurface.textSecondary}]}>
+          Ergebnis: {retry.data.requeued} erneut eingeplant, {retry.data.skipped.length} übersprungen. {retry.data.detail??""}
+        </Text>:null}
+        {retry.data?.skipped.map(item=><Text key={item.id} style={[styles.hint,{color:glassSurface.textSecondary}]}>
+          Job #{item.id}: {item.reason.replaceAll("_"," ")}
+        </Text>)}
+        {retry.data?.tokenRefresh?.detail?<Text style={[styles.hint,{color:glassSurface.textSecondary}]}>
+          Token-Prüfung: {retry.data.tokenRefresh.detail}
+        </Text>:null}
+      </View>:null}
       {stats.uncertainBlockers.credentialsBlocked.length>0?<View style={[styles.blocker,{borderColor:glassPalette.amber}]}>
         <Text style={[styles.title,{color:glassPalette.amber}]}>Unklare Vorgänge: Zugang prüfen</Text>
         {stats.uncertainBlockers.guidance.map(line=><Text key={line} style={[styles.hint,{color:glassSurface.textSecondary}]}>
@@ -93,6 +134,8 @@ const styles=StyleSheet.create({
   metric:{minWidth:90,flexGrow:1,borderWidth:1,borderRadius:10,padding:10,gap:3},
   number:{fontSize:19,fontWeight:"800"},
   blocker:{borderWidth:1,borderRadius:12,padding:10,gap:6},
+  failureRow:{borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:glassSurface.border,paddingTop:7},
+  failureTitle:{fontSize:12,fontWeight:"800"},
   modeRow:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",gap:10},
   modeLabel:{fontSize:11,fontWeight:"700"},
   modeStatus:{fontSize:11,fontWeight:"800"},
