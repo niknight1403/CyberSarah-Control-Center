@@ -241,7 +241,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       declaredSize: storageUploadIntentsTable.declaredSize,
     }).from(storageUploadIntentsTable).where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
-      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+      eq(storageUploadIntentsTable.principal, principal),
     )).limit(1);
     if (!intent || !matchesDeclaredUploadMetadata(
       { contentType: intent.declaredContentType, size: intent.declaredSize },
