@@ -1,12 +1,13 @@
 import type { Express, Request } from "express";
 import { ENV } from "./env";
+import { validateSignedStorageUrl, validateStorageObjectKey } from "../../lib/storage-proxy-logic";
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*splat", async (req: Request<{ splat?: string[] }>, res) => {
     const rawSplat = req.params.splat;
     const key = Array.isArray(rawSplat) ? rawSplat.join("/") : rawSplat;
-    if (!key) {
-      res.status(400).send("Missing storage key");
+    if (!validateStorageObjectKey(key)) {
+      res.status(400).send("Invalid storage key");
       return;
     }
 
@@ -18,31 +19,35 @@ export function registerStorageProxy(app: Express) {
     try {
       const forgeUrl = new URL(
         "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
+        ENV.forgeApiUrl.replace(/\\/+$/, "") + "/",
       );
+      if (forgeUrl.protocol !== "https:" && forgeUrl.hostname !== "localhost" && forgeUrl.hostname !== "127.0.0.1") {
+        res.status(500).send("Storage backend URL must use HTTPS");
+        return;
+      }
       forgeUrl.searchParams.set("path", key);
 
       const forgeResp = await fetch(forgeUrl, {
         headers: { Authorization: `Bearer ${ENV.forgeApiKey}` },
+        redirect: "error",
       });
 
       if (!forgeResp.ok) {
-        const body = await forgeResp.text().catch(() => "");
-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
+        console.error(`[StorageProxy] forge error: ${forgeResp.status}`);
         res.status(502).send("Storage backend error");
         return;
       }
 
-      const { url } = (await forgeResp.json()) as { url: string };
-      if (!url) {
-        res.status(502).send("Empty signed URL from backend");
+      const payload = (await forgeResp.json()) as { url?: unknown };
+      if (!validateSignedStorageUrl(payload.url)) {
+        res.status(502).send("Invalid signed storage URL from backend");
         return;
       }
 
       res.set("Cache-Control", "no-store");
-      res.redirect(307, url);
+      res.redirect(307, payload.url);
     } catch (err) {
-      console.error("[StorageProxy] failed:", err);
+      console.error("[StorageProxy] failed:", err instanceof Error ? err.message : "unknown error");
       res.status(502).send("Storage proxy error");
     }
   });
