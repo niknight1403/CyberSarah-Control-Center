@@ -2,10 +2,10 @@ import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
 import { evaluateGxpGate } from "../lib/gxp-governance";
 import { appendGxpAuditEvent, verifyGxpAuditChain } from "./gxp-audit-store";
-import { getCxCaseById } from "./cx-workforce-store";
+import { CxCaseRecordValidationError, getCxCaseById } from "./cx-workforce-store";
 import { buildGxpCxCaseAuditPayload } from "../lib/gxp-cx-link";
 
-async function recordRejectedAssessment(actorUserId: number, framework: string, activity: string) {
+async function recordRejectedAssessment(actorUserId: number, framework: string, activity: string, rejectionReason = "opaque_reference_validation_failed") {
   // Never persist rejected input values: they may contain free-form or personal data.
   return appendGxpAuditEvent({
     actorUserId,
@@ -17,7 +17,7 @@ async function recordRejectedAssessment(actorUserId: number, framework: string, 
       allowedToExecute: false,
       automationMode: "assessment_only",
       humanApprovalRequired: true,
-      rejectionReason: "opaque_reference_validation_failed",
+      rejectionReason,
     },
   });
 }
@@ -63,7 +63,16 @@ export const gxpGovernanceRouter = router({
     evidenceReferences: z.array(z.string().max(128)).max(50).optional(),
     riskLevel: z.enum(["low", "medium", "high", "critical"]).optional(),
   })).mutation(async ({ input, ctx }) => {
-    const cxCase = await getCxCaseById(input.caseId);
+    let cxCase: Awaited<ReturnType<typeof getCxCaseById>>;
+    try {
+      cxCase = await getCxCaseById(input.caseId);
+    } catch (error) {
+      if (error instanceof CxCaseRecordValidationError) {
+        await recordRejectedAssessment(ctx.user.id, input.framework, input.activity, "stored_cx_record_validation_failed");
+      }
+      // Database and infrastructure failures are not input-validation events.
+      throw error;
+    }
     if (!cxCase) throw new Error("CX-Fall nicht gefunden.");
     let result;
     try {
