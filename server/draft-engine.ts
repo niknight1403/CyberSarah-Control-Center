@@ -205,7 +205,7 @@ async function contentWasAlreadySuggested(payload: unknown, injected?: DraftEngi
   if (typeof candidate.content !== "string" || candidate.content.trim().length < 40) return false;
   const db = await engineDb(injected); if (!db) return false;
   const history = await db.select({payload:draftQueue.payload}).from(draftQueue)
-    .where(eq(draftQueue.kind,"content")).orderBy(desc(draftQueue.createdAt)).limit(250);
+    .where(and(eq(draftQueue.kind,"content"),eq(draftQueue.createdBy,"draft-engine"))).orderBy(desc(draftQueue.createdAt)).limit(250);
   return history.some(row => isNearDuplicateContent(candidate, contentPayload(row.payload)));
 }
 
