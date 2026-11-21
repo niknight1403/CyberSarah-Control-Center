@@ -13,6 +13,6 @@ The endpoints continue to accept only PNG, JPEG, and WebP files up to 15 MB. MP4
 
 ## Remaining limitations
 
-The issued-upload registry is currently process-memory only. It is not durable across restarts or multiple API instances, and it does not yet bind an upload to an authenticated operator/tenant record. Do not use this path as a production multi-instance upload workflow until a persistent upload-intent table with owner, expiry, state, and one-time confirmation is implemented.
+The upload intent is now stored in the Revenue OS PostgreSQL database (`storage_upload_intents`) with a unique object path, declared MIME type/size, expiry, and atomic `pending` → `confirming` → `confirmed`/`rejected` state. The API fails closed when the database is unavailable. This survives process restarts and coordinates confirmation across instances. The principal is currently the single server identity `revenue-os-storage-service`; it is not an end-user or tenant binding. Do not treat this as multi-tenant ownership isolation until authenticated operator/tenant context is integrated.
 
-The upload confirmation validates the actual GCS metadata. Confirmation does not itself grant public ACL visibility. Public visibility must remain a separate, explicit operation after a verified publishing workflow.
+Confirmation validates the actual GCS metadata against both the global allowlist/15 MB cap and the request's declared MIME type/size. A mismatch is deleted and marked rejected. Transient storage failures release the claim for retry. Confirmation does not itself grant public ACL visibility. Public visibility must remain a separate, explicit operation after a verified publishing workflow.
