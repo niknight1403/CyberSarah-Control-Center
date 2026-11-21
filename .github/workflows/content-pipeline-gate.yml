@@ -9,13 +9,11 @@ on:
       - "server/publishing-retry-service.ts"
       - "server/publishing-claim.ts"
       - "server/x-token-service.ts"
-      - "lib/publishing-retry-logic.ts"
-      - "lib/publishing-failure-reasons-logic.ts"
-      - "tests/content-dedupe-logic.test.ts
-      - tests/tiktok-publish-status-logic.test.ts
-      - lib/tiktok-publish-status-logic.ts"
       - "server/image-generation.ts"
       - "server/media-pipeline.ts"
+      - "lib/publishing-retry-logic.ts"
+      - "lib/publishing-failure-reasons-logic.ts"
+      - "lib/tiktok-publish-status-logic.ts"
       - "lib/draft-engine-logic.ts"
       - "lib/image-generation-logic.ts"
       - "lib/content-dedupe-logic.ts"
@@ -23,6 +21,8 @@ on:
       - "drizzle/0026_approved_content_pipeline.sql"
       - "drizzle/meta/_journal.json"
       - "tests/content-pipeline*.test.ts"
+      - "tests/content-dedupe-logic.test.ts"
+      - "tests/tiktok-publish-status-logic.test.ts"
       - ".github/workflows/content-pipeline-gate.yml"
   push:
     branches: [main]
@@ -30,13 +30,23 @@ on:
       - "server/draft-engine*.ts"
       - "server/channel-autopilot.ts"
       - "server/publishing-service.ts"
+      - "server/publishing-retry-service.ts"
+      - "server/publishing-claim.ts"
+      - "server/x-token-service.ts"
       - "server/image-generation.ts"
       - "server/media-pipeline.ts"
+      - "lib/publishing-retry-logic.ts"
+      - "lib/publishing-failure-reasons-logic.ts"
+      - "lib/tiktok-publish-status-logic.ts"
       - "lib/draft-engine-logic.ts"
       - "lib/image-generation-logic.ts"
+      - "lib/content-dedupe-logic.ts"
       - "drizzle/schema.ts"
       - "drizzle/0026_approved_content_pipeline.sql"
+      - "drizzle/meta/_journal.json"
       - "tests/content-pipeline*.test.ts"
+      - "tests/content-dedupe-logic.test.ts"
+      - "tests/tiktok-publish-status-logic.test.ts"
       - ".github/workflows/content-pipeline-gate.yml"
 permissions:
   contents: read
@@ -52,5 +62,5 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run check
-      - run: npx vitest run tests/content-pipeline-contract.test.ts tests/content-dedupe-logic.test.ts tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts
+      - run: npx vitest run tests/content-pipeline-contract.test.ts tests/content-dedupe-logic.test.ts tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts tests/tiktok-publish-status-logic.test.ts
       - run: npm run build
