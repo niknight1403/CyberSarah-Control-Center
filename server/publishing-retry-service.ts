@@ -92,8 +92,8 @@ export async function retryFailedJobsControlled(options: {
       const resolved = await resolveXToken({ force: true, now });
       tokenRefresh = {
         attempted: true,
-        ok: Boolean(resolved.token),
-        detail: resolved.token ? "X-Token erneuert." : resolved.reason,
+        ok: Boolean(resolved.token && resolved.refreshed),
+        detail: resolved.refreshed ? "X-Token erneuert." : resolved.reason ?? "Kein neuer X-Token ausgegeben.",
       };
     } catch (error) {
       tokenRefresh = { attempted: true, ok: false, detail: error instanceof Error ? error.message : "unbekannter Fehler" };
