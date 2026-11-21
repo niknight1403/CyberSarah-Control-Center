@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { Readable } from "stream";
+import { isValidStorageUploadKey } from "../lib/storageUploadAuth";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -12,10 +13,24 @@ import { ObjectPermission } from "../lib/objectAcl";
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
-// Only server-side agents (e.g. InfluencerAutoPostAgent) currently mint uploads,
-// and they only ever write generated social-media images. Keep the allowlist and
-// size cap aligned with that real usage so this route cannot be turned into a
-// generic, unauthenticated write-anything-anywhere storage sink.
+// Upload capabilities are privileged. Require a dedicated server-to-server key;
+// do not reuse the dashboard/browser key or rely on the private deployment boundary.
+function requireStorageUploadAuth(req: Request, res: Response, next: NextFunction): void {
+  const expected = process.env["REVENUE_OS_STORAGE_API_KEY"] ?? "";
+  const supplied = req.get("X-Revenue-Storage-Key") ?? "";
+  if (!expected) {
+    res.status(503).json({ error: "Storage upload authentication is not configured" });
+    return;
+  }
+  if (!isValidStorageUploadKey(expected, supplied)) {
+    res.status(403).json({ error: "Storage upload access denied" });
+    return;
+  }
+  next();
+}
+
+// Only server-side agents currently mint uploads. Keep the allowlist and size cap
+// aligned with the actual generated-image workflow; video upload is not enabled.
 const ALLOWED_UPLOAD_CONTENT_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -23,9 +38,7 @@ const ALLOWED_UPLOAD_CONTENT_TYPES = new Set([
 ]);
 const MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB
 
-// Simple sliding-window limiter for the upload-URL bootstrap route. There is no
-// app-level auth on this API (single-operator, private-deployment app), so this
-// bounds how many signed write capabilities a single caller can mint per window.
+// Simple sliding-window limiter for authenticated upload-URL requests.
 const UPLOAD_RATE_LIMIT_MAX = 20;
 const UPLOAD_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 const uploadRequestLog = new Map<string, number[]>();
@@ -79,7 +92,7 @@ function consumePendingUpload(objectPath: string): boolean {
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
  */
-router.post("/storage/uploads/request-url", uploadRateLimiter, async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireStorageUploadAuth, uploadRateLimiter, async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
@@ -126,7 +139,7 @@ router.post("/storage/uploads/request-url", uploadRateLimiter, async (req: Reque
  * re-reads the object's real GCS metadata and deletes it immediately if it
  * violates the same allowlist/size cap, closing that gap.
  */
-router.post("/storage/uploads/confirm", async (req: Request, res: Response) => {
+router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Request, res: Response) => {
   const parsed = ConfirmUploadBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
