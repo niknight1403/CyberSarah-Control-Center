@@ -26,7 +26,7 @@ import {
 } from "../lib/publishing-auto-resolution-logic";
 import { readPlatformCredentialsFromEnv } from "./publishing-service";
 import { resolveXToken } from "./x-token-service";
-import type { PlatformCredentials } from "../lib/publishing-queue-logic";
+import { publishingReceiptMode, type PlatformCredentials } from "../lib/publishing-queue-logic";
 import { getDb } from "./db";
 
 type PublishingDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -401,7 +401,7 @@ async function applyVerifiedResolution(
     }
     const [changed] = await tx.update(publishingJobs).set({
       status: "veroeffentlicht",
-      mode: "live",
+      mode: publishingReceiptMode(externalId),
       externalId,
       publishedAt: now,
       lastError: null,
