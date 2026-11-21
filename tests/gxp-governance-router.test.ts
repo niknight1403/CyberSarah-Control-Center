@@ -11,6 +11,7 @@ vi.mock("../server/gxp-audit-store", () => ({
   verifyGxpAuditChain: mocks.verifyGxpAuditChain,
 }));
 vi.mock("../server/cx-workforce-store", () => ({
+  CxCaseRecordValidationError: class CxCaseRecordValidationError extends Error {},
   getCxCaseById: mocks.getCxCaseById,
 }));
 
@@ -98,4 +99,43 @@ describe("GxP governance router audit behavior", () => {
     }));
     expect(JSON.stringify(mocks.appendGxpAuditEvent.mock.calls)).not.toContain("customer@example.com");
   });
+  it("audits malformed persisted CX records without exposing stored values", async () => {
+    mocks.getCxCaseById.mockRejectedValueOnce(
+      new (class CxCaseRecordValidationError extends Error {})("invalid stored CX case"),
+    );
+    const caller = gxpGovernanceRouter.createCaller(adminContext);
+
+    await expect(caller.assessCxCase({
+      caseId: "b".repeat(32),
+      framework: "GMP",
+      activity: "deviation",
+    })).rejects.toThrow("invalid stored CX case");
+
+    expect(mocks.appendGxpAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 7,
+      framework: "GMP",
+      activity: "deviation",
+      assessmentStatus: "input_rejected",
+      missingControls: ["input_validation_failed"],
+      eventPayload: expect.objectContaining({
+        rejectionReason: "opaque_reference_validation_failed",
+        allowedToExecute: false,
+        automationMode: "assessment_only",
+      }),
+    }));
+    expect(JSON.stringify(mocks.appendGxpAuditEvent.mock.calls)).not.toContain("invalid stored CX case");
+  });
+
+  it("does not misclassify CX database failures as rejected input", async () => {
+    mocks.getCxCaseById.mockRejectedValueOnce(new Error("CX database unavailable"));
+    const caller = gxpGovernanceRouter.createCaller(adminContext);
+
+    await expect(caller.assessCxCase({
+      caseId: "b".repeat(32),
+      framework: "GMP",
+      activity: "deviation",
+    })).rejects.toThrow("CX database unavailable");
+    expect(mocks.appendGxpAuditEvent).not.toHaveBeenCalled();
+  });
+
 });
