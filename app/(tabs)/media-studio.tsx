@@ -61,7 +61,7 @@ export default function MediaStudioScreen() {
             <Text style={styles.title}>Medien-Studio</Text>
           </View>
           <StatusChip
-            label={videoAvailable === null ? "PRÜFEN" : videoAvailable ? "BEREIT" : "OHNE FFMPEG"}
+            label={videoAvailable === null ? "PRÜFEN" : videoAvailable ? "RENDER BEREIT" : "OHNE FFMPEG"}
             accent={videoAvailable === false ? "amber" : "purple"}
           />
         </View>
