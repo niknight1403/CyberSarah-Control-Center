@@ -42,6 +42,17 @@ describe("publishing operations UI contract", () => {
     expect(card).toContain("stats.failureReasons.retryable===0");
   });
 });
+describe("X rejected-token fallback safety", () => {
+  it("never returns the previously rejected token from a forced refresh path", () => {
+    const source = readFileSync("server/x-token-service.ts", "utf8");
+    const forceGuard = source.indexOf('if (force) {\n    return {\n      token: null');
+    const fallback = source.indexOf('const envToken = process.env.X_PUBLISH_TOKEN');
+    expect(forceGuard).toBeGreaterThan(-1);
+    expect(fallback).toBeGreaterThan(forceGuard);
+    const retry = readFileSync("server/publishing-retry-service.ts", "utf8");
+    expect(retry).toContain("ok: Boolean(resolved.token && resolved.refreshed)");
+  });
+});
 describe("X auth refresh contract", () => {
   it("forces a fresh X token refresh after provider auth failure", () => {
     const source = readFileSync("server/x-token-service.ts", "utf8");
