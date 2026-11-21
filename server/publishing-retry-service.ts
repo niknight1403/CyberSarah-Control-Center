@@ -29,9 +29,11 @@ export type RetryRunResult = {
 };
 
 /** Holt Kandidaten: fehlgeschlagen, nie beim Provider, aelteste zuerst. */
-async function loadCandidates(limit: number) {
+async function loadCandidates(limit: number, userOpenId?: string) {
   const db = await getDb();
   if (!db) return null;
+  const filters = [eq(publishingJobs.status, "fehlgeschlagen"), isNull(publishingJobs.mode)];
+  if (userOpenId) filters.push(eq(publishingJobs.userOpenId, userOpenId));
   return db
     .select({
       id: publishingJobs.id,
@@ -42,7 +44,7 @@ async function loadCandidates(limit: number) {
       mode: publishingJobs.mode,
     })
     .from(publishingJobs)
-    .where(and(eq(publishingJobs.status, "fehlgeschlagen"), isNull(publishingJobs.mode)))
+    .where(and(...filters))
     .orderBy(asc(publishingJobs.updatedAt))
     .limit(Math.min(Math.max(limit, 1) * 4, 100));
 }
@@ -51,6 +53,7 @@ export async function retryFailedJobsControlled(options: {
   limit?: number;
   dryRun?: boolean;
   now?: Date;
+  userOpenId?: string;
 } = {}): Promise<RetryRunResult> {
   const now = options.now ?? new Date();
   const limit = Math.min(options.limit ?? SYSTEM_RETRY_MAX_PER_RUN, SYSTEM_RETRY_MAX_PER_RUN);
@@ -59,7 +62,7 @@ export async function retryFailedJobsControlled(options: {
     ok: true, dryRun, considered: 0, requeued: 0, skipped: [], tokenRefresh: null,
   };
 
-  const rows = await loadCandidates(limit);
+  const rows = await loadCandidates(limit, options.userOpenId);
   if (!rows) return { ...empty, ok: false, detail: "Datenbank nicht verfuegbar." };
 
   // Vor dem Planen: gibt es fuer X ueberhaupt ein verwendbares Token?
