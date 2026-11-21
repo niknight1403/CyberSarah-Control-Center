@@ -29,5 +29,5 @@ export function isNearDuplicateContent(candidate: ContentDraftFingerprint, previ
   const topicA = typeof candidate.topic === "string" ? normalize(candidate.topic) : "";
   const topicB = typeof previous.topic === "string" ? normalize(previous.topic) : "";
   const similarity = jaccard(tokens(currentText), tokens(previousText));
-  return topicA.length > 0 && topicA === topicB ? similarity >= 0.72 : similarity >= 0.88;
+  return topicA.length > 0 && topicA === topicB ? similarity >= 0.65 : similarity >= 0.88;
 }
