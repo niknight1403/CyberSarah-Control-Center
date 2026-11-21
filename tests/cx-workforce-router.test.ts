@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   describeHubspotEnv: vi.fn(),
@@ -31,6 +31,15 @@ const userContext = {
   user: { id: 8, role: "user" } as never,
 };
 const anonymousContext = { req: {} as never, res: {} as never, user: null };
+
+// isolate:false reuses the module registry across test files. Remove these
+// router-only mocks so later HubSpot/store tests import the real modules.
+afterAll(() => {
+  vi.doUnmock("../server/integrations/hubspot");
+  vi.doUnmock("../server/cx-workforce-hubspot");
+  vi.doUnmock("../server/cx-workforce-store");
+  vi.resetModules();
+});
 
 describe("CX workforce router access and operations", () => {
   beforeEach(() => {
