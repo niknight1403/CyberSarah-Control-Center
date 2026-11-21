@@ -48,6 +48,8 @@ describe("asset card logic (Sprint 367)", () => {
   it("validiert Asset-URLs vorab statt Blind-Versuch (Optimierung 4)", () => {
     expect(validateAssetUrl("https://cdn.example.com/bild.jpg", "image")).toEqual({ valid: true });
     expect(validateAssetUrl("https://cdn.example.com/video.mp4", "video").valid).toBe(true);
+    expect(validateAssetUrl("https://cdn.example.com/signed/reel.MP4?token=abc&expires=123", "video").valid).toBe(true);
+    expect(validateAssetUrl("https://cdn.example.com/video.mp4#fragment", "video").valid).toBe(true);
     expect(validateAssetUrl("https://cdn.example.com/bild.gif", "image").valid).toBe(false);
     expect(validateAssetUrl("data:image/png;base64,xxx", "image").reason).toContain("http(s)://");
     expect(validateAssetUrl("https://cdn.example.com/bild.jpg", "video").valid).toBe(false);
