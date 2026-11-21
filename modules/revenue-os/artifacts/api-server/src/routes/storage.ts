@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { Readable } from "stream";
 import { isValidStorageUploadKey } from "../lib/storageUploadAuth";
+import { verifiziereToken } from "../lib/adminAccount";
 import { matchesDeclaredUploadMetadata } from "../lib/storageUploadIntentLogic";
 import {
   RequestUploadUrlBody,
@@ -29,7 +30,16 @@ function requireStorageUploadAuth(req: Request, res: Response, next: NextFunctio
     res.status(403).json({ error: "Storage upload access denied" });
     return;
   }
-  next();
+  const authorization = req.headers.authorization ?? "";
+  const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const session = bearer ? verifiziereToken(bearer) : null;
+  if (session && Number.isSafeInteger(session.userId) && session.userId > 0) {
+    res.locals.storageUploadPrincipal = "user:" + session.userId;
+    res.locals.storageUploadOwnerUserId = session.userId;
+    next();
+    return;
+  }
+  res.status(expected ? 403 : 503).json({ error: "Storage upload access denied or not configured" });
 }
 
 // Only server-side agents currently mint uploads. Keep the allowlist and size cap
@@ -71,6 +81,8 @@ function uploadRateLimiter(req: Request, res: Response, next: NextFunction): voi
 // Upload intent state is durable in the Revenue OS PostgreSQL database.
 // This service identity is deliberately not represented as an end-user or tenant.
 const STORAGE_UPLOAD_PRINCIPAL = "revenue-os-storage-service";
+const getPrincipal = (res: Response): string => String(res.locals.storageUploadPrincipal ?? STORAGE_UPLOAD_PRINCIPAL);
+const getOwnerUserId = (res: Response): number | null => Number.isSafeInteger(res.locals.storageUploadOwnerUserId) ? res.locals.storageUploadOwnerUserId : null;
 const OBJECT_PATH_PATTERN = /^\/objects\/uploads\/[0-9a-f-]{36}$/;
 const PENDING_UPLOAD_TTL_MS = 30 * 60 * 1000;
 
@@ -84,12 +96,15 @@ async function registerPendingUpload(
   objectPath: string,
   declaredContentType: string,
   declaredSize: number,
+  principal: string,
+  ownerUserId: number | null,
 ): Promise<void> {
   if (!db) throw new Error("Upload intent database unavailable");
   const now = new Date();
   await db.insert(storageUploadIntentsTable).values({
     objectPath,
-    principal: STORAGE_UPLOAD_PRINCIPAL,
+    principal,
+    ownerUserId,
     declaredContentType,
     declaredSize,
     status: "pending",
@@ -99,13 +114,13 @@ async function registerPendingUpload(
   });
 }
 
-async function beginPendingUploadConfirmation(objectPath: string): Promise<boolean> {
+async function beginPendingUploadConfirmation(objectPath: string, principal: string): Promise<boolean> {
   if (!db) throw new Error("Upload intent database unavailable");
   const [claimed] = await db.update(storageUploadIntentsTable)
     .set({ status: "confirming", updatedAt: new Date() })
     .where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
-      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+      eq(storageUploadIntentsTable.principal, principal),
       eq(storageUploadIntentsTable.status, "pending"),
       gt(storageUploadIntentsTable.expiresAt, new Date()),
     ))
@@ -113,24 +128,24 @@ async function beginPendingUploadConfirmation(objectPath: string): Promise<boole
   return Boolean(claimed);
 }
 
-async function completePendingUploadConfirmation(objectPath: string, status: "confirmed" | "rejected"): Promise<void> {
+async function completePendingUploadConfirmation(objectPath: string, principal: string, status: "confirmed" | "rejected"): Promise<void> {
   if (!db) throw new Error("Upload intent database unavailable");
   await db.update(storageUploadIntentsTable)
     .set({ status, updatedAt: new Date() })
     .where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
-      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+      eq(storageUploadIntentsTable.principal, principal),
       eq(storageUploadIntentsTable.status, "confirming"),
     ));
 }
 
-async function releasePendingUploadConfirmation(objectPath: string): Promise<void> {
+async function releasePendingUploadConfirmation(objectPath: string, principal: string): Promise<void> {
   if (!db) throw new Error("Upload intent database unavailable");
   await db.update(storageUploadIntentsTable)
     .set({ status: "pending", updatedAt: new Date() })
     .where(and(
       eq(storageUploadIntentsTable.objectPath, objectPath),
-      eq(storageUploadIntentsTable.principal, STORAGE_UPLOAD_PRINCIPAL),
+      eq(storageUploadIntentsTable.principal, principal),
       eq(storageUploadIntentsTable.status, "confirming"),
       gt(storageUploadIntentsTable.expiresAt, new Date()),
     ));
@@ -167,7 +182,7 @@ router.post("/storage/uploads/request-url", requireStorageUploadAuth, uploadRate
   try {
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-    await registerPendingUpload(objectPath, contentType, size);
+    await registerPendingUpload(objectPath, contentType, size, getPrincipal(res), getOwnerUserId(res));
 
     res.json(
       RequestUploadUrlResponse.parse({
@@ -208,7 +223,8 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
 
   if (!requireUploadDatabase(res)) return;
 
-  if (!(await beginPendingUploadConfirmation(objectPath))) {
+  const principal = getPrincipal(res);
+  if (!(await beginPendingUploadConfirmation(objectPath, principal))) {
     res.status(403).json({ error: "No pending upload for this object path" });
     return;
   }
@@ -230,15 +246,15 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       { contentType, size },
     )) {
       await objectStorageService.deleteObjectEntity(objectPath);
-      await completePendingUploadConfirmation(objectPath, "rejected");
+      await completePendingUploadConfirmation(objectPath, principal, "rejected");
       res.status(422).json({ error: "Upload-Metadaten stimmen nicht mit dem Auftrag überein" });
       return;
     }
-    await completePendingUploadConfirmation(objectPath, "confirmed");
+    await completePendingUploadConfirmation(objectPath, principal, "confirmed");
     res.json(ConfirmUploadResponse.parse({ ok: true, contentType, size }));
   } catch (error) {
     if (error instanceof ObjectNotFoundError) {
-      await releasePendingUploadConfirmation(objectPath);
+      await releasePendingUploadConfirmation(objectPath, principal);
       res.status(404).json({ error: "Object not found" });
       return;
     }
