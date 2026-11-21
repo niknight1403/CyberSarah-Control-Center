@@ -161,6 +161,12 @@ async function startServer() {
 
   // ── DB-Schema automatisch synchronisieren (drizzle-kit push) ──────────────
   if (hasDb) {
+    // The DB package currently degrades connection failures to db=null.
+    // Do not let that fallback masquerade as a healthy configured deployment.
+    const { db } = await import("@workspace/db");
+    if (!db) {
+      throw new Error("DATABASE_URL is configured but PostgreSQL is unavailable; refusing to start");
+    }
     try {
       logger.info("🐘 Prüfe DB-Schema...");
       const { execSync } = await import("child_process");
