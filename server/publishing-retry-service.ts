@@ -115,7 +115,19 @@ export async function retryFailedJobsControlled(options: {
   if (!db) return { ...empty, ok: false, detail: "Datenbank nicht verfuegbar." };
 
   const requeued: number[] = [];
+  const skipped = plan.skipped.map((entry) => ({ id: entry.id, reason: entry.reason }));
   for (const entry of plan.retries) {
+    const candidate = rows.find((row) => row.id === entry.id);
+    // Only X has an implemented refresh flow. Never spend attempts by blindly
+    // retrying auth failures on static-token providers, or after X refresh failed.
+    if (entry.needsTokenRefresh && candidate?.platform !== "x") {
+      skipped.push({ id: entry.id, reason: "auth_ohne_automatische_token_erneuerung" });
+      continue;
+    }
+    if (entry.needsTokenRefresh && candidate?.platform === "x" && tokenRefresh?.ok !== true) {
+      skipped.push({ id: entry.id, reason: "x_token_refresh_fehlgeschlagen" });
+      continue;
+    }
     const updated = await db
       .update(publishingJobs)
       .set({
@@ -140,7 +152,7 @@ export async function retryFailedJobsControlled(options: {
     dryRun: false,
     considered: rows.length,
     requeued: requeued.length,
-    skipped: plan.skipped.map((entry: RetryDecision) => ({ id: entry.id, reason: entry.reason })),
+    skipped,
     tokenRefresh,
     detail: `${requeued.length} erneut eingeplant, ${plan.skipped.length} uebersprungen`,
   };
