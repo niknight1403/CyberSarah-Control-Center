@@ -2,7 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { Readable } from "stream";
 import { isValidStorageUploadKey } from "../lib/storageUploadAuth";
 import { verifiziereToken } from "../lib/adminAccount";
-import { matchesDeclaredUploadMetadata } from "../lib/storageUploadIntentLogic";
+import { matchesDeclaredUploadMetadata, resolveUploadTenantId } from "../lib/storageUploadIntentLogic";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -42,22 +42,19 @@ async function requireStorageUploadAuth(req: Request, res: Response, next: NextF
       const memberships = await db.select({ tenantId: tenantMembershipsTable.tenantId })
         .from(tenantMembershipsTable)
         .where(eq(tenantMembershipsTable.userId, session.userId));
-      const requestedTenant = req.get("X-Tenant-ID");
-      let tenantId: number | null = null;
-      if (requestedTenant) {
-        const parsedTenant = Number(requestedTenant);
-        if (!Number.isSafeInteger(parsedTenant) || parsedTenant <= 0 ||
-            !memberships.some((membership) => membership.tenantId === parsedTenant)) {
-          res.status(403).json({ error: "Keine Berechtigung für diesen Tenant" });
-          return;
-        }
-        tenantId = parsedTenant;
-      } else if (memberships.length === 1) {
-        tenantId = memberships[0].tenantId;
-      } else if (memberships.length > 1) {
-        res.status(400).json({ error: "X-Tenant-ID ist bei mehreren Tenant-Mitgliedschaften erforderlich" });
+      const tenantResolution = resolveUploadTenantId(
+        memberships.map((membership) => membership.tenantId),
+        req.get("X-Tenant-ID"),
+      );
+      if (!tenantResolution.ok) {
+        res.status(tenantResolution.reason === "selection_required" ? 400 : 403).json({
+          error: tenantResolution.reason === "selection_required"
+            ? "X-Tenant-ID ist bei mehreren Tenant-Mitgliedschaften erforderlich"
+            : "Keine Berechtigung für diesen Tenant",
+        });
         return;
       }
+      const tenantId = tenantResolution.tenantId;
       res.locals.storageUploadPrincipal = "user:" + session.userId;
       res.locals.storageUploadOwnerUserId = session.userId;
       res.locals.storageUploadTenantId = tenantId;
