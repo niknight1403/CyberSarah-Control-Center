@@ -11,7 +11,7 @@ import {
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError, UploadNonCompliantError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
-import { db, storageUploadIntentsTable } from "@workspace/db";
+import { db, storageUploadIntentsTable, tenantMembershipsTable } from "@workspace/db";
 import { and, eq, gt } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -19,12 +19,13 @@ const objectStorageService = new ObjectStorageService();
 
 // Upload capabilities are privileged. Require a dedicated server-to-server key;
 // do not reuse the dashboard/browser key or rely on the private deployment boundary.
-function requireStorageUploadAuth(req: Request, res: Response, next: NextFunction): void {
+async function requireStorageUploadAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const expected = process.env["REVENUE_OS_STORAGE_API_KEY"] ?? "";
   const supplied = req.get("X-Revenue-Storage-Key") ?? "";
   if (expected && isValidStorageUploadKey(expected, supplied)) {
     res.locals.storageUploadPrincipal = STORAGE_UPLOAD_PRINCIPAL;
     res.locals.storageUploadOwnerUserId = null;
+    res.locals.storageUploadTenantId = null;
     next();
     return;
   }
@@ -33,10 +34,40 @@ function requireStorageUploadAuth(req: Request, res: Response, next: NextFunctio
   const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
   const session = bearer ? verifiziereToken(bearer) : null;
   if (session && Number.isSafeInteger(session.userId) && session.userId > 0) {
-    res.locals.storageUploadPrincipal = "user:" + session.userId;
-    res.locals.storageUploadOwnerUserId = session.userId;
-    next();
-    return;
+    if (!db) {
+      res.status(503).json({ error: "Upload-Auftragsdatenbank nicht verfügbar" });
+      return;
+    }
+    try {
+      const memberships = await db.select({ tenantId: tenantMembershipsTable.tenantId })
+        .from(tenantMembershipsTable)
+        .where(eq(tenantMembershipsTable.userId, session.userId));
+      const requestedTenant = req.get("X-Tenant-ID");
+      let tenantId: number | null = null;
+      if (requestedTenant) {
+        const parsedTenant = Number(requestedTenant);
+        if (!Number.isSafeInteger(parsedTenant) || parsedTenant <= 0 ||
+            !memberships.some((membership) => membership.tenantId === parsedTenant)) {
+          res.status(403).json({ error: "Keine Berechtigung für diesen Tenant" });
+          return;
+        }
+        tenantId = parsedTenant;
+      } else if (memberships.length === 1) {
+        tenantId = memberships[0].tenantId;
+      } else if (memberships.length > 1) {
+        res.status(400).json({ error: "X-Tenant-ID ist bei mehreren Tenant-Mitgliedschaften erforderlich" });
+        return;
+      }
+      res.locals.storageUploadPrincipal = "user:" + session.userId;
+      res.locals.storageUploadOwnerUserId = session.userId;
+      res.locals.storageUploadTenantId = tenantId;
+      next();
+      return;
+    } catch (error) {
+      req.log.error({ err: error }, "Tenant-Mitgliedschaften konnten nicht geprüft werden");
+      res.status(503).json({ error: "Tenant-Berechtigung derzeit nicht prüfbar" });
+      return;
+    }
   }
 
   res.status(expected ? 403 : 503).json({
@@ -85,6 +116,7 @@ function uploadRateLimiter(req: Request, res: Response, next: NextFunction): voi
 const STORAGE_UPLOAD_PRINCIPAL = "revenue-os-storage-service";
 const getPrincipal = (res: Response): string => String(res.locals.storageUploadPrincipal ?? STORAGE_UPLOAD_PRINCIPAL);
 const getOwnerUserId = (res: Response): number | null => Number.isSafeInteger(res.locals.storageUploadOwnerUserId) ? res.locals.storageUploadOwnerUserId : null;
+const getTenantId = (res: Response): number | null => Number.isSafeInteger(res.locals.storageUploadTenantId) ? res.locals.storageUploadTenantId : null;
 const OBJECT_PATH_PATTERN = /^\/objects\/uploads\/[0-9a-f-]{36}$/;
 const PENDING_UPLOAD_TTL_MS = 30 * 60 * 1000;
 
@@ -100,6 +132,7 @@ async function registerPendingUpload(
   declaredSize: number,
   principal: string,
   ownerUserId: number | null,
+  tenantId: number | null,
 ): Promise<void> {
   if (!db) throw new Error("Upload intent database unavailable");
   const now = new Date();
@@ -107,6 +140,7 @@ async function registerPendingUpload(
     objectPath,
     principal,
     ownerUserId,
+    tenantId,
     declaredContentType,
     declaredSize,
     status: "pending",
@@ -184,7 +218,7 @@ router.post("/storage/uploads/request-url", requireStorageUploadAuth, uploadRate
   try {
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-    await registerPendingUpload(objectPath, contentType, size, getPrincipal(res), getOwnerUserId(res));
+    await registerPendingUpload(objectPath, contentType, size, getPrincipal(res), getOwnerUserId(res), getTenantId(res));
 
     res.json(
       RequestUploadUrlResponse.parse({
@@ -261,7 +295,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       return;
     }
     if (error instanceof UploadNonCompliantError) {
-      await completePendingUploadConfirmation(objectPath, "rejected");
+      await completePendingUploadConfirmation(objectPath, principal, "rejected");
       req.log.warn(
         { objectPath, contentType: error.contentType, size: error.size },
         "Upload verstößt gegen Richtlinie, Objekt gelöscht"
@@ -269,7 +303,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       res.status(422).json({ error: "Upload verstößt gegen Größen-/Dateityp-Richtlinie" });
       return;
     }
-    await releasePendingUploadConfirmation(objectPath);
+    await releasePendingUploadConfirmation(objectPath, principal);
     req.log.error({ err: error }, "Error confirming upload");
     res.status(500).json({ error: "Failed to confirm upload" });
   }
