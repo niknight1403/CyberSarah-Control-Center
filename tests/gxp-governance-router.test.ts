@@ -119,7 +119,7 @@ describe("GxP governance router audit behavior", () => {
       assessmentStatus: "input_rejected",
       missingControls: ["input_validation_failed"],
       eventPayload: expect.objectContaining({
-        rejectionReason: "opaque_reference_validation_failed",
+        rejectionReason: "stored_cx_record_validation_failed",
         allowedToExecute: false,
         automationMode: "assessment_only",
       }),
