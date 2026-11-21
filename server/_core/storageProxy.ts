@@ -21,19 +21,23 @@ export function registerStorageProxy(app: Express) {
         "v1/storage/presign/get",
         ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
       );
-      if (forgeUrl.protocol !== "https:" && forgeUrl.hostname !== "localhost" && forgeUrl.hostname !== "127.0.0.1") {
+      if (
+        forgeUrl.protocol !== "https:" &&
+        forgeUrl.hostname !== "localhost" &&
+        forgeUrl.hostname !== "127.0.0.1"
+      ) {
         res.status(500).send("Storage backend URL must use HTTPS");
         return;
       }
       forgeUrl.searchParams.set("path", key);
 
       const forgeResp = await fetch(forgeUrl, {
-        headers: { Authorization: \`Bearer \${ENV.forgeApiKey}\` },
+        headers: { Authorization: "Bearer " + ENV.forgeApiKey },
         redirect: "error",
       });
 
       if (!forgeResp.ok) {
-        console.error(\`[StorageProxy] forge error: \${forgeResp.status}\`);
+        console.error("[StorageProxy] forge error: " + forgeResp.status);
         res.status(502).send("Storage backend error");
         return;
       }
