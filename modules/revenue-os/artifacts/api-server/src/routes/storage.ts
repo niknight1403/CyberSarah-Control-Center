@@ -65,24 +65,40 @@ function uploadRateLimiter(req: Request, res: Response, next: NextFunction): voi
   next();
 }
 
-// Every presigned upload URL we mint is recorded here (objectPath -> expiry).
-// /storage/uploads/confirm may only act on an objectPath that was actually
-// issued by /storage/uploads/request-url, and only once. This prevents an
-// unauthenticated caller from invoking confirm with an arbitrary/guessed
-// object path — including paths belonging to unrelated private objects —
-// to trigger a deletion side effect on something it never uploaded.
+// Keep upload intents process-local until a durable, owner-bound store is available.
+// Confirmation uses a short claim so concurrent requests cannot both finalize the
+// same intent. Transient GCS errors release the claim for a safe retry.
 const OBJECT_PATH_PATTERN = /^\/objects\/uploads\/[0-9a-f-]{36}$/;
 const PENDING_UPLOAD_TTL_MS = 30 * 60 * 1000; // presigned URL TTL (15 min) + grace period
-const pendingUploads = new Map<string, number>();
+type PendingUploadState = { expiresAt: number; status: "pending" | "confirming" };
+const pendingUploads = new Map<string, PendingUploadState>();
 
 function registerPendingUpload(objectPath: string): void {
-  pendingUploads.set(objectPath, Date.now() + PENDING_UPLOAD_TTL_MS);
+  pendingUploads.set(objectPath, { expiresAt: Date.now() + PENDING_UPLOAD_TTL_MS, status: "pending" });
 }
 
-function consumePendingUpload(objectPath: string): boolean {
-  const expiresAt = pendingUploads.get(objectPath);
+function beginPendingUploadConfirmation(objectPath: string): boolean {
+  const intent = pendingUploads.get(objectPath);
+  if (!intent || intent.expiresAt <= Date.now() || intent.status !== "pending") {
+    if (intent && intent.expiresAt <= Date.now()) pendingUploads.delete(objectPath);
+    return false;
+  }
+  intent.status = "confirming";
+  return true;
+}
+
+function completePendingUploadConfirmation(objectPath: string): void {
   pendingUploads.delete(objectPath);
-  return expiresAt !== undefined && expiresAt > Date.now();
+}
+
+function releasePendingUploadConfirmation(objectPath: string): void {
+  const intent = pendingUploads.get(objectPath);
+  if (!intent) return;
+  if (intent.expiresAt <= Date.now()) {
+    pendingUploads.delete(objectPath);
+    return;
+  }
+  if (intent.status === "confirming") intent.status = "pending";
 }
 
 /**
@@ -153,7 +169,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
     return;
   }
 
-  if (!consumePendingUpload(objectPath)) {
+  if (!beginPendingUploadConfirmation(objectPath)) {
     res.status(403).json({ error: "No pending upload for this object path" });
     return;
   }
@@ -163,13 +179,16 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       allowedContentTypes: ALLOWED_UPLOAD_CONTENT_TYPES,
       maxSizeBytes: MAX_UPLOAD_SIZE_BYTES,
     });
+    completePendingUploadConfirmation(objectPath);
     res.json(ConfirmUploadResponse.parse({ ok: true, contentType, size }));
   } catch (error) {
     if (error instanceof ObjectNotFoundError) {
+      releasePendingUploadConfirmation(objectPath);
       res.status(404).json({ error: "Object not found" });
       return;
     }
     if (error instanceof UploadNonCompliantError) {
+      completePendingUploadConfirmation(objectPath);
       req.log.warn(
         { objectPath, contentType: error.contentType, size: error.size },
         "Upload verstößt gegen Richtlinie, Objekt gelöscht"
@@ -177,6 +196,7 @@ router.post("/storage/uploads/confirm", requireStorageUploadAuth, async (req: Re
       res.status(422).json({ error: "Upload verstößt gegen Größen-/Dateityp-Richtlinie" });
       return;
     }
+    releasePendingUploadConfirmation(objectPath);
     req.log.error({ err: error }, "Error confirming upload");
     res.status(500).json({ error: "Failed to confirm upload" });
   }
