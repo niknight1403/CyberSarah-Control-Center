@@ -45,12 +45,16 @@ describe("CX HubSpot read-only snapshot", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("reports partial failure when one HubSpot API scope is missing", async () => {
+  it("reports partial failure without exposing upstream provider details", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes("/tickets/search")) {
         return new Response(JSON.stringify({ total: 0, results: [] }), { status: 200 });
       }
-      return new Response("missing conversations scope", { status: 403 });
+      return new Response(JSON.stringify({
+        message: "missing conversations scope",
+        customerEmail: "private-customer@example.invalid",
+        requestToken: "sensitive-provider-detail",
+      }), { status: 403, headers: { "content-type": "application/json" } });
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -58,6 +62,9 @@ describe("CX HubSpot read-only snapshot", () => {
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("failed");
     expect(result.problems).toHaveLength(1);
+    expect(JSON.stringify(result.problems)).not.toContain("missing conversations scope");
+    expect(JSON.stringify(result.problems)).not.toContain("private-customer@example.invalid");
+    expect(JSON.stringify(result.problems)).not.toContain("sensitive-provider-detail");
     expect(result.writesPerformed).toBe(false);
   });
 });
