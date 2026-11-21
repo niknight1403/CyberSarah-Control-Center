@@ -65,7 +65,7 @@ export async function reconcileApprovedContentDrafts(limit=50){
   const db=await getDb(); if(!db) throw new Error("Datenbank nicht verfügbar.");
   const rows=await db.select({id:draftQueue.id,payload:draftQueue.payload,decidedBy:draftQueue.decidedBy})
     .from(draftQueue).where(and(eq(draftQueue.kind,"content"),eq(draftQueue.status,"approved")))
-    .orderBy(desc(draftQueue.decidedAt)).limit(Math.min(Math.max(limit,1),200));
+    .orderBy(sql`${draftQueue.decidedAt} ASC NULLS FIRST`,sql`${draftQueue.id} ASC`).limit(Math.min(Math.max(limit,1),200));
   let inserted=0,reused=0,invalid=0;
   for(const row of rows){
     const p=row.payload&&typeof row.payload==="object"
