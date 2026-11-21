@@ -72,7 +72,7 @@ export async function reconcileApprovedContentDrafts(limit=50){
       ? row.payload as {personaId?:unknown;platform?:unknown;topic?:unknown;content?:unknown}
       : {};
     const personaId=typeof p.personaId==="string"?p.personaId.trim():"";
-    const platform=typeof p.platform==="string"?p.platform.trim().toLowerCase().replace("youtube/shorts","tiktok"):"";
+    const platform=typeof p.platform==="string"?p.platform.trim().toLowerCase():"";
     const topic=typeof p.topic==="string"?p.topic.trim():"";
     const content=typeof p.content==="string"?p.content.trim():"";
     const supported=new Set(["instagram","tiktok","linkedin","x","threads","bluesky"]);
