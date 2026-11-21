@@ -5,6 +5,23 @@ import { appendGxpAuditEvent, verifyGxpAuditChain } from "./gxp-audit-store";
 import { getCxCaseById } from "./cx-workforce-store";
 import { buildGxpCxCaseAuditPayload } from "../lib/gxp-cx-link";
 
+async function recordRejectedAssessment(actorUserId: number, framework: string, activity: string) {
+  // Never persist rejected input values: they may contain free-form or personal data.
+  return appendGxpAuditEvent({
+    actorUserId,
+    framework,
+    activity,
+    assessmentStatus: "input_rejected",
+    missingControls: ["input_validation_failed"],
+    eventPayload: {
+      allowedToExecute: false,
+      automationMode: "assessment_only",
+      humanApprovalRequired: true,
+      rejectionReason: "opaque_reference_validation_failed",
+    },
+  });
+}
+
 export const gxpGovernanceRouter = router({
   evaluateGate: adminProcedure.input(z.object({
     framework: z.enum(["GMP", "GDP", "GLP", "GCP", "GxP_GENERIC"]),
@@ -14,7 +31,13 @@ export const gxpGovernanceRouter = router({
     evidenceReferences: z.array(z.string().max(128)).max(50).optional(),
     riskLevel: z.enum(["low", "medium", "high", "critical"]).optional(),
   })).mutation(async ({ input, ctx }) => {
-    const result = evaluateGxpGate({ ...input, actorId: String(ctx.user.id) });
+    let result;
+    try {
+      result = evaluateGxpGate({ ...input, actorId: String(ctx.user.id) });
+    } catch (error) {
+      await recordRejectedAssessment(ctx.user.id, input.framework, input.activity);
+      throw error;
+    }
     // Store only minimized assessment metadata; never copy SOP/evidence references or customer content.
     const audit = await appendGxpAuditEvent({
       actorUserId: ctx.user.id,
@@ -42,13 +65,25 @@ export const gxpGovernanceRouter = router({
   })).mutation(async ({ input, ctx }) => {
     const cxCase = await getCxCaseById(input.caseId);
     if (!cxCase) throw new Error("CX-Fall nicht gefunden.");
-    const result = evaluateGxpGate({
-      framework: input.framework,
-      activity: input.activity,
-      sopReference: input.sopReference,
-      evidenceReferences: input.evidenceReferences,
-      riskLevel: input.riskLevel,
-      actorId: String(ctx.user.id),
+    let result;
+    try {
+      result = evaluateGxpGate({
+        framework: input.framework,
+        activity: input.activity,
+        sopReference: input.sopReference,
+        evidenceReferences: input.evidenceReferences,
+        riskLevel: input.riskLevel,
+        actorId: String(ctx.user.id),
+      });
+    } catch (error) {
+      await recordRejectedAssessment(ctx.user.id, input.framework, input.activity);
+      throw error;
+    }
+    const cxAuditPayload = buildGxpCxCaseAuditPayload({
+      caseId: cxCase.id,
+      category: cxCase.triage?.category,
+      priority: cxCase.triage?.priority,
+      requiredControls: result.requiredControls,
     });
     const audit = await appendGxpAuditEvent({
       actorUserId: ctx.user.id,
@@ -56,12 +91,7 @@ export const gxpGovernanceRouter = router({
       activity: result.activity,
       assessmentStatus: result.status,
       missingControls: result.missingControls,
-      eventPayload: buildGxpCxCaseAuditPayload({
-        caseId: cxCase.id,
-        category: cxCase.triage?.category,
-        priority: cxCase.triage?.priority,
-        requiredControls: result.requiredControls,
-      }),
+      eventPayload: cxAuditPayload,
     });
     return { ...result, relatedRecordType: "cx_case" as const, relatedRecordId: cxCase.id, auditEventId: audit.id, auditEventHash: audit.eventHash };
   }),
