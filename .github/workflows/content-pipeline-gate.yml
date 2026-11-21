@@ -55,6 +55,7 @@ on:
       - "tests/gxp-cx-link.test.ts"
       - "tests/cx-workforce-logic.test.ts"
       - "tests/cx-workforce-store.test.ts"
+      - "tests/cx-workforce-router.test.ts"
       - "scripts/test-gxp-audit-migration.ts"
       - ".github/workflows/content-pipeline-gate.yml"
 permissions:
