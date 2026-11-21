@@ -68,12 +68,12 @@ export async function getCxHubspotSnapshot(env: Record<string, string | undefine
     : [];
 
   if (ticketResult.status === "rejected") {
-    const error = ticketResult.reason;
-    problems.push(`Ticket-Lesezugriff fehlgeschlagen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`);
+    // Do not forward upstream error bodies: HubSpot may include customer data or request details.
+    problems.push("Ticket-Lesezugriff fehlgeschlagen. Bitte HubSpot-Berechtigungen und Serverprotokolle prüfen.");
   }
   if (conversationResult.status === "rejected") {
-    const error = conversationResult.reason;
-    problems.push(`Inbox-Lesezugriff fehlgeschlagen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`);
+    // Keep diagnostics generic; raw provider messages are not safe for admin API responses.
+    problems.push("Inbox-Lesezugriff fehlgeschlagen. Bitte HubSpot-Berechtigungen und Serverprotokolle prüfen.");
   }
 
   const recentTickets = ticketRows.slice(0, 10).map((ticket) => ({
