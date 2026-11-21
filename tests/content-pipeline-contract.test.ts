@@ -19,7 +19,13 @@ describe("approved content production contract", () => {
     const reconciler = readFileSync("server/channel-autopilot.ts", "utf8");
     expect(reconciler).toContain('supported.has(platform)');
     expect(reconciler).toContain('content.length<10');
+    expect(reconciler).toContain('users.openId');
+    expect(reconciler).toContain('or(eq(users.openId,row.decidedBy),eq(users.email,row.decidedBy))');
     expect(reconciler).toContain('Legacy approved rows may predate the current publishing contract');
+    const router = readFileSync("server/draft-engine-router.ts", "utf8");
+    expect(router).toContain('const decidedBy = ctx.user.openId;');
+    expect(readFileSync("server/publishing-service.ts", "utf8")).toContain('const platform = draft.platform.trim().toLowerCase();');
+    expect(reconciler).not.toContain('replace("youtube/shorts","tiktok")');
   });
 });
 describe("zero-cost media safety contract", () => {
