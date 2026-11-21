@@ -73,6 +73,8 @@ describe("Render-Lauf mit injizierten Abhängigkeiten (Sprint 275)", () => {
     expect(assembler.concats).toBe(1);
     if (result.ok) {
       expect(result.source).toBe("render");
+      expect(result.publishable).toBe(false);
+      expect(result.deliveryStatus).toBe("local_preview_only");
       expect(result.dataUrl).toContain("data:video/mp4;base64,");
       expect(result.sceneCount).toBe(3);
     }
