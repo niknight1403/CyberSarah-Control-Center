@@ -143,6 +143,23 @@ describe("zero-cost media safety contract", () => {
   });
 });
 
+describe("TikTok publication visibility contract", () => {
+  it("keeps SELF_ONLY completion separate from public live metrics", () => {
+    const queue = readFileSync("lib/publishing-queue-logic.ts", "utf8");
+    expect(queue).toContain('externalId.startsWith("tiktok-publish:") ? "live_private" : "live"');
+    const claim = readFileSync("server/publishing-claim.ts", "utf8");
+    expect(claim).toContain("mode: publishingReceiptMode(externalId)");
+    const router = readFileSync("server/publishing-router.ts", "utf8");
+    expect(router).toContain('visibility: job.mode === "live_private" ? "private"');
+    const ops = readFileSync("server/publishing-ops.ts", "utf8");
+    expect(ops).toContain("privateCompleted24h");
+    expect(ops).toContain("${publishingJobs.mode}='live_private'");
+    expect(ops).toContain("${publishingJobs.mode}='live'");
+    expect(readFileSync("server/publishing-review.ts", "utf8")).toContain("publishingReceiptMode(decision.externalId.trim())");
+    expect(readFileSync("server/publishing-auto-resolution.ts", "utf8")).toContain("publishingReceiptMode(externalId)");
+  });
+});
+
 describe("provider publication receipt contract", () => {
   it("requires real provider post identifiers and completes Threads publication", () => {
     const source = readFileSync("server/publishing-service.ts", "utf8");
