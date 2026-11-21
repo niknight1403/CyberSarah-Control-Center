@@ -12,6 +12,7 @@ on:
       - "lib/image-generation-logic.ts"
       - "drizzle/schema.ts"
       - "drizzle/0026_approved_content_pipeline.sql"
+      - "drizzle/meta/_journal.json"
       - "tests/content-pipeline*.test.ts"
       - ".github/workflows/content-pipeline-gate.yml"
   push:
@@ -42,5 +43,5 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run check
-      - run: npx vitest run tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts
+      - run: npx vitest run tests/content-pipeline-contract.test.ts tests/draft-engine-logic.test.ts tests/image-generation-logic.test.ts tests/media-pipeline-logic.test.ts tests/channel-autopilot-logic.test.ts
       - run: npm run build
