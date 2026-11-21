@@ -11,6 +11,17 @@ describe("CX workforce triage", () => {
     expect(result.automationMode).toBe("draft_only");
   });
 
+  it("keeps mixed security and billing incidents critical and in the security queue", () => {
+    const result = triageCxRequest({
+      message: "Mein Konto wurde gehackt. Die Rechnung, Zahlung, Abbuchung, Stripe-Belastung und Invoice sind falsch.",
+    });
+    expect(result.category).toBe("security");
+    expect(result.priority).toBe("critical");
+    expect(result.queue).toBe("security");
+    expect(result.humanReviewRequired).toBe(true);
+    expect(result.responseDraft).toContain("Aus Sicherheitsgründen");
+  });
+
   it("routes refunds to billing with human review and no refund promise", () => {
     const result = triageCxRequest({ message: "Ich möchte eine Rückerstattung, bitte Geld zurück." });
     expect(result.category).toBe("refund");
