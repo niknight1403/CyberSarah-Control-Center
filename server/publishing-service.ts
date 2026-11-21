@@ -141,7 +141,7 @@ export async function enqueueApprovedContentDraft(
   if (!db) throw new Error("Datenbank nicht verfuegbar — freigegebener Content nicht einreihbar.");
   const content = draft.content.trim();
   if (!userOpenId || !Number.isSafeInteger(draft.id) || draft.id < 1 || content.length < 10) throw new Error("Ungueltiger freigegebener Content-Draft.");
-  const platform = draft.platform.toLowerCase().replace("youtube/shorts", "tiktok");
+  const platform = draft.platform.trim().toLowerCase();
   const supported = new Set(["instagram","tiktok","linkedin","x","threads","bluesky"]);
   if (!supported.has(platform)) throw new Error(`Plattform ${platform} wird von der Publishing-Pipeline nicht unterstuetzt.`);
   const [created] = await db.insert(publishingJobs).values({
