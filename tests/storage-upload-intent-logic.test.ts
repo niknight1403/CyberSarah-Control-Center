@@ -48,5 +48,8 @@ describe("storage upload tenant membership", () => {
     expect(resolveUploadTenantId([], undefined)).toEqual({ ok: true, tenantId: null });
     expect(resolveUploadTenantId([17], "0")).toEqual({ ok: false, reason: "invalid" });
     expect(resolveUploadTenantId([17], "1.5")).toEqual({ ok: false, reason: "invalid" });
+    expect(resolveUploadTenantId([17], " 17 ")).toEqual({ ok: false, reason: "invalid" });
+    expect(resolveUploadTenantId([17], "+17")).toEqual({ ok: false, reason: "invalid" });
+    expect(resolveUploadTenantId([17], "9007199254740992")).toEqual({ ok: false, reason: "invalid" });
   });
 });
