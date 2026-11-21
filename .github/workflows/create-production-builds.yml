@@ -12,7 +12,8 @@ name: create-production-builds
 # (Expo-Web-Export + Capacitor + Gradle), nicht ueber EAS: das EAS-Projekt haengt
 # noch am alten Kontonamen @niko1403, ein EAS-Build wuerde dort scheitern.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs: {}
 
 permissions:
   contents: read
