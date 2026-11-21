@@ -2,6 +2,23 @@ import { and, asc, desc, gt, lte, sql } from "drizzle-orm";
 import { gxpAuditEvents } from "../drizzle/schema";
 import { getDb } from "./db";
 
+/**
+ * Deterministic database seam for Vitest. The suite runs with isolate:false,
+ * so module-level vi.mock("./db") can leak into neighbouring test files.
+ */
+let gxpAuditGetDb: typeof getDb = getDb;
+
+export function setGxpAuditDbForTests(override: typeof getDb | null): void {
+  if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error("GxP-Audit-Test-Hook ist nur im Test-Modus verfuegbar.");
+  }
+  gxpAuditGetDb = override ?? getDb;
+}
+
+function auditDb(): ReturnType<typeof getDb> {
+  return gxpAuditGetDb();
+}
+
 import {
   GXP_AUDIT_GENESIS_HASH,
   hashGxpAuditEvent,
@@ -21,7 +38,7 @@ type AuditInput = {
 export const GXP_AUDIT_VERIFY_BATCH_SIZE = 500;
 
 export async function appendGxpAuditEvent(input: AuditInput): Promise<{ id: number; eventHash: string }> {
-  const db = await getDb();
+  const db = await auditDb();
   if (!db) throw new Error("GxP audit ledger requires an available database.");
 
   return db.transaction(async (tx) => {
@@ -56,7 +73,7 @@ export async function appendGxpAuditEvent(input: AuditInput): Promise<{ id: numb
 }
 
 export async function verifyGxpAuditChain() {
-  const db = await getDb();
+  const db = await auditDb();
   if (!db) throw new Error("GxP audit ledger requires an available database.");
 
   // Fix the verification boundary first. Appends committed after this read are
