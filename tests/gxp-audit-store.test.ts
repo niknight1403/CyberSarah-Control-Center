@@ -167,7 +167,7 @@ describe("GxP audit database store", () => {
     let selectCount = 0;
     const select = () => {
       selectCount += 1;
-      return queryBuilder(selectCount === 1 ? [{ id: 2 }] : [first]);
+      return queryBuilder(selectCount === 1 ? [{ id: 2 }] : selectCount === 2 ? [first] : []);
     };
     setGxpAuditDbForTests(async () => ({ select } as never));
 
