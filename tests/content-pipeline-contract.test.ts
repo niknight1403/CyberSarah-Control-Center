@@ -42,6 +42,15 @@ describe("publishing operations UI contract", () => {
     expect(card).toContain("stats.failureReasons.retryable===0");
   });
 });
+describe("publishing retry credential safety", () => {
+  it("does not requeue auth failures without a successful supported token refresh", () => {
+    const service = readFileSync("server/publishing-retry-service.ts", "utf8");
+    expect(service).toContain('candidate?.platform !== "x"');
+    expect(service).toContain('auth_ohne_automatische_token_erneuerung');
+    expect(service).toContain('tokenRefresh?.ok !== true');
+    expect(service).toContain('x_token_refresh_fehlgeschlagen');
+  });
+});
 describe("publishing autopilot retry integration", () => {
   it("runs bounded classified retries before processing due jobs", () => {
     const service = readFileSync("server/publishing-service.ts", "utf8");
