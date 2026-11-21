@@ -14,6 +14,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "./db";
 import { affiliateProducts, draftQueue, revenueOffers, type DraftQueueRow, type InsertDraftQueueRow } from "../drizzle/schema";
+import { isNearDuplicateContent } from "../lib/content-dedupe-logic";
 import {
   DRAFT_MAX_PENDING_BY_KIND,
   REVENUE_HUBS,
@@ -195,20 +196,17 @@ function engineDb(injected?: DraftEngineDb | null): Promise<DraftEngineDb | null
   return injected !== undefined ? Promise.resolve(injected) : getDb();
 }
 
-function contentSignature(value: unknown): string {
-  if (!value || typeof value !== "object") return "";
-  const payload = value as { topic?: unknown; content?: unknown };
-  return [payload.topic, payload.content].filter(v => typeof v === "string").join(" ")
-    .toLowerCase().normalize("NFKD").replace(/[^a-z0-9äöüß]+/gi, " ").trim().slice(0, 1200);
+function contentPayload(value: unknown): { topic?: unknown; content?: unknown } {
+  return value && typeof value === "object" ? value as { topic?: unknown; content?: unknown } : {};
 }
 
 async function contentWasAlreadySuggested(payload: unknown, injected?: DraftEngineDb | null): Promise<boolean> {
-  const signature = contentSignature(payload);
-  if (!signature) return false;
+  const candidate = contentPayload(payload);
+  if (typeof candidate.content !== "string" || candidate.content.trim().length < 40) return false;
   const db = await engineDb(injected); if (!db) return false;
   const history = await db.select({payload:draftQueue.payload}).from(draftQueue)
     .where(eq(draftQueue.kind,"content")).orderBy(desc(draftQueue.createdAt)).limit(250);
-  return history.some(row => contentSignature(row.payload) === signature);
+  return history.some(row => isNearDuplicateContent(candidate, contentPayload(row.payload)));
 }
 
 export async function insertPendingDraft(
