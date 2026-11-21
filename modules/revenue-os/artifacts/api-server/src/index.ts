@@ -165,7 +165,9 @@ async function startServer() {
       logger.info("🐘 Prüfe DB-Schema...");
       const { execSync } = await import("child_process");
       const path = await import("path");
-      const dbDir = path.resolve(import.meta.dirname ?? ".", "../../lib/db");
+      // src/index.ts and dist/index.js both live one level below api-server;
+      // the DB workspace is a sibling of artifacts/, three levels above this file.
+      const dbDir = path.resolve(import.meta.dirname ?? ".", "../../../lib/db");
       execSync("npx drizzle-kit push --config ./drizzle.config.ts", {
         cwd: dbDir,
         env: { ...process.env, DATABASE_URL: process.env["DATABASE_URL"] },
