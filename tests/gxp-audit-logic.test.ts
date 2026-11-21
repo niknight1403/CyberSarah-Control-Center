@@ -3,6 +3,7 @@ import {
   GXP_AUDIT_GENESIS_HASH,
   hashGxpAuditEvent,
   verifyGxpAuditEvents,
+  verifyGxpAuditEventsChunk,
   type GxpAuditChainRow,
 } from "@/lib/gxp-audit-logic";
 
@@ -68,6 +69,29 @@ describe("GxP audit hash chain", () => {
   it("accepts an empty ledger with zero checked events", () => {
     expect(verifyGxpAuditEvents([])).toMatchObject({
       valid: true, checkedEvents: 0, brokenAtId: null, latestHash: GXP_AUDIT_GENESIS_HASH,
+    });
+  });
+
+  it("continues a valid chain across independently loaded pages", () => {
+    const first = makeEvent(1, GXP_AUDIT_GENESIS_HASH);
+    const second = makeEvent(2, first.eventHash);
+    const third = makeEvent(3, second.eventHash);
+    const pageOne = verifyGxpAuditEventsChunk([first, second]);
+    const pageTwo = verifyGxpAuditEventsChunk([third], pageOne.latestHash, pageOne.checkedEvents);
+    expect(pageOne.valid).toBe(true);
+    expect(pageTwo).toMatchObject({
+      valid: true, checkedEvents: 3, brokenAtId: null, latestHash: third.eventHash,
+    });
+  });
+
+  it("detects tampering in a later page and preserves the verified count", () => {
+    const first = makeEvent(1, GXP_AUDIT_GENESIS_HASH);
+    const second = makeEvent(2, first.eventHash);
+    const tampered = { ...second, eventPayload: { changed: true } };
+    const pageOne = verifyGxpAuditEventsChunk([first]);
+    const pageTwo = verifyGxpAuditEventsChunk([tampered], pageOne.latestHash, pageOne.checkedEvents);
+    expect(pageTwo).toMatchObject({
+      valid: false, checkedEvents: 1, brokenAtId: 2, latestHash: first.eventHash,
     });
   });
 });
