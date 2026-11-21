@@ -11,7 +11,9 @@ on:
       - "server/x-token-service.ts"
       - "lib/publishing-retry-logic.ts"
       - "lib/publishing-failure-reasons-logic.ts"
-      - "tests/content-dedupe-logic.test.ts"
+      - "tests/content-dedupe-logic.test.ts
+      - tests/tiktok-publish-status-logic.test.ts
+      - lib/tiktok-publish-status-logic.ts"
       - "server/image-generation.ts"
       - "server/media-pipeline.ts"
       - "lib/draft-engine-logic.ts"
