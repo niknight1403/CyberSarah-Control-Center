@@ -3,6 +3,7 @@ import { adminProcedure, router } from "./_core/trpc";
 import { evaluateGxpGate } from "../lib/gxp-governance";
 import { appendGxpAuditEvent, verifyGxpAuditChain } from "./gxp-audit-store";
 import { getCxCaseById } from "./cx-workforce-store";
+import { buildGxpCxCaseAuditPayload } from "../lib/gxp-cx-link";
 
 export const gxpGovernanceRouter = router({
   evaluateGate: adminProcedure.input(z.object({
@@ -55,16 +56,12 @@ export const gxpGovernanceRouter = router({
       activity: result.activity,
       assessmentStatus: result.status,
       missingControls: result.missingControls,
-      eventPayload: {
+      eventPayload: buildGxpCxCaseAuditPayload({
+        caseId: cxCase.id,
+        category: cxCase.triage?.category,
+        priority: cxCase.triage?.priority,
         requiredControls: result.requiredControls,
-        allowedToExecute: false,
-        automationMode: "assessment_only",
-        humanApprovalRequired: true,
-        relatedRecordType: "cx_case",
-        relatedRecordId: cxCase.id,
-        cxTriageCategory: cxCase.triage.category,
-        cxPriority: cxCase.triage.priority,
-      },
+      }),
     });
     return { ...result, relatedRecordType: "cx_case" as const, relatedRecordId: cxCase.id, auditEventId: audit.id, auditEventHash: audit.eventHash };
   }),
