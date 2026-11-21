@@ -9,3 +9,22 @@ export function matchesDeclaredUploadMetadata(
     actual.size > 0 &&
     declared.size === actual.size;
 }
+
+export type UploadTenantResolution =
+  | { ok: true; tenantId: number | null }
+  | { ok: false; reason: "invalid" | "forbidden" | "selection_required" };
+
+export function resolveUploadTenantId(
+  memberships: readonly number[],
+  requestedTenant: string | undefined,
+): UploadTenantResolution {
+  if (requestedTenant !== undefined && requestedTenant !== "") {
+    const tenantId = Number(requestedTenant);
+    if (!Number.isSafeInteger(tenantId) || tenantId <= 0) return { ok: false, reason: "invalid" };
+    return memberships.includes(tenantId)
+      ? { ok: true, tenantId }
+      : { ok: false, reason: "forbidden" };
+  }
+  if (memberships.length > 1) return { ok: false, reason: "selection_required" };
+  return { ok: true, tenantId: memberships[0] ?? null };
+}
