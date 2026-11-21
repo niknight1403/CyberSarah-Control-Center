@@ -169,8 +169,8 @@ jobs:
           test -s "$APK" || { echo "Admin-APK fehlt: $APK"; exit 1; }
           ls -lh "$APK"
           SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
-          APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort | tail -1)"
           set -euo pipefail
+          APKSIGNER="$(find "$SDK/build-tools" -name apksigner -type f | sort -V | tail -1)"
           test -x "$APKSIGNER" || { echo "apksigner im Android SDK nicht gefunden"; exit 1; }
           "$APKSIGNER" verify --verbose --print-certs "$APK" | sed -n '1,10p'
 
