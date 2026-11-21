@@ -50,7 +50,7 @@ describe("CX HubSpot read-only snapshot", () => {
       if (String(input).includes("/tickets/search")) {
         return new Response(JSON.stringify({ total: 0, results: [] }), { status: 200 });
       }
-      return new Response("missing conversations scope", { status: 403 });
+      return new Response(JSON.stringify({ message: "missing conversations scope", token: "sensitive-provider-detail" }), { status: 403, headers: { "content-type": "application/json" } });
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -58,6 +58,8 @@ describe("CX HubSpot read-only snapshot", () => {
     expect(result.ticketRead).toBe("connected");
     expect(result.conversationRead).toBe("failed");
     expect(result.problems).toHaveLength(1);
+    expect(JSON.stringify(result.problems)).not.toContain("sensitive-provider-detail");
+    expect(JSON.stringify(result.problems)).not.toContain("missing conversations scope");
     expect(result.writesPerformed).toBe(false);
   });
 });

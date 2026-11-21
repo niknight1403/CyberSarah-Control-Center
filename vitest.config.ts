@@ -59,10 +59,11 @@ export default defineConfig({
       // waren der Haupttreiber der ~120 s Backup-Suite.
       SUPPORT_BACKUP_TEST_KDF_ITERATIONS: "10000",
     },
-    // Sprint 187 (Performance): Worker ueber Testdateien hinweg wiederverwenden
-    // (~5 s Ersparnis bei 144 Dateien) und ein Fallback-Timeout von 3 Minuten,
-    // damit langsame CI-Runner nicht an der 5-s-Vorgabe scheitern.
-    isolate: false,
+    // Testdateien voneinander isolieren: vi.mock()-Registrierungen und
+    // Modul-Caches duerfen nicht in andere Testdateien auslaufen.
+    // Besonders CX- und GxP-Tests mocken server/db und muessen deterministisch
+    // unabhaengig von Worker-Reihenfolge und Dateiplanung laufen.
+    isolate: true,
     testTimeout: 180_000,
     include: ["tests/**/*.test.{ts,tsx}", "tests/*.test.{ts,tsx}"],
     watch: false,

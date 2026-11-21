@@ -13,6 +13,7 @@ name: create-production-builds
 # noch am alten Kontonamen @niko1403, ein EAS-Build wuerde dort scheitern.
 on:
   workflow_dispatch:
+    inputs: {}
 
 permissions:
   contents: read
