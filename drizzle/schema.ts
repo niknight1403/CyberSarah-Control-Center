@@ -414,6 +414,8 @@ export const funnelCampaigns = pgTable("funnel_campaigns", {
   metric: varchar("metric", { length: 200 }).notNull(),
   /** awaiting_approval | live | paused | rejected */
   status: varchar("status", { length: 32 }).default("awaiting_approval").notNull(),
+  /** Block 2: Eigentuemer-Konto (NULL = Altbestand, nur fuer Admins sichtbar). */
+  ownerOpenId: varchar("ownerOpenId", { length: 64 }),
   /** Affiliate-Link inkl. Tracking-Parameter (nach Freigabe gesetzt). */
   affiliateUrl: varchar("affiliateUrl", { length: 800 }),
   /** Oeffentlicher Landing-Slug (nur live-Kampagnen werden ausgeliefert). */

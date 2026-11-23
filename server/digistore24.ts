@@ -18,7 +18,15 @@
 
 import axios from "axios";
 import { z } from "zod";
-import { router, adminProcedure } from "./_core/trpc";
+import { router, adminProcedure, protectedProcedure } from "./_core/trpc";
+import {
+  canAccessOwner as canAccessOwnerSafe,
+  ownerForWrite,
+  ownerScope,
+  requireOwnership,
+  tenantOf,
+  type Tenant,
+} from "./_core/tenant";
 import { syncDigistore24Commissions } from "./digistore24-api";
 import { invokeLLM, type Message } from "./_core/llm";
 import { countPendingDraftsByKind, insertPendingDraft } from "./draft-engine";
@@ -105,7 +113,7 @@ async function discoverDigistoreProducts(): Promise<{
 }
 
 /** Generiert den Launch-Funnel und legt ihn in der Freigabe-Queue ab. */
-async function generateDigistoreFunnel(slug: string, productTitle: string): Promise<{
+async function generateDigistoreFunnel(slug: string, productTitle: string, tenant: Tenant): Promise<{
   queued: boolean;
   ok: boolean;
   detail: string;
@@ -163,6 +171,7 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
           hypothesis: funnel.hypothesis,
           stages: funnel.stages,
           metric: funnel.metric,
+          ownerOpenId: ownerForWrite(tenant),
           landingJson: {
             headline: funnel.headline ?? funnel.name,
             subheadline: funnel.subheadline ?? "",
@@ -194,12 +203,15 @@ async function generateDigistoreFunnel(slug: string, productTitle: string): Prom
 }
 
 /** Kampagnen-Verwaltung: One-Click-Launch (Block 4, HITL-Freigabe). */
-async function launchCampaign(campaignId: number) {
+async function launchCampaign(campaignId: number, tenant: Tenant) {
   const db = await getDb();
   if (!db) return { ok: false as const, reason: "Die Kontodatenbank ist nicht verfuegbar." };
   const rows = await db.select().from(funnelCampaigns).where(eq(funnelCampaigns.id, campaignId)).limit(1);
   const campaign = rows[0];
   if (!campaign) return { ok: false as const, reason: "Kampagne nicht gefunden." };
+  if (!canAccessOwnerSafe(tenant, campaign.ownerOpenId)) {
+    return { ok: false as const, reason: "Kampagne gehoert zu einem anderen Konto." };
+  }
 
   const productRows = await db
     .select()
@@ -248,13 +260,22 @@ export const digistore24Router = router({
         productTitle: z.string().trim().min(4).max(300),
       })
     )
-    .mutation(async ({ input }) => generateDigistoreFunnel(input.slug, input.productTitle)),
+    .mutation(async ({ ctx, input }) =>
+      generateDigistoreFunnel(input.slug, input.productTitle, tenantOf(ctx.user)),
+    ),
 
-  /** Block 4: Alle Kampagnen mit Status und Landing-URLs (Admin-Uebersicht). */
-  campaigns: adminProcedure.query(async () => {
+  /** Block 4/2: Kampagnen des eigenen Kontos (Admins sehen alle). */
+  campaigns: protectedProcedure.query(async ({ ctx }) => {
+    const tenant = tenantOf(ctx.user);
     const db = await getDb();
     if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
-    const rows = await db.select().from(funnelCampaigns).orderBy(desc(funnelCampaigns.createdAt)).limit(100);
+    const scope = ownerScope(funnelCampaigns.ownerOpenId, tenant);
+    const rows = await db
+      .select()
+      .from(funnelCampaigns)
+      .where(scope)
+      .orderBy(desc(funnelCampaigns.createdAt))
+      .limit(100);
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -267,16 +288,25 @@ export const digistore24Router = router({
   }),
 
   /** Block 4: One-Click-Launch — schaltet eine Kampagne nach Pruefung live. */
-  launch: adminProcedure
+  launch: protectedProcedure
     .input(z.object({ campaignId: z.number().int().positive() }))
-    .mutation(async ({ input }) => launchCampaign(input.campaignId)),
+    .mutation(async ({ ctx, input }) => launchCampaign(input.campaignId, tenantOf(ctx.user))),
 
   /** Block 4: Kampagne pausieren (Landing wird sofort unauffindbar). */
-  revoke: adminProcedure
+  revoke: protectedProcedure
     .input(z.object({ campaignId: z.number().int().positive() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const tenant = tenantOf(ctx.user);
       const db = await getDb();
       if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
+      const rows = await db
+        .select({ id: funnelCampaigns.id, ownerOpenId: funnelCampaigns.ownerOpenId })
+        .from(funnelCampaigns)
+        .where(eq(funnelCampaigns.id, input.campaignId))
+        .limit(1);
+      const row = rows[0];
+      if (!row) throw new Error("Kampagne nicht gefunden.");
+      requireOwnership(tenant, row.ownerOpenId, "Diese Kampagne");
       await db
         .update(funnelCampaigns)
         .set({ status: "paused", updatedAt: new Date() })
@@ -285,10 +315,17 @@ export const digistore24Router = router({
     }),
 
   /** Block 4: Woechentlicher Wachstums-Report — ganze Funnel-Messkette live. */
-  growthReport: adminProcedure.query(async () => {
+  growthReport: protectedProcedure.query(async ({ ctx }) => {
+    const tenant = tenantOf(ctx.user);
     const db = await getDb();
     if (!db) throw new Error("Die Kontodatenbank ist nicht verfügbar.");
-    const campaigns = await db.select().from(funnelCampaigns).orderBy(desc(funnelCampaigns.createdAt)).limit(100);
+    const scope = ownerScope(funnelCampaigns.ownerOpenId, tenant);
+    const campaigns = await db
+      .select()
+      .from(funnelCampaigns)
+      .where(scope)
+      .orderBy(desc(funnelCampaigns.createdAt))
+      .limit(100);
     const events = await db.select().from(conversionEvents).orderBy(desc(conversionEvents.occurredAt)).limit(500);
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
     const weekEvents = events.filter((e) => new Date(e.occurredAt) >= since);
