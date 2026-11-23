@@ -129,6 +129,13 @@ export function RevenueAutopilotCard() {
                 <Text style={styles.note} accessibilityRole="summary">
                   Status: {growthHealth?.label} · {growthHealth?.detail}
                 </Text>
+                <Text style={growth.data.measurement.observed ? styles.note : styles.error}>
+                  Messbasis: letzte {growth.data.measurement.windowDays} Tage · Impressionen aus {growth.data.measurement.impressionsSource === "platform" ? "Plattformdaten" : "Attributionsereignissen"}
+                  {" · "}Letzte Beobachtung: {growth.data.measurement.latestEvidenceAt
+                    ? new Date(growth.data.measurement.latestEvidenceAt).toLocaleString("de-DE")
+                    : "kein Nachweis"}
+                  {growth.data.measurement.observed ? "" : " · Reichweite nicht verifiziert"}
+                </Text>
                 <Text style={styles.note}>Letzter Lauf: {growth.data.runtime.completedAt
                   ? new Date(growth.data.runtime.completedAt).toLocaleString("de-DE")
                   : "kein Nachweis"} · Fehler in Folge: {growth.data.runtime.consecutiveFailures}</Text>
@@ -148,8 +155,8 @@ export function RevenueAutopilotCard() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Growth Pulse analysieren und Entwürfe vorbereiten"
-                  disabled={growNow.isPending || !growth.data.enabled || growth.data.quality.status === "blocked"}
-                  style={[styles.button, (growNow.isPending || !growth.data.enabled || growth.data.quality.status === "blocked") && styles.buttonDisabled]}
+                  disabled={growNow.isPending || !growth.data.enabled || growth.data.quality.status !== "valid"}
+                  style={[styles.button, (growNow.isPending || !growth.data.enabled || growth.data.quality.status !== "valid") && styles.buttonDisabled]}
                   onPress={() => {
                     setRunFeedback(null);
                     growNow.mutate(undefined, {
@@ -165,7 +172,7 @@ export function RevenueAutopilotCard() {
                     });
                   }}
                 >
-                  <Text style={styles.buttonText}>{growNow.isPending ? "Werte Signale aus …" : "Growth Pulse jetzt starten"}</Text>
+                  <Text style={styles.buttonText}>{growNow.isPending ? "Werte Signale aus …" : growth.data.quality.status !== "valid" ? "Messbasis zuerst prüfen" : "Growth Pulse jetzt starten"}</Text>
                 </Pressable>
                 {growNow.error ? <Text style={styles.error}>{growNow.error.message}</Text> : null}
                 <Text style={styles.note}>*Attributierter Umsatzwert abzüglich Refunds; Währung nicht verifiziert, kein belegter Gewinn. Veröffentlichungen, Werbeausgaben und Preisänderungen bleiben freigabepflichtig.</Text>
