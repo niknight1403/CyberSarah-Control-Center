@@ -5,6 +5,8 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
+import { isValidApiKeyFormat } from "../../lib/api-key-logic";
+import { resolveApiKey } from "../api-key-service";
 import { ENV } from "./env";
 import type {
   ExchangeTokenRequest,
@@ -258,6 +260,22 @@ class SDKServer {
       token = authHeader.slice("Bearer ".length).trim();
     }
 
+    // Block 2: Konto-API-Schluessel (ccc_live_...) sind eigenstaendige
+    // Bearer-Credentials und werden NICHT als Session-JWT interpretiert.
+    // Aufloesung nur bei passender Form; ein ungueltiger Schluessel endet mit
+    // 401 statt in der Session-Pruefung als "Invalid session cookie".
+    if (token && isValidApiKeyFormat(token)) {
+      const resolved = await resolveApiKey(token);
+      if (!resolved) {
+        throw ForbiddenError("Invalid API key");
+      }
+      const keyOwner = await db.getUserByOpenId(resolved.ownerOpenId);
+      if (!keyOwner) {
+        throw ForbiddenError("API key owner not found");
+      }
+      return { ...keyOwner, apiKeyId: resolved.keyId, apiKeyScope: resolved.scope };
+    }
+
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = token || cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
@@ -323,6 +341,9 @@ const CRON_OPEN_ID_PREFIX = "cron_";
 export type AuthenticatedUser = User & {
   taskUid?: string;
   isCron?: boolean;
+  /** Gesetzt, wenn die Anfrage ueber einen Konto-API-Schluessel kam. */
+  apiKeyId?: number;
+  apiKeyScope?: "read" | "write";
 };
 
 function buildCronUser(userInfo: GetUserInfoWithJwtResponse): AuthenticatedUser {

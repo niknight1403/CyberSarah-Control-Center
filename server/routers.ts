@@ -42,6 +42,7 @@ import { revenueRouter } from "./revenue-router";
 import { draftEngineRouter } from "./draft-engine-router";
 import { campaignBridgeRouter } from "./campaign-bridge-router";
 import { digistore24Router } from "./digistore24";
+import { apiKeysRouter } from "./api-keys-router";
 import { trendRevenueRouter } from "./trend-revenue-bridge";
 import { pillarsRouter } from "./pillars-router";
 import { haraRouter, saasRouter, crossSellRouter, expansionRouter, subscriptionManagementRouter, revenueTradingRouter } from "./revenue-command-router";
@@ -99,6 +100,7 @@ export const appRouter = router({
   draftEngine: draftEngineRouter,
   campaignBridge: campaignBridgeRouter,
   digistore24: digistore24Router,
+  apiKeys: apiKeysRouter,
   trendRevenue: trendRevenueRouter,
   pillars: pillarsRouter,
   hara: haraRouter,

@@ -40,6 +40,14 @@ const requireUser = t.middleware(async (opts) => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
+  // Block 2: Ein Schluessel mit Scope "read" darf ausschliesslich lesen.
+  if (opts.type === "mutation" && (ctx.user as { apiKeyScope?: string }).apiKeyScope === "read") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Dieser API-Schluessel darf nur lesen. Fuer Aenderungen bitte einen Schluessel mit Scope 'write' verwenden.",
+    });
+  }
+
   return next({
     ctx: {
       ...ctx,

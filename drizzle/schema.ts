@@ -1041,3 +1041,34 @@ export const mcpApprovalRequests = pgTable("mcp_approval_requests", {
 
 export type McpApprovalRequestRow = typeof mcpApprovalRequests.$inferSelect;
 export type InsertMcpApprovalRequestRow = typeof mcpApprovalRequests.$inferInsert;
+
+/**
+ * Block 2 (Multi-Tenancy) — API-Schluessel je Konto (Migration 0039).
+ *
+ * Gespeichert wird nur der SHA-256-Hash; der Klartext existiert ausschliesslich
+ * im Moment der Erstellung in der Antwort. `keyPrefix` dient der Anzeige in der
+ * Schluesselliste, `scopes` ist "read" oder "write".
+ */
+export const tenantApiKeys = pgTable(
+  "tenant_api_keys",
+  {
+    id: serial("id").primaryKey(),
+    ownerOpenId: varchar("ownerOpenId", { length: 64 }).notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    keyPrefix: varchar("keyPrefix", { length: 24 }).notNull(),
+    keyHash: varchar("keyHash", { length: 64 }).notNull(),
+    scope: varchar("scope", { length: 16 }).notNull().default("write"),
+    lastUsedAt: timestamp("lastUsedAt", { withTimezone: true }),
+    revokedAt: timestamp("revokedAt", { withTimezone: true }),
+    expiresAt: timestamp("expiresAt", { withTimezone: true }),
+    createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tenant_api_keys_hash_idx").on(table.keyHash),
+    index("tenant_api_keys_owner_idx").on(table.ownerOpenId),
+    index("tenant_api_keys_owner_active_idx").on(table.ownerOpenId, table.revokedAt),
+  ],
+);
+
+export type TenantApiKeyRow = typeof tenantApiKeys.$inferSelect;
+export type InsertTenantApiKeyRow = typeof tenantApiKeys.$inferInsert;
