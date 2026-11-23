@@ -23,6 +23,13 @@ export type CxCaseRecord = {
   status: "needs_review" | "draft_ready";
   triage: CxTriageResult;
   createdAt: string;
+  qualityGovernance?: {
+    potentialQualityEvent: boolean;
+    matchedTerms: string[];
+    requiresHumanQualityReview: boolean;
+    automaticDispositionAllowed: false;
+    workflowStatus: "awaiting_human_quality_review" | "not_applicable";
+  };
 };
 
 /**
@@ -34,6 +41,7 @@ export async function saveCxCase(input: {
   source: CxCaseRecord["source"];
   externalReference?: string;
   triage: CxTriageResult;
+  qualityGovernance?: Omit<NonNullable<CxCaseRecord["qualityGovernance"]>, "workflowStatus">;
 }) {
   const externalReference = normalizeCxExternalReference(input.externalReference);
   const db = await getDb();
@@ -48,6 +56,10 @@ export async function saveCxCase(input: {
     externalReference,
     status: input.triage.humanReviewRequired ? "needs_review" : "draft_ready",
     triage: input.triage,
+    qualityGovernance: input.qualityGovernance ? {
+      ...input.qualityGovernance,
+      workflowStatus: input.qualityGovernance.potentialQualityEvent ? "awaiting_human_quality_review" : "not_applicable",
+    } : undefined,
     createdAt: new Date().toISOString(),
   };
 
@@ -73,4 +85,12 @@ export async function listCxCases(limit = 50): Promise<CxCaseRecord[]> {
     .orderBy(desc(modelRouterSettings.updatedAt))
     .limit(safeLimit);
   return rows.map((row) => row.value as CxCaseRecord);
+}
+
+/** Admin queue view: potential quality signals are separated from routine CX cases. */
+export async function listCxQualityEvents(limit = 50): Promise<CxCaseRecord[]> {
+  const cases = await listCxCases(100);
+  return cases
+    .filter((item) => item.qualityGovernance?.potentialQualityEvent === true)
+    .slice(0, Math.max(1, Math.min(100, Math.floor(limit))));
 }

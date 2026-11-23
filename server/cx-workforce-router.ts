@@ -1,9 +1,20 @@
 import { z } from "zod";
 import { adminProcedure, router } from "./_core/trpc";
 import { triageCxRequest } from "../lib/cx-workforce-logic";
+import { detectGxpQualitySignal } from "../lib/gxp-policy-logic";
 import { describeHubspotEnv } from "./integrations/hubspot";
 import { getCxHubspotSnapshot } from "./cx-workforce-hubspot";
-import { listCxCases, saveCxCase } from "./cx-workforce-store";
+import { listCxCases, listCxQualityEvents, saveCxCase } from "./cx-workforce-store";
+
+function triageWithQualityGovernance(input: { subject?: string; message: string; productInterest?: string; purchaseIntent?: string }) {
+  const triage = triageCxRequest(input);
+  const qualityGovernance = detectGxpQualitySignal(input);
+  if (qualityGovernance.potentialQualityEvent) {
+    triage.humanReviewRequired = true;
+    triage.escalationReasons = [...new Set([...triage.escalationReasons, "potential_gxp_quality_event"])];
+  }
+  return { triage, qualityGovernance };
+}
 
 export const cxWorkforceRouter = router({
   readiness: adminProcedure.query(() => {
@@ -27,12 +38,16 @@ export const cxWorkforceRouter = router({
   }),
   liveInboxSnapshot: adminProcedure.query(() => getCxHubspotSnapshot()),
   caseQueue: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(({ input }) => listCxCases(input?.limit ?? 50)),
+  qualityEventQueue: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(({ input }) => listCxQualityEvents(input?.limit ?? 50)),
   previewTriage: adminProcedure.input(z.object({
     subject: z.string().max(300).optional(),
     message: z.string().min(3).max(12000),
     productInterest: z.string().max(100).optional(),
     purchaseIntent: z.string().max(100).optional(),
-  })).mutation(({ input }) => triageCxRequest(input)),
+  })).mutation(({ input }) => {
+    const result = triageWithQualityGovernance(input);
+    return { ...result.triage, qualityGovernance: result.qualityGovernance };
+  }),
   recordTriage: adminProcedure.input(z.object({
     subject: z.string().max(300).optional(),
     message: z.string().min(3).max(12000),
@@ -41,9 +56,9 @@ export const cxWorkforceRouter = router({
     externalReference: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
   })).mutation(async ({ input }) => {
     const { externalReference, ...triageInput } = input;
-    const triage = triageCxRequest(triageInput);
-    const saved = await saveCxCase({ source: "admin_preview", externalReference, triage });
-    return { saved: true as const, case: saved, customerMessageStored: false as const };
+    const { triage, qualityGovernance } = triageWithQualityGovernance(triageInput);
+    const saved = await saveCxCase({ source: "admin_preview", externalReference, triage, qualityGovernance });
+    return { saved: true as const, case: saved, qualityGovernance: saved.qualityGovernance, customerMessageStored: false as const };
   }),
   batchPreview: adminProcedure.input(z.object({
     requests: z.array(z.object({
@@ -55,7 +70,10 @@ export const cxWorkforceRouter = router({
   })).mutation(({ input }) => ({
     items: input.requests.map((request, index) => ({
       index,
-      triage: triageCxRequest(request),
+      triage: (() => {
+        const result = triageWithQualityGovernance(request);
+        return { ...result.triage, qualityGovernance: result.qualityGovernance };
+      })(),
     })),
     source: "admin_supplied_preview_only" as const,
     noHubspotRecordsWritten: true as const,
