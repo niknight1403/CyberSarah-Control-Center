@@ -72,7 +72,8 @@ export async function growthPulseOverview() {
     },
     runtime: growthRuntimeHealth(runtime, new Date()),
     trend: compareGrowthWindows(growthMetrics(recent), metrics,
-      !previous.snapshot.jobsTruncated && !recent.jobsTruncated),
+      quality.status === "valid" && !previous.snapshot.jobsTruncated && !recent.jobsTruncated &&
+      previous.snapshot.reachSource === recent.reachSource),
     rates: growthRateCard(metrics),
     evidenceFingerprint: growthPulseFingerprint(metrics),
     channel: { health: previous.health, decision: previous.decision },

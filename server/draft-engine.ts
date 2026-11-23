@@ -15,6 +15,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { affiliateProducts, draftQueue, revenueOffers, type DraftQueueRow, type InsertDraftQueueRow } from "../drizzle/schema";
 import { isNearDuplicateContent } from "../lib/content-dedupe-logic";
+import { PUBLISHING_PLATFORMS, SUPPORTED_PUBLISHING_PLATFORMS } from "../lib/publishing-platforms";
 import {
   DRAFT_MAX_PENDING_BY_KIND,
   REVENUE_HUBS,
@@ -101,7 +102,7 @@ export const CONTENT_TOPIC_SEEDS = [
   "Audience Affinity: Themen enger an echte Zielgruppenprobleme koppeln",
 ] as const;
 
-export const CONTENT_PLATFORMS = ["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"] as const;
+export const CONTENT_PLATFORMS = PUBLISHING_PLATFORMS;
 
 function seedIndexForDay(nowMs: number, offset: number): number {
   return Math.floor(nowMs / 86_400_000 + offset) % CONTENT_TOPIC_SEEDS.length;
@@ -408,7 +409,7 @@ export async function decideDraft(id: number, action: "approve" | "reject", deci
     const payload = pending.payload && typeof pending.payload === "object"
       ? pending.payload as { personaId?: unknown; platform?: unknown; topic?: unknown; content?: unknown }
       : {};
-    const supported = new Set(["instagram", "tiktok", "linkedin", "x", "threads", "bluesky"]);
+    const supported = SUPPORTED_PUBLISHING_PLATFORMS;
     const personaId = typeof payload.personaId === "string" ? payload.personaId.trim() : "";
     const platform = typeof payload.platform === "string" ? payload.platform.trim().toLowerCase() : "";
     const topic = typeof payload.topic === "string" ? payload.topic.trim() : "";
