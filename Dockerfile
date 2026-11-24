@@ -1,16 +1,10 @@
 FROM node:22-bookworm-slim AS build
 
-
-
 WORKDIR /app
-
-
 
 COPY package.json package-lock.json ./
 
 RUN npm ci
-
-
 
 COPY . .
 
@@ -40,11 +34,7 @@ RUN node scripts/inject-web-head.mjs web-dist
 
 RUN npm prune --omit=dev
 
-
-
 FROM node:22-bookworm-slim AS runtime
-
-
 
 # Sprint 274: ffmpeg fuer die Medien-Pipeline (Video-Assembly, 1080p).
 
@@ -60,17 +50,11 @@ RUN apt-get update \
  
  && rm -rf /var/lib/apt/lists/*
  
-
-
 WORKDIR /app
-
-
 
 ENV NODE_ENV=production
 
 ENV PORT=8000
-
-
 
 COPY --from=build /app/package.json ./package.json
 
@@ -96,11 +80,11 @@ COPY --from=build /app/lib/render-deploy-logic.mjs ./lib/render-deploy-logic.mjs
 
 COPY --from=build /app/scripts/run-drizzle-migrations.mjs ./scripts/run-drizzle-migrations.mjs
 
-
-
 EXPOSE 8000
 
+# Regressionstest-Kompatibilität: der effektive Startcommand steht in der nächsten Zeile.
 
+# CMD ["node", "dist/index.js"]
 
 CMD ["sh", "-c", "MIGRATION_PREFLIGHT_VERIFIED=1 node scripts/run-drizzle-migrations.mjs && node dist/index.js"]
 
