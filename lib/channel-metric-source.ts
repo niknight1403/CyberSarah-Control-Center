@@ -5,6 +5,11 @@ const safeCount = (value: unknown): number | null => {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 };
+/** A fetch timestamp alone is not evidence that reach metrics were returned. */
+export function reachInsightEvidenceAt(rows: readonly { insights: ReachInsights | null; fetchedAt: Date | null }[]) {
+  return rows.filter(row => row.insights && ["impressions", "reach", "views", "plays", "video_views"]
+    .some(key => safeCount(row.insights?.[key]) !== null)).map(row => row.fetchedAt);
+}
 export function mergeChannelReach(
   eventImpressions: unknown, eventViews: unknown, insights: readonly ReachInsights[],
 ) {

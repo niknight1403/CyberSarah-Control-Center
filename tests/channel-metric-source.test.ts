@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { mergeChannelReach } from "../lib/channel-metric-source";
+import { mergeChannelReach, reachInsightEvidenceAt } from "../lib/channel-metric-source";
 describe("Sprint 03: safe and provenance-aware platform reach", () => {
+  it("only timestamps valid reach insights as reach observations", () => {
+    const valid = new Date("2026-11-23T10:00:00Z");
+    expect(reachInsightEvidenceAt([
+      { insights: { likes: 10 }, fetchedAt: new Date("2026-11-23T12:00:00Z") },
+      { insights: { reach: "invalid" }, fetchedAt: new Date("2026-11-23T11:00:00Z") },
+      { insights: { impressions: 0 }, fetchedAt: valid },
+    ])).toEqual([valid]);
+  });
   it("avoids adding two overlapping views/impression sources together", () => {
     const result = mergeChannelReach(1000, 500, [
       { impressions: 600, views: 240 }, { impressions: 650, views: 300 },

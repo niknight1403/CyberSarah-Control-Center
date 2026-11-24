@@ -20,6 +20,7 @@
 
 import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { create, type AxiosInstance } from "axios";
+import { SUPPORTED_PUBLISHING_PLATFORMS } from "../lib/publishing-platforms";
 import {
   autoCardAssetUrl,
   validateAssetUrl,
@@ -143,7 +144,7 @@ export async function enqueueApprovedContentDraft(
   const content = draft.content.trim();
   if (!userOpenId || !Number.isSafeInteger(draft.id) || draft.id < 1 || content.length < 10) throw new Error("Ungueltiger freigegebener Content-Draft.");
   const platform = draft.platform.trim().toLowerCase();
-  const supported = new Set(["instagram","tiktok","linkedin","x","threads","bluesky"]);
+  const supported = SUPPORTED_PUBLISHING_PLATFORMS;
   if (!supported.has(platform)) throw new Error(`Plattform ${platform} wird von der Publishing-Pipeline nicht unterstuetzt.`);
   const [created] = await db.insert(publishingJobs).values({
     userOpenId, product: draft.topic.trim() || "Freigegebener Content", goal: "reach",

@@ -1,9 +1,21 @@
+import { auditGrowthMetrics } from "./growth-data-quality";
+
 export type ChannelAutopilotSnapshot={
   impressions:number;views:number;clicks:number;leads:number;purchases:number;refunds:number;
   confirmedRevenueCents:number;published:number;failed:number;
   activeExperiments:number;pendingContentDrafts:number;pendingRevenueDrafts:number;
   reachSource?:"events"|"platform";invalidInsightValues?:number;jobsTruncated?:boolean;latestEvidenceAt?:string|null;
 };
+/** The scheduled channel loop must obey the same evidence gate as Growth Pulse. */
+export function channelDraftEvidenceGate(snapshot: ChannelAutopilotSnapshot, at = new Date()) {
+  const quality = auditGrowthMetrics(snapshot, at, snapshot);
+  return {
+    allowed: quality.status === "valid" && !snapshot.jobsTruncated,
+    reason: quality.errors[0] ?? quality.warnings[0] ??
+      (snapshot.jobsTruncated ? "Publishing-Verlauf abgeschnitten" : null),
+    quality,
+  };
+}
 export type ChannelLever="DISCOVERY"|"PACKAGING"|"RETENTION"|"CTA"|"LANDING"|"MONETIZATION"|"RELIABILITY"|"COMPOUND";
 export type ChannelAutopilotDecision={
   lever:ChannelLever;score:number;confidence:number;reason:string;
@@ -72,7 +84,7 @@ export function buildChannelExperimentDraft(decision:ChannelAutopilotDecision,ru
 export function buildChannelContentDraft(decision:ChannelAutopilotDecision,evidenceFingerprint?:string){
   return {
     personaId:"automationsklar-editorial",
-    platform:"youtube/shorts",
+    platform:"threads",
     topic:`Autopilot-Experiment: ${decision.lever}`,
     content:`Hypothese: ${decision.reason}\n\nExperiment: ${decision.experiment}\n\nPrimärmetrik: ${decision.metric}\nZiel: ${decision.target}`,
     assets:[],

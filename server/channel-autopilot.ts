@@ -1,10 +1,11 @@
 import { and, desc, eq, gte, or, sql } from "drizzle-orm";
 import { draftQueue,publishingJobs,revenueAttributionEvents,revenueExperiments,users } from "../drizzle/schema";
 import { DRAFT_MAX_PENDING_BY_KIND, type RevenueLoopDraftPayload } from "../lib/draft-engine-logic";
-import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
+import { buildChannelContentDraft,buildChannelExperimentDraft,channelAutopilotHealth,channelAutopilotDraftGate,channelDraftEvidenceGate,channelEvidenceFingerprint,decideChannelAutopilot,type ChannelAutopilotSnapshot } from "../lib/channel-autopilot-logic";
 import { getDb } from "./db";
-import { mergeChannelReach } from "../lib/channel-metric-source";
+import { mergeChannelReach, reachInsightEvidenceAt } from "../lib/channel-metric-source";
 import { latestGrowthEvidence } from "../lib/growth-evidence-freshness";
+import { SUPPORTED_PUBLISHING_PLATFORMS } from "../lib/publishing-platforms";
 import { materializeProductionSystem } from "./faceless-multichannel-service";
 import { enqueueApprovedContentDraft } from "./publishing-service";
 
@@ -18,7 +19,7 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
   const since=new Date(Date.now()-Math.min(90,Math.max(1,days))*86_400_000);
   const [eventRows,jobs,experiments,pending]=await Promise.all([
     db.select({
-      lastEventAt:sql<Date | null>`max(${revenueAttributionEvents.occurredAt})`,
+      lastReachAt:sql<Date | null>`max(${revenueAttributionEvents.occurredAt}) filter (where ${revenueAttributionEvents.eventType} in ('impression','view','click'))`,
       impressions:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='impression')`,
       views:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='view')`,
       clicks:sql<number>`count(*) filter (where ${revenueAttributionEvents.eventType}='click')`,
@@ -32,7 +33,7 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
     db.select({active:sql<number>`count(*) filter (where ${revenueExperiments.name} like 'CHANNEL AUTO%')`}).from(revenueExperiments).where(eq(revenueExperiments.status,"learning")),
     db.select({content:sql<number>`count(*) filter (where ${draftQueue.kind}='content')`,revenue:sql<number>`count(*) filter (where ${draftQueue.kind}='revenue-loop')`}).from(draftQueue).where(eq(draftQueue.status,"pending")),
   ]);
-  const events=eventRows[0]??{lastEventAt:null,impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,purchaseCents:0,refundCents:0};
+  const events=eventRows[0]??{lastReachAt:null,impressions:0,views:0,clicks:0,leads:0,purchases:0,refunds:0,purchaseCents:0,refundCents:0};
   const purchaseCents=Number(events.purchaseCents??0);
   const refundCents=Number(events.refundCents??0);
   const reach = mergeChannelReach(events.impressions, events.views,
@@ -41,8 +42,8 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
     impressions:reach.impressions,
     views:reach.views,
     reachSource:reach.impressionsSource,
-    latestEvidenceAt:latestGrowthEvidence(events.lastEventAt,
-      ...jobs.map(j => j.insightsFetchedAt)),
+    latestEvidenceAt:latestGrowthEvidence(events.lastReachAt,
+      ...reachInsightEvidenceAt(jobs.map(j => ({insights:j.insights,fetchedAt:j.insightsFetchedAt})))),
     invalidInsightValues:reach.discardedValues,
     clicks:Number(events.clicks??0),leads:Number(events.leads??0),purchases:Number(events.purchases??0),refunds:Number(events.refunds??0),
     confirmedRevenueCents:purchaseCents-refundCents,
@@ -58,7 +59,8 @@ export async function collectChannelAutopilotSnapshot(days=30):Promise<ChannelAu
 export async function channelAutopilotOverview(){
   const snapshot=await collectChannelAutopilotSnapshot();
   const decision=decideChannelAutopilot(snapshot);
-  return {mode:"24/7-observe-diagnose-draft-learn",snapshot,health:channelAutopilotHealth(snapshot),decision,externalActionsExecuted:0,generatedAt:new Date().toISOString()};
+  return {mode:"24/7-observe-diagnose-draft-learn",snapshot,health:channelAutopilotHealth(snapshot),decision,
+    evidence:channelDraftEvidenceGate(snapshot),externalActionsExecuted:0,generatedAt:new Date().toISOString()};
 }
 
 export async function reconcileApprovedContentDrafts(limit=50){
@@ -75,7 +77,7 @@ export async function reconcileApprovedContentDrafts(limit=50){
     const platform=typeof p.platform==="string"?p.platform.trim().toLowerCase():"";
     const topic=typeof p.topic==="string"?p.topic.trim():"";
     const content=typeof p.content==="string"?p.content.trim():"";
-    const supported=new Set(["instagram","tiktok","linkedin","x","threads","bluesky"]);
+    const supported=SUPPORTED_PUBLISHING_PLATFORMS;
     // Legacy approved rows may predate the current publishing contract.
     // Quarantine them from this reconciliation pass without changing their
     // human approval state or repeatedly throwing from the 15-minute loop.
@@ -99,6 +101,11 @@ export async function runChannelAutopilot(){
   const reconciliation=await reconcileApprovedContentDrafts();
   const snapshot=await collectChannelAutopilotSnapshot();
   const decision=decideChannelAutopilot(snapshot);
+  const evidence=channelDraftEvidenceGate(snapshot);
+  if(!evidence.allowed){
+    return {snapshot,health:channelAutopilotHealth(snapshot),decision,generated:0,
+      skipped:`measurement-review: ${evidence.reason}`,reconciliation,externalActionsExecuted:0};
+  }
   const cooldownBucket=Math.floor(Date.now()/(6*60*60_000));
   const evidenceFingerprint=channelEvidenceFingerprint(snapshot);
   const experiment=buildChannelExperimentDraft(decision,String(cooldownBucket),evidenceFingerprint);

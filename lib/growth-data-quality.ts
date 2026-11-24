@@ -22,6 +22,9 @@ export function auditGrowthMetrics(data: GrowthMetrics, at = new Date(), source?
   if (!Number.isSafeInteger(data.confirmedRevenueCents)) {
     errors.push("confirmedRevenueCents: keine sichere ganzzahlige Minor-Unit");
   }
+  if (!errors.length && data.impressions === 0 && data.views === 0 && data.clicks === 0 && data.leads === 0 && data.purchases === 0) {
+    warnings.push("Keine Reichweiten- oder Funnel-Beobachtungen vorhanden; Tracking und Kanaele pruefen");
+  }
   if (!errors.length) {
     if (data.impressions === 0 && (data.views > 0 || data.clicks > 0)) warnings.push("Reichweite ohne Impressionen: Tracking-Basis abgleichen");
     if (data.clicks === 0 && data.leads > 0) warnings.push("Leads ohne Klickdaten: Quellenzuordnung unvollstaendig");
@@ -44,7 +47,9 @@ export function auditGrowthMetrics(data: GrowthMetrics, at = new Date(), source?
   if (source && (data.impressions > 0 || data.clicks > 0 || data.purchases > 0)) {
     const freshness = growthEvidenceFreshness(source.latestEvidenceAt, at);
     if (!freshness.fresh) {
-      warnings.push(freshness.latestAt
+      warnings.push(freshness.latestAt !== null && Date.parse(freshness.latestAt) > at.getTime() + 3_600_000
+        ? "Messwert liegt in der Zukunft: Quellenuhr und Zeitstempel pruefen"
+        : freshness.latestAt
         ? "Umsatz-/Reichweitenmessung ist aelter als 72 Stunden"
         : "Fuer vorhandene Messwerte ist keine gueltige Beobachtungszeit dokumentiert");
     }

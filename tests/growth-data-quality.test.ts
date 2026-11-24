@@ -7,6 +7,11 @@ const base: GrowthMetrics = {
   pendingContentDrafts: 0, pendingRevenueDrafts: 0, activeExperiments: 1,
 };
 describe("Growth Pulse Sprint 01 – trustworthy counters", () => {
+  it("does not present an empty funnel as validated reach", () => {
+    const report = auditGrowthMetrics({ ...base, impressions: 0, views: 0, clicks: 0, leads: 0, purchases: 0 });
+    expect(report.status).toBe("review");
+    expect(report.warnings.some(w => w.includes("Keine Reichweiten"))).toBe(true);
+  });
   it("accepts coherent measured counters", () => {
     expect(auditGrowthMetrics(base).status).toBe("valid");
   });
@@ -54,6 +59,12 @@ describe("Growth Pulse Sprint 01 – trustworthy counters", () => {
     const result = auditGrowthMetrics(base, new Date("2026-10-30T12:00:00Z"),
       { latestEvidenceAt: null });
     expect(result.warnings.some(w => w.includes("Beobachtungszeit"))).toBe(true);
+  });
+  it("identifies future-dated evidence instead of calling it stale", () => {
+    const result = auditGrowthMetrics(base, new Date("2026-10-30T12:00:00Z"),
+      { latestEvidenceAt: "2026-10-31T12:00:00Z" });
+    expect(result.status).toBe("review");
+    expect(result.warnings.some(w => w.includes("Zukunft"))).toBe(true);
   });
 
 });

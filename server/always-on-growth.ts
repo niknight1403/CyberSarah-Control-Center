@@ -64,9 +64,16 @@ export async function growthPulseOverview() {
     plan: refundRiskPlan(metrics) ?? decideGrowthPlan(metrics),
     metrics,
     quality,
+    measurement: {
+      windowDays: 30 as const,
+      impressionsSource: previous.snapshot.reachSource,
+      latestEvidenceAt: previous.snapshot.latestEvidenceAt ?? null,
+      observed: quality.status === "valid",
+    },
     runtime: growthRuntimeHealth(runtime, new Date()),
     trend: compareGrowthWindows(growthMetrics(recent), metrics,
-      !previous.snapshot.jobsTruncated && !recent.jobsTruncated),
+      quality.status === "valid" && !previous.snapshot.jobsTruncated && !recent.jobsTruncated &&
+      previous.snapshot.reachSource === recent.reachSource),
     rates: growthRateCard(metrics),
     evidenceFingerprint: growthPulseFingerprint(metrics),
     channel: { health: previous.health, decision: previous.decision },
