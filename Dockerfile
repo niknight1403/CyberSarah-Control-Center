@@ -1,46 +1,110 @@
 FROM node:22-bookworm-slim AS build
 
+
+
 WORKDIR /app
 
+
+
 COPY package.json package-lock.json ./
+
 RUN npm ci
 
+
+
 COPY . .
+
 RUN npm run build
+
 # Statischer Expo-Web-Export fuer die kombinierte Web+API-Auslieferung.
+
 # CSS-Interop-Cache seeden (SHA-1-Fix fuer frische npm-ci-Installs, vgl. build-apk.yml)
+
 RUN mkdir -p node_modules/react-native-css-interop/.cache \
+
  && touch node_modules/react-native-css-interop/.cache/web.css
+ 
 RUN npx expo export -p web --output-dir web-dist
+
 # Expo output:single übernimmt app/+html.tsx nicht in die ausgelieferte index.html.
+
 # Die Startup-Shell wird deshalb deterministisch nach dem Export injiziert.
+
 RUN node scripts/inject-web-startup-shell.mjs web-dist
+
 # Expo output:single setzt auch keine SEO-Tags (Titel, OG, canonical).
+
 # Der Kopf wird ebenfalls deterministisch nach dem Export injiziert.
+
 RUN node scripts/inject-web-head.mjs web-dist
+
 RUN npm prune --omit=dev
+
+
 
 FROM node:22-bookworm-slim AS runtime
 
+
+
 # Sprint 274: ffmpeg fuer die Medien-Pipeline (Video-Assembly, 1080p).
+
 # Ehrlich: ohne dieses Binary ist Video-Generierung in Produktion nicht
+
 # verfuegbar — der Faehigkeits-Check (probeFfmpeg) meldet das klar.
+
 RUN apt-get update \
+
  && apt-get install -y --no-install-recommends ffmpeg \
+ 
  && apt-get clean \
+ 
  && rm -rf /var/lib/apt/lists/*
+ 
+
 
 WORKDIR /app
 
+
+
 ENV NODE_ENV=production
+
 ENV PORT=8000
 
+
+
 COPY --from=build /app/package.json ./package.json
+
 COPY --from=build /app/package-lock.json ./package-lock.json
+
 COPY --from=build /app/node_modules ./node_modules
+
 COPY --from=build /app/dist ./dist
+
 COPY --from=build /app/web-dist ./web-dist
+
+# Render kann den Docker-Service direkt nach einem Git-Push starten, ohne den
+
+# manuellen GitHub-Migrationsworkflow auszuführen. Die Migration läuft deshalb
+
+# beim Containerstart über den vorhandenen, idempotenten Runner gegen die
+
+# Laufzeit-DATABASE_URL. Die Dateien bleiben außerhalb des Frontend-Bundles.
+
+COPY --from=build /app/drizzle ./drizzle
+
+COPY --from=build /app/lib/render-deploy-logic.mjs ./lib/render-deploy-logic.mjs
+
+COPY --from=build /app/scripts/run-drizzle-migrations.mjs ./scripts/run-drizzle-migrations.mjs
+
+
 
 EXPOSE 8000
 
-CMD ["node", "dist/index.js"]
+
+
+CMD ["sh", "-c", "MIGRATION_PREFLIGHT_VERIFIED=1 node scripts/run-drizzle-migrations.mjs && node dist/index.js"]
+
+
+
+
+
