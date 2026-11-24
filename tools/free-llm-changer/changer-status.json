@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-23T22:09:32",
+  "stand": "2026-11-24T06:14:55",
   "aktiv": "groq",
   "aktiv_name": "Groq Free Tier",
   "endpunkt": "https://api.groq.com/openai/v1",
-  "modell": "openai/gpt-oss-20b",
+  "modell": "qwen/qwen3.8-27b",
   "anbieter": [
     {
       "id": "gemini",
       "status": "NICHT KONFIGURIERT/ERREICHBAR",
-      "http_status": null,
+      "http_status": 503,
       "modell": "gemma-4-31b-it",
-      "detail": "000 gemma-4-31b-it",
+      "detail": "503 gemma-4-31b-it",
       "hinweis": null
     },
     {
@@ -25,17 +25,17 @@
       "id": "groq",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "openai/gpt-oss-20b",
-      "detail": "openai/gpt-oss-20b",
+      "modell": "qwen/qwen3.8-27b",
+      "detail": "qwen/qwen3.8-27b",
       "hinweis": null
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT",
-      "http_status": 429,
+      "status": "VERFUEGBAR",
+      "http_status": null,
       "modell": "liquid/lfm-3-1.7b:free",
-      "detail": "429 liquid/lfm-3-1.7b:free",
-      "hinweis": "Changer rotiert weiter"
+      "detail": "liquid/lfm-3-1.7b:free",
+      "hinweis": null
     },
     {
       "id": "cerebras",
