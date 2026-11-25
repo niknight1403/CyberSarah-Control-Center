@@ -1,10 +1,14 @@
 name: Revenue-OS Render configuration preflight
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/revenue-render-preflight.yml'
 permissions:
   contents: read
 jobs:
   preflight:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 3
     env:
