@@ -35,11 +35,17 @@ jobs:
           FOCUS_IDS: '34,3'
         run: |
           set -u
-          TOK=$(curl -s -m 25 -X POST -H 'Content-Type: application/json' \
+          LOGIN_BODY="$(mktemp)"
+          LOGIN_CODE=$(curl -s -m 25 -o "$LOGIN_BODY" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
             -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
-            https://hub.cybersarah-ki.com/api/auth/login \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))')
-          [ -n "$TOK" ] || { echo "FEHLER: Hub-Login fehlgeschlagen"; exit 1; }
+            https://hub.cybersarah-ki.com/api/auth/login || echo "000")
+          # Antwort defensiv lesen: ein Gateway-Fehler liefert HTML/leer statt JSON
+          # und darf keinen Python-Traceback als einzige Fehlermeldung hinterlassen.
+          TOK=$(jq -r '.token // ""' "$LOGIN_BODY" 2>/dev/null || echo "")
+          if [ -z "$TOK" ]; then
+            echo "FEHLER: Hub-Login fehlgeschlagen (HTTP $LOGIN_CODE): $(head -c 200 "$LOGIN_BODY" | tr -d '\n')"
+            exit 1
+          fi
           export TOK
           python3 - <<'PY'
           import json, os, urllib.request

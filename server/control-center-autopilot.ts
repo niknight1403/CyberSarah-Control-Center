@@ -229,7 +229,12 @@ export async function runControlCenterAutopilot(deps: ControlCenterAutopilotDeps
   }
   for (const item of drafts.skipped) {
     const detail = `${item.kind}: ${item.reason}`;
-    if (/\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(item.reason)) deferred.push(detail);
+    // Ein erschoepftes Zeitbudget ist kein Defekt: die Draft-Engine bricht
+    // bewusst ab und setzt im naechsten Cron-Lauf fort (truncated = true).
+    // Frueher landete das als "echte Blockade" im Bericht und faerbte den
+    // Autopilot-Lauf dauerhaft rot, obwohl in jedem Lauf Entwuerfe entstanden.
+    const budgetPause = drafts.truncated === true && /Zeitbudget/i.test(item.reason);
+    if (budgetPause || /\b429\b|quota|rate.?limit|resource_exhausted|too many requests|temporarily deferred|circuit breaker/i.test(item.reason)) deferred.push(detail);
     else blocked.push(detail);
   }
 

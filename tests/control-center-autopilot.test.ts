@@ -106,6 +106,35 @@ describe("control center autopilot", () => {
     expect(result.decision.action).toBe("RETRY");
   });
 
+  it("wertet ein erschoepftes Draft-Zeitbudget als verschobene Arbeit, nicht als Blockade", async () => {
+    const truncatedDrafts = vi.fn(async () => ({
+      plan: [],
+      generated: { content: 4 },
+      truncated: true,
+      skipped: [{ kind: "content" as const, reason: "Zeitbudget von 90 s erreicht — Rest folgt im naechsten Lauf." }],
+    }));
+    const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts: truncatedDrafts, ...growthDeps });
+
+    expect(result.blocked).toEqual([]);
+    expect(result.deferred.join(" ")).toContain("Zeitbudget von 90 s erreicht");
+    expect(result.realActions.join(" ")).toContain("4 Creator-Content-Entwuerfe erzeugt".replace("Entwuerfe", "Entwürfe"));
+  });
+
+  it("haelt einen echten Draft-Fehler ohne Zeitbudget weiterhin als Blockade", async () => {
+    const brokenDrafts = vi.fn(async () => ({
+      plan: [],
+      generated: {},
+      truncated: false,
+      skipped: [{ kind: "idea" as const, reason: "Datenbank nicht lesbar: connection refused" }],
+    }));
+    const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
+    const result = await runControlCenterAutopilot({ scan, revenue, drafts: brokenDrafts, ...growthDeps });
+
+    expect(result.deferred.join(" ")).not.toContain("Datenbank nicht lesbar");
+    expect(result.blocked.join(" ")).toContain("Datenbank nicht lesbar");
+  });
+
   it("meldet Growth-Ausfaelle als echte Blockade statt falschen Erfolg", async () => {
     const scan = vi.fn(async () => ({ accepted: true, completed: false, background: true }));
     const growth = vi.fn(async () => { throw new Error("Growth DB offline"); }) as never;
