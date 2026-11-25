@@ -1,0 +1,44 @@
+name: Revenue-OS Render configuration preflight
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/revenue-render-preflight.yml'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      DATABASE_URL: ${{ secrets.REVENUE_OS_DATABASE_URL }}
+      DEPLOY_TOKEN: ${{ secrets.REVENUE_OS_DEPLOY_TOKEN }}
+      JWT_SECRET: ${{ secrets.REVENUE_OS_JWT_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      REVENUE_OS_API_KEY: ${{ secrets.REVENUE_OS_API_KEY }}
+    steps:
+      - name: Validate presence without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for key in RENDER_API_KEY DATABASE_URL DEPLOY_TOKEN JWT_SECRET STRIPE_SECRET_KEY GROQ_API_KEY REVENUE_OS_API_KEY; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Missing $key"
+              missing=1
+            else
+              echo "$key present"
+            fi
+          done
+          if [[ -n "$JWT_SECRET" && ${#JWT_SECRET} -lt 32 ]]; then
+            echo "::error::JWT_SECRET too short"
+            missing=1
+          fi
+          if [[ -n "$DEPLOY_TOKEN" && ${#DEPLOY_TOKEN} -lt 32 ]]; then
+            echo "::error::DEPLOY_TOKEN too short"
+            missing=1
+          fi
+          exit "$missing"
