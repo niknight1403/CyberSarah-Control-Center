@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-25T21:54:12",
-  "aktiv": "gemini",
-  "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
-  "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemma-4-26b-a4b-it",
+  "stand": "2026-11-26T03:55:34",
+  "aktiv": "groq",
+  "aktiv_name": "Groq Free Tier",
+  "endpunkt": "https://api.groq.com/openai/v1",
+  "modell": "qwen/qwen3.8-27b",
   "anbieter": [
     {
       "id": "gemini",
-      "status": "VERFUEGBAR",
-      "http_status": null,
-      "modell": "gemma-4-26b-a4b-it",
-      "detail": "gemma-4-26b-a4b-it",
+      "status": "NICHT KONFIGURIERT/ERREICHBAR",
+      "http_status": 503,
+      "modell": "gemma-4-31b-it",
+      "detail": "503 gemma-4-31b-it",
       "hinweis": null
     },
     {
@@ -25,17 +25,17 @@
       "id": "groq",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "openai/gpt-oss-20b",
-      "detail": "openai/gpt-oss-20b",
+      "modell": "qwen/qwen3.8-27b",
+      "detail": "qwen/qwen3.8-27b",
       "hinweis": null
     },
     {
       "id": "openrouter",
-      "status": "LIMIT ERREICHT",
-      "http_status": 429,
-      "modell": "liquid/lfm-3-1.7b:free",
-      "detail": "429 liquid/lfm-3-1.7b:free",
-      "hinweis": "Changer rotiert weiter"
+      "status": "VERFUEGBAR",
+      "http_status": null,
+      "modell": "baidu/ernie-5.5-flash-preview:free",
+      "detail": "baidu/ernie-5.5-flash-preview:free",
+      "hinweis": null
     },
     {
       "id": "cerebras",
