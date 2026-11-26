@@ -7,6 +7,13 @@ name: Villa-Fokus-Wächter
 #
 # Der Wächter greift nur über die öffentliche Hub-API ein (kein Neustart, kein
 # Code-Deploy) und schaltet sich selbst ab, sobald beide Zielvillen fertig sind.
+#
+# 26.11.2026: Ein Hub-Ausfall (nginx 502) liess den Wächter alle 15 Minuten rot
+# werden, obwohl er korrekt nichts getan hat. Jetzt wird zwischen einem echten
+# Konfigurationsfehler (4xx, falsche Zugangsdaten) und einer temporär nicht
+# erreichbaren Hub-Instanz (5xx/Netzwerk) unterschieden: den Ausfall selbst
+# meldet weiterhin VillaForge-Ops; der Wächter versucht den Login mehrfach und
+# beendet den Lauf bei anhaltender Nicht-Erreichbarkeit mit einer Warnung.
 
 on:
   schedule:
@@ -17,6 +24,9 @@ on:
         description: 'Nur anzeigen, nichts ändern'
         type: boolean
         default: false
+      base_url:
+        description: 'Hub-Basis-URL (leer = öffentliche Domain)'
+        default: ''
 
 concurrency:
   group: villa-focus-guard
@@ -33,27 +43,70 @@ jobs:
           VF_HUB_PASSWORD: ${{ secrets.VF_HUB_PASSWORD }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
           FOCUS_IDS: '34,3'
+          HUB_BASE: ${{ inputs.base_url || 'https://hub.cybersarah-ki.com' }}
         run: |
           set -u
-          LOGIN_BODY="$(mktemp)"
-          LOGIN_CODE=$(curl -s -m 25 -o "$LOGIN_BODY" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
-            -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
-            https://hub.cybersarah-ki.com/api/auth/login || echo "000")
-          # Antwort defensiv lesen: ein Gateway-Fehler liefert HTML/leer statt JSON
-          # und darf keinen Python-Traceback als einzige Fehlermeldung hinterlassen.
-          TOK=$(jq -r '.token // ""' "$LOGIN_BODY" 2>/dev/null || echo "")
+          HUB_BASE="${HUB_BASE%/}"
+          export HUB_BASE
+
+          # Login mit kurzen Wiederholungen: ein einzelner 502 aus dem nginx
+          # (Deploy, Neustart der Hub-Instanz) soll den Lauf nicht rot machen.
+          LOGIN_CODE=000
+          TOK=""
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            LOGIN_BODY="$(mktemp)"
+            LOGIN_CODE=$(curl -s -m 25 -o "$LOGIN_BODY" -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+              -d "{\"email\":\"$VF_HUB_EMAIL\",\"password\":\"$VF_HUB_PASSWORD\"}" \
+              "$HUB_BASE/api/auth/login" 2>/dev/null || true)
+            # curl schreibt bei einem Abbruch selbst schon 000 - ein zusaetzliches
+            # "|| echo 000" ergaebe "000000" und wuerde den Netzwerkfehler als
+            # Konfigurationsfehler fehlklassifizieren. Nur die letzten drei
+            # Ziffern zaehlen.
+            LOGIN_CODE="${LOGIN_CODE:-000}"
+            LOGIN_CODE="${LOGIN_CODE: -3}"
+            # Antwort defensiv lesen: ein Gateway-Fehler liefert HTML/leer statt JSON
+            # und darf keinen Python-Traceback als einzige Fehlermeldung hinterlassen.
+            TOK=$(jq -r '.token // ""' "$LOGIN_BODY" 2>/dev/null || echo "")
+            if [ -n "$TOK" ]; then
+              break
+            fi
+            # Nur bei vorübergehenden Störungen erneut versuchen (Netzwerk, 5xx).
+            # Ein 4xx ist eine Konfigurations-/Zugangsdatenfrage und wird sofort gemeldet.
+            case "$LOGIN_CODE" in
+              000|5??) ;;
+              *) break ;;
+            esac
+            if [ "$attempt" -lt 3 ]; then
+              echo "Login-Versuch $attempt/3: HTTP $LOGIN_CODE - neuer Versuch in $((attempt * 5))s"
+              sleep $((attempt * 5))
+            fi
+            attempt=$((attempt + 1))
+          done
+
           if [ -z "$TOK" ]; then
+            # 000 = Netzwerkfehler, 5xx = Hub/Gateway nicht verfügbar.
+            # Das ist eine Störung der Hub-Instanz, kein Fehler des Wächters:
+            # VillaForge-Ops meldet die Erreichbarkeit, der Wächter läuft in
+            # 15 Minuten wieder. Zugangsdaten-/Konfigurationsfehler (4xx)
+            # bleiben ein harter Fehler, damit sie nicht untergehen.
+            if [ "$LOGIN_CODE" = "000" ] || [ "${LOGIN_CODE#5}" != "$LOGIN_CODE" ]; then
+              echo "::warning::Hub nicht erreichbar (HTTP $LOGIN_CODE) - kein Eingriff in diesem Lauf, nächster Versuch in 15 Minuten."
+              echo "Hub-Basis: $HUB_BASE"
+              echo "Antwort: $(head -c 200 "$LOGIN_BODY" 2>/dev/null | tr -d '\n')"
+              exit 0
+            fi
             echo "FEHLER: Hub-Login fehlgeschlagen (HTTP $LOGIN_CODE): $(head -c 200 "$LOGIN_BODY" | tr -d '\n')"
             exit 1
           fi
           export TOK
           python3 - <<'PY'
-          import json, os, urllib.request
+          import json, os, urllib.request, urllib.error
 
           TOK = os.environ['TOK']
           DRY = bool(os.environ.get('DRY_RUN'))
           TARGETS = [int(x) for x in os.environ.get('FOCUS_IDS', '34,3').split(',') if x.strip()]
-          BASE = 'https://hub.cybersarah-ki.com'
+          BASE = os.environ.get('HUB_BASE', 'https://hub.cybersarah-ki.com').rstrip('/')
 
           def call(path, method='GET', body=None):
               data = json.dumps(body).encode() if body is not None else None
@@ -69,6 +122,10 @@ jobs:
                   return 0, str(e)[:200]
 
           status, villas = call('/api/villas')
+          if status == 0 or 500 <= status <= 599:
+              print(f'::warning::Hub nicht erreichbar ({status}) - kein Eingriff in diesem Lauf, nächster Versuch in 15 Minuten.')
+              print(f'Antwort: {villas}')
+              raise SystemExit(0)
           if status != 200 or not isinstance(villas, list):
               print(f'FEHLER: Villenliste nicht lesbar ({status}): {villas}')
               raise SystemExit(1)
