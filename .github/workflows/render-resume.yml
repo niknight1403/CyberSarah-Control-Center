@@ -1,0 +1,100 @@
+name: Render Resume
+
+# Setzt einen von Render suspendierten Service wieder in Betrieb.
+# Anlass: Issue #340 — app.cybersarah-ki.com lieferte ab 2026-11-26 19:11 UTC
+# HTTP 503 mit "This service has been suspended by its owner".
+# Das Skript ist bewusst nur lesend/resumierend: kein Deploy, keine Env-Aenderung.
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_id:
+        description: "Render-Service-ID (leer = cybersarah-control-center)"
+        required: false
+        default: "srv-dahjgllg1s2s73bf9u4g"
+      health_url:
+        description: "Health-URL fuer die Verifikation"
+        required: false
+        default: "https://app.cybersarah-ki.com/api/health"
+
+permissions:
+  contents: read
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Service-Status pruefen und ggf. fortsetzen (Render-API)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ inputs.service_id }}
+          HEALTH_URL: ${{ inputs.health_url }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.request, urllib.error
+
+          key = os.environ["RENDER_API_KEY"]
+          sid = os.environ.get("SERVICE_ID", "").strip() or "srv-dahjgllg1s2s73bf9u4g"
+          health_url = os.environ.get("HEALTH_URL", "").strip() or "https://app.cybersarah-ki.com/api/health"
+
+          def api(path, method="GET"):
+              req = urllib.request.Request(
+                  "https://api.render.com/v1" + path,
+                  method=method,
+                  headers={"Authorization": "Bearer " + key, "Accept": "application/json"},
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  body = response.read().decode("utf-8", "replace")
+                  return json.loads(body) if body.strip() else {}
+
+          def suspended_state():
+              svc = api(f"/services/{sid}")
+              svc = svc.get("service", svc)
+              return svc.get("suspended"), svc.get("name"), svc.get("serviceDetails", {}).get("url")
+
+          before, name, url = suspended_state()
+          print(f"Service: {name} ({sid}) | publicUrl={url}")
+          print(f"Status vorher: suspended={before}")
+
+          if before != "suspended":
+              print("Kein Resume noetig — Service ist nicht suspendiert.")
+          else:
+              try:
+                  api(f"/services/{sid}/resume", method="POST")
+                  print("Resume-Aufruf akzeptiert.")
+              except urllib.error.HTTPError as e:
+                  detail = e.read().decode("utf-8", "replace")[:400]
+                  print(f"::error::Resume fehlgeschlagen: HTTP {e.code} — {detail}")
+                  raise SystemExit(1)
+
+          for attempt in range(1, 19):
+              state, _, _ = suspended_state()
+              print(f"Warte {attempt * 10}s: suspended={state}")
+              if state != "suspended":
+                  break
+              time.sleep(10)
+
+          final, _, _ = suspended_state()
+          print(f"Status nachher: suspended={final}")
+
+          ok = False
+          for attempt in range(1, 13):
+              try:
+                  with urllib.request.urlopen(health_url, timeout=20) as response:
+                      code = response.status
+                      print(f"Health-Versuch {attempt}: HTTP {code}")
+                      if code == 200:
+                          ok = True
+                          break
+              except urllib.error.HTTPError as e:
+                  print(f"Health-Versuch {attempt}: HTTP {e.code}")
+              except Exception as e:  # noqa: BLE001
+                  print(f"Health-Versuch {attempt}: {type(e).__name__}: {e}")
+              time.sleep(10)
+
+          if not ok:
+              print("::error::Health-Check nach Resume nicht gruen.")
+              raise SystemExit(1)
+          print("Health-Check gruen — Service wieder erreichbar.")
+          PY
