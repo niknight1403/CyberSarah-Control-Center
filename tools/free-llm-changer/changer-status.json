@@ -1,16 +1,16 @@
 {
-  "stand": "2026-11-27T04:45:50",
+  "stand": "2026-11-27T14:40:46",
   "aktiv": "gemini",
   "aktiv_name": "Google Gemini Free Tier (Hauptkey)",
   "endpunkt": "https://generativelanguage.googleapis.com/v1beta/openai/",
-  "modell": "gemini-flash-latest",
+  "modell": "gemma-4-31b-it",
   "anbieter": [
     {
       "id": "gemini",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "gemini-flash-latest",
-      "detail": "gemini-flash-latest",
+      "modell": "gemma-4-31b-it",
+      "detail": "gemma-4-31b-it",
       "hinweis": null
     },
     {
@@ -33,8 +33,8 @@
       "id": "openrouter",
       "status": "VERFUEGBAR",
       "http_status": null,
-      "modell": "baidu/ernie-5.5-flash-preview:free",
-      "detail": "baidu/ernie-5.5-flash-preview:free",
+      "modell": "google/gemma-4-26b-a4b-it:free",
+      "detail": "google/gemma-4-26b-a4b-it:free",
       "hinweis": null
     },
     {
