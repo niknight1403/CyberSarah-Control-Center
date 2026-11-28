@@ -8,6 +8,13 @@ name: Uptime-Waechter
 #   Label 'uptime-alert' an (keine Duplikate — Folgefuehler kommentieren das
 #   bestehende Issue) und alarmiert optional den Discord-Webhook.
 # - Erholung: kommentiert und schliesst das offene Alert-Issue automatisch.
+#
+# Sprint 96 (Issue #340): Der Ausfall wird klassifiziert (lib/uptime-alert-logic.mjs).
+# Eine Anbieter-Suspendierung ("This service has been suspended by its owner")
+# ist kein Deploy-Problem und wird als solche benannt, inklusive des einzigen
+# wirksamen naechsten Schritts fuer den Eigentuemer. Ein Resume/Deploy kann sie
+# nicht beheben — Render lehnt /resume mit HTTP 400 ab.
+#
 # Kosten: ~1440 Runner-Minuten/Monat, weit unter dem 2000-Minuten-Kontingent
 # privater Repos. Ein manuelles Testen ist jederzeit per workflow_dispatch moeglich.
 
@@ -34,7 +41,10 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      ALERT_DIR: /tmp/uptime-alert
     steps:
+      - uses: actions/checkout@v4
+
       - name: Health-Check (3 Versuche, 20s Timeout)
         id: health
         run: |
@@ -61,6 +71,21 @@ jobs:
             head -c 500 /tmp/health-body.json 2>/dev/null || true
           fi
 
+      - name: Ausfall klassifizieren
+        id: classify
+        if: steps.health.outputs.ok == 'false'
+        continue-on-error: true
+        run: |
+          TS=$(date -u +"%Y-%m-%d %H:%M UTC")
+          HEALTH_STATUS="${{ steps.health.outputs.code }}" \
+          HEALTH_BODY_FILE=/tmp/health-body.json \
+          HEALTH_URL="$HEALTH_URL" \
+          ALERT_TIMESTAMP="$TS" \
+          node scripts/uptime-alert-report.mjs --out "$ALERT_DIR" | tee /tmp/classify.txt
+          grep -E '^(classification|owner_action_required|transient)=' /tmp/classify.txt >> "$GITHUB_OUTPUT" || true
+          echo "--- Issue-Text ---"
+          cat "$ALERT_DIR-body.md"
+
       - name: Alert-Label sicherstellen
         if: always()
         run: |
@@ -74,29 +99,31 @@ jobs:
         if: steps.health.outputs.ok == 'false'
         run: |
           TS=$(date -u +"%Y-%m-%d %H:%M UTC")
-          BODY="Der automatische Uptime-Wächter hat **${HEALTH_URL}** als nicht erreichbar erkannt (letzter HTTP-Status: \`${{ steps.health.outputs.code }}\`, ${TS}).
-
-          Das ist der erste Alarm in diesem Zeitraum? Dann reagiert Render evtl. gerade neu — das Issue wird automatisch geschlossen, sobald der Health-Check wieder grün ist.
-
-          Manuelle Prüfung: Render-Dashboard, \`render-diagnose.yml\`-Workflow und \`https://app.cybersarah-ki.com/api/health\` im Browser."
+          if [ ! -s "$ALERT_DIR-body.md" ]; then
+            # Fallback, falls die Klassifikation nicht lief: generischer Text.
+            printf 'Der automatische Uptime-Waechter hat **%s** als nicht erreichbar erkannt (HTTP-Status: `%s`, %s).\n\nManuelle Pruefung: Render-Dashboard, `render-diagnose.yml`-Workflow und die Health-URL im Browser.\n' \
+              "$HEALTH_URL" "${{ steps.health.outputs.code }}" "$TS" > "$ALERT_DIR-body.md"
+            printf '⚠️ Immer noch nicht erreichbar (HTTP `%s`, %s).\n' "${{ steps.health.outputs.code }}" "$TS" > "$ALERT_DIR-comment.md"
+            printf '🚨 **CyberSarah Produktiv-Ausfall**: app.cybersarah-ki.com nicht erreichbar (HTTP %s) — %s. Details im GitHub-Issue.\n' "${{ steps.health.outputs.code }}" "$TS" > "$ALERT_DIR-discord.txt"
+          fi
 
           OPEN=$(gh issue list --repo "$REPO" --label uptime-alert --state open --json number --jq '.[0].number')
           if [ -z "$OPEN" ]; then
             gh issue create \
               --repo "$REPO" \
-              --title "🚨 Produktiv-Ausfall: app.cybersarah-ki.com nicht erreichbar" \
+              --title "$(cat "$ALERT_DIR-title.txt" 2>/dev/null || echo '🚨 Produktiv-Ausfall: app.cybersarah-ki.com nicht erreichbar')" \
               --label uptime-alert \
-              --body "$BODY"
+              --body-file "$ALERT_DIR-body.md"
             echo "Neues Alert-Issue angelegt."
           else
-            gh issue comment "$OPEN" --repo "$REPO" --body "⚠️ Immer noch nicht erreichbar (HTTP \`${{ steps.health.outputs.code }}\`, ${TS})."
+            gh issue comment "$OPEN" --repo "$REPO" --body-file "$ALERT_DIR-comment.md"
             echo "Bestehendes Alert-Issue #$OPEN kommentiert."
           fi
 
           if [ -n "$DISCORD_WEBHOOK_URL" ]; then
-            curl -sf -H "Content-Type: application/json" \
-              -d "{\"content\": \"🚨 **CyberSarah Produktiv-Ausfall**: app.cybersarah-ki.com nicht erreichbar (HTTP ${{ steps.health.outputs.code }}) — ${TS}. Details im GitHub-Issue.\"}" \
-              "$DISCORD_WEBHOOK_URL" || echo "Discord-Webhook fehlgeschlagen — GitHub-Issue ist die verbindliche Alarmierung."
+            node -e 'const fs=require("fs");const t=fs.readFileSync(process.env.ALERT_DIR+"-discord.txt","utf8").trim();process.stdout.write(JSON.stringify({content:t}))' > /tmp/discord.json
+            curl -sf -H "Content-Type: application/json" -d @/tmp/discord.json "$DISCORD_WEBHOOK_URL" \
+              || echo "Discord-Webhook fehlgeschlagen — GitHub-Issue ist die verbindliche Alarmierung."
           fi
 
       - name: Bei Erholung Issue schliessen

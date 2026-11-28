@@ -4,6 +4,12 @@ name: Render Resume
 # Anlass: Issue #340 — app.cybersarah-ki.com lieferte ab 2026-11-26 19:11 UTC
 # HTTP 503 mit "This service has been suspended by its owner".
 # Das Skript ist bewusst nur lesend/resumierend: kein Deploy, keine Env-Aenderung.
+# Unterscheidet zwei Faelle (Sprint 96): eine Suspendierung durch den Nutzer wird
+# per API aufgehoben; eine Plattform-Suspendierung (Billing/Konto) lehnt Render mit
+# HTTP 400 "only services suspended by a user can be resumed" ab. Dann endet der
+# Lauf mit ::warning:: und Schritt-Zusammenfassung statt mit einem roten Fehler,
+# denn weder Resume noch Deploy koennen das beheben - nur der Eigentuemer im
+# Render-Dashboard. Issue #340 dokumentiert den Fall.
 
 on:
   workflow_dispatch:
@@ -65,6 +71,23 @@ jobs:
                   print("Resume-Aufruf akzeptiert.")
               except urllib.error.HTTPError as e:
                   detail = e.read().decode("utf-8", "replace")[:400]
+                  # Render unterscheidet: eine Suspendierung durch den Nutzer ist per API
+                  # aufhebbar, eine Suspendierung durch die Plattform (Billing/Konto) nicht.
+                  if e.code == 400 and "only services suspended by a user" in detail:
+                      print("::warning::Der Dienst ist auf Plattform-Ebene suspendiert, nicht durch den Nutzer. "
+                            "Ein API-Resume ist laut Render nicht moeglich; nur der Eigentuemer kann die "
+                            "Suspendierung im Render-Dashboard (Status/Billing) aufheben. Deploy oder Code-Fix "
+                            "helfen hier nicht. Issue #340 dokumentiert den Fall.")
+                      summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "")
+                      if summary_path:
+                          with open(summary_path, "a", encoding="utf-8") as fh:
+                              fh.write("## Render-Resume nicht moeglich\n\n")
+                              fh.write(f"Der Service `{sid}` ist auf Plattform-Ebene suspendiert. "
+                                       f"Render lehnt `/resume` mit HTTP 400 ab: `{detail.strip()}`\n\n")
+                              fh.write("**Naechster Schritt (Eigentuemer):** Render-Dashboard, Service "
+                                       "`cybersarah-control-center`, Status/Billing pruefen und die "
+                                       "Suspendierung aufheben.\n")
+                      raise SystemExit(0)
                   print(f"::error::Resume fehlgeschlagen: HTTP {e.code} — {detail}")
                   raise SystemExit(1)
 
